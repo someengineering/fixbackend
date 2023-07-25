@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "auth"
+version = "0.1.0"
+description = "An authentication compinent for the new security tool."
+authors = ["Some Engineering Inc."]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Django = "^4.2.3"
+social-auth-app-django = "^5.2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
