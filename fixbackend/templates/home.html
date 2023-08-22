@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% load socialaccount %}
+
+{% block title %}
+Fix main page
+{% endblock %}
+
+{% block content %}
+<h1>Welcome to FIX</h1>
+
+{% if user.is_authenticated %}
+<p>Welcome {{ user.username }} !!!</p>
+{% else %}
+<a href="{% provider_login_url 'github' %}">Sign Up via github</a>
+{% endif %}
+
+{% endblock %}

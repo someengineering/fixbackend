@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>
+        {% block title %}
+        {% endblock %}
+    </title>
+    {% load bootstrap5 %}
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+</head>
+
+<body>
+
+    <div class="container">
+        <ul class="nav bg-info">
+            <li class="nav-item">
+                <a class="nav-link link-light" href="/">HOME</a>
+                <a class="nav-link link-light" href="/accounts/logout">logout</a>
+            </li>
+        </ul>
+
+
+        {% block content %}
+
+        {% endblock %}
+</body>
+
+</html>
