@@ -30,6 +30,7 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
+# order matters here!
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -39,6 +40,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     'django.contrib.sites',
+
+    # the app itself
     "fixbackend",
     
     # allauth
@@ -46,6 +49,9 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.github',
+
+    # organizations
+    'organizations',
 
     # bootstrap
     'bootstrap5',
@@ -155,3 +161,5 @@ SOCIALACCOUNT_PROVIDERS = {
         ],
     }
 }
+
+SOCIALACCOUNT_QUERY_EMAIL = True # to fetch the email from github

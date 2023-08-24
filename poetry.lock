@@ -422,6 +422,35 @@ django = ">=2.2,<5.0"
 docs = ["m2r2 (>=0.2.5,<0.3.0)", "sphinx (>=4.4,<5.0)", "sphinx_rtd_theme (>=1.0,<2.0)"]
 
 [[package]]
+name = "django-extensions"
+version = "3.2.3"
+description = "Extensions for Django"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "django-extensions-3.2.3.tar.gz", hash = "sha256:44d27919d04e23b3f40231c4ab7af4e61ce832ef46d610cc650d53e68328410a"},
+    {file = "django_extensions-3.2.3-py3-none-any.whl", hash = "sha256:9600b7562f79a92cbf1fde6403c04fee314608fefbb595502e34383ae8203401"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+
+[[package]]
+name = "django-organizations"
+version = "2.1.0"
+description = "Group accounts for Django"
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-organizations-2.1.0.tar.gz", hash = "sha256:300bdbbd857749f1cdd0e6613417e3b2a40516c3a688bfd1d5228fbb994713c1"},
+    {file = "django_organizations-2.1.0-py2.py3-none-any.whl", hash = "sha256:3f9f30e52f5c31427b4e9b2a494f984f126053024f07c76dd83d24aedcfbd5a6"},
+]
+
+[package.dependencies]
+Django = ">=2.2.0"
+six = "*"
+
+[[package]]
 name = "django-stubs"
 version = "4.2.3"
 description = "Mypy stubs for Django"
@@ -1299,4 +1328,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "fc8d93773b2621a2d36df6d63aea9f7d181b75e8a2c374220d9bbd44ebfa47a3"
+content-hash = "4044a399bf90ec3fed22f9b59d2caad246ca6e435477a5bda95e900015e2b42d"

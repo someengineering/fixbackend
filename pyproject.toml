@@ -13,6 +13,8 @@ django-stubs = {extras = ["compatible-mypy"], version = "^4.2.3"}
 mypy = "^1.4.1"
 django-allauth = "^0.54.0"
 django-bootstrap-v5 = "^1.0.11"
+django-organizations = "^2.1.0"
+django-extensions = "^3.2.3"
 
 
 [tool.poetry.group.dev.dependencies]
