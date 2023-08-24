@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include, re_path
+from organizations.backends import invitation_backend
+
 
 
 urlpatterns = [
@@ -23,4 +25,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('organizations/', include('organizations.urls')),    
+    path('invitations/', include(invitation_backend().get_urls())),
 ]

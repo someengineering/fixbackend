@@ -1,0 +1,24 @@
+{% extends '../base.html' %}
+
+
+{% block title %}
+Your organizations
+{% endblock %}
+
+{% block content %}
+<h1>Your organizations</h1>
+
+<a href="{% url 'organization_add' %}">Create a new organization</a>
+
+<h2>Organizations you are a member of</h2>
+
+
+<ul>
+    {% for organization in organizations %}
+    <li>
+        <a href="{{ organization.get_absolute_url }}">{{ organization }}</a>
+    </li>
+    {% endfor %}
+</ul>
+
+{% endblock %}
