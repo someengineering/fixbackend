@@ -7,8 +7,20 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+fastapi = "^0.101.1"
+uvicorn = {extras = ["standard"], version = "^0.23.2"}
+fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^12.1.1"}
+aiomysql = "^0.2.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.20"}
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.25.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry.scripts]
+start = "fixbackend.main:start"
