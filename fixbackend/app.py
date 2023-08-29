@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security.http import HTTPBearer
 from fastapi_users.router.oauth import generate_state_token
 
-from fixbackend.db import User, create_db_and_tables
+from fixbackend.db import User
 from fixbackend.schemas import UserRead, UserUpdate
 from fixbackend.users import (
     SECRET,
@@ -96,8 +96,4 @@ async def single_page_app():
     return HTMLResponse(content=html_content, status_code=200)
 
 
-@app.on_event("startup")
-async def on_startup():
-    # Not needed if you setup a migration system like Alembic
-    await create_db_and_tables()
 
