@@ -1,5 +1,7 @@
 # Migrations for fixbackend
 
+A good intro: https://harrisonmorgan.dev/2021/02/15/getting-started-with-fastapi-users-and-alembic/
+
 ## Usage
 
 ### Update the database schema to the latest version

@@ -8,9 +8,7 @@ from fastapi_users.db import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
-
-DATABASE_URL = "mysql+aiomysql://mariadb:mariadb@127.0.0.1:3306/mariadb"
-
+from fixbackend.config import get_config
 
 class Base(DeclarativeBase):
     pass
@@ -26,7 +24,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     )
 
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(get_config().database_url)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -35,5 +33,5 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-async def get_user_db(session: Annotated[AsyncSession, Depends(get_async_session)]):
+async def get_user_db(session: Annotated[AsyncSession, Depends(get_async_session, use_cache=True)]):
     yield SQLAlchemyUserDatabase(session, User, OAuthAccount)

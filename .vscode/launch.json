@@ -11,10 +11,16 @@
             "module": "uvicorn",
             "args": [
                 "fixbackend.app:app",
-                "--reload"
+                "--reload",
+            ],
+            "pythonArgs": [
+                "-Xfrozen_modules=off"
             ],
             "jinja": true,
-            "justMyCode": false
+            "justMyCode": false,
+            "env": {
+                "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+            }
         }
     ]
 }

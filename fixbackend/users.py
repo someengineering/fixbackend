@@ -16,18 +16,19 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 
 from fixbackend.db import User, get_user_db
 from fixbackend.auth.cookie_redirect_transport import CookieRedirectTransport
-
-SECRET = "SECRET"
+from fixbackend.config import get_config
 
 google_oauth_client = GoogleOAuth2(
-    os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
-    os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+    get_config().google_oauth_client_id,
+    get_config().google_oauth_client_secret
 )
 
 
+
+
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
-    reset_password_token_secret = SECRET
-    verification_token_secret = SECRET
+    reset_password_token_secret = get_config().secret
+    verification_token_secret = get_config().secret
 
 
 
@@ -41,7 +42,7 @@ bearer_transport = BearerTransport(tokenUrl="") # tokenUrl is only needed for sw
 cookie_transport = CookieRedirectTransport(CookieTransport("fix-jwt", cookie_max_age=int(time.time())+10, cookie_httponly=False, cookie_path="/app"), redirect_path="/app")
 
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET, lifetime_seconds=3600)
+    return JWTStrategy(secret=get_config().secret, lifetime_seconds=3600)
 
 # only used for passing the jwt via a cookie after the sign in
 oauth_redirect_backend = AuthenticationBackend(

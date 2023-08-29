@@ -5,9 +5,7 @@ from fastapi.security.http import HTTPBearer
 from fastapi_users.router.oauth import generate_state_token
 
 from fixbackend.db import User
-from fixbackend.schemas import UserRead, UserUpdate
 from fixbackend.users import (
-    SECRET,
     auth_backend,
     oauth_redirect_backend,
     current_active_user,
@@ -15,6 +13,7 @@ from fixbackend.users import (
     google_oauth_client,
     get_jwt_strategy
 )
+from fixbackend.config import get_config
 
 app = FastAPI()
 
@@ -40,7 +39,7 @@ async def hello(context: UserContext):
 
 
 app.include_router(
-    fastapi_users.get_oauth_router(google_oauth_client, oauth_redirect_backend, SECRET, is_verified_by_default=True, associate_by_email=True),
+    fastapi_users.get_oauth_router(google_oauth_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True),
     prefix="/auth/google",
     tags=["auth"],
 )
@@ -55,7 +54,7 @@ async def refresh_jwt(context: UserContext):
 @app.get("/login", response_class=HTMLResponse)
 async def home():
     state_data: Dict[str, str] = {}
-    state = generate_state_token(state_data, SECRET)
+    state = generate_state_token(state_data, get_config().secret)
     auth_url = await google_oauth_client.get_authorization_url("http://127.0.0.1:8000/auth/google/callback", state)
     html_content = f"""
     <html>
@@ -74,9 +73,6 @@ async def home():
 
 @app.get("/app", response_class=HTMLResponse)
 async def single_page_app():
-    state_data: Dict[str, str] = {}
-    state = generate_state_token(state_data, SECRET)
-    auth_url = await google_oauth_client.get_authorization_url("http://127.0.0.1:8000/auth/google/callback", state)
     html_content = f"""
     <html>
         <head>
