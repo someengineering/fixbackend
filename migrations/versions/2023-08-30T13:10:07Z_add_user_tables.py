@@ -1,20 +1,19 @@
-"""Add user tables
+"""add user tables
 
-Revision ID: c202943c79f1
+Revision ID: 5eaf979cfb28
 Revises: 
-Create Date: 2023-08-29 11:25:44.356789
+Create Date: 2023-08-30 13:10:07.034525+00:00
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
 from fastapi_users_db_sqlalchemy.generics import GUID
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c202943c79f1'
+revision: str = '5eaf979cfb28'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
