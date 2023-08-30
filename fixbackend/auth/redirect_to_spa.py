@@ -1,30 +1,29 @@
 
 from fastapi import Response, status
-from fastapi.security import APIKeyCookie
+from fastapi.security.base import SecurityBase
 
 from fastapi_users.authentication.transport.base import Transport
 from fastapi_users.openapi import OpenAPIResponseType
-from fastapi_users.authentication.transport.cookie import CookieTransport
+from fastapi_users.authentication.transport.base import TransportLogoutNotSupportedError
 
 
 class RedirectToSPA(Transport):
 
     """
-    A "pseudo" transport used only in oauth routers to set the local storage 
+    A "pseudo" transport used only in oauth routers to set the local storage and redirect to SPA
     """
 
-    scheme: APIKeyCookie
+    scheme: SecurityBase # not used
 
     def __init__(
         self,
-        cookie_transport: CookieTransport,
         redirect_path: str = "/app"
     ):
-        self.cookie_transport = cookie_transport
         self.redirect_path = redirect_path
 
     async def get_login_response(self, token: str) -> Response:
         payload = f"""
+    <!DOCTYPE html>
     <html>
         <head>
             <script>
@@ -43,7 +42,7 @@ class RedirectToSPA(Transport):
         return response
 
     async def get_logout_response(self) -> Response:
-        return await self.cookie_transport.get_logout_response()
+        raise TransportLogoutNotSupportedError()
 
     @staticmethod
     def get_openapi_login_responses_success() -> OpenAPIResponseType:
@@ -51,4 +50,4 @@ class RedirectToSPA(Transport):
 
     @staticmethod
     def get_openapi_logout_responses_success() -> OpenAPIResponseType:
-        return CookieTransport.get_openapi_logout_responses_success()
+        return {status.HTTP_200_OK: {"model": None}}
