@@ -15,7 +15,7 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from fastapi_users.db import SQLAlchemyUserDatabase
 
 from fixbackend.db import User, get_user_db
-from fixbackend.auth.cookie_redirect_transport import CookieRedirectTransport
+from fixbackend.auth.redirect_to_spa import RedirectToSPA
 from fixbackend.config import get_config
 
 google_oauth_client = GoogleOAuth2(
@@ -39,14 +39,14 @@ async def get_user_manager(user_db: Annotated[SQLAlchemyUserDatabase, Depends(ge
 
 bearer_transport = BearerTransport(tokenUrl="") # tokenUrl is only needed for swagger and non-social login, it is no needed here.
 
-cookie_transport = CookieRedirectTransport(CookieTransport("fix-jwt", cookie_max_age=int(time.time())+10, cookie_httponly=False, cookie_path="/app"), redirect_path="/app")
+cookie_transport = RedirectToSPA(CookieTransport("fix-jwt", cookie_max_age=int(time.time())+10, cookie_httponly=False, cookie_path="/app"), redirect_path="/app")
 
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=get_config().secret, lifetime_seconds=3600)
 
 # only used for passing the jwt via a cookie after the sign in
 oauth_redirect_backend = AuthenticationBackend(
-    name="cookie-redirect",
+    name="spa-redirect",
     transport=cookie_transport,
     get_strategy=get_jwt_strategy
 )

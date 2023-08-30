@@ -7,10 +7,10 @@ from fastapi_users.openapi import OpenAPIResponseType
 from fastapi_users.authentication.transport.cookie import CookieTransport
 
 
-class CookieRedirectTransport(Transport):
+class RedirectToSPA(Transport):
 
     """
-    Modified CookieTrasport that performs redirect in addition to setting a cookie.
+    A "pseudo" transport used only in oauth routers to set the local storage 
     """
 
     scheme: APIKeyCookie
@@ -18,16 +18,28 @@ class CookieRedirectTransport(Transport):
     def __init__(
         self,
         cookie_transport: CookieTransport,
-        redirect_path: str = "/"
+        redirect_path: str = "/app"
     ):
         self.cookie_transport = cookie_transport
         self.redirect_path = redirect_path
 
     async def get_login_response(self, token: str) -> Response:
-        response = await self.cookie_transport.get_login_response(token)
-        response.status_code = status.HTTP_303_SEE_OTHER
-        response.headers.append("Location", self.redirect_path)
-        response.headers.append("Content-type", "text/html")
+        payload = f"""
+    <html>
+        <head>
+            <script>
+                localStorage.setItem("fix-jwt", "{token}");
+                window.location.replace("{self.redirect_path}");
+            </script>
+        </head>
+        <body></body>
+    </html>"""
+
+        response = Response(
+            content=payload, 
+            status_code=status.HTTP_200_OK, 
+            media_type="text/html"
+        )
         return response
 
     async def get_logout_response(self) -> Response:
@@ -35,7 +47,7 @@ class CookieRedirectTransport(Transport):
 
     @staticmethod
     def get_openapi_login_responses_success() -> OpenAPIResponseType:
-        return {status.HTTP_303_SEE_OTHER: {"model": None}}
+        return {status.HTTP_200_OK: {"model": None}}
 
     @staticmethod
     def get_openapi_logout_responses_success() -> OpenAPIResponseType:
