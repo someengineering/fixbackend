@@ -1,12 +1,20 @@
 from typing import Dict
+import uuid
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from fastapi_users import FastAPIUsers
 from fastapi_users.router.oauth import generate_state_token
 
 from fixbackend.config import get_config
 from fixbackend.auth.oauth import google_client, oauth_redirect_backend
 from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
-from fixbackend.auth.dependencies import UserContext, fastapi_users
+from fixbackend.auth.dependencies import UserContext
+from fixbackend.auth.models import User
+from fixbackend.auth.user_manager import get_user_manager
+
+
+fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [jwt_auth_backend])
+
 
 auth_router = APIRouter()
 
