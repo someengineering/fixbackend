@@ -89,11 +89,6 @@ class OrganizationService:
     async def create_invitation(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> OrganizationInvite:
         """Create an invite for an organization."""
         user = await self.session.get(User, user_id)
-        # organization = await self.session.get(
-            # Organization, 
-            # organization_id, 
-            # options=[selectinload(Organization.owners), selectinload(Organization.members)]
-        # )
         organization = await self.get_organization(organization_id, with_users=True)
 
         if user is None or organization is None:

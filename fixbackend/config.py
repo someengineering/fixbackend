@@ -22,6 +22,8 @@ class Config(BaseSettings):
     secret: str = "secret"
     google_oauth_client_id: str
     google_oauth_client_secret: str
+    github_oauth_client_id: str
+    github_oauth_client_secret: str
 
 
 
