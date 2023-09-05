@@ -29,9 +29,9 @@ class OrganizationInvite(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
-    organization: Mapped[Organization] = relationship()
+    organization: Mapped[Organization] = relationship(lazy="joined")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), nullable=False)
-    user: Mapped[User] = relationship()
+    user: Mapped[User] = relationship(lazy="joined")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

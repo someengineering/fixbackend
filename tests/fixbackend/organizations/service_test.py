@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy import create_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from fixbackend.config import get_config
-from fixbackend.organizations.service import OrganizationServiceImpl
+from fixbackend.organizations.service import OrganizationService
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
@@ -94,7 +94,7 @@ async def user(session: AsyncSession) -> User:
 
 @pytest.mark.asyncio
 async def test_create_organization(session: AsyncSession, user: User):
-    service = OrganizationServiceImpl(session)
+    service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
     assert organization.name == "Test Organization"
@@ -112,7 +112,7 @@ async def test_create_organization(session: AsyncSession, user: User):
 @pytest.mark.asyncio
 async def test_get_organization(session: AsyncSession, user: User):
     # we can get an existing organization by id
-    service = OrganizationServiceImpl(session)
+    service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
     retrieved_organization = await service.get_organization(organization.id)
@@ -122,10 +122,22 @@ async def test_get_organization(session: AsyncSession, user: User):
     retrieved_organization = await service.get_organization(uuid.uuid4())
     assert retrieved_organization is None
 
+
+@pytest.mark.asyncio
+async def test_list_organizations(session: AsyncSession, user: User):
+    service = OrganizationService(session)
+    organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
+
+    # the user should be the owner of the organization
+    organizations = await service.list_organizations(user.id)
+    assert len(organizations) == 1
+    assert organizations[0] == organization
+
+
 @pytest.mark.asyncio
 async def test_add_to_organization(session: AsyncSession, user: User):
     # add an existing user to the organization
-    service = OrganizationServiceImpl(session)
+    service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
 
@@ -151,7 +163,7 @@ async def test_add_to_organization(session: AsyncSession, user: User):
 @pytest.mark.asyncio
 async def test_create_invitation(session: AsyncSession, user: User):
     # create an invitation for an existing user
-    service = OrganizationServiceImpl(session)
+    service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
 
@@ -171,7 +183,7 @@ async def test_create_invitation(session: AsyncSession, user: User):
 
 @pytest.mark.asyncio
 async def test_accept_invitation(session: AsyncSession, user: User):
-    service = OrganizationServiceImpl(session)
+    service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
 
@@ -192,3 +204,52 @@ async def test_accept_invitation(session: AsyncSession, user: User):
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert next(iter(retrieved_organization.members)).user == new_user
+
+
+@pytest.mark.asyncio
+async def test_list_invitations(session: AsyncSession, user: User):
+    service = OrganizationService(session)
+    organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
+    org_id = organization.id
+
+    user_db = await anext(get_user_db(session))
+    user_dict = {
+        "email": "bar@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    new_user = await user_db.create(user_dict)
+
+    invitation = await service.create_invitation(organization_id=org_id, user_id=new_user.id)
+
+    # list the invitations
+    invitations = await service.list_invitations(organization_id=org_id)
+    assert len(invitations) == 1
+    assert invitations[0] == invitation
+
+
+@pytest.mark.asyncio
+async def test_delete_invitation(session: AsyncSession, user: User):
+    service = OrganizationService(session)
+    organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
+    org_id = organization.id
+
+    user_db = await anext(get_user_db(session))
+    user_dict = {
+        "email": "bar@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    new_user = await user_db.create(user_dict)
+
+    invitation = await service.create_invitation(organization_id=org_id, user_id=new_user.id)
+
+    # delete the invitation
+    await service.delete_invitation(invitation_id=invitation.id)
+
+    # the invitation should not exist anymore
+    invitations = await service.list_invitations(organization_id=org_id)
+    assert len(invitations) == 0
+
+
+

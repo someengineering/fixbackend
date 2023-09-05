@@ -7,12 +7,12 @@ from fastapi_users.router.oauth import generate_state_token
 from fixbackend.config import get_config
 from fixbackend.auth.oauth import google_client, oauth_redirect_backend
 from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
-from fixbackend.auth.dependencies import UserContext, fastapi_users
+from fixbackend.auth.dependencies import AuthenticatedUser, fastapi_users
 
 
-auth_router = APIRouter()
+router = APIRouter()
 
-auth_router.include_router(
+router.include_router(
     fastapi_users.get_oauth_router(google_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True),
     prefix="/auth/google",
     tags=["auth"],
@@ -20,7 +20,7 @@ auth_router.include_router(
 )
 
 
-@auth_router.get("/login", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/login", response_class=HTMLResponse)
 async def login(request: Request):
     state_data: Dict[str, str] = {}
     state = generate_state_token(state_data, get_config().secret)
@@ -44,8 +44,8 @@ async def login(request: Request):
     """
     return HTMLResponse(content=html_content, status_code=200)
 
-@auth_router.post("/auth/jwt/refresh")
-async def refresh_jwt(context: UserContext):
+@router.post("/auth/jwt/refresh")
+async def refresh_jwt(context: AuthenticatedUser):
     """Refresh the JWT token if still logged in."""
     return await jwt_auth_backend.login(get_jwt_strategy(), context.user)
 
