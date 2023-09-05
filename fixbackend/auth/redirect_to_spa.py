@@ -1,4 +1,3 @@
-
 from fastapi import Response, status
 from fastapi.security.base import SecurityBase
 
@@ -13,12 +12,9 @@ class RedirectToSPA(Transport):
     A "pseudo" transport used only in oauth routers to set the local storage and redirect to SPA
     """
 
-    scheme: SecurityBase # not used
+    scheme: SecurityBase  # not used
 
-    def __init__(
-        self,
-        redirect_path: str = "/app"
-    ):
+    def __init__(self, redirect_path: str = "/app"):
         self.redirect_path = redirect_path
 
     async def get_login_response(self, token: str) -> Response:
@@ -34,11 +30,7 @@ class RedirectToSPA(Transport):
         <body></body>
     </html>"""
 
-        response = Response(
-            content=payload, 
-            status_code=status.HTTP_200_OK, 
-            media_type="text/html"
-        )
+        response = Response(content=payload, status_code=status.HTTP_200_OK, media_type="text/html")
         return response
 
     async def get_logout_response(self) -> Response:

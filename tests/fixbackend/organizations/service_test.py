@@ -1,35 +1,29 @@
-from typing import AsyncIterator, Iterator
-import pytest
-from fixbackend.base_model import Base
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine, AsyncEngine
-from sqlalchemy import create_engine
-from sqlalchemy_utils import create_database, database_exists, drop_database
-from fixbackend.config import get_config
-from fixbackend.organizations.service import OrganizationService
-from fixbackend.auth.user_manager import UserManager
-from fixbackend.auth.db import get_user_db
-from fixbackend.auth.models import User
+import asyncio
 import uuid
+from asyncio import AbstractEventLoop
+from typing import AsyncIterator, Iterator
 
-
+import pytest
 from alembic.command import upgrade as alembic_upgrade
 from alembic.config import Config as AlembicConfig
-import asyncio
-from asyncio import AbstractEventLoop
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
+from sqlalchemy_utils import create_database, database_exists, drop_database
 
+from fixbackend.auth.db import get_user_db
+from fixbackend.auth.models import User
+from fixbackend.organizations.service import OrganizationService
 
-DATABASE_URL = "mysql+aiomysql://root:mariadb@127.0.0.1:3306/fixbackend-testdb"
+DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 
 # only used to create/drop the database
-SYNC_DATABASE_URL = "mysql+pymysql://root:mariadb@127.0.0.1:3306/fixbackend-testdb"
-
+SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
 
 
 @pytest.fixture(scope="session")
-def event_loop(request) -> Iterator[AbstractEventLoop]:  # noqa: indirect usage
-   loop = asyncio.get_event_loop_policy().new_event_loop()
-   yield loop
-   loop.close()
+def event_loop() -> Iterator[AbstractEventLoop]:
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -42,16 +36,14 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
         drop_database(SYNC_DATABASE_URL)
     else:
         create_database(SYNC_DATABASE_URL)
-    
+
     while not database_exists(SYNC_DATABASE_URL):
         await asyncio.sleep(0.1)
-        
 
     engine = create_async_engine(DATABASE_URL)
     alembic_config = AlembicConfig("alembic.ini")
     alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
     await asyncio.to_thread(alembic_upgrade, alembic_config, "head")
-    
 
     yield engine
 
@@ -79,6 +71,7 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     await transaction.rollback()
     await connection.close()
 
+
 @pytest.fixture
 async def user(session: AsyncSession) -> User:
     user_db = await anext(get_user_db(session))
@@ -86,14 +79,14 @@ async def user(session: AsyncSession) -> User:
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
         "is_verified": True,
-    }  
+    }
     user = await user_db.create(user_dict)
 
     return user
 
 
 @pytest.mark.asyncio
-async def test_create_organization(session: AsyncSession, user: User):
+async def test_create_organization(session: AsyncSession, user: User) -> None:
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
@@ -110,13 +103,13 @@ async def test_create_organization(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_get_organization(session: AsyncSession, user: User):
+async def test_get_organization(session: AsyncSession, user: User) -> None:
     # we can get an existing organization by id
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
     retrieved_organization = await service.get_organization(organization.id)
-    assert retrieved_organization == organization 
+    assert retrieved_organization == organization
 
     # if the organization does not exist, None should be returned
     retrieved_organization = await service.get_organization(uuid.uuid4())
@@ -124,7 +117,7 @@ async def test_get_organization(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_list_organizations(session: AsyncSession, user: User):
+async def test_list_organizations(session: AsyncSession, user: User) -> None:
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
@@ -135,7 +128,7 @@ async def test_list_organizations(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_add_to_organization(session: AsyncSession, user: User):
+async def test_add_to_organization(session: AsyncSession, user: User) -> None:
     # add an existing user to the organization
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
@@ -161,7 +154,7 @@ async def test_add_to_organization(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_create_invitation(session: AsyncSession, user: User):
+async def test_create_invitation(session: AsyncSession, user: User) -> None:
     # create an invitation for an existing user
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
@@ -172,7 +165,7 @@ async def test_create_invitation(session: AsyncSession, user: User):
         "email": "123foo@bar.com",
         "hashed_password": "notreallyhashed",
         "is_verified": True,
-    }  
+    }
     new_user = await user_db.create(user_dict)
     new_user_id = new_user.id
 
@@ -182,7 +175,7 @@ async def test_create_invitation(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_accept_invitation(session: AsyncSession, user: User):
+async def test_accept_invitation(session: AsyncSession, user: User) -> None:
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
@@ -192,7 +185,7 @@ async def test_accept_invitation(session: AsyncSession, user: User):
         "email": "123foo@bar.com",
         "hashed_password": "notreallyhashed",
         "is_verified": True,
-    }  
+    }
     new_user = await user_db.create(user_dict)
 
     invitation = await service.create_invitation(organization_id=org_id, user_id=new_user.id)
@@ -207,7 +200,7 @@ async def test_accept_invitation(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_list_invitations(session: AsyncSession, user: User):
+async def test_list_invitations(session: AsyncSession, user: User) -> None:
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
@@ -229,7 +222,7 @@ async def test_list_invitations(session: AsyncSession, user: User):
 
 
 @pytest.mark.asyncio
-async def test_delete_invitation(session: AsyncSession, user: User):
+async def test_delete_invitation(session: AsyncSession, user: User) -> None:
     service = OrganizationService(session)
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
     org_id = organization.id
@@ -250,6 +243,3 @@ async def test_delete_invitation(session: AsyncSession, user: User):
     # the invitation should not exist anymore
     invitations = await service.list_invitations(organization_id=org_id)
     assert len(invitations) == 0
-
-
-

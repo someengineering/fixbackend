@@ -1,19 +1,16 @@
-from typing import Set, Optional, NewType
-from datetime import datetime
-
-from sqlalchemy.orm import Mapped, relationship, declared_attr, mapped_column
-from sqlalchemy import ForeignKey, String, DateTime, Boolean, Integer, func, select, Column, Table  
-from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+from datetime import datetime
+from typing import Set
+
+from fastapi_users_db_sqlalchemy.generics import GUID
+from sqlalchemy import ForeignKey, String, DateTime
+from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import User
 from fixbackend.base_model import Base
 
 
-
 class Organization(Base):
-
     __tablename__ = "organization"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
@@ -24,7 +21,6 @@ class Organization(Base):
 
 
 class OrganizationInvite(Base):
-
     __tablename__ = "organization_invite"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
@@ -59,4 +55,3 @@ class OrganizationMembers(Base):
     organization: Mapped[Organization] = relationship(back_populates="members", lazy="joined")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
     user: Mapped[User] = relationship(lazy="joined")
-
