@@ -1,11 +1,11 @@
 from typing import List
 
-from fastapi_users.db import (
+from fastapi_users_db_sqlalchemy import (
     SQLAlchemyBaseOAuthAccountTableUUID,
     SQLAlchemyBaseUserTableUUID,
 )
 from sqlalchemy.orm import Mapped, relationship
-from fixbackend.models import Base
+from fixbackend.base_model import Base
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
     pass

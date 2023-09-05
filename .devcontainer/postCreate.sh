@@ -1,6 +1,6 @@
 echo "[client]
 protocol = tcp
-user     = mariadb
+user     = root
 password = mariadb" >> ~/.my.cnf
 
 poetry install

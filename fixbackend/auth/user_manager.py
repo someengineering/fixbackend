@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi_users import BaseUserManager, UUIDIDMixin
-from fastapi_users.db import SQLAlchemyUserDatabase
+from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
 from fixbackend.auth.db import get_user_db
 from fixbackend.config import get_config
@@ -19,3 +19,4 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 async def get_user_manager(user_db: Annotated[SQLAlchemyUserDatabase, Depends(get_user_db)]):
     yield UserManager(user_db)
 
+UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

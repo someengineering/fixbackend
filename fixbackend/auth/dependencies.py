@@ -26,4 +26,4 @@ class CurrentActiveUserDependencies:
         ) -> None:
         self.user = user
 
-UserContext = Annotated[CurrentActiveUserDependencies, Depends()]
+AuthenticatedUser = Annotated[CurrentActiveUserDependencies, Depends()]

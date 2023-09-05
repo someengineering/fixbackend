@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from fixbackend.auth.router import auth_router
-from fixbackend.auth.dependencies import UserContext
+from fixbackend.auth.router import router as auth_router
+from fixbackend.organizations.router import router as organizations_router
+from fixbackend.auth.dependencies import AuthenticatedUser
 
 app = FastAPI()
 
 @app.get("/hello")
-async def hello(context: UserContext):
+async def hello(context: AuthenticatedUser):
     """
     Replies back with "Hello <user_email>!" if the user is authenticated.
     """
@@ -17,6 +18,11 @@ async def hello(context: UserContext):
 app.include_router(
     auth_router,
     tags=["auth"],
+)
+app.include_router(
+    organizations_router,
+    prefix="/organizations",
+    tags=["organizations"],
 )
 
 @app.get("/app", response_class=HTMLResponse)
@@ -30,7 +36,7 @@ async def single_page_app():
         <body>
             <h1>Welcome to beginning of the FIX Single Page App!</h1>
 
-            <p>Do you want to start building the SPA? Please have a session token:</p> <code id="cookie"></code>;
+            <p>Do you want to start building the SPA? Please have a session token:</p> <code id="cookie"></code>
             <script>
             document.getElementById("cookie").innerHTML=localStorage.getItem("fix-jwt"); 
             </script>

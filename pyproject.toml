@@ -14,10 +14,15 @@ aiomysql = "^0.2.0"
 sqlalchemy = {extras = ["asyncio"], version = "^2.0.20"}
 alembic = "^1.11.3"
 pydantic-settings = "^2.0.3"
+attrs = "^23.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.25.1"
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.1"
+sqlalchemy-utils = "^0.41.1"
+pymysql = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -26,3 +31,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 start = "fixbackend.main:main"
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "tests",
+]
