@@ -13,10 +13,10 @@ from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
 from fixbackend.organizations.service import OrganizationService
 
-DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
+DATABASE_URL = "mysql+aiomysql://root:mariadb@127.0.0.1:3306/fixbackend-testdb"
 
 # only used to create/drop the database
-SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
+SYNC_DATABASE_URL = "mysql+pymysql://root:mariadb@127.0.0.1:3306/fixbackend-testdb"
 
 
 @pytest.fixture(scope="session")
