@@ -18,7 +18,6 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         await self.request_verify(user, request)
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None) -> None:
-        
         # todo: replace with email sending provider
         print(f"Verification requested for user {user.id}. Verification token: {token}")
 

@@ -6,7 +6,7 @@ authors = ["Some Engineering Inc."]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.9"
 fastapi = "^0.101.1"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^12.1.1"}
@@ -24,6 +24,9 @@ pytest = "^7.4.0"
 pytest-asyncio = "^0.21.1"
 sqlalchemy-utils = "^0.41.1"
 pymysql = "^1.1.0"
+black = ">=23.7.0"
+flake8 = ">=6.1.0"
+
 
 [build-system]
 requires = ["poetry-core"]

@@ -34,7 +34,7 @@ app.include_router(login_page_router, tags=["returns HTML"])
 
 @app.get("/app", response_class=HTMLResponse, tags=["returns HTML"])
 async def single_page_app_entrypoint() -> Response:
-    html_content = f"""
+    html_content = """
     <!DOCTYPE html>
     <html>
         <head>
@@ -45,7 +45,7 @@ async def single_page_app_entrypoint() -> Response:
 
             <p>Do you want to start building the SPA? Please have a session token:</p> <code id="cookie"></code>
             <script>
-            document.getElementById("cookie").innerHTML=localStorage.getItem("fix-jwt"); 
+            document.getElementById("cookie").innerHTML=localStorage.getItem("fix-jwt");
             </script>
 
         </body>

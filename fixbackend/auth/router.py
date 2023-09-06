@@ -1,14 +1,12 @@
-from typing import Dict, Any
+from typing import Dict, Any, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.oauth2 import BaseOAuth2
 
-from fixbackend.config import get_config
-from fixbackend.auth.oauth import google_client, github_client, oauth_redirect_backend
-from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
 from fixbackend.auth.dependencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
+from fixbackend.auth.oauth import github_client
 from fixbackend.auth.oauth import google_client, oauth_redirect_backend
 from fixbackend.config import get_config
 from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate
@@ -70,7 +68,7 @@ async def login(request: Request) -> Response:
     state = generate_state_token(state_data, get_config().secret)
 
     async def get_auth_url(client: BaseOAuth2[Any]) -> str:
-        # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41
+        # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41 # noqa
         callback_url_name = f"oauth:{client.name}.{oauth_redirect_backend.name}.callback"
         # where google should call us back
         callback_url = str(request.url_for(callback_url_name))
