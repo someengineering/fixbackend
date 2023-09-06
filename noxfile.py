@@ -1,5 +1,5 @@
 from nox_poetry import session, Session
-
+from tempfile import TemporaryDirectory
 
 locations = ["fixbackend", "tests", "noxfile.py"]
 
@@ -23,6 +23,11 @@ def flake8(session: Session) -> None:
 @session(python=["3.11"])
 def test(session: Session) -> None:
     args = session.posargs or ["--cov"]
+    # workaround for CI to create a wheel outside the project folder
+    with TemporaryDirectory() as tmpdir:
+        session.run("cp", "-R", ".", str(tmpdir), external=True)
+        with session.chdir(tmpdir):
+            session.poetry.installroot()
     session.install("pytest", "pytest-cov", "pytest-asyncio", "sqlalchemy-utils", ".")
     session.run("pytest", *args)
 
