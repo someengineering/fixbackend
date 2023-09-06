@@ -23,7 +23,9 @@ router.include_router(
 )
 
 router.include_router(
-    fastapi_users.get_oauth_router(github_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True),
+    fastapi_users.get_oauth_router(
+        github_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True
+    ),
     prefix="/auth/github",
     tags=["auth"],
 )
@@ -33,6 +35,7 @@ router.include_router(
 async def login(request: Request) -> Response:
     state_data: Dict[str, str] = {}
     state = generate_state_token(state_data, get_config().secret)
+
     async def get_auth_url(client: BaseOAuth2) -> str:
         # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41
         callback_url_name = f"oauth:{client.name}.{oauth_redirect_backend.name}.callback"

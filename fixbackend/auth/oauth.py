@@ -11,10 +11,7 @@ from fixbackend.config import get_config
 
 google_client = GoogleOAuth2(get_config().google_oauth_client_id, get_config().google_oauth_client_secret)
 
-github_client = GitHubOAuth2(
-    get_config().github_oauth_client_id,
-    get_config().github_oauth_client_secret
-) 
+github_client = GitHubOAuth2(get_config().github_oauth_client_id, get_config().github_oauth_client_secret)
 
 transport = RedirectToSPA(redirect_path="/app")
 
