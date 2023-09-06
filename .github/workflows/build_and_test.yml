@@ -22,4 +22,4 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           # Change this to be your CI task/script
-          runCmd: nox
+          runCmd: nox --envdir /tmp/.nox
