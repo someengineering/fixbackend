@@ -1,4 +1,4 @@
-from typing import Dict, Any, Any
+from typing import Dict, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi_users.router.oauth import generate_state_token
@@ -9,7 +9,7 @@ from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
 from fixbackend.auth.oauth import github_client
 from fixbackend.auth.oauth import google_client, oauth_redirect_backend
 from fixbackend.config import get_config
-from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate
+from fixbackend.auth.schemas import UserRead, UserCreate
 
 auth_router = APIRouter()
 
@@ -19,7 +19,8 @@ auth_router.include_router(
     ),
     prefix="/google",
     tags=["auth"],
-    include_in_schema=False,  # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+    # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+    include_in_schema=False,
 )
 
 auth_router.include_router(
@@ -28,7 +29,8 @@ auth_router.include_router(
     ),
     prefix="/github",
     tags=["auth"],
-    include_in_schema=False,  # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+    # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+    include_in_schema=False,
 )
 
 auth_router.include_router(
