@@ -1,15 +1,16 @@
-from typing import List, Annotated
+from typing import List
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException
-from fixbackend.auth.dependencies import AuthenticatedUser
+from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
+
+from fixbackend.auth.dependencies import AuthenticatedUser
+from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite
 from fixbackend.organizations.service import OrganizationServiceDependency
-from fixbackend.auth.user_manager import UserManagerDependency
-from uuid import UUID
-from pydantic import EmailStr
 
 router = APIRouter()
-
 
 
 @router.get("/")
@@ -71,11 +72,14 @@ async def list_invites(
 
     invites = await organization_service.list_invitations(organization_id=organization_id)
 
-    return [OrganizationInvite(
-        organization_slug=invite.organization.slug,
-        email=invite.user.email,
-        expires_at=invite.expires_at,
-    ) for invite in invites]
+    return [
+        OrganizationInvite(
+            organization_slug=invite.organization.slug,
+            email=invite.user.email,
+            expires_at=invite.expires_at,
+        )
+        for invite in invites
+    ]
 
 
 @router.post("/{organization_id}/invites/")
@@ -106,6 +110,7 @@ async def invite_to_organization(
         expires_at=invite.expires_at,
     )
 
+
 @router.delete("/{organization_id}/invites/{invite_id}")
 async def delete_invite(
     organization_id: UUID,
@@ -118,12 +123,10 @@ async def delete_invite(
     if org is None:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-
     if user_context.user.email not in [owner.user.email for owner in org.owners]:
         raise HTTPException(status_code=403, detail="You must be an owner of this organization to delete an invitation")
 
     await organization_service.delete_invitation(invite_id)
-
 
 
 @router.get("/invites/{invite_id}/accept")
