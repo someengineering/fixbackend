@@ -12,19 +12,19 @@ from fixbackend.auth.user_manager import get_user_manager
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [jwt_auth_backend])
 
 
-current_active_user = fastapi_users.current_user(active=True)
+current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
 
 
 bearer_header = HTTPBearer()
 
 
-class CurrentActiveUserDependencies:
+class CurrentVerifyedActiveUserDependencies:
     def __init__(
         self,
-        swagger_auth_workaround: Annotated[str, Depends(bearer_header)],  # to enable swagger bearer auth
-        user: Annotated[User, Depends(current_active_user)],
+        swagger_auth_workaround: Annotated[str, Depends(bearer_header)],  # to generate swagger bearer auth
+        user: Annotated[User, Depends(current_active_verified_user)],
     ) -> None:
         self.user = user
 
 
-AuthenticatedUser = Annotated[CurrentActiveUserDependencies, Depends()]
+AuthenticatedUser = Annotated[CurrentVerifyedActiveUserDependencies, Depends()]

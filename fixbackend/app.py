@@ -3,7 +3,7 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, Response
 
-from fixbackend.auth.router import router as auth_router
+from fixbackend.auth.router import auth_router, login_page_router
 from fixbackend.organizations.router import router as organizations_router
 from fixbackend.auth.dependencies import AuthenticatedUser
 
@@ -20,6 +20,7 @@ async def hello(context: AuthenticatedUser) -> Dict[str, Any]:
 
 app.include_router(
     auth_router,
+    prefix="/auth",
     tags=["auth"],
 )
 app.include_router(
@@ -28,9 +29,11 @@ app.include_router(
     tags=["organizations"],
 )
 
+app.include_router(login_page_router, tags=["returns HTML"])
 
-@app.get("/app", response_class=HTMLResponse)
-async def single_page_app() -> Response:
+
+@app.get("/app", response_class=HTMLResponse, tags=["returns HTML"])
+async def single_page_app_entrypoint() -> Response:
     html_content = """
     <!DOCTYPE html>
     <html>
