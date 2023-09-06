@@ -1,6 +1,6 @@
 from typing import Dict
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.oauth2 import BaseOAuth2
 
@@ -8,12 +8,16 @@ from fixbackend.config import get_config
 from fixbackend.auth.oauth import google_client, github_client, oauth_redirect_backend
 from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
 from fixbackend.auth.dependencies import AuthenticatedUser, fastapi_users
-
+from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
+from fixbackend.auth.oauth import google_client, oauth_redirect_backend
+from fixbackend.config import get_config
 
 router = APIRouter()
 
 router.include_router(
-    fastapi_users.get_oauth_router(google_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True),
+    fastapi_users.get_oauth_router(
+        google_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True
+    ),
     prefix="/auth/google",
     tags=["auth"],
 )
@@ -26,7 +30,7 @@ router.include_router(
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login(request: Request):
+async def login(request: Request) -> Response:
     state_data: Dict[str, str] = {}
     state = generate_state_token(state_data, get_config().secret)
     async def get_auth_url(client: BaseOAuth2) -> str:
@@ -57,8 +61,8 @@ async def login(request: Request):
     """
     return HTMLResponse(content=html_content, status_code=200)
 
+
 @router.post("/auth/jwt/refresh")
-async def refresh_jwt(context: AuthenticatedUser):
+async def refresh_jwt(context: AuthenticatedUser) -> Response:
     """Refresh the JWT token if still logged in."""
     return await jwt_auth_backend.login(get_jwt_strategy(), context.user)
-

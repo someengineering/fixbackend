@@ -1,5 +1,7 @@
+from typing import Any, Dict
+
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from fixbackend.auth.router import router as auth_router
 from fixbackend.organizations.router import router as organizations_router
@@ -7,8 +9,9 @@ from fixbackend.auth.dependencies import AuthenticatedUser
 
 app = FastAPI()
 
+
 @app.get("/hello")
-async def hello(context: AuthenticatedUser):
+async def hello(context: AuthenticatedUser) -> Dict[str, Any]:
     """
     Replies back with "Hello <user_email>!" if the user is authenticated.
     """
@@ -25,8 +28,9 @@ app.include_router(
     tags=["organizations"],
 )
 
+
 @app.get("/app", response_class=HTMLResponse)
-async def single_page_app():
+async def single_page_app() -> Response:
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -45,6 +49,3 @@ async def single_page_app():
     </html>
     """
     return HTMLResponse(content=html_content, status_code=200)
-
-
-

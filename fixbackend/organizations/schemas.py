@@ -1,8 +1,11 @@
-from typing import List
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr
+from typing import List
 from uuid import UUID
-from fixbackend.organizations.models import Organization as OrganizationModel, OrganizationInvite as OrganizationInviteModel
+
+from pydantic import BaseModel, Field, EmailStr
+
+from fixbackend.organizations.models import Organization as OrganizationModel
+
 
 class Organization(BaseModel):
     id: UUID = Field(description="The organization's unique identifier")
@@ -25,8 +28,8 @@ class Organization(BaseModel):
         }
     }
 
-    @staticmethod
-    def from_orm(model: OrganizationModel) -> "Organization":
+    @classmethod
+    def from_orm(cls, model: OrganizationModel) -> "Organization":
         return Organization(
             id=model.id,
             slug=model.slug,
@@ -34,12 +37,11 @@ class Organization(BaseModel):
             owners=[o.user.email for o in model.owners],
             members=[m.user.email for m in model.members],
         )
-    
+
 
 class CreateOrganization(BaseModel):
     name: str = Field(description="The organization's name, a human-readable string")
     slug: str = Field(description="The organization's unique slug, used in URLs", pattern="^[a-z0-9-]+$")
-
 
     model_config = {
         "json_schema_extra": {
@@ -51,6 +53,7 @@ class CreateOrganization(BaseModel):
             ]
         }
     }
+
 
 class OrganizationInvite(BaseModel):
     organization_slug: str = Field(description="The slug of the organization to invite the user to")
