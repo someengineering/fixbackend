@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi_users.router.oauth import generate_state_token
@@ -11,32 +11,65 @@ from fixbackend.auth.dependencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
 from fixbackend.auth.oauth import google_client, oauth_redirect_backend
 from fixbackend.config import get_config
+from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate
 
-router = APIRouter()
+auth_router = APIRouter()
 
-router.include_router(
+auth_router.include_router(
     fastapi_users.get_oauth_router(
         google_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True
     ),
-    prefix="/auth/google",
+    prefix="/google",
     tags=["auth"],
+    include_in_schema=False,  # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
 )
 
-router.include_router(
+auth_router.include_router(
     fastapi_users.get_oauth_router(
         github_client, oauth_redirect_backend, get_config().secret, is_verified_by_default=True, associate_by_email=True
     ),
-    prefix="/auth/github",
+    prefix="/github",
+    tags=["auth"],
+    include_in_schema=False,  # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+)
+
+auth_router.include_router(
+    fastapi_users.get_auth_router(jwt_auth_backend, requires_verification=True),
+    prefix="/jwt",
+    tags=["auth"],
+)
+
+auth_router.include_router(
+    fastapi_users.get_register_router(user_schema=UserRead, user_create_schema=UserCreate),
+    tags=["auth"],
+)
+
+auth_router.include_router(
+    fastapi_users.get_reset_password_router(),
+    tags=["auth"],
+)
+
+auth_router.include_router(
+    fastapi_users.get_verify_router(UserRead),
     tags=["auth"],
 )
 
 
-@router.get("/login", response_class=HTMLResponse)
+@auth_router.post("/jwt/refresh", tags=["auth"])
+async def refresh_jwt(context: AuthenticatedUser) -> Response:
+    """Refresh the JWT token if still logged in."""
+    return await jwt_auth_backend.login(get_jwt_strategy(), context.user)
+
+
+login_page_router = APIRouter()
+
+
+@login_page_router.get("/login", response_class=HTMLResponse)
 async def login(request: Request) -> Response:
     state_data: Dict[str, str] = {}
     state = generate_state_token(state_data, get_config().secret)
 
-    async def get_auth_url(client: BaseOAuth2) -> str:
+    async def get_auth_url(client: BaseOAuth2[Any]) -> str:
         # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41
         callback_url_name = f"oauth:{client.name}.{oauth_redirect_backend.name}.callback"
         # where google should call us back
@@ -59,13 +92,9 @@ async def login(request: Request) -> Response:
             <br>
             <a href="{github_auth_url}">Login via GitHub</a>
 
+
+
         </body>
     </html>
     """
     return HTMLResponse(content=html_content, status_code=200)
-
-
-@router.post("/auth/jwt/refresh")
-async def refresh_jwt(context: AuthenticatedUser) -> Response:
-    """Refresh the JWT token if still logged in."""
-    return await jwt_auth_backend.login(get_jwt_strategy(), context.user)

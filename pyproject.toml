@@ -38,5 +38,3 @@ fixbackend = "fixbackend.__main__:main"
 asyncio_mode = "auto"
 testpaths = [ "tests" ]
 
-[tool.mypy]
-ignore_missing_imports = "true"

@@ -57,7 +57,7 @@ clean-env: ## remove environment
 
 lint: ## static code analysis
 	black --line-length 120 --check fixbackend tests
-	mypy --python-version 3.10 --strict --install-types --non-interactive fixbackend tests
+	mypy --python-version 3.11 --config-file mypy.ini --install-types --non-interactive fixbackend tests
 
 test: ## run tests quickly with the default Python
 	pytest

@@ -7,7 +7,7 @@ from fixbackend.config import get_config
 
 
 bearer_transport = BearerTransport(
-    tokenUrl=""
+    tokenUrl="/auth/jwt/login"
 )  # tokenUrl is only needed for swagger and non-social login, it is no needed here.
 
 
