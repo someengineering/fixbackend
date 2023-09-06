@@ -1,9 +1,6 @@
 from fastapi_users.authentication import AuthenticationBackend
-from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.clients.github import GitHubOAuth2
-from fastapi_users.authentication import (
-    AuthenticationBackend,
-)
+from httpx_oauth.clients.google import GoogleOAuth2
 
 from fixbackend.auth.jwt import get_jwt_strategy
 from fixbackend.auth.redirect_to_spa import RedirectToSPA

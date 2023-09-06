@@ -31,7 +31,7 @@ app.include_router(
 
 @app.get("/app", response_class=HTMLResponse)
 async def single_page_app() -> Response:
-    html_content = f"""
+    html_content = """
     <!DOCTYPE html>
     <html>
         <head>
@@ -42,7 +42,7 @@ async def single_page_app() -> Response:
 
             <p>Do you want to start building the SPA? Please have a session token:</p> <code id="cookie"></code>
             <script>
-            document.getElementById("cookie").innerHTML=localStorage.getItem("fix-jwt"); 
+            document.getElementById("cookie").innerHTML=localStorage.getItem("fix-jwt");
             </script>
 
         </body>
