@@ -36,7 +36,7 @@ async def login(request: Request) -> Response:
     state = generate_state_token(state_data, get_config().secret)
 
     async def get_auth_url(client: BaseOAuth2[Any]) -> str:
-        # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41
+        # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41 # noqa
         callback_url_name = f"oauth:{client.name}.{oauth_redirect_backend.name}.callback"
         # where google should call us back
         callback_url = str(request.url_for(callback_url_name))

@@ -25,6 +25,7 @@ pytest-asyncio = "^0.21.1"
 sqlalchemy-utils = "^0.41.1"
 pymysql = "^1.1.0"
 black = ">=23.7.0"
+flake8 = ">=6.1.0"
 
 
 [build-system]
