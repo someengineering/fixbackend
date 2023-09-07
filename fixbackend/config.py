@@ -21,10 +21,10 @@ parser.add_argument("--database_url")
 class Config(BaseSettings):
     database_url: str = "mysql+aiomysql://mariadb:mariadb@127.0.0.1:3306/mariadb"
     secret: str = "secret"
-    google_oauth_client_id: str
-    google_oauth_client_secret: str
-    github_oauth_client_id: str
-    github_oauth_client_secret: str
+    google_oauth_client_id: str = "42"
+    google_oauth_client_secret: str = "42"
+    github_oauth_client_id: str = "42"
+    github_oauth_client_secret: str = "42"
 
 
 # production implementation
