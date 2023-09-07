@@ -15,7 +15,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = get_config().secret
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
-        await self.request_verify(user, request)
+        if not user.is_verified:  # oauth2 users are already verifyed
+            await self.request_verify(user, request)
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None) -> None:
         # todo: replace with email sending provider
