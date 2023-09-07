@@ -1,5 +1,5 @@
 import uuid
-
+from pydantic import BaseModel, Field
 from fastapi_users import schemas
 
 
@@ -13,3 +13,8 @@ class UserCreate(schemas.BaseUserCreate):
 
 class UserUpdate(schemas.BaseUserUpdate):
     pass
+
+
+class OAuthProviderAuthUrl(BaseModel):
+    name: str = Field(description="Name of the OAuth provider")
+    authUrl: str = Field(description="URL to initiate auth flow")
