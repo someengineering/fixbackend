@@ -47,7 +47,7 @@ clean-pyc: ## remove Python file artifacts
 	find . -name '__pycache__' -exec rm -fr {} +
 
 clean-test: ## remove test and coverage artifacts
-	rm -fr .tox/
+	rm -fr .nox/
 	rm -f .coverage
 	rm -fr htmlcov/
 	rm -fr .pytest_cache
@@ -62,8 +62,8 @@ lint: ## static code analysis
 test: ## run tests quickly with the default Python
 	pytest
 
-test-all: ## run tests on every Python version with tox
-	tox
+test-all: ## run tests on every Python version with nox
+	nox
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source fixbackend -m pytest

@@ -9,7 +9,7 @@
 <!-- (Feel free to remove any items that do not apply to this PR.) -->
 
 - [x] Add test coverage for new or updated functionality
-- [x] Lint and test with `tox`
+- [x] Lint and test with `nox`
 
 # Code of Conduct
 

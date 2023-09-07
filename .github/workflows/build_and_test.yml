@@ -18,23 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Build and run dev container task
+        uses: devcontainers/ci@v0.3
         with:
-          python-version: '3.9'
-          architecture: 'x64'
-
-      - name: Restore dependency cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache
-          key: ${{runner.os}}-pip-${{hashFiles('**/pyproject.toml')}}
-          restore-keys: |
-            ${{runner.os}}-pip-
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip tox
-
-      - name: Run tests
-        run: tox
+          # Change this to be your CI task/script
+          runCmd: nox --envdir /tmp/.nox
