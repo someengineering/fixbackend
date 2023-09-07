@@ -1,7 +1,6 @@
 echo "[client]
 protocol = tcp
-user     = root
-password = mariadb" >> ~/.my.cnf
+user     = root" >> ~/.my.cnf
 
 bash .devcontainer/loadSecrets.sh
 
