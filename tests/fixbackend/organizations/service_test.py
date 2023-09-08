@@ -1,7 +1,6 @@
 import asyncio
 import uuid
-from asyncio import AbstractEventLoop
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterator
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
@@ -17,13 +16,6 @@ DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 
 # only used to create/drop the database
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Iterator[AbstractEventLoop]:
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -68,7 +60,7 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     yield session
 
     await session.close()
-    await transaction.rollback()
+    await transaction.close()
     await connection.close()
 
 
