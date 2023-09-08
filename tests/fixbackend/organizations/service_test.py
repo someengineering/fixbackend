@@ -1,7 +1,6 @@
 import asyncio
 import uuid
-from asyncio import AbstractEventLoop
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterator
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
