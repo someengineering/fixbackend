@@ -60,8 +60,8 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
     yield session
 
-    await transaction.close()
     await session.close()
+    await transaction.close()
     await connection.close()
 
 
