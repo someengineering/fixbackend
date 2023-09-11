@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Set
+from typing import List
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import ForeignKey, String, DateTime
@@ -16,8 +16,8 @@ class Organization(Base):
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
-    owners: Mapped[Set["OrganizationOwners"]] = relationship(back_populates="organization")
-    members: Mapped[Set["OrganizationMembers"]] = relationship(back_populates="organization")
+    owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization")
+    members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization")
 
 
 class OrganizationInvite(Base):

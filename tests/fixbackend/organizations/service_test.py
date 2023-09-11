@@ -26,8 +26,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     # make sure the db exists and it is clean
     if database_exists(SYNC_DATABASE_URL):
         drop_database(SYNC_DATABASE_URL)
-    else:
-        create_database(SYNC_DATABASE_URL)
+    create_database(SYNC_DATABASE_URL)
 
     while not database_exists(SYNC_DATABASE_URL):
         await asyncio.sleep(0.1)
@@ -40,7 +39,10 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     yield engine
 
     await engine.dispose()
-    drop_database(SYNC_DATABASE_URL)
+    try:
+        drop_database(SYNC_DATABASE_URL)
+    except Exception:
+        pass
 
 
 @pytest.fixture
@@ -114,9 +116,10 @@ async def test_list_organizations(session: AsyncSession, user: User) -> None:
     organization = await service.create_organization(name="Test Organization", slug="test-organization", owner=user)
 
     # the user should be the owner of the organization
-    organizations = await service.list_organizations(user.id)
+    organizations = await service.list_organizations(user.id, with_users=True)
     assert len(organizations) == 1
     assert organizations[0] == organization
+    assert organizations[0].owners[0].user == user
 
 
 @pytest.mark.asyncio
