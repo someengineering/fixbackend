@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 locations = ["fixbackend", "tests", "noxfile.py"]
 
 
-@session(python=["3.11"], reuse_venv=True)
+@session(python=["3.11"])
 def black(session: Session) -> None:
     opts = ["--line-length", "120", "--check"]
     args = session.posargs or locations + opts
@@ -12,7 +12,7 @@ def black(session: Session) -> None:
     session.run("black", *args)
 
 
-@session(python=["3.11"], reuse_venv=True)
+@session(python=["3.11"])
 def flake8(session: Session) -> None:
     opts = ["--max-line-length", "120"]
     args = session.posargs or locations + opts
@@ -20,7 +20,7 @@ def flake8(session: Session) -> None:
     session.run("flake8", *args)
 
 
-@session(python=["3.11"], reuse_venv=True)
+@session(python=["3.11"])
 def test(session: Session) -> None:
     args = session.posargs or ["--cov"]
     # workaround for CI to create a wheel outside the project folder
@@ -32,7 +32,7 @@ def test(session: Session) -> None:
     session.run("pytest", *args)
 
 
-@session(python=["3.11"], reuse_venv=True)
+@session(python=["3.11"])
 def mypy(session: Session) -> None:
     opts = ["--install-type", "--non-interactive", "--python-version", "3.11"]
     args = session.posargs or locations + opts

@@ -22,7 +22,7 @@ class OrganizationService:
         """Create an organization."""
         organization = Organization(name=name, slug=slug)
         owner_relationship = OrganizationOwners(user_id=owner.id)
-        organization.owners.add(owner_relationship)
+        organization.owners.append(owner_relationship)
         self.session.add(organization)
 
         await self.session.commit()
