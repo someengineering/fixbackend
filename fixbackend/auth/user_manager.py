@@ -10,7 +10,7 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
 from fixbackend.config import get_config
-from fixbackend.auth.user_verifyer import UserVerifyerDependency
+from fixbackend.auth.user_verifyer import UserVerifyerDependency, UserVerifyer
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -21,7 +21,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self,
         user_db: BaseUserDatabase[User, uuid.UUID],
         password_helper: PasswordHelperProtocol | None,
-        user_verifyer: UserVerifyerDependency,
+        user_verifyer: UserVerifyer,
     ):
         super().__init__(user_db, password_helper)
         self.user_verifyer = user_verifyer
