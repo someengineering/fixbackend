@@ -69,3 +69,11 @@ async def test_registration_flow(client: AsyncClient) -> None:
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["access_token"] is not None
+
+    # token refresh is possible
+    response = await client.post(
+        "/auth/jwt/refresh", headers={"Authorization": f"Bearer {response_json['access_token']}"}
+    )
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["access_token"] is not None
