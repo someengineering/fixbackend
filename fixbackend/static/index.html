@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>FIX Single page app</title>
+</head>
+
+<body>
+    <h1>Welcome to beginning of the FIX Single Page App!</h1>
+
+    <p>Do you want to start building the SPA? Please have a session token:</p> <code id="cookie"></code>
+    <script>
+        document.getElementById("cookie").innerHTML = localStorage.getItem("fix-jwt");
+    </script>
+
+</body>
+
+</html>

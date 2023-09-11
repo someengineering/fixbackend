@@ -14,7 +14,7 @@ class RedirectToSPA(Transport):
 
     scheme: SecurityBase  # not used
 
-    def __init__(self, redirect_path: str = "/app"):
+    def __init__(self, redirect_path: str):
         self.redirect_path = redirect_path
 
     async def get_login_response(self, token: str) -> Response:

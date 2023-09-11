@@ -10,7 +10,7 @@ google_client = GoogleOAuth2(get_config().google_oauth_client_id, get_config().g
 
 github_client = GitHubOAuth2(get_config().github_oauth_client_id, get_config().github_oauth_client_secret)
 
-transport = RedirectToSPA(redirect_path="/app")
+transport = RedirectToSPA(redirect_path="/")
 
 
 # should only be used for setting up the token via localstorage to launch the SPA
