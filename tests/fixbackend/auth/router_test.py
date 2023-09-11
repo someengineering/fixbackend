@@ -38,7 +38,7 @@ async def test_registration_flow(client: AsyncClient) -> None:
     }
 
     # register user
-    response = await client.post("/auth/register", json=registration_json)
+    response = await client.post("/api/auth/register", json=registration_json)
     assert response.status_code == 201
 
     login_json = {
@@ -47,7 +47,7 @@ async def test_registration_flow(client: AsyncClient) -> None:
     }
 
     # non_verifyed can't login
-    response = await client.post("/auth/jwt/login", data=login_json)
+    response = await client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 400
 
     # verify user
@@ -55,7 +55,7 @@ async def test_registration_flow(client: AsyncClient) -> None:
     verification_json = {
         "token": token,
     }
-    response = await client.post("/auth/verify", json=verification_json)
+    response = await client.post("/api/auth/verify", json=verification_json)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["email"] == user.email
@@ -65,14 +65,14 @@ async def test_registration_flow(client: AsyncClient) -> None:
     assert response_json["id"] == str(user.id)
 
     # verifyed can login
-    response = await client.post("/auth/jwt/login", data=login_json)
+    response = await client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["access_token"] is not None
 
     # token refresh is possible
     response = await client.post(
-        "/auth/jwt/refresh", headers={"Authorization": f"Bearer {response_json['access_token']}"}
+        "/api/auth/jwt/refresh", headers={"Authorization": f"Bearer {response_json['access_token']}"}
     )
     assert response.status_code == 200
     response_json = response.json()
