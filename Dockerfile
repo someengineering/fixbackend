@@ -16,4 +16,4 @@ ADD fixbackend/static /app/fixbackend/static
 ADD migrations /app/migrations
 ADD alembic.ini /app/alembic.ini
 EXPOSE 8000
-ENTRYPOINT ["fixbackend", "--migrate"]
+ENTRYPOINT ["fixbackend"]
