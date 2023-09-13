@@ -12,39 +12,45 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import argparse
-from functools import lru_cache
-from typing import Any
+import os
+import sys
+from argparse import ArgumentParser
+from typing import Annotated
 
+from fastapi import Depends
 from pydantic_settings import BaseSettings
 
 
-def strip_nulls(input: Any) -> Any:
-    if not isinstance(input, dict):
-        return input
-    return {k: strip_nulls(v) for k, v in input.items() if v}
-
-
-parser = argparse.ArgumentParser(
-    prog="FIX Backend",
-)
-
-parser.add_argument("--database_url")
-
-
 class Config(BaseSettings):
-    database_url: str = "mysql+aiomysql://mariadb:mariadb@127.0.0.1:3306/mariadb"
-    secret: str = "secret"
-    google_oauth_client_id: str = "42"
-    google_oauth_client_secret: str = "42"
-    github_oauth_client_id: str = "42"
-    github_oauth_client_secret: str = "42"
+    instance_id: str
+    database_url: str
+    secret: str
+    google_oauth_client_id: str
+    google_oauth_client_secret: str
+    github_oauth_client_id: str
+    github_oauth_client_secret: str
+    redis_url: str
 
 
-# production implementation
-@lru_cache()
 def get_config() -> Config:
-    args, unknown = parser.parse_known_args()
-    config_vals = strip_nulls(vars(args))
-    config = Config(**config_vals)
-    return config
+    parser = ArgumentParser(prog="FIX Backend")
+    parser.add_argument(
+        "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
+    )
+    parser.add_argument("--database-url", default="mysql+aiomysql://mariadb:mariadb@127.0.0.1:3306/mariadb")
+    parser.add_argument("--secret", default="secret")
+    parser.add_argument("--google-oauth-client-id", default=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--redis-url", default="redis://localhost:6379/0")
+    args, unknown = parser.parse_known_args(sys.argv[1:])
+    return Config(**vars(args))
+
+
+# placeholder for dependencies, will be replaced during the app initialization
+def config() -> Config:
+    raise RuntimeError("Config dependency not initialized yet.")
+
+
+ConfigDependency = Annotated[Config, Depends(config)]

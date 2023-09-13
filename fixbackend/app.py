@@ -12,38 +12,62 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from fastapi import FastAPI, Response
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from fixbackend.auth.router import auth_router, login_page_router
-from fixbackend.organizations.router import router as organizations_router
+from fixbackend import config
+from fixbackend.auth.oauth import github_client, google_client
+from fixbackend.auth.router import auth_router, login_router
+from fixbackend.organizations.router import organizations_router
 
-app = FastAPI()
-
-
-app.include_router(
-    auth_router,
-    prefix="/api/auth",
-    tags=["auth"],
-)
-app.include_router(
-    organizations_router,
-    prefix="/api/organizations",
-    tags=["organizations"],
-)
+log = logging.getLogger(__name__)
 
 
-@app.get("/health")
-async def health() -> Response:
-    return Response(status_code=200)
+def fast_api_app() -> FastAPI:
+    cfg = config.get_config()
+    google = google_client(cfg)
+    github = github_client(cfg)
+
+    @asynccontextmanager
+    async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
+        log.info("Application services started.")
+        yield None
+        log.info("Application services stopped.")
+
+    app = FastAPI(
+        title="Fix Backend",
+        summary="Backend for the FIX project",
+        description="Backend for the FIX project",
+        lifespan=setup_teardown_application,
+    )
+
+    app.dependency_overrides[config.config] = lambda: cfg
+
+    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
+    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
+    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
+
+    @app.get("/health")
+    async def health() -> Response:
+        return Response(status_code=200)
+
+    @app.get("/ready")
+    async def ready() -> Response:
+        return Response(status_code=200)
+
+    return app
 
 
-@app.get("/ready")
-async def ready() -> Response:
-    return Response(status_code=200)
-
-
-app.include_router(login_page_router, tags=["returns HTML"])
-
-
-app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
+def setup_process() -> FastAPI:
+    """
+    This function is used by uvicorn to start the server.
+    Entrypoint for the application to start the server.
+    """
+    logging.basicConfig(level=logging.INFO)
+    return fast_api_app()

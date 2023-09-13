@@ -16,7 +16,7 @@ import uvicorn
 
 
 def main() -> None:
-    uvicorn.run("fixbackend.app:app", host="0.0.0.0", log_level="info")
+    uvicorn.run("fixbackend.app:setup_process", host="0.0.0.0", log_level="info")
 
 
 if __name__ == "__main__":

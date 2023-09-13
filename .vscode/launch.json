@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "fixbackend.app:app",
+                "fixbackend.app:setup_process",
                 "--reload",
             ],
             "pythonArgs": [

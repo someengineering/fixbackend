@@ -18,11 +18,16 @@ from httpx_oauth.clients.google import GoogleOAuth2
 
 from fixbackend.auth.jwt import get_jwt_strategy
 from fixbackend.auth.redirect_to_spa import RedirectToSPA
-from fixbackend.config import get_config
+from fixbackend.config import Config
 
-google_client = GoogleOAuth2(get_config().google_oauth_client_id, get_config().google_oauth_client_secret)
 
-github_client = GitHubOAuth2(get_config().github_oauth_client_id, get_config().github_oauth_client_secret)
+def google_client(config: Config) -> GoogleOAuth2:
+    return GoogleOAuth2(config.google_oauth_client_id, config.google_oauth_client_secret)
+
+
+def github_client(config: Config) -> GitHubOAuth2:
+    return GitHubOAuth2(config.github_oauth_client_id, config.github_oauth_client_secret)
+
 
 transport = RedirectToSPA(redirect_path="/")
 
