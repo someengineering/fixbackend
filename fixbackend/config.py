@@ -14,7 +14,7 @@
 
 import os
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from typing import Annotated
 
 from fastapi import Depends
@@ -32,7 +32,7 @@ class Config(BaseSettings):
     redis_url: str
 
 
-def get_config() -> Config:
+def parse_args() -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
     parser.add_argument(
         "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
@@ -44,7 +44,14 @@ def get_config() -> Config:
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--redis-url", default="redis://localhost:6379/0")
+    parser.add_argument("--skip-migrations", default=False, action="store_true")
     args, unknown = parser.parse_known_args(sys.argv[1:])
+    return args
+
+
+def get_config() -> Config:
+    args = parse_args()
+    delattr(args, "skip_migrations")  # this is not a valid config option
     return Config(**vars(args))
 
 
