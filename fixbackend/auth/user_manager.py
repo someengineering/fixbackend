@@ -23,22 +23,22 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
 from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
-from fixbackend.config import get_config
+from fixbackend.config import ConfigDependency
 from fixbackend.auth.user_verifyer import UserVerifyerDependency, UserVerifyer
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
-    reset_password_token_secret = get_config().secret
-    verification_token_secret = get_config().secret
-
     def __init__(
         self,
+        config: ConfigDependency,
         user_db: BaseUserDatabase[User, uuid.UUID],
         password_helper: PasswordHelperProtocol | None,
         user_verifyer: UserVerifyer,
     ):
         super().__init__(user_db, password_helper)
         self.user_verifyer = user_verifyer
+        self.reset_password_token_secret = config.secret
+        self.verification_token_secret = config.secret
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if not user.is_verified:  # oauth2 users are already verifyed

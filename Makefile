@@ -57,6 +57,7 @@ clean-env: ## remove environment
 
 lint: ## static code analysis
 	black --line-length 120 --check fixbackend tests
+	flake8 --max-line-length 120 fixbackend tests
 	mypy --python-version 3.11 --config-file mypy.ini --install-types --non-interactive fixbackend tests
 
 test: ## run tests quickly with the default Python
@@ -76,6 +77,7 @@ venv:
 	python3 -m venv venv --prompt "fixbackend"
 	. ./venv/bin/activate && python3 -m pip install --upgrade poetry
 	. ./venv/bin/activate && poetry install
+	. ./venv/bin/activate && pip install --upgrade nox-poetry nox
 	. ./venv/bin/activate && mypy --install-types --non-interactive fixbackend tests
 
 
