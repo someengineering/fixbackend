@@ -13,10 +13,18 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uvicorn
-
+from fixbackend.config import parse_args
+from alembic.config import Config
+from alembic import command
 
 def main() -> None:
-    uvicorn.run("fixbackend.app:setup_process", host="0.0.0.0", log_level="info")
+    args = parse_args()
+
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", args.database_url)
+    command.upgrade(alembic_cfg, "head")
+
+    uvicorn.run("fixbackend.app:setup_process", host="0.0.0.0", log_level="info", )
 
 
 if __name__ == "__main__":
