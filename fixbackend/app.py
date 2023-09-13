@@ -23,23 +23,21 @@ from fastapi.staticfiles import StaticFiles
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, login_router
-from fixbackend.organizations.router import router as organizations_router
+from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-    # cfg = config.get_config()
-    log.info("Application services started.")
-    yield None
-    log.info("Application services stopped.")
 
 
 def fast_api_app() -> FastAPI:
     cfg = config.get_config()
     google = google_client(cfg)
     github = github_client(cfg)
+
+    @asynccontextmanager
+    async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
+        log.info("Application services started.")
+        yield None
+        log.info("Application services stopped.")
 
     app = FastAPI(
         title="Fix Backend",
@@ -48,9 +46,9 @@ def fast_api_app() -> FastAPI:
         lifespan=setup_teardown_application,
     )
 
-    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
-    app.include_router(organizations_router, prefix="/api/organizations", tags=["organizations"])
     app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
+    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
+    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
     app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
 
     @app.get("/health")
