@@ -15,7 +15,7 @@
 from typing import AsyncIterator, List, Tuple
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
-from tests.fixbackend.conftest import default_config
+from tests.fixbackend.conftest import default_config  # noqa: F401
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
 from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
