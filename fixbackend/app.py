@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 
 from fixbackend.auth.router import auth_router, login_page_router
@@ -31,6 +31,17 @@ app.include_router(
     prefix="/api/organizations",
     tags=["organizations"],
 )
+
+
+@app.get("/health")
+async def health() -> Response:
+    return Response(status_code=200)
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    return Response(status_code=200)
+
 
 app.include_router(login_page_router, tags=["returns HTML"])
 
