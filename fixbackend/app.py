@@ -46,6 +46,8 @@ def fast_api_app() -> FastAPI:
         lifespan=setup_teardown_application,
     )
 
+    app.dependency_overrides[config.config] = lambda: cfg
+
     app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])

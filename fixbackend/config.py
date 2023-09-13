@@ -15,7 +15,6 @@
 import os
 import sys
 from argparse import ArgumentParser
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -33,7 +32,6 @@ class Config(BaseSettings):
     redis_url: str
 
 
-@lru_cache()
 def get_config() -> Config:
     parser = ArgumentParser(prog="FIX Backend")
     parser.add_argument(
@@ -46,8 +44,13 @@ def get_config() -> Config:
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--redis-url", default="redis://localhost:6379/0")
-    args = parser.parse_args(sys.argv[1:])
+    args, unknown = parser.parse_known_args(sys.argv[1:])
     return Config(**vars(args))
 
 
-ConfigDependency = Annotated[Config, Depends(get_config)]
+# placeholder for dependencies, will be replaced during the app initialization
+def config() -> Config:
+    raise RuntimeError("Config dependency not initialized yet.")
+
+
+ConfigDependency = Annotated[Config, Depends(config)]

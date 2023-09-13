@@ -93,7 +93,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     @router.post("/jwt/refresh", tags=["auth"])
     async def refresh_jwt(context: AuthenticatedUser) -> Response:
         """Refresh the JWT token if still logged in."""
-        return await jwt_auth_backend.login(get_jwt_strategy(), context.user)
+        return await jwt_auth_backend.login(get_jwt_strategy(config), context.user)
 
     @router.get("/oauth-providers", tags=["auth"])
     async def list_all_oauth_providers(request: Request) -> List[OAuthProviderAuthUrl]:

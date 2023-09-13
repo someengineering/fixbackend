@@ -49,10 +49,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
 
 async def get_user_manager(
+    config: ConfigDependency,
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
     user_verifyer: UserVerifyerDependency,
 ) -> AsyncIterator[UserManager]:
-    yield UserManager(user_db, None, user_verifyer)
+    yield UserManager(config, user_db, None, user_verifyer)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

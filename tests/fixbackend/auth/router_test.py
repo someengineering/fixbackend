@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import AsyncIterator, List, Tuple
-from fixbackend.app import app
+from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
@@ -33,6 +33,8 @@ class InMemoryVerifyer(UserVerifyer):
 
 
 verifyer = InMemoryVerifyer()
+
+app = fast_api_app()
 
 
 @pytest.fixture
