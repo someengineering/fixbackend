@@ -15,11 +15,12 @@
 from typing import AsyncIterator, List, Tuple
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
+from tests.fixbackend.conftest import default_config
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
 from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
 from fixbackend.auth.user_verifyer import UserVerifyer, get_user_verifyer
-
+from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 
@@ -38,9 +39,10 @@ app = fast_api_app()
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:  # noqa: F811
+async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_user_verifyer] = lambda: verifyer
+    app.dependency_overrides[get_config] = lambda: default_config
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac

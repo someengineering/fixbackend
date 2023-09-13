@@ -17,6 +17,8 @@ import pytest
 import asyncio
 from asyncio import AbstractEventLoop
 
+from fixbackend.config import Config
+
 
 @pytest.fixture(scope="session")
 def event_loop() -> Iterator[AbstractEventLoop]:
@@ -24,3 +26,17 @@ def event_loop() -> Iterator[AbstractEventLoop]:
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture
+def default_config() -> Config:
+    return Config(
+        instance_id="",
+        database_url="",
+        secret="",
+        google_oauth_client_id="",
+        google_oauth_client_secret="",
+        github_oauth_client_id="",
+        github_oauth_client_secret="",
+        redis_url="",
+    )
