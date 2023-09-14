@@ -35,11 +35,10 @@ class InMemoryVerifyer(UserVerifyer):
 
 verifyer = InMemoryVerifyer()
 
-app = fast_api_app()
-
 
 @pytest.fixture
 async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    app = fast_api_app(default_config)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_user_verifyer] = lambda: verifyer
     app.dependency_overrides[get_config] = lambda: default_config
