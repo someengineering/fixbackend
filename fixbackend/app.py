@@ -48,11 +48,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
 
-    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
-    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
-    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
-    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
-
     @app.get("/health")
     async def health() -> Response:
         return Response(status_code=200)
@@ -60,6 +55,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @app.get("/ready")
     async def ready() -> Response:
         return Response(status_code=200)
+
+    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
+    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
+    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
 
     return app
 
