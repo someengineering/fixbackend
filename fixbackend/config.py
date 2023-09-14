@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -23,13 +23,23 @@ from pydantic_settings import BaseSettings
 
 class Config(BaseSettings):
     instance_id: str
-    database_url: str
+    database_name: str
+    database_user: str
+    database_password: Optional[str]
+    database_host: str
+    database_port: int
     secret: str
     google_oauth_client_id: str
     google_oauth_client_secret: str
     github_oauth_client_id: str
     github_oauth_client_secret: str
-    redis_url: str
+    redis_readwrite_url: str
+    redis_readonly_url: str
+
+    @property
+    def database_url(self) -> str:
+        password = f":{self.database_password}" if self.database_password else ""
+        return f"mysql+aiomysql://{self.database_user}{password}@{self.database_host}:{self.database_port}/{self.database_name}"  # noqa
 
 
 def parse_args() -> Namespace:
@@ -37,16 +47,24 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
     )
-    parser.add_argument("--database-url", default="mysql+aiomysql://mariadb:mariadb@127.0.0.1:3306/mariadb")
+    parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix-database"))
+    parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "mariadb"))
+    parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD"))
+    parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
+    parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
     parser.add_argument("--secret", default="secret")
     parser.add_argument("--google-oauth-client-id", default=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
-    parser.add_argument("--redis-url", default="redis://localhost:6379/0")
+    parser.add_argument(
+        "--redis-readwrite-url", default=os.environ.get("REDIS_READWRITE_URL", "redis://localhost:6379/0")
+    )
+    parser.add_argument(
+        "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
+    )
     parser.add_argument("--skip-migrations", default=False, action="store_true")
-    args, unknown = parser.parse_known_args(sys.argv[1:])
-    return args
+    return parser.parse_args(sys.argv[1:])
 
 
 def get_config() -> Config:

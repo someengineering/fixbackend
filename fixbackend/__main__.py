@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uvicorn
-from fixbackend.config import parse_args
+from fixbackend.config import parse_args, get_config
 from alembic.config import Config
 from alembic import command
 
@@ -22,7 +22,7 @@ def main() -> None:
     args = parse_args()
     if not args.skip_migrations:
         alembic_cfg = Config("alembic.ini")
-        alembic_cfg.set_main_option("sqlalchemy.url", args.database_url)
+        alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
         command.upgrade(alembic_cfg, "head")
 
     uvicorn.run(
