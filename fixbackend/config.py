@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -42,7 +42,7 @@ class Config(BaseSettings):
         return f"mysql+aiomysql://{self.database_user}{password}@{self.database_host}:{self.database_port}/{self.database_name}"  # noqa
 
 
-def parse_args() -> Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
     parser.add_argument(
         "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
@@ -64,11 +64,11 @@ def parse_args() -> Namespace:
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
     )
     parser.add_argument("--skip-migrations", default=False, action="store_true")
-    return parser.parse_args(sys.argv[1:])
+    return parser.parse_args(argv if argv is not None else sys.argv[1:])
 
 
-def get_config() -> Config:
-    args = parse_args()
+def get_config(argv: Optional[Sequence[str]] = None) -> Config:
+    args = parse_args(argv)
     delattr(args, "skip_migrations")  # this is not a valid config option
     return Config(**vars(args))
 
