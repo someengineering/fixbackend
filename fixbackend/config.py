@@ -64,8 +64,7 @@ def parse_args() -> Namespace:
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
     )
     parser.add_argument("--skip-migrations", default=False, action="store_true")
-    args, _ = parser.parse_known_args(sys.argv[1:])
-    return args
+    return parser.parse_args(sys.argv[1:])
 
 
 def get_config() -> Config:
