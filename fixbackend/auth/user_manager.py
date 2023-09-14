@@ -45,7 +45,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             await self.request_verify(user, request)
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None) -> None:
-        await self.user_verifyer.verify(user, token)
+        await self.user_verifyer.verify(user, token, request)
 
 
 async def get_user_manager(
