@@ -16,15 +16,15 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI
-from fastapi.responses import Response
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request, Response
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, login_router
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
+from fastapi.templating import Jinja2Templates
+
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +48,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
 
+    templates = Jinja2Templates("fixbackend/templates")
+
+    @app.get("/")
+    async def root(request: Request) -> Response:
+        cdn_origin = cfg.frontend_cdn_origin()
+        return templates.TemplateResponse("index.html", {"request": request, "cdn_origin": cdn_origin})
+
     @app.get("/health")
     async def health() -> Response:
         return Response(status_code=200)
@@ -59,7 +66,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
     app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
-    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
 
     return app
 
