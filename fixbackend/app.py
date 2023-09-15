@@ -23,13 +23,13 @@ from fastapi.staticfiles import StaticFiles
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, login_router
+from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
 
 
-def fast_api_app() -> FastAPI:
-    cfg = config.get_config()
+def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
 
@@ -48,11 +48,6 @@ def fast_api_app() -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
 
-    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
-    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
-    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
-    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
-
     @app.get("/health")
     async def health() -> Response:
         return Response(status_code=200)
@@ -60,6 +55,11 @@ def fast_api_app() -> FastAPI:
     @app.get("/ready")
     async def ready() -> Response:
         return Response(status_code=200)
+
+    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
+    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
+    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+    app.mount("/", StaticFiles(directory="fixbackend/static", html=True), name="static")
 
     return app
 
@@ -70,4 +70,4 @@ def setup_process() -> FastAPI:
     Entrypoint for the application to start the server.
     """
     logging.basicConfig(level=logging.INFO)
-    return fast_api_app()
+    return fast_api_app(config.get_config())

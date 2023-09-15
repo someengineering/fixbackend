@@ -11,22 +11,9 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-import uvicorn
 from fixbackend.config import parse_args, get_config
-from alembic.config import Config
-from alembic import command
 
 
-def main() -> None:
-    args = parse_args()
-    if not args.skip_migrations:
-        alembic_cfg = Config("alembic.ini")
-        alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
-        command.upgrade(alembic_cfg, "head")
-
-    uvicorn.run("fixbackend.app:setup_process", host="0.0.0.0", log_level="info", forwarded_allow_ips="*")
-
-
-if __name__ == "__main__":
-    main()
+def test_parse_args() -> None:
+    assert parse_args([]) is not None
+    assert get_config([]) is not None

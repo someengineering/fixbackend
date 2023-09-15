@@ -32,11 +32,16 @@ def event_loop() -> Iterator[AbstractEventLoop]:
 def default_config() -> Config:
     return Config(
         instance_id="",
-        database_url="",
+        database_name="",
+        database_user="",
+        database_password=None,
+        database_host="",
+        database_port=3306,
         secret="",
         google_oauth_client_id="",
         google_oauth_client_secret="",
         github_oauth_client_id="",
         github_oauth_client_secret="",
-        redis_url="",
+        redis_readwrite_url="",
+        redis_readonly_url="",
     )
