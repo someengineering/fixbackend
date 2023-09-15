@@ -68,7 +68,7 @@ class EMailUserVerifyer(UserVerifyer):
                         "Data": "FIX: verify your e-mail address",
                     },
                 },
-                Source="FIX team <info@some.engineering>",
+                Source="FIX team <noreply@fix.tt>",
             )
 
         await asyncio.to_thread(lambda: send_email(destination, token))
