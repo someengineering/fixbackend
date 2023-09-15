@@ -35,6 +35,12 @@ class Config(BaseSettings):
     github_oauth_client_secret: str
     redis_readwrite_url: str
     redis_readonly_url: str
+    cdn_enpoint: str
+    cdn_bucket: str
+    fixui_sha: str
+
+    def frontend_cdn_origin(self) -> str:
+        return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
 
     @property
     def database_url(self) -> str:
@@ -64,7 +70,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
     )
     parser.add_argument("--skip-migrations", default=False, action="store_true")
-    return parser.parse_args(argv if argv is not None else sys.argv[1:])
+    parser.add_argument(
+        "--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://somecdn.ams3.cdn.digitaloceanspaces.com")
+    )
+    parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
+    parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
+
+    return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
 def get_config(argv: Optional[Sequence[str]] = None) -> Config:
