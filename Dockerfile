@@ -14,8 +14,7 @@ RUN  apt-get update \
       && pip install --no-cache-dir -r dist/requirements.txt \
       && pip install --no-cache-dir --no-deps dist/*.whl  \
       && rm -rf /app/dist
-# static files are not included in the wheel and need to be copied manually
-ADD fixbackend/static /app/fixbackend/static
+ADD fixbackend/templates /app/fixbackend/templates
 # migrations needs to run too
 ADD migrations /app/migrations
 ADD alembic.ini /app/alembic.ini
