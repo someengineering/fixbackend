@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncIterator, List, Tuple
+from typing import AsyncIterator, List, Tuple, Optional
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from tests.fixbackend.conftest import default_config  # noqa: F401
@@ -23,13 +23,14 @@ from fixbackend.auth.user_verifyer import UserVerifyer, get_user_verifyer
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
+from fastapi import Request
 
 
 class InMemoryVerifyer(UserVerifyer):
     def __init__(self) -> None:
         self.verification_requests: List[Tuple[User, str]] = []
 
-    async def verify(self, user: User, token: str) -> None:
+    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         return self.verification_requests.append((user, token))
 
 

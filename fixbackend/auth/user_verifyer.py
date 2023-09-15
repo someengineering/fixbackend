@@ -12,21 +12,66 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated
+from typing import Annotated, Optional
 from abc import ABC, abstractmethod
-from fastapi import Depends
+from fastapi import Depends, Request
 from fixbackend.auth.models import User
+import boto3
+import asyncio
 
 
 class UserVerifyer(ABC):
     @abstractmethod
-    async def verify(self, user: User, token: str) -> None:
+    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         pass
 
 
 class ConsoleUserVerifyer(UserVerifyer):
-    async def verify(self, user: User, token: str) -> None:
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
+        assert request
+        verification_link = request.url_for("verify:verify")
+        print(
+            f"Verification requested for user {user.id}. Do a POST request to {verification_link} with "
+            f'the following payload: {{"token": "{token}" }}'
+        )
+
+
+class EMailUserVerifyer(UserVerifyer):
+    def __init__(self) -> None:
+        self.client = boto3.client("ses", "eu-central-1")
+
+    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
+        destination = user.email
+        assert request
+
+        verification_link = request.base_url
+        verification_link = verification_link.replace(fragment=f"verify={token}")
+
+        def send_email(destination: str, token: str) -> None:
+            body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
+
+            self.client.send_email(
+                Destination={
+                    "ToAddresses": [
+                        destination,
+                    ],
+                },
+                Message={
+                    "Body": {
+                        "Text": {
+                            "Charset": "UTF-8",
+                            "Data": body_text,
+                        },
+                    },
+                    "Subject": {
+                        "Charset": "UTF-8",
+                        "Data": "FIX: verify your e-mail address",
+                    },
+                },
+                Source="FIX team <noreply@fix.tt>",
+            )
+
+        await asyncio.to_thread(lambda: send_email(destination, token))
 
 
 def get_user_verifyer() -> UserVerifyer:
