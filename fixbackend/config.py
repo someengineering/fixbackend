@@ -71,7 +71,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--skip-migrations", default=False, action="store_true")
     parser.add_argument(
-        "--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://somecdn.ams3.cdn.digitaloceanspaces.com")
+        "--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://cdn.some.engineering/")
     )
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
