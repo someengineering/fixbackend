@@ -44,4 +44,7 @@ def default_config() -> Config:
         github_oauth_client_secret="",
         redis_readwrite_url="",
         redis_readonly_url="",
+        cdn_enpoint="",
+        cdn_bucket="",
+        fixui_sha="",
     )
