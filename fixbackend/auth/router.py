@@ -21,8 +21,8 @@ from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
-from fixbackend.auth.dependencies import AuthenticatedUser, fastapi_users
-from fixbackend.auth.jwt import jwt_auth_backend, get_jwt_strategy
+from fixbackend.auth.dependencies import fastapi_users
+from fixbackend.auth.jwt import cookie_auth_backend
 from fixbackend.auth.oauth import oauth_redirect_backend
 from fixbackend.auth.schemas import UserRead, UserCreate, OAuthProviderAuthUrl
 from fixbackend.config import Config
@@ -70,7 +70,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     router.include_router(
-        fastapi_users.get_auth_router(jwt_auth_backend, requires_verification=True),
+        fastapi_users.get_auth_router(cookie_auth_backend, requires_verification=True),
         prefix="/jwt",
         tags=["auth"],
     )
@@ -89,11 +89,6 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         fastapi_users.get_verify_router(UserRead),
         tags=["auth"],
     )
-
-    @router.post("/jwt/refresh", tags=["auth"])
-    async def refresh_jwt(context: AuthenticatedUser) -> Response:
-        """Refresh the JWT token if still logged in."""
-        return await jwt_auth_backend.login(get_jwt_strategy(config), context.user)
 
     @router.get("/oauth-providers", tags=["auth"])
     async def list_all_oauth_providers(request: Request) -> List[OAuthProviderAuthUrl]:

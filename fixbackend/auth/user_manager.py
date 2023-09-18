@@ -24,7 +24,7 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
 from fixbackend.config import ConfigDependency
-from fixbackend.auth.user_verifyer import UserVerifyerDependency, UserVerifyer
+from fixbackend.auth.user_verifier import UserVerifierDependency, UserVerifier
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -33,27 +33,27 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         config: ConfigDependency,
         user_db: BaseUserDatabase[User, uuid.UUID],
         password_helper: PasswordHelperProtocol | None,
-        user_verifyer: UserVerifyer,
+        user_verifier: UserVerifier,
     ):
         super().__init__(user_db, password_helper)
-        self.user_verifyer = user_verifyer
+        self.user_verifier = user_verifier
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
-        if not user.is_verified:  # oauth2 users are already verifyed
+        if not user.is_verified:  # oauth2 users are already verified
             await self.request_verify(user, request)
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None) -> None:
-        await self.user_verifyer.verify(user, token, request)
+        await self.user_verifier.verify(user, token, request)
 
 
 async def get_user_manager(
     config: ConfigDependency,
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
-    user_verifyer: UserVerifyerDependency,
+    user_verifier: UserVerifierDependency,
 ) -> AsyncIterator[UserManager]:
-    yield UserManager(config, user_db, None, user_verifyer)
+    yield UserManager(config, user_db, None, user_verifier)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

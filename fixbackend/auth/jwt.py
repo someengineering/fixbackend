@@ -14,23 +14,20 @@
 
 from typing import Any
 
-from fastapi_users.authentication import JWTStrategy, AuthenticationBackend, BearerTransport
+from fastapi_users.authentication import JWTStrategy, AuthenticationBackend, CookieTransport
 
 
 from fixbackend.config import ConfigDependency
 
-bearer_transport = BearerTransport(
-    tokenUrl="/auth/jwt/login"
-)  # tokenUrl is only needed for swagger and non-social login, it is no needed here.
+cookie_transport = CookieTransport(cookie_name="fix.auth")
 
 
 def get_jwt_strategy(config: ConfigDependency) -> JWTStrategy[Any, Any]:
     return JWTStrategy(secret=config.secret, lifetime_seconds=3600)
 
 
-# for all other authenticatino tasks
-jwt_auth_backend = AuthenticationBackend(
-    name="jwt",
-    transport=bearer_transport,
+cookie_auth_backend = AuthenticationBackend(
+    name="cookie",
+    transport=cookie_transport,
     get_strategy=get_jwt_strategy,
 )
