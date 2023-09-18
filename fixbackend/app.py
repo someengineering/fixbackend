@@ -16,15 +16,17 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import FastAPI, Request, Response
+from fastapi.templating import Jinja2Templates
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, login_router
+from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
-from fastapi.templating import Jinja2Templates
-
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +37,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
+        arq_redis = await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url))
+        RedisCollectQueue(arq_redis)
         log.info("Application services started.")
         yield None
+        await arq_redis.close()
         log.info("Application services stopped.")
 
     app = FastAPI(

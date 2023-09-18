@@ -20,8 +20,16 @@ services:
     # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    container_name: "fixbackend-redis-${USER}"
+
   db:
     image: mariadb:11
+    ports:
+      - "3306:3306"
     restart: unless-stopped
     container_name: "fixbackend-mariadb-${USER}"
     volumes:
