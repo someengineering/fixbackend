@@ -24,7 +24,7 @@ from fastapi import FastAPI, Request, Response
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
-from fixbackend.auth.router import auth_router, login_router
+from fixbackend.auth.router import auth_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
@@ -40,6 +40,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url))
         RedisCollectQueue(arq_redis)
+        await load_app_from_cdn()
         log.info("Application services started.")
         yield None
         await arq_redis.close()
@@ -76,7 +77,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def ready() -> Response:
         return Response(status_code=200)
 
-    app.include_router(login_router(cfg, google, github), tags=["returns HTML"])
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
 
