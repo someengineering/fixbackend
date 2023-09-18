@@ -28,6 +28,8 @@ from fixbackend.auth.router import auth_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
+from fastapi.staticfiles import StaticFiles
+
 
 log = logging.getLogger(__name__)
 
@@ -57,17 +59,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:
+        if cfg.developer_mode:
+            return b""  # in dev mode static files from local directory are used
+
         async with httpx.AsyncClient() as client:
             log.info("Loading app from CDN")
             response = await client.get(f"{cfg.frontend_cdn_origin()}/index.html")
             log.info("Loaded app from CDN")
             body = response.content
             return body
-
-    @app.get("/")
-    async def root(request: Request) -> Response:
-        body = await load_app_from_cdn()
-        return Response(content=body, media_type="text/html")
 
     @app.get("/health")
     async def health() -> Response:
@@ -79,6 +79,14 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+
+    if cfg.developer_mode:
+        app.mount("/", StaticFiles(directory="fixfrontend_build", html=True), name="fixfrontend_build")
+
+    @app.get("/")
+    async def root(request: Request) -> Response:
+        body = await load_app_from_cdn()
+        return Response(content=body, media_type="text/html")
 
     return app
 

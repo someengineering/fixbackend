@@ -39,6 +39,7 @@ class Config(BaseSettings):
     cdn_enpoint: str
     cdn_bucket: str
     fixui_sha: str
+    developer_mode: bool
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -75,6 +76,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://cdn.some.engineering"))
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
+    parser.add_argument("--dev", dest="developer_mode", default=False)
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
