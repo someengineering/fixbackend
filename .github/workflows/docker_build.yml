@@ -101,6 +101,7 @@ jobs:
           gh auth login --with-token <<< "${{ secrets.SOME_CI_PAT }}"
 
       - name: Bump tag version
+        if: github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.SOME_CI_PAT }}
         run: |
