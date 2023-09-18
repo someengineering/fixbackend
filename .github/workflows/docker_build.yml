@@ -97,6 +97,7 @@ jobs:
           provenance: false # Temporary workaround for https://github.com/docker/buildx/issues/1533
 
       - name: Authenticate with GitHub CLI
+        if: github.event_name != 'pull_request'
         run: |
           gh auth login --with-token <<< "${{ secrets.SOME_CI_PAT }}"
 
