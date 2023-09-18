@@ -29,7 +29,7 @@ services:
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: 1
       MYSQL_ROOT_PASSWORD: null
-      MYSQL_DATABASE: mariadb
+      MYSQL_DATABASE: fix-database
       MYSQL_USER: mariadb
       MYSQL_PASSWORD: mariadb
     # Add "forwardPorts": ["3306"] to **devcontainer.json** to forward MariaDB locally.

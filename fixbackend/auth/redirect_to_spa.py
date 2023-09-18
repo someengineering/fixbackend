@@ -45,6 +45,7 @@ class RedirectToSPA(Transport):
     </html>"""
 
         response = Response(content=payload, status_code=status.HTTP_200_OK, media_type="text/html")
+        response.set_cookie("fix.auth", value=token)
         return response
 
     async def get_logout_response(self) -> Response:
