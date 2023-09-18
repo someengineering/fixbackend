@@ -15,7 +15,6 @@
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
