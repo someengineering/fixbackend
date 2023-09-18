@@ -35,6 +35,7 @@ class Config(BaseSettings):
     github_oauth_client_secret: str
     redis_readwrite_url: str
     redis_readonly_url: str
+    redis_queue_url: str
     cdn_enpoint: str
     cdn_bucket: str
     fixui_sha: str
@@ -69,6 +70,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
     )
+    parser.add_argument("--redis-queue-url", default=os.environ.get("REDIS_QUEUE_URL", "redis://localhost:6379/5"))
     parser.add_argument("--skip-migrations", default=False, action="store_true")
     parser.add_argument("--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://cdn.some.engineering/"))
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
