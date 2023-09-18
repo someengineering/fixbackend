@@ -16,18 +16,19 @@ services:
     command: sleep infinity
 
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
-    network_mode: service:db
     # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   redis:
     image: redis:7
+    network_mode: service:app
     ports:
       - "6379:6379"
     container_name: "fixbackend-redis-${USER}"
 
   db:
     image: mariadb:11
+    network_mode: service:app
     ports:
       - "3306:3306"
     restart: unless-stopped
