@@ -99,39 +99,3 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         return [await get_auth_url(request, state, client) for client in clients]
 
     return router
-
-
-def login_router(
-    config: Config,
-    google_client: GoogleOAuth2,
-    github_client: GitHubOAuth2,
-) -> APIRouter:
-    router = APIRouter()
-
-    @router.get("/login", response_class=HTMLResponse)
-    async def login(request: Request) -> Response:
-        state_data: Dict[str, str] = {}
-        state = generate_state_token(state_data, config.secret)
-
-        google_auth_url = await get_auth_url(request, state, google_client)
-        github_auth_url = await get_auth_url(request, state, github_client)
-        html_content = f"""
-        <html>
-            <head>
-                <title>FIX Backend</title>
-            </head>
-            <body>
-                <h1>Welcome to FIX Backend!</h1>
-
-                <a href="{google_auth_url.authUrl}">Login via Google</a>
-                <br>
-                <a href="{github_auth_url.authUrl}">Login via GitHub</a>
-
-
-
-            </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content, status_code=200)
-
-    return router

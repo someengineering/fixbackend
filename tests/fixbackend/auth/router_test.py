@@ -85,5 +85,9 @@ async def test_registration_flow(client: AsyncClient) -> None:
     # verified can login
     response = await client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 204
-    response_cookies = response.cookies
-    assert response_cookies.get("fix.auth") is not None
+    auth_cookie = response.cookies.get("fix.auth")
+    assert auth_cookie is not None
+
+    # organization is created by default
+    response = await client.get("/api/organizations/", cookies={"fix.auth": auth_cookie})
+    assert response.json()[0].get("name") == user.email
