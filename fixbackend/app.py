@@ -16,10 +16,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+import httpx
 from arq import create_pool
 from arq.connections import RedisSettings
+from async_lru import alru_cache
 from fastapi import FastAPI, Request, Response
-from fastapi.templating import Jinja2Templates
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
@@ -53,12 +54,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
 
-    templates = Jinja2Templates("fixbackend/templates")
+    @alru_cache(maxsize=1)
+    async def load_app_from_cdn() -> bytes:
+        async with httpx.AsyncClient() as client:
+            log.info("Loading app from CDN")
+            response = await client.get(f"{cfg.frontend_cdn_origin()}/index.html")
+            log.info("Loaded app from CDN")
+            body = response.content
+            return body
 
     @app.get("/")
     async def root(request: Request) -> Response:
-        cdn_origin = cfg.frontend_cdn_origin()
-        return templates.TemplateResponse("index.html", {"request": request, "cdn_origin": cdn_origin})
+        body = await load_app_from_cdn()
+        return Response(content=body, media_type="text/html")
 
     @app.get("/health")
     async def health() -> Response:
