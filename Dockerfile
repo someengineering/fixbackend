@@ -14,7 +14,6 @@ RUN  apt-get update \
       && pip install --no-cache-dir -r dist/requirements.txt \
       && pip install --no-cache-dir --no-deps dist/*.whl  \
       && rm -rf /app/dist
-ADD fixbackend/templates /app/fixbackend/templates
 # migrations needs to run too
 ADD migrations /app/migrations
 ADD alembic.ini /app/alembic.ini
