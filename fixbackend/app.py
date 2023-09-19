@@ -59,7 +59,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:
-        if cfg.developer_mode:
+        if cfg.static_assets:
             return b""  # in dev mode static files from local directory are used
 
         async with httpx.AsyncClient() as client:
@@ -80,8 +80,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
 
-    if cfg.developer_mode:
-        app.mount("/", StaticFiles(directory="fixfrontend_build", html=True), name="fixfrontend_build")
+    if cfg.static_assets:
+        app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
 
     @app.get("/")
     async def root(request: Request) -> Response:

@@ -53,7 +53,7 @@ def default_config() -> Config:
         cdn_enpoint="",
         cdn_bucket="",
         fixui_sha="",
-        developer_mode=False,
+        static_assets=None,
     )
 
 
