@@ -42,7 +42,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url))
         RedisCollectQueue(arq_redis)
-        await load_app_from_cdn()
+        if not cfg.static_assets:
+            await load_app_from_cdn()
         log.info("Application services started.")
         yield None
         await arq_redis.close()
@@ -59,9 +60,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:
-        if cfg.static_assets:
-            return b""  # in dev mode static files from local directory are used
-
         async with httpx.AsyncClient() as client:
             log.info("Loading app from CDN")
             response = await client.get(f"{cfg.frontend_cdn_origin()}/index.html")
