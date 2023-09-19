@@ -28,6 +28,8 @@ from fixbackend.auth.router import auth_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
+from fastapi.staticfiles import StaticFiles
+
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +42,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url))
         RedisCollectQueue(arq_redis)
-        await load_app_from_cdn()
+        if not cfg.static_assets:
+            await load_app_from_cdn()
         log.info("Application services started.")
         yield None
         await arq_redis.close()
@@ -64,11 +67,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             body = response.content
             return body
 
-    @app.get("/")
-    async def root(request: Request) -> Response:
-        body = await load_app_from_cdn()
-        return Response(content=body, media_type="text/html")
-
     @app.get("/health")
     async def health() -> Response:
         return Response(status_code=200)
@@ -79,6 +77,14 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+
+    if cfg.static_assets:
+        app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
+
+    @app.get("/")
+    async def root(request: Request) -> Response:
+        body = await load_app_from_cdn()
+        return Response(content=body, media_type="text/html")
 
     return app
 
