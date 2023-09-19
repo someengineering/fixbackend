@@ -53,7 +53,7 @@ jobs:
             type=pep440,pattern={{version}}
             type=pep440,pattern={{major}}.{{minor}}
             type=pep440,pattern={{major}}
-            type=sha,prefix=
+            type=sha,format=long,prefix=
             type=edge
           labels: |
             org.opencontainers.image.title=fixbackend
