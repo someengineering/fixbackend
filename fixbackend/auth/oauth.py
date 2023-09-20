@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Any
 from fastapi_users.authentication import AuthenticationBackend
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
@@ -29,8 +30,7 @@ def github_client(config: Config) -> GitHubOAuth2:
     return GitHubOAuth2(config.github_oauth_client_id, config.github_oauth_client_secret)
 
 
-transport = RedirectToSPA(redirect_path="/")
-
-
 # should only be used for setting up the token via localstorage to launch the SPA
-oauth_redirect_backend = AuthenticationBackend(name="spa-redirect", transport=transport, get_strategy=get_jwt_strategy)
+def oauth_redirect_backend(config: Config) -> AuthenticationBackend[Any, Any]:
+    transport = RedirectToSPA(redirect_url=config.oauth_redirect_url, ttl_seconds=config.session_ttl)
+    return AuthenticationBackend(name="spa-redirect", transport=transport, get_strategy=get_jwt_strategy)
