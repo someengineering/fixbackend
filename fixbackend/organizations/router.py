@@ -167,4 +167,8 @@ def organizations_router() -> APIRouter:
 
         return None
 
+    @router.get("/{organization_id}/cf_url")
+    async def get_cf_url(organization_id: UUID, user_context: AuthenticatedUser) -> str:
+        return "https://example.com"
+
     return router
