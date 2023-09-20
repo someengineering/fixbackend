@@ -30,6 +30,7 @@ class Organization(Base):
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
+    external_id: Mapped[uuid.UUID] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization")
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization")
 

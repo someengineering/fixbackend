@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.dependencies import AuthenticatedUser
 from fixbackend.auth.user_manager import UserManagerDependency
-from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite
+from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite, ExternalId
 from fixbackend.organizations.service import OrganizationServiceDependency
 
 
@@ -166,5 +166,27 @@ def organizations_router() -> APIRouter:
         await organization_service.accept_invitation(invite_id)
 
         return None
+
+    @router.get("/{organization_id}/external_id")
+    async def get_externa_id(
+        organization_id: UUID,
+        user_context: AuthenticatedUser,
+        organization_service: OrganizationServiceDependency,
+    ) -> ExternalId:
+        """Get an organization's external id."""
+        org = await organization_service.get_organization(organization_id)
+        if org is None:
+            raise HTTPException(status_code=404, detail="Organization not found")
+
+        if user_context.user.email not in [owner.user.email for owner in org.owners]:
+            raise HTTPException(
+                status_code=403, detail="You must be an owner of this organization to get an external ID"
+            )
+
+        return ExternalId(external_id=org.external_id)
+
+    @router.get("/{organization_id}/cf_url")
+    async def get_cf_url(organization_id: UUID, user_context: AuthenticatedUser) -> str:
+        return "https://example.com"
 
     return router
