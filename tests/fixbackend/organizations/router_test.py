@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence
 import uuid
 
 from fixbackend.app import fast_api_app
@@ -38,6 +38,14 @@ org_id = uuid.uuid4()
 external_id = uuid.uuid4()
 user_id = uuid.uuid4()
 user = User(id=user_id, email="foo@example.com", hashed_password="passord", is_verified=True, is_active=True)
+organization = Organization(
+    id=uuid.uuid4(),
+    name="org name",
+    slug="org-slug",
+    external_id=external_id,
+    owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
+    members=[],
+)
 
 
 class OrganizationServiceMock(OrganizationService):
@@ -45,14 +53,10 @@ class OrganizationServiceMock(OrganizationService):
         pass
 
     async def get_organization(self, organization_id: UUID, with_users: bool = False) -> Organization | None:
-        return Organization(
-            id=uuid.uuid4(),
-            name="org name",
-            slug="org-slug",
-            external_id=external_id,
-            owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
-            members=[],
-        )
+        return organization
+
+    async def list_organizations(self, owner_id: UUID, with_users: bool = False) -> Sequence[Organization]:
+        return [organization]
 
 
 @pytest.fixture
@@ -69,10 +73,9 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 
 
 @pytest.mark.asyncio
-async def test_external_id(client: AsyncClient) -> None:
-    # organization is created by default
-    response = await client.get(f"/api/organizations/{org_id}/external_id")
-    assert response.json().get("external_id") == str(external_id)
+async def test_list_organizations(client: AsyncClient) -> None:
+    response = await client.get("/api/organizations/")
+    assert response.json()[0] is not None
 
 
 @pytest.mark.asyncio

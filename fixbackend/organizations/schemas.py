@@ -85,17 +85,3 @@ class OrganizationInvite(BaseModel):
             ]
         }
     }
-
-
-class ExternalId(BaseModel):
-    external_id: UUID = Field(description="The organization's external identifier")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "external_id": "00000000-0000-0000-0000-000000000000",
-                }
-            ]
-        }
-    }
