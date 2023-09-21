@@ -46,7 +46,7 @@ def github_client(config: Config) -> GitHubOAuth2:
 
 # should only be used for setting up the token via localstorage to launch the SPA
 def oauth_redirect_backend(config: Config) -> AuthenticationBackend[Any, Any]:
-    transport = RedirectToSPA(redirect_url=config.oauth_redirect_url, ttl_seconds=config.session_ttl)
+    transport = RedirectToSPA(redirect_url="/", ttl_seconds=config.session_ttl)
     return AuthenticationBackend(name="spa-redirect", transport=transport, get_strategy=get_jwt_strategy)
 
 
