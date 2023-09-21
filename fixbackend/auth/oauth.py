@@ -1,4 +1,5 @@
 #  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2019 François Voron
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -32,6 +33,7 @@ from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
 from fastapi_users.jwt import SecretType, decode_jwt, generate_jwt
 from fastapi_users.router.common import ErrorCode, ErrorModel
+from urllib.parse import quote
 
 
 def google_client(config: Config) -> GoogleOAuth2:
@@ -60,6 +62,8 @@ def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seco
     return generate_jwt(data, secret, lifetime_seconds)
 
 
+# forked version of fastapi_users.router.oauth.get_oauth_router
+# to allow for redirect_url to be set via the JWT token
 def get_oauth_router(
     oauth_client: BaseOAuth2[Any],
     backend: AuthenticationBackend[Any, Any],
@@ -144,7 +148,7 @@ def get_oauth_router(
             )
 
         try:
-            decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
+            decoded_state = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except jwt.DecodeError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
 
@@ -174,6 +178,8 @@ def get_oauth_router(
 
         # Authenticate
         response = await backend.login(strategy, user)
+        # replace the redirect url with the one from the JWT token
+        response.headers["location"] = quote(str(decoded_state.get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;")
         await user_manager.on_after_login(user, request, response)
         return response
 

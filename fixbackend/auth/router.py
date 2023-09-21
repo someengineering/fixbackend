@@ -96,8 +96,9 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     @router.get("/oauth-providers", tags=["auth"])
-    async def list_all_oauth_providers(request: Request) -> List[OAuthProviderAuthUrl]:
+    async def list_all_oauth_providers(request: Request, redirect_url: str = "/") -> List[OAuthProviderAuthUrl]:
         state_data: Dict[str, str] = {}
+        state_data["redirect_url"] = redirect_url
         state = generate_state_token(state_data, config.secret)
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
