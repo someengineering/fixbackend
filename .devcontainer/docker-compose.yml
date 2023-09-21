@@ -25,12 +25,12 @@ services:
     container_name: "fixbackend-redis-${USER}"
 
   db:
-    image: mariadb:11
+    image: mysql:8
     network_mode: service:app
     restart: unless-stopped
-    container_name: "fixbackend-mariadb-${USER}"
+    container_name: "fixbackend-mysql-${USER}"
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: 1
       MYSQL_ROOT_PASSWORD: null
@@ -41,4 +41,4 @@ services:
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
 volumes:
-  mariadb-data:
+  mysql-data:
