@@ -23,7 +23,7 @@ from httpx_oauth.oauth2 import BaseOAuth2
 
 from fixbackend.auth.dependencies import fastapi_users
 from fixbackend.auth.jwt import get_cookie_auth_backend
-from fixbackend.auth.oauth import oauth_redirect_backend
+from fixbackend.auth.oauth import oauth_redirect_backend, get_oauth_router
 from fixbackend.auth.schemas import UserRead, UserCreate, OAuthProviderAuthUrl
 from fixbackend.config import Config
 
@@ -47,7 +47,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     cookie_auth_backend = get_cookie_auth_backend(config)
 
     router.include_router(
-        fastapi_users.get_oauth_router(
+        get_oauth_router(
             google_client,
             oauth_auth_backend,
             config.secret,
@@ -61,7 +61,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     router.include_router(
-        fastapi_users.get_oauth_router(
+        get_oauth_router(
             github_client,
             oauth_auth_backend,
             config.secret,
@@ -96,8 +96,9 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     @router.get("/oauth-providers", tags=["auth"])
-    async def list_all_oauth_providers(request: Request) -> List[OAuthProviderAuthUrl]:
+    async def list_all_oauth_providers(request: Request, redirect_url: str = "/") -> List[OAuthProviderAuthUrl]:
         state_data: Dict[str, str] = {}
+        state_data["redirect_url"] = redirect_url
         state = generate_state_token(state_data, config.secret)
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
