@@ -55,7 +55,6 @@ def default_config() -> Config:
         fixui_sha="",
         static_assets=None,
         session_ttl=3600,
-        oauth_redirect_url="/",
     )
 
 
