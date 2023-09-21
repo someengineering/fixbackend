@@ -13,25 +13,16 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import AsyncIterator, Sequence
-import uuid
+from typing import AsyncIterator
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.models import User
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
 from tests.fixbackend.conftest import default_config  # noqa: F401
 from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
-from fixbackend.organizations.service import (
-    get_organization_service,
-    OrganizationService,
-)
-from fixbackend.organizations.models import Organization, OrganizationOwners
 from fixbackend.config import config as get_config, Config
-from fixbackend.auth.dependencies import get_current_active_verified_user
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from uuid import UUID
 
 
 @pytest.fixture
@@ -50,7 +41,7 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
     payload = {
         "account_id": "123456789012",
         "external_id": "00000000-0000-0000-0000-000000000000",
-        "role_name": "arn:aws:iam::123456789012:role/FooBarRole",
+        "role_name": "FooBarRole",
         "tenant_id": "00000000-0000-0000-0000-000000000000",
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
