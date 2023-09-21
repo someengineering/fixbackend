@@ -17,21 +17,25 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi_users import FastAPIUsers
+from fixbackend.config import get_config
 
-from fixbackend.auth.jwt import cookie_auth_backend
+from fixbackend.auth.jwt import get_cookie_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 
-fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [cookie_auth_backend])
+
+# todo: use dependency injection
+fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_cookie_auth_backend(get_config())])
 
 
-current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
+# the value below is a dependency itsef
+get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
 
 
 class CurrentVerifiedActiveUserDependencies:
     def __init__(
         self,
-        user: Annotated[User, Depends(current_active_verified_user)],
+        user: Annotated[User, Depends(get_current_active_verified_user)],
     ) -> None:
         self.user = user
 

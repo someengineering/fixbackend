@@ -13,21 +13,24 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Any
-
 from fastapi_users.authentication import JWTStrategy, AuthenticationBackend, CookieTransport
-
-
 from fixbackend.config import ConfigDependency
-
-cookie_transport = CookieTransport(cookie_name="fix.auth")
 
 
 def get_jwt_strategy(config: ConfigDependency) -> JWTStrategy[Any, Any]:
-    return JWTStrategy(secret=config.secret, lifetime_seconds=3600)
+    return JWTStrategy(secret=config.secret, lifetime_seconds=config.session_ttl)
 
 
-cookie_auth_backend = AuthenticationBackend(
-    name="cookie",
-    transport=cookie_transport,
-    get_strategy=get_jwt_strategy,
-)
+def get_cookie_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
+    cookie_transport = CookieTransport(
+        cookie_name="fix.auth",
+        cookie_secure=True,
+        cookie_httponly=True,
+        cookie_samesite="strict",
+        cookie_max_age=config.session_ttl,
+    )
+    return AuthenticationBackend(
+        name="cookie",
+        transport=cookie_transport,
+        get_strategy=get_jwt_strategy,
+    )

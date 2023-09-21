@@ -28,7 +28,7 @@ from fixbackend.organizations.service import (
 )
 from fixbackend.organizations.models import Organization, OrganizationOwners
 from fixbackend.config import config as get_config, Config
-from fixbackend.auth.dependencies import current_active_verified_user
+from fixbackend.auth.dependencies import get_current_active_verified_user
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 from uuid import UUID
@@ -64,7 +64,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app = fast_api_app(default_config)
 
     app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[current_active_verified_user] = lambda: user
+    app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
 
