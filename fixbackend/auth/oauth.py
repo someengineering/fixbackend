@@ -17,8 +17,6 @@ from typing import Any, Dict, Optional, Tuple, List
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 
-from fixbackend.auth.jwt import get_jwt_strategy
-from fixbackend.auth.redirect_to_spa import RedirectToSPA
 from fixbackend.config import Config
 from fixbackend.auth.user_manager import UserManagerDependency
 
@@ -42,12 +40,6 @@ def google_client(config: Config) -> GoogleOAuth2:
 
 def github_client(config: Config) -> GitHubOAuth2:
     return GitHubOAuth2(config.github_oauth_client_id, config.github_oauth_client_secret)
-
-
-# should only be used for setting up the token via localstorage to launch the SPA
-def oauth_redirect_backend(config: Config) -> AuthenticationBackend[Any, Any]:
-    transport = RedirectToSPA(redirect_url="/", ttl_seconds=config.session_ttl)
-    return AuthenticationBackend(name="spa-redirect", transport=transport, get_strategy=get_jwt_strategy)
 
 
 STATE_TOKEN_AUDIENCE = "fastapi-users:oauth-state"
@@ -180,6 +172,7 @@ def get_oauth_router(
         response = await backend.login(strategy, user)
         # replace the redirect url with the one from the JWT token
         response.headers["location"] = quote(str(decoded_state.get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;")
+        response.status_code = status.HTTP_303_SEE_OTHER
         await user_manager.on_after_login(user, request, response)
         return response
 
