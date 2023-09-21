@@ -20,6 +20,7 @@ boto3 = "^1.28.45"
 async-lru = "^2.0.4"
 arq = "^0.25.0"
 fixcloudutils = { extras = ["redis", "arango"], version = "^1.5.0" }
+websockets = "^11.0.3"
 
 
 [tool.poetry.group.dev.dependencies]
