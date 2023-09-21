@@ -12,10 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from uuid import UUID
-
 from fastapi import APIRouter
 import logging
+
+from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
 
 
 log = logging.getLogger(__name__)
@@ -25,12 +25,7 @@ def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
 
     @router.post("/callbacks/aws/cf")
-    def aws_cloudformation_callback(tenant_id: UUID, external_id: UUID, account_id: str, role_arn: str) -> None:
-        log.info(
-            (
-                f"AWS cloudformation callback for tenant {tenant_id} and external_id {external_id}"
-                f"with account_id {account_id} and role_arn {role_arn}"
-            )
-        )
+    def aws_cloudformation_callback(payload: AwsCloudFormationLambdaCallbackParameters) -> None:
+        log.info((f"AWS cloudformation callback: {payload}"))
 
     return router
