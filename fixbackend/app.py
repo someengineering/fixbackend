@@ -28,6 +28,7 @@ from fixbackend.auth.router import auth_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.organizations.router import organizations_router
+from fixbackend.cloud_accounts.router import cloud_accounts_router
 from fastapi.staticfiles import StaticFiles
 
 
@@ -77,6 +78,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
+    app.include_router(cloud_accounts_router(), prefix="/api/cloud", tags=["cloud_accounts"])
 
     if cfg.static_assets:
         app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
