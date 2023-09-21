@@ -81,7 +81,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
     parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", 3600)))
     parser.add_argument(
-        "--oauth-redirect-url", default=os.environ.get("OAUTH_REDIRECT_PATH", "/")
+        "--oauth-redirect-url", default=os.environ.get("OAUTH_REDIRECT_URL", "/")
     )  # only for development to point to the frontend server
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
