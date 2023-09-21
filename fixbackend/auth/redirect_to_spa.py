@@ -38,7 +38,7 @@ class RedirectToSPA(Transport):
         response.set_cookie(
             "fix.auth", value=token, httponly=True, secure=True, samesite="strict", expires=self.ttl_seconds
         )
-        response.set_cookie("fix.authenticated", value="true", samesite="strict", expires=self.ttl_seconds)
+        response.set_cookie("fix.authenticated", value="1", samesite="strict", expires=self.ttl_seconds)
         return response
 
     async def get_logout_response(self) -> Response:
