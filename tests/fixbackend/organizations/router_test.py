@@ -28,7 +28,7 @@ from fixbackend.organizations.service import (
 )
 from fixbackend.organizations.models import Organization, OrganizationOwners
 from fixbackend.config import config as get_config, Config
-from fixbackend.auth.dependencies import current_active_verified_user
+from fixbackend.auth.dependencies import get_current_active_verified_user
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 from uuid import UUID
@@ -43,6 +43,7 @@ organization = Organization(
     name="org name",
     slug="org-slug",
     external_id=external_id,
+    tenant_id=uuid.uuid4(),
     owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
     members=[],
 )
@@ -64,7 +65,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app = fast_api_app(default_config)
 
     app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[current_active_verified_user] = lambda: user
+    app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
 
@@ -82,3 +83,10 @@ async def test_list_organizations(client: AsyncClient) -> None:
 async def test_cloudformation_link(client: AsyncClient) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
     assert response.json() == "https://example.com"
+
+
+@pytest.mark.asyncio
+async def test_external_id(client: AsyncClient) -> None:
+    # organization is created by default
+    response = await client.get(f"/api/organizations/{org_id}/external_id")
+    assert response.json().get("external_id") == str(external_id)

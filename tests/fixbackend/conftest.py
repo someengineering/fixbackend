@@ -54,6 +54,7 @@ def default_config() -> Config:
         cdn_bucket="",
         fixui_sha="",
         static_assets=None,
+        session_ttl=3600,
     )
 
 

@@ -25,6 +25,7 @@ class Organization(BaseModel):
     id: UUID = Field(description="The organization's unique identifier")
     slug: str = Field(description="The organization's unique slug, used in URLs")
     name: str = Field(description="The organization's name, a human-readable string")
+    tenant_id: UUID = Field(description="The id of the tenant, currently a 1:1 relationship with the organization.")
     owners: List[EmailStr] = Field(description="The organization's owners, who can manage the organization")
     members: List[EmailStr] = Field(description="The organization's members, who can view the organizatione")
 
@@ -48,6 +49,7 @@ class Organization(BaseModel):
             id=model.id,
             slug=model.slug,
             name=model.name,
+            tenant_id=model.tenant_id,
             owners=[o.user.email for o in model.owners],
             members=[m.user.email for m in model.members],
         )
@@ -81,6 +83,20 @@ class OrganizationInvite(BaseModel):
                     "organization_slug": "my-org",
                     "email": "invitee@example.com",
                     "expires_at": "2021-01-01T00:00:00Z",
+                }
+            ]
+        }
+    }
+
+
+class ExternalId(BaseModel):
+    external_id: UUID = Field(description="The organization's external identifier")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "external_id": "00000000-0000-0000-0000-000000000000",
                 }
             ]
         }

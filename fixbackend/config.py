@@ -40,6 +40,7 @@ class Config(BaseSettings):
     cdn_bucket: str
     fixui_sha: str
     static_assets: Optional[Path]
+    session_ttl: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -77,6 +78,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
+    parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", 3600)))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
