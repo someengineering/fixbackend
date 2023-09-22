@@ -42,7 +42,14 @@ def test(session: Session) -> None:
         session.run("cp", "-R", ".", str(tmpdir), external=True)
         with session.chdir(tmpdir):
             session.poetry.installroot()
-    session.install("pytest", "pytest-cov", "pytest-asyncio", "sqlalchemy-utils", ".")
+    session.install(
+        "pytest",
+        "pytest-cov",
+        "pytest-asyncio",
+        "sqlalchemy-utils",
+        "git+https://github.com/frankie567/httpx-ws.git@f9f2555603f40053f84adf6890e6cda245294b18#egg=httpx-ws",
+        ".",
+    )
     session.run("pytest", *args)
 
 

@@ -2,9 +2,9 @@ from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fixbackend.config import Config
 from fixbackend.organizations.dependencies import UserTenantsDependency
-from fixbackend.events.event_service import EventServiceDependency
+from fixbackend.events.websocket_event_handler import WebsockedtEventHandlerDependency
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def websocket_router(config: Config) -> APIRouter:
@@ -12,7 +12,10 @@ def websocket_router(config: Config) -> APIRouter:
 
     @router.websocket("/events/{tenant_id}")
     async def events(
-        websocket: WebSocket, tenant_id: UUID, tenants: UserTenantsDependency, event_service: EventServiceDependency
+        websocket: WebSocket,
+        tenant_id: UUID,
+        tenants: UserTenantsDependency,
+        event_handler: WebsockedtEventHandlerDependency,
     ) -> None:
         await websocket.accept()
         # check if the user is authorized to listen to this tenant
@@ -21,7 +24,7 @@ def websocket_router(config: Config) -> APIRouter:
             await websocket.close()
             return
 
-        event_service.register_tenant_listener(tenant_id, websocket)
+        await event_handler.register_tenant_listener(tenant_id, websocket)
 
         last_received_pong: datetime = datetime.utcnow()
         closed = False
@@ -43,6 +46,6 @@ def websocket_router(config: Config) -> APIRouter:
             tg.create_task(receive_messages())
 
         # remove the listener once the connection is closed
-        event_service.unregister_tenant_listener(tenant_id, websocket)
+        await event_handler.unregister_tenant_listener(websocket)
 
     return router

@@ -13,7 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import AsyncIterator
+from typing import Any, AsyncIterator, Dict
+from uuid import UUID
+
+from fastapi import WebSocket
 
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
@@ -24,7 +27,10 @@ from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 from fixbackend.organizations.dependencies import get_user_tenants
-from fixbackend.events.event_service import EventService, get_event_service
+from fixbackend.events.websocket_event_handler import (
+    WebsocketEventHandler,
+    get_websocket_event_handler,
+)
 import uuid
 
 from httpx_ws import aconnect_ws
@@ -33,7 +39,28 @@ from httpx_ws.transport import ASGIWebSocketTransport
 
 tenant_id = uuid.uuid4()
 
-event_service = EventService()
+
+class WebsocketHandlerMock(WebsocketEventHandler):
+    def __init__(
+        self,
+    ) -> None:
+        self.tenants: Dict[UUID, WebSocket] = {}
+
+    async def send_to_tenant(self, tenant_id: UUID, message: Any) -> None:
+        websocket = self.tenants[tenant_id]
+        await websocket.send_json(message)
+
+    async def register_tenant_listener(self, tenant_id: UUID, websocket: WebSocket) -> None:
+        self.tenants[tenant_id] = websocket
+
+    async def unregister_tenant_listener(self, websocket: WebSocket) -> None:
+        for tenant_id, ws in self.tenants.items():
+            if ws == websocket:
+                del self.tenants[tenant_id]
+                break
+
+
+event_service = WebsocketHandlerMock()
 
 
 @pytest.fixture
@@ -43,7 +70,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_user_tenants] = lambda: [tenant_id]
-    app.dependency_overrides[get_event_service] = lambda: event_service
+    app.dependency_overrides[get_websocket_event_handler] = lambda: event_service
 
     async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:
         yield ac
@@ -52,9 +79,6 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 @pytest.mark.asyncio
 async def test_websocket(websocket_client: AsyncClient) -> None:
     async with aconnect_ws(f"/ws/events/{tenant_id}", websocket_client) as ws:
-        message = await ws.receive_json()
-        assert message["type"] == "ping"
-        await ws.send_json({"type": "pong"})
         await event_service.send_to_tenant(tenant_id, {"type": "foo"})
         message = await ws.receive_json()
         assert message["type"] == "foo"
