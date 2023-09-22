@@ -14,7 +14,7 @@
 import pytest
 from redis.asyncio import Redis
 
-from fixbackend.collect.collect_queue import RedisCollectQueue, JobAlreadyEnqueued
+from fixbackend.collect.collect_queue import RedisCollectQueue, JobAlreadyEnqueued, AwsAccountInformation
 from fixbackend.db_handler.graph_db_access import GraphDatabaseAccessHolder
 
 
@@ -26,9 +26,25 @@ async def test_redis_collect_queue(
     assert set(await arq_redis.keys()) == set()
     # enqueue new job
     access = graph_database_access_holder.database_for_current_tenant()
-    config = {"resotoworker": {"collector": ["aws"]}}
-    await collect_queue.enqueue(access, config, 1, job_id="test")
+    aws_account = AwsAccountInformation("123", "test", "arn", "1234")
+    await collect_queue.enqueue(access, aws_account, job_id="test")
     assert set(await arq_redis.keys()) == {b"arq:queue", b"arq:job:test"}
     # enqueue again will fail
     with pytest.raises(JobAlreadyEnqueued):
-        await collect_queue.enqueue(access, config, 1, job_id="test")
+        await collect_queue.enqueue(access, aws_account, job_id="test")
+
+
+async def test_aws_account_info_json() -> None:
+    aws_account_info = AwsAccountInformation(
+        aws_account_id="123456789012",
+        aws_account_name="test",
+        aws_role_arn="arn:aws:iam::123456789012:role/test",
+        external_id="test",
+    )
+    assert aws_account_info.to_json() == {
+        "kind": "aws_account_information",
+        "aws_account_id": "123456789012",
+        "aws_account_name": "test",
+        "aws_role_arn": "arn:aws:iam::123456789012:role/test",
+        "external_id": "test",
+    }
