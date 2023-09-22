@@ -19,13 +19,13 @@ from fastapi import Depends
 from fastapi_users import FastAPIUsers
 from fixbackend.config import get_config
 
-from fixbackend.auth.jwt import get_cookie_auth_backend
+from fixbackend.auth.jwt import get_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 
 
 # todo: use dependency injection
-fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_cookie_auth_backend(get_config())])
+fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_auth_backend(get_config())])
 
 
 # the value below is a dependency itsef

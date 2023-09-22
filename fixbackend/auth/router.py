@@ -22,17 +22,17 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
 from fixbackend.auth.dependencies import fastapi_users
-from fixbackend.auth.jwt import get_cookie_auth_backend
-from fixbackend.auth.oauth import oauth_redirect_backend, get_oauth_router
+from fixbackend.auth.jwt import get_auth_backend
+from fixbackend.auth.oauth import get_oauth_router
 from fixbackend.auth.schemas import UserRead, UserCreate, OAuthProviderAuthUrl
 from fixbackend.config import Config
 
 
 async def get_auth_url(
-    request: Request, state: str, client: BaseOAuth2[Any], oauth_auth_backend: AuthenticationBackend[Any, Any]
+    request: Request, state: str, client: BaseOAuth2[Any], auth_backend: AuthenticationBackend[Any, Any]
 ) -> OAuthProviderAuthUrl:
     # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41 # noqa
-    callback_url_name = f"oauth:{client.name}.{oauth_auth_backend.name}.callback"
+    callback_url_name = f"oauth:{client.name}.{auth_backend.name}.callback"
     # where oauth should call us back
     callback_url = str(request.url_for(callback_url_name))
     # the link to start the authorization with Google
@@ -43,13 +43,12 @@ async def get_auth_url(
 def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitHubOAuth2) -> APIRouter:
     router = APIRouter()
 
-    oauth_auth_backend = oauth_redirect_backend(config)
-    cookie_auth_backend = get_cookie_auth_backend(config)
+    auth_backend = get_auth_backend(config)
 
     router.include_router(
         get_oauth_router(
             google_client,
-            oauth_auth_backend,
+            auth_backend,
             config.secret,
             is_verified_by_default=True,
             associate_by_email=True,
@@ -63,7 +62,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     router.include_router(
         get_oauth_router(
             github_client,
-            oauth_auth_backend,
+            auth_backend,
             config.secret,
             is_verified_by_default=True,
             associate_by_email=True,
@@ -75,7 +74,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     router.include_router(
-        fastapi_users.get_auth_router(cookie_auth_backend, requires_verification=True),
+        fastapi_users.get_auth_router(auth_backend, requires_verification=True),
         prefix="/jwt",
         tags=["auth"],
     )
@@ -102,6 +101,6 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         state = generate_state_token(state_data, config.secret)
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
-        return [await get_auth_url(request, state, client, oauth_auth_backend) for client in clients]
+        return [await get_auth_url(request, state, client, auth_backend) for client in clients]
 
     return router
