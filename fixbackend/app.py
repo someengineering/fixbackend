@@ -21,6 +21,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import FastAPI, Request, Response
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
@@ -76,6 +77,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def ready() -> Response:
         return Response(status_code=200)
 
+    Instrumentator().instrument(app).expose(app)
     app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
     app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
     app.include_router(cloud_accounts_router(), prefix="/api/cloud", tags=["cloud_accounts"])
