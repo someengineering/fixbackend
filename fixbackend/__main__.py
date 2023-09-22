@@ -25,7 +25,14 @@ def main() -> None:
         alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
         command.upgrade(alembic_cfg, "head")
 
-    uvicorn.run("fixbackend.app:setup_process", host="0.0.0.0", log_level="info", forwarded_allow_ips="*")
+    uvicorn.run(
+        "fixbackend.app:setup_process",
+        host="0.0.0.0",
+        log_level="info",
+        forwarded_allow_ips="*",
+        ws_ping_interval=1,
+        ws_ping_timeout=5,
+    )
 
 
 if __name__ == "__main__":

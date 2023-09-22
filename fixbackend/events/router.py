@@ -26,14 +26,6 @@ def websocket_router(config: Config) -> APIRouter:
         last_received_pong: datetime = datetime.utcnow()
         closed = False
 
-        async def send_pings() -> None:
-            try:
-                while not closed:
-                    await websocket.send_json({"type": "ping"})
-                    await asyncio.sleep(1)
-            except WebSocketDisconnect:
-                pass
-
         async def receive_messages() -> None:
             try:
                 while not closed:
@@ -47,25 +39,10 @@ def websocket_router(config: Config) -> APIRouter:
             except WebSocketDisconnect:
                 pass
 
-        async def check_pongs() -> None:
-            nonlocal closed
-            try:
-                while not closed:
-                    await asyncio.sleep(1)
-                    if datetime.utcnow() - last_received_pong > timedelta(seconds=10):
-                        await websocket.close()
-                        closed = True
-                        return
-            except WebSocketDisconnect:
-                pass
-
-        # start all tasks and wait till exception or close
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(send_pings())
             tg.create_task(receive_messages())
-            tg.create_task(check_pongs())
 
         # remove the listener once the connection is closed
-        # event_service.unregister_tenant_listener(tenant_id, websocket)
+        event_service.unregister_tenant_listener(tenant_id, websocket)
 
     return router
