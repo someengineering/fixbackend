@@ -22,16 +22,17 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import User
 from fixbackend.base_model import Base
+from fixbackend.ids import TenantId, OrganizationId
 
 
 class Organization(Base):
     __tablename__ = "organization"
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    id: Mapped[OrganizationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
     external_id: Mapped[uuid.UUID] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
+    tenant_id: Mapped[TenantId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization")
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization")
 

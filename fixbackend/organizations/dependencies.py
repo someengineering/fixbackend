@@ -1,17 +1,17 @@
-from typing import Annotated, List
-from uuid import UUID
+from typing import Annotated, Dict
 
 from fastapi import Depends
 from fixbackend.auth.dependencies import AuthenticatedUser
 from fixbackend.organizations.service import OrganizationServiceDependency
+from fixbackend.ids import TenantId, OrganizationId
 
 
 # todo: take this info from the user's JWT
-async def get_user_tenants(
+async def get_user_organization_ids(
     user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
-) -> List[UUID]:
+) -> Dict[OrganizationId, TenantId]:
     orgs = await organization_service.list_organizations(user_context.user.id)
-    return [org.tenant_id for org in orgs]
+    return {org.id: org.tenant_id for org in orgs}
 
 
-UserTenantsDependency = Annotated[List[UUID], Depends(get_user_tenants)]
+UserOrganizationsDependency = Annotated[Dict[OrganizationId, TenantId], Depends(get_user_organization_ids)]
