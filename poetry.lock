@@ -1130,6 +1130,27 @@ files = [
 httpx = ">=0.18,<0.25"
 
 [[package]]
+name = "httpx-ws"
+version = "0.4.1"
+description = "WebSockets support for HTTPX"
+optional = false
+python-versions = ">=3.8"
+files = []
+develop = false
+
+[package.dependencies]
+anyio = "*"
+httpcore = ">=0.17.3,<0.18"
+httpx = ">=0.23.1"
+wsproto = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/frankie567/httpx-ws.git"
+reference = "f9f2555603f40053f84adf6890e6cda245294b18"
+resolved_reference = "f9f2555603f40053f84adf6890e6cda245294b18"
+
+[[package]]
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -2766,6 +2787,20 @@ files = [
 ]
 
 [[package]]
+name = "wsproto"
+version = "1.2.0"
+description = "WebSockets state-machine based protocol implementation"
+optional = false
+python-versions = ">=3.7.0"
+files = [
+    {file = "wsproto-1.2.0-py3-none-any.whl", hash = "sha256:b9acddd652b585d75b20477888c56642fdade28bdfd3579aa24a4d2c037dd736"},
+    {file = "wsproto-1.2.0.tar.gz", hash = "sha256:ad565f26ecb92588a3e43bc3d96164de84cd9902482b130d0ddbaa9664a85065"},
+]
+
+[package.dependencies]
+h11 = ">=0.9.0,<1"
+
+[[package]]
 name = "zipp"
 version = "3.16.2"
 description = "Backport of pathlib-compatible object wrapper for zip files"
@@ -2783,4 +2818,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9"
-content-hash = "7ad017f765a98d94b4128f00dfcd33d48d32774c09211f98704d6783a29bb1ab"
+content-hash = "b4c0541b4139f0bc1941af785e971b5cb7bd62802457ec79eca6e22a6eaa7932"

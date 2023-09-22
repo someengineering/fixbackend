@@ -24,28 +24,40 @@ def websocket_router(config: Config) -> APIRouter:
         event_service.register_tenant_listener(tenant_id, websocket)
 
         last_received_pong: datetime = datetime.utcnow()
+        closed = False
 
         async def send_pings() -> None:
-            while True:
-                await asyncio.sleep(1)
-                await websocket.send_json({"type": "ping"})
+            try:
+                while not closed:
+                    await websocket.send_json({"type": "ping"})
+                    await asyncio.sleep(1)
+            except WebSocketDisconnect:
+                pass
 
         async def receive_messages() -> None:
-            while True:
-                message = await websocket.receive_json()
-                match message["type"]:
-                    case "pong":
-                        nonlocal last_received_pong
-                        last_received_pong = datetime.utcnow()
-                    case _:
-                        await websocket.send_json({"error": "Unknown message type"})
+            try:
+                while not closed:
+                    message = await websocket.receive_json()
+                    match message["type"]:
+                        case "pong":
+                            nonlocal last_received_pong
+                            last_received_pong = datetime.utcnow()
+                        case _:
+                            await websocket.send_json({"error": "Unknown message type"})
+            except WebSocketDisconnect:
+                pass
 
         async def check_pongs() -> None:
-            while True:
-                await asyncio.sleep(1)
-                if datetime.utcnow() - last_received_pong > timedelta(seconds=10):
-                    await websocket.close()
-                    raise WebSocketDisconnect()
+            nonlocal closed
+            try:
+                while not closed:
+                    await asyncio.sleep(1)
+                    if datetime.utcnow() - last_received_pong > timedelta(seconds=10):
+                        await websocket.close()
+                        closed = True
+                        return
+            except WebSocketDisconnect:
+                pass
 
         # start all tasks and wait till exception or close
         async with asyncio.TaskGroup() as tg:
@@ -54,6 +66,6 @@ def websocket_router(config: Config) -> APIRouter:
             tg.create_task(check_pongs())
 
         # remove the listener once the connection is closed
-        event_service.unregister_tenant_listener(tenant_id, websocket)
+        # event_service.unregister_tenant_listener(tenant_id, websocket)
 
     return router
