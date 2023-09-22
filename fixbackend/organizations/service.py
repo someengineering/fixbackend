@@ -57,9 +57,9 @@ class OrganizationService:
         results = await self.session.execute(statement)
         return results.unique().scalar_one_or_none()
 
-    async def list_organizations(self, owner_id: uuid.UUID, with_users: bool = False) -> Sequence[Organization]:
+    async def list_organizations(self, user_id: uuid.UUID, with_users: bool = False) -> Sequence[Organization]:
         """List all organizations where the user is an owner."""
-        statement = select(Organization).join(OrganizationOwners).where(OrganizationOwners.user_id == owner_id)
+        statement = select(Organization).join(OrganizationOwners).where(OrganizationOwners.user_id == user_id)
         if with_users:
             statement = statement.options(selectinload(Organization.owners), selectinload(Organization.members))
         results = await self.session.execute(statement)
