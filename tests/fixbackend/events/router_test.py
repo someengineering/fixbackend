@@ -50,14 +50,13 @@ class WebsocketHandlerMock(WebsocketEventHandler):
         websocket = self.tenants[tenant_id]
         await websocket.send_json(message)
 
-    async def register_tenant_listener(self, tenant_id: UUID, websocket: WebSocket) -> None:
+    async def handle_websocket(self, tenant_id: UUID, websocket: WebSocket) -> None:
         self.tenants[tenant_id] = websocket
-
-    async def unregister_tenant_listener(self, websocket: WebSocket) -> None:
-        for tenant_id, ws in self.tenants.items():
-            if ws == websocket:
-                del self.tenants[tenant_id]
-                break
+        try:
+            while True:
+                await websocket.receive_json()
+        except Exception:
+            pass
 
 
 event_service = WebsocketHandlerMock()

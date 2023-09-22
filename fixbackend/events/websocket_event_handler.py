@@ -17,29 +17,25 @@ ReadonlyRedisDependency = Annotated[Redis, Depends(get_readonly_redis)]
 
 class WebsocketEventHandler:
     def __init__(self, readonly_redis: ReadonlyRedisDependency) -> None:
-        self.connected_tenants: Dict[WebSocket, RedisPubSubListener] = {}
         self.readonly_redis = readonly_redis
 
-    async def register_tenant_listener(self, tenant_id: UUID, websocket: WebSocket) -> None:
-        async def message_handler(id: str, at: datetime, publisher: str, kind: str, data: Dict[str, Any]) -> None:
+    async def handle_websocket(self, tenant_id: UUID, websocket: WebSocket) -> None:
+        async def redis_message_handler(id: str, at: datetime, publisher: str, kind: str, data: Dict[str, Any]) -> None:
             await websocket.send_json(
                 {"type": "event", "id": id, "at": at, "publisher": publisher, "kind": kind, "data": data}
             )
 
-        listener = RedisPubSubListener(
+        async with RedisPubSubListener(
             redis=self.readonly_redis,
             channel=f"tenant-events::{tenant_id}",
-            handler=message_handler,
-        )
+            handler=redis_message_handler,
+        ):
+            try:
+                while True:
+                    await websocket.receive_json()
 
-        self.connected_tenants[websocket] = listener
-
-        await listener.start()
-
-    async def unregister_tenant_listener(self, websocket: WebSocket) -> None:
-        if listener := self.connected_tenants.get(websocket):
-            await listener.stop()
-            del self.connected_tenants[websocket]
+            except Exception:
+                pass
 
 
 def get_websocket_event_handler(readonly_redis: ReadonlyRedisDependency) -> WebsocketEventHandler:
