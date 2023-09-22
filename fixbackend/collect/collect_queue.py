@@ -13,9 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, ClassVar
 
 from arq import ArqRedis
+from attr import define
+from cattr import unstructure
 from fixcloudutils.types import Json
 
 from fixbackend.db_handler.graph_db_access import GraphDatabaseAccess
@@ -29,13 +31,30 @@ class JobAlreadyEnqueued(Exception):
     """
 
 
+class AccountInformation(ABC):
+    kind: ClassVar[str] = "account_information"
+
+    def to_json(self) -> Json:
+        js: Json = unstructure(self)
+        js["kind"] = self.kind
+        return js
+
+
+@define
+class AwsAccountInformation(AccountInformation):
+    kind: ClassVar[str] = "aws_account_information"
+    aws_account_id: str
+    aws_account_name: Optional[str]
+    aws_role_arn: str
+    external_id: str
+
+
 class CollectQueue(ABC):
     @abstractmethod
     async def enqueue(
         self,
         db: GraphDatabaseAccess,
-        worker_config: Json,
-        account_len_hint: int,
+        account: AccountInformation,
         *,
         env: Optional[Dict[str, str]] = None,
         job_id: Optional[str] = None,
@@ -45,9 +64,8 @@ class CollectQueue(ABC):
         Enqueue a collect job. This method will only put the job into the queue.
 
         :param db: The database access configuration.
-        :param worker_config: A complete resoto worker configuration.
+        :param account: The account information to collect.
         :param env: The environment variables to pass to the worker.
-        :param account_len_hint: The number of accounts to collect.
         :param job_id: Globally unique identifier of this job.
                If provided and another job exists with the same id, the job will not be enqueued.
         :param wait_until_done: If true, this method will wait until the job is completed.
@@ -63,8 +81,7 @@ class RedisCollectQueue(CollectQueue):
     async def enqueue(
         self,
         db: GraphDatabaseAccess,
-        worker_config: Json,
-        account_len_hint: int,
+        account: AccountInformation,
         *,
         env: Optional[Dict[str, str]] = None,
         job_id: Optional[str] = None,
@@ -76,16 +93,13 @@ class RedisCollectQueue(CollectQueue):
             graphdb_database=db.database,
             graphdb_username=db.username,
             graphdb_password=db.password,
-            worker_config=worker_config,
+            account=account.to_json(),
             env=env or {},
-            account_len_hint=account_len_hint,
         )
         job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id)
         if job is None:
             raise JobAlreadyEnqueued(f"Failed to enqueue collect job {job_id}")
-        log.info(
-            f"Enqueuing collect job {job.job_id} for tenant={db.tenant_id} and account_len_hint={account_len_hint}"
-        )
+        log.info(f"Enqueuing collect job {job.job_id} for tenant={db.tenant_id}")
         if wait_until_done:
             # this will either return none or throw an exception (reraised from the worker)
             log.debug("Waiting for collect job to finish.")
