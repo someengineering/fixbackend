@@ -57,9 +57,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
     )
-    parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix-database"))
-    parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "mariadb"))
-    parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD"))
+    parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
+    parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
+    parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
     parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
     parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
     parser.add_argument("--secret", default="secret")
