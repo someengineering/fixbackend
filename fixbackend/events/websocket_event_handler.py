@@ -16,7 +16,7 @@ ReadonlyRedisDependency = Annotated[Redis, Depends(get_readonly_redis)]
 
 
 class WebsocketEventHandler:
-    def __init__(self, readonly_redis: ReadonlyRedisDependency) -> None:
+    def __init__(self, readonly_redis: Redis) -> None:
         self.readonly_redis = readonly_redis
 
     async def handle_websocket(self, tenant_id: TenantId, websocket: WebSocket) -> None:

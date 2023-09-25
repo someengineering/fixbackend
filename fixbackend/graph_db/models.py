@@ -11,14 +11,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from fixbackend.db_handler.graph_db_access import GraphDatabaseAccessHolder, GraphDatabaseAccessManager
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from attrs import define
+
+from fixbackend.ids import TenantId
 
 
-def test_access_holder(graph_database_access_holder: GraphDatabaseAccessHolder) -> None:
-    access = graph_database_access_holder.database_for_current_tenant()
-    assert access.tenant_id == "test"
-
-
-def test_access_manager(graph_database_access_manager: GraphDatabaseAccessManager) -> None:
-    access = graph_database_access_manager.database_for_tenant("test")
-    assert access.tenant_id == "test"
+@define
+class GraphDatabaseAccess:
+    tenant_id: TenantId
+    server: str
+    username: str
+    password: str
+    database: str

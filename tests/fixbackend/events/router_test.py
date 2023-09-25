@@ -20,12 +20,10 @@ from fastapi import WebSocket
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
-from tests.fixbackend.conftest import default_config  # noqa: F401
-from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from fixbackend.organizations.dependencies import get_user_organization_ids
+from fixbackend.auth.current_user_dependencies import get_user_organization_ids
 from fixbackend.events.websocket_event_handler import (
     WebsocketEventHandler,
     get_websocket_event_handler,

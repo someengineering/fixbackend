@@ -19,10 +19,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
-from fixbackend.auth.dependencies import AuthenticatedUser
-from fixbackend.auth.user_manager import UserManagerDependency
+from fixbackend.auth.current_user_dependencies import AuthenticatedUser
+from fixbackend.auth.dependencies import UserManagerDependency
 from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite, ExternalId
-from fixbackend.organizations.service import OrganizationServiceDependency
+from fixbackend.organizations.dependencies import OrganizationServiceDependency
 
 
 def organizations_router() -> APIRouter:
@@ -69,10 +69,7 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}/invites/")
     async def list_invites(
-        organization_id: UUID,
-        user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
-        user_manager: UserManagerDependency,
+        organization_id: UUID, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
     ) -> List[OrganizationInvite]:
         """List all pending invitations for an org."""
         org = await organization_service.get_organization(organization_id)

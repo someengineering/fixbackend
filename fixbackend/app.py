@@ -21,17 +21,19 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
-from fastapi.staticfiles import StaticFiles
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.exceptions import HTTPException
 
-from fixbackend import config
+from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router
 from fixbackend.cloud_accounts.router import cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
+from fixbackend.dependencies import FixDependencies, ServiceNames as SN
 from fixbackend.events.router import websocket_router
 from fixbackend.organizations.router import organizations_router
 
@@ -41,15 +43,18 @@ log = logging.getLogger(__name__)
 def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
+    deps = FixDependencies()
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        arq_redis = await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url))
-        RedisCollectQueue(arq_redis)
+        arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
+        deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
+        deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         if not cfg.static_assets:
             await load_app_from_cdn()
-        log.info("Application services started.")
-        yield None
+        async with deps:
+            log.info("Application services started.")
+            yield None
         await arq_redis.close()
         log.info("Application services stopped.")
 
@@ -61,6 +66,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     )
 
     app.dependency_overrides[config.config] = lambda: cfg
+    app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
 
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:

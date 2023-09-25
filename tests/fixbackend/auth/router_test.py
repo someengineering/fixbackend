@@ -13,17 +13,18 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import AsyncIterator, List, Tuple, Optional
-from fixbackend.app import fast_api_app
-from fixbackend.auth.models import User
-from tests.fixbackend.conftest import default_config  # noqa: F401
-from fixbackend.db import get_async_session
-from httpx import AsyncClient
-from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
-from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
-from fixbackend.config import config as get_config, Config
-from sqlalchemy.ext.asyncio import AsyncSession
+
 import pytest
 from fastapi import Request
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
+
+from fixbackend.app import fast_api_app
+from fixbackend.auth.models import User
+from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
+from fixbackend.config import config as get_config, Config
+from fixbackend.db import get_async_session
+from fixbackend.dependencies import fix_dependencies, FixDependencies
 
 
 class InMemoryVerifier(UserVerifier):
@@ -38,11 +39,15 @@ verifier = InMemoryVerifier()
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
+async def client(
+    db_engine: AsyncEngine, session: AsyncSession, default_config: Config
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
+    deps = FixDependencies(async_engine=db_engine)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_user_verifier] = lambda: verifier
     app.dependency_overrides[get_config] = lambda: default_config
+    app.dependency_overrides[fix_dependencies] = lambda: deps
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac

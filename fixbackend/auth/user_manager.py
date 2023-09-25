@@ -12,31 +12,29 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import uuid
-from typing import Annotated, AsyncIterator, Optional
 import re
+import uuid
+from typing import Optional
 
-from fastapi import Depends, Request
+from fastapi import Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.db import BaseUserDatabase
 from fastapi_users.password import PasswordHelperProtocol
-from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-from fixbackend.auth.db import get_user_db
 from fixbackend.auth.models import User
-from fixbackend.config import ConfigDependency
-from fixbackend.auth.user_verifier import UserVerifierDependency, UserVerifier
-from fixbackend.organizations.service import OrganizationServiceDependency
+from fixbackend.auth.user_verifier import UserVerifier
+from fixbackend.config import Config
+from fixbackend.organizations.service import OrganizationService
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     def __init__(
         self,
-        config: ConfigDependency,
+        config: Config,
         user_db: BaseUserDatabase[User, uuid.UUID],
         password_helper: PasswordHelperProtocol | None,
         user_verifier: UserVerifier,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationService,
     ):
         super().__init__(user_db, password_helper)
         self.user_verifier = user_verifier
@@ -58,20 +56,4 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def create_default_organization(self, user: User) -> None:
         org_slug = re.sub("[^a-zA-Z0-9-]", "-", user.email)
-        await self.organization_service.create_organization(
-            user.email,
-            org_slug,
-            user,
-        )
-
-
-async def get_user_manager(
-    config: ConfigDependency,
-    user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
-    user_verifier: UserVerifierDependency,
-    organization_service: OrganizationServiceDependency,
-) -> AsyncIterator[UserManager]:
-    yield UserManager(config, user_db, None, user_verifier, organization_service)
-
-
-UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]
+        await self.organization_service.create_organization(user.email, org_slug, user)
