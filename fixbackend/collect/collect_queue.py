@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Optional, ClassVar
 
 from arq import ArqRedis
-from attr import define
+from attrs import define
 from cattr import unstructure
 from fixcloudutils.types import Json
 

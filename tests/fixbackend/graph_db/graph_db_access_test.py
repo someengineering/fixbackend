@@ -11,6 +11,14 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import uuid
 
 import pytest
@@ -22,7 +30,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 
 @pytest.mark.asyncio
 async def test_access_manager(graph_database_access_manager: GraphDatabaseAccessManager) -> None:
-    tenant_id = TenantId(uuid.uuid1())
+    tenant_id = TenantId(uuid.uuid4())
     access = await graph_database_access_manager.create_database_access(tenant_id)
     again = await graph_database_access_manager.get_database_access(tenant_id)
     assert access == again
@@ -32,7 +40,7 @@ async def test_access_manager(graph_database_access_manager: GraphDatabaseAccess
 async def test_access_manager_join_session(
     graph_database_access_manager: GraphDatabaseAccessManager, async_session_maker: AsyncSessionMaker
 ) -> None:
-    tenant_id = TenantId(uuid.uuid1())
+    tenant_id = TenantId(uuid.uuid4())
     async with async_session_maker() as session:
         res = await graph_database_access_manager.create_database_access(tenant_id, session=session)
         assert res is not None

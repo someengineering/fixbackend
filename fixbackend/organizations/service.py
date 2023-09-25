@@ -35,8 +35,8 @@ class OrganizationService:
 
     async def create_organization(self, name: str, slug: str, owner: User) -> models.Organization:
         """Create an organization."""
-        org_id = OrganizationId(uuid.uuid1())
-        tenant_id = TenantId(uuid.uuid1())
+        org_id = OrganizationId(uuid.uuid4())
+        tenant_id = TenantId(uuid.uuid4())
         organization = Organization(id=org_id, name=name, slug=slug, tenant_id=tenant_id)
         owner_relationship = OrganizationOwners(user_id=owner.id)
         organization.owners.append(owner_relationship)

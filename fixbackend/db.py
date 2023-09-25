@@ -15,16 +15,15 @@
 from typing import AsyncGenerator, Annotated, Callable
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from fixbackend.config import ConfigDependency
+from fixbackend.dependencies import FixDependency
 
 AsyncSessionMaker = Callable[[], AsyncSession]
 
 
-def get_async_session_maker(config: ConfigDependency) -> AsyncSessionMaker:
-    engine = create_async_engine(config.database_url)
-    return async_sessionmaker(engine, expire_on_commit=False)
+async def get_async_session_maker(fix: FixDependency) -> AsyncSessionMaker:
+    return async_sessionmaker(fix.async_engine)
 
 
 AsyncSessionMakerDependency = Annotated[AsyncSessionMaker, Depends(get_async_session_maker)]

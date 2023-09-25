@@ -24,7 +24,7 @@ from fixbackend.ids import TenantId
 @pytest.fixture
 def graph_db_access() -> GraphDatabaseAccess:
     return GraphDatabaseAccess(
-        tenant_id=TenantId(uuid.uuid1()),
+        tenant_id=TenantId(uuid.uuid4()),
         server="http://localhost:8529",
         username="test",
         password="test",
