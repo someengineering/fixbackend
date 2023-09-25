@@ -101,7 +101,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         return Response(content=body, media_type="text/html")
 
     @app.exception_handler(404)
-    async def not_found_handler(request: Request, exception: HTTPException):
+    async def not_found_handler(request: Request, exception: HTTPException) -> Response:
         if request.url.path.startswith(API_PREFIX):
             return await http_exception_handler(request, exception)
         return await root(request)
