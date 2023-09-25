@@ -20,19 +20,20 @@ import httpx
 from arq import create_pool
 from arq.connections import RedisSettings
 from async_lru import alru_cache
-from fastapi import FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.exception_handlers import http_exception_handler
 from prometheus_fastapi_instrumentator import Instrumentator
+from starlette.exceptions import HTTPException
 
 from fixbackend import config
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router
+from fixbackend.cloud_accounts.router import cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
-from fixbackend.organizations.router import organizations_router
-from fixbackend.cloud_accounts.router import cloud_accounts_router
 from fixbackend.events.router import websocket_router
-from fastapi.staticfiles import StaticFiles
-
+from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
 
@@ -79,9 +80,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
         return Response(status_code=200)
 
     Instrumentator().instrument(app).expose(app)
-    app.include_router(auth_router(cfg, google, github), prefix="/api/auth", tags=["auth"])
-    app.include_router(organizations_router(), prefix="/api/organizations", tags=["organizations"])
-    app.include_router(cloud_accounts_router(), prefix="/api/cloud", tags=["cloud_accounts"])
+
+    API_PREFIX = "/api"
+
+    api_router = APIRouter(prefix=API_PREFIX)
+
+    api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
+    api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
+    api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
+
+    app.include_router(api_router)
     app.include_router(websocket_router(cfg), prefix="/ws", tags=["events"])
 
     if cfg.static_assets:
@@ -91,6 +99,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def root(request: Request) -> Response:
         body = await load_app_from_cdn()
         return Response(content=body, media_type="text/html")
+
+    @app.exception_handler(404)
+    async def not_found_handler(request: Request, exception: HTTPException):
+        if request.url.path.startswith(API_PREFIX):
+            return await http_exception_handler(request, exception)
+        return await root(request)
 
     return app
 
