@@ -6,7 +6,7 @@ authors = ["Some Engineering Inc."]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9"
+python = ">=3.9,<4.0"
 fastapi = "^0.101.1"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^12.1.1"}
@@ -20,6 +20,8 @@ boto3 = "^1.28.45"
 async-lru = "^2.0.4"
 arq = "^0.25.0"
 fixcloudutils = { extras = ["redis", "arango"], version = "^1.5.0" }
+prometheus-fastapi-instrumentator = ">=6.1.0"
+websockets = "^11.0.3"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -33,6 +35,7 @@ black = ">=23.7.0"
 flake8 = ">=6.1.0"
 coverage = {extras = ["toml"], version = "^7.3.1"}
 pytest-cov = "^4.1.0"
+httpx-ws = { git = "https://github.com/frankie567/httpx-ws.git", rev = "f9f2555603f40053f84adf6890e6cda245294b18" }
 
 
 [build-system]
