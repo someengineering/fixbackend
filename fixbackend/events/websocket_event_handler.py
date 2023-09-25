@@ -25,15 +25,18 @@ class WebsocketEventHandler:
                 {"type": "event", "id": id, "at": at, "publisher": publisher, "kind": kind, "data": data}
             )
 
+        async def ignore_incoming_messages(websocket: WebSocket) -> None:
+            while True:
+                await websocket.receive()
+                await websocket.send_text("Receiving messages is not supported yet.")
+
         async with RedisPubSubListener(
             redis=self.readonly_redis,
             channel=f"tenant-events::{tenant_id}",
             handler=redis_message_handler,
         ):
             try:
-                while True:
-                    await websocket.receive_json()
-
+                await ignore_incoming_messages(websocket)
             except Exception:
                 pass
 
