@@ -20,7 +20,7 @@ from attr import define
 from cattr import unstructure
 from fixcloudutils.types import Json
 
-from fixbackend.db_handler.graph_db_access import GraphDatabaseAccess
+from fixbackend.graph_db.models import GraphDatabaseAccess
 
 log = logging.getLogger(__name__)
 

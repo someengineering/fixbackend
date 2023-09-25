@@ -15,10 +15,8 @@
 from typing import AsyncIterator, List, Tuple, Optional
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
-from tests.fixbackend.conftest import default_config  # noqa: F401
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
-from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession

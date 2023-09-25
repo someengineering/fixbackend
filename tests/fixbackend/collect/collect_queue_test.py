@@ -11,27 +11,40 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import uuid
+
 import pytest
 from redis.asyncio import Redis
 
 from fixbackend.collect.collect_queue import RedisCollectQueue, JobAlreadyEnqueued, AwsAccountInformation
-from fixbackend.db_handler.graph_db_access import GraphDatabaseAccessHolder
+from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import TenantId
+
+
+@pytest.fixture
+def graph_db_access() -> GraphDatabaseAccess:
+    return GraphDatabaseAccess(
+        tenant_id=TenantId(uuid.uuid1()),
+        server="http://localhost:8529",
+        username="test",
+        password="test",
+        database="test",
+    )
 
 
 @pytest.mark.asyncio
 async def test_redis_collect_queue(
-    arq_redis: Redis, collect_queue: RedisCollectQueue, graph_database_access_holder: GraphDatabaseAccessHolder
+    arq_redis: Redis, collect_queue: RedisCollectQueue, graph_db_access: GraphDatabaseAccess
 ) -> None:
     # assert no keys in redis
     assert set(await arq_redis.keys()) == set()
     # enqueue new job
-    access = graph_database_access_holder.database_for_current_tenant()
     aws_account = AwsAccountInformation("123", "test", "arn", "1234")
-    await collect_queue.enqueue(access, aws_account, job_id="test")
+    await collect_queue.enqueue(graph_db_access, aws_account, job_id="test")
     assert set(await arq_redis.keys()) == {b"arq:queue", b"arq:job:test"}
     # enqueue again will fail
     with pytest.raises(JobAlreadyEnqueued):
-        await collect_queue.enqueue(access, aws_account, job_id="test")
+        await collect_queue.enqueue(graph_db_access, aws_account, job_id="test")
 
 
 async def test_aws_account_info_json() -> None:
