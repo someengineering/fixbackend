@@ -169,7 +169,16 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}/cf_url")
     async def get_cf_url(organization_id: UUID, user_context: AuthenticatedUser) -> str:
-        return "https://example.com"
+        external_id = "00000000-0000-0000-0000-000000000000"
+        tenant_id = "00000000-0000-0000-0000-000000000000"
+        env = "dev-eu"
+        return (
+            f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
+            f"?templateURL=https://fixpublic.s3.amazonaws.com/aws/fix-role-{env}.yaml"
+            "&stackName=FixAccess"
+            f"&param_FixTenantId={tenant_id}"
+            f"&param_FixExternalId={external_id}"
+        )
 
     @router.get("/{organization_id}/external_id")
     async def get_externa_id(
