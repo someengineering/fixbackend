@@ -22,7 +22,7 @@
 import uuid
 from typing import Annotated, Dict
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Header, HTTPException, status
 from fastapi_users import FastAPIUsers
 
 from fixbackend.auth.dependencies import get_user_manager
@@ -41,10 +41,16 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_auth_backen
 get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
 
 
+def check_csrf_token(X_FIX_CSRF: Annotated[str | None, Header()] = None) -> None:
+    if X_FIX_CSRF is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
 class CurrentVerifiedActiveUserDependencies:
     def __init__(
         self,
         user: Annotated[User, Depends(get_current_active_verified_user)],
+        csrf_token: Annotated[None, Depends(check_csrf_token)],
     ) -> None:
         self.user = user
 

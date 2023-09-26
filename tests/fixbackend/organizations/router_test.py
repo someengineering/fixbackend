@@ -22,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user
+from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, check_csrf_token
 from fixbackend.auth.models import orm
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
@@ -65,6 +65,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[check_csrf_token] = lambda: None
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
