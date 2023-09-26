@@ -12,14 +12,11 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import uuid
 from typing import Annotated, AsyncIterator
 
 from fastapi import Depends
-from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-from fixbackend.auth.db import get_user_db
-from fixbackend.auth.models import User
+from fixbackend.auth.db import UserRepositoryDependency
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_verifier import UserVerifierDependency
 from fixbackend.config import ConfigDependency
@@ -28,11 +25,11 @@ from fixbackend.organizations.dependencies import OrganizationServiceDependency
 
 async def get_user_manager(
     config: ConfigDependency,
-    user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
+    user_repository: UserRepositoryDependency,
     user_verifier: UserVerifierDependency,
     organization_service: OrganizationServiceDependency,
 ) -> AsyncIterator[UserManager]:
-    yield UserManager(config, user_db, None, user_verifier, organization_service)
+    yield UserManager(config, user_repository, None, user_verifier, organization_service)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

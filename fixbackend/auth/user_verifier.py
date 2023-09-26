@@ -12,12 +12,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, Optional
-from abc import ABC, abstractmethod
-from fastapi import Depends, Request
-from fixbackend.auth.models import User
-import boto3
 import asyncio
+from abc import ABC, abstractmethod
+from typing import Annotated, Optional
+
+import boto3
+from fastapi import Depends, Request
+
+from fixbackend.auth.models import User
 
 
 class UserVerifier(ABC):

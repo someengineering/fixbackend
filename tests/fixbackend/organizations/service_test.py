@@ -17,14 +17,14 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.db import get_user_db
+from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.organizations.service import OrganizationService
 
 
 @pytest.fixture
 async def user(session: AsyncSession) -> User:
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -44,7 +44,7 @@ async def test_create_organization(organisation_service: OrganizationService, us
     assert organization.name == "Test Organization"
     assert organization.slug == "test-organization"
     for owner in organization.owners:
-        assert owner.user == user
+        assert User.from_orm(owner.user) == user
 
     assert len(organization.members) == 0
 
@@ -78,7 +78,7 @@ async def test_list_organizations(organisation_service: OrganizationService, use
     organizations = await organisation_service.list_organizations(user.id, with_users=True)
     assert len(organizations) == 1
     assert organizations[0] == organization
-    assert organizations[0].owners[0].user == user
+    assert User.from_orm(organizations[0].owners[0].user) == user
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_add_to_organization(
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
     new_user = await user_db.create(new_user_dict)
     new_user_id = new_user.id
@@ -100,7 +100,7 @@ async def test_add_to_organization(
     retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
-    assert next(iter(retrieved_organization.members)).user == new_user
+    assert User.from_orm(next(iter(retrieved_organization.members)).user) == new_user
 
     # when adding a user which is already a member of the organization, nothing should happen
     await organisation_service.add_to_organization(organization_id=org_id, user_id=new_user_id)
@@ -117,7 +117,7 @@ async def test_create_invitation(organisation_service: OrganizationService, sess
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     user_dict = {
         "email": "123foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -138,7 +138,7 @@ async def test_accept_invitation(organisation_service: OrganizationService, sess
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     user_dict = {
         "email": "123foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -154,7 +154,7 @@ async def test_accept_invitation(organisation_service: OrganizationService, sess
     retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
-    assert next(iter(retrieved_organization.members)).user == new_user
+    assert User.from_orm(next(iter(retrieved_organization.members)).user) == new_user
 
 
 @pytest.mark.asyncio
@@ -164,7 +164,7 @@ async def test_list_invitations(organisation_service: OrganizationService, sessi
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",
@@ -187,7 +187,7 @@ async def test_delete_invitation(organisation_service: OrganizationService, sess
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_db(session))
+    user_db = await anext(get_user_repository(session))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",

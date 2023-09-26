@@ -21,11 +21,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fixbackend.auth.models import User
+from fixbackend.auth.models import User, orm
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import TenantId, OrganizationId
+from fixbackend.ids import OrganizationId, TenantId
 from fixbackend.organizations import models
-from fixbackend.organizations.models import Organization, OrganizationInvite, OrganizationOwners, OrganizationMembers
+from fixbackend.organizations.models import Organization, OrganizationInvite, OrganizationMembers, OrganizationOwners
 
 
 class OrganizationService:
@@ -95,7 +95,7 @@ class OrganizationService:
 
     async def create_invitation(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> OrganizationInvite:
         """Create an invite for an organization."""
-        user = await self.session.get(User, user_id)
+        user = await self.session.get(orm.User, user_id)
         organization = await self.get_organization(organization_id, with_users=True)
 
         if user is None or organization is None:

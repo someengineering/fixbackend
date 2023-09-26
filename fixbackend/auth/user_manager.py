@@ -18,9 +18,9 @@ from typing import Optional
 
 from fastapi import Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
-from fastapi_users.db import BaseUserDatabase
 from fastapi_users.password import PasswordHelperProtocol
 
+from fixbackend.auth.db import UserRepository
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier
 from fixbackend.config import Config
@@ -31,12 +31,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     def __init__(
         self,
         config: Config,
-        user_db: BaseUserDatabase[User, uuid.UUID],
+        user_repository: UserRepository,
         password_helper: PasswordHelperProtocol | None,
         user_verifier: UserVerifier,
         organization_service: OrganizationService,
     ):
-        super().__init__(user_db, password_helper)
+        super().__init__(user_repository, password_helper)
         self.user_verifier = user_verifier
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
