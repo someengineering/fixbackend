@@ -23,7 +23,7 @@ from fixbackend.auth.models import orm
 
 
 @frozen
-class OauthAccount(OAuthAccountProtocol[UUID]):
+class OAuthAccount(OAuthAccountProtocol[UUID]):
     id: UUID
     oauth_name: str
     access_token: str
@@ -33,8 +33,8 @@ class OauthAccount(OAuthAccountProtocol[UUID]):
     account_email: str
 
     @staticmethod
-    def from_orm(acc: orm.OAuthAccount) -> "OauthAccount":
-        return OauthAccount(
+    def from_orm(acc: orm.OAuthAccount) -> "OAuthAccount":
+        return OAuthAccount(
             id=acc.id,
             oauth_name=acc.oauth_name,
             access_token=acc.access_token,
@@ -57,14 +57,14 @@ class OauthAccount(OAuthAccountProtocol[UUID]):
 
 
 @frozen
-class User(UserOAuthProtocol[UUID, OauthAccount]):
+class User(UserOAuthProtocol[UUID, OAuthAccount]):
     id: UUID
     email: str
     hashed_password: str
     is_active: bool
     is_superuser: bool
     is_verified: bool
-    oauth_accounts: List[OauthAccount]
+    oauth_accounts: List[OAuthAccount]
 
     @staticmethod
     def from_orm(user: orm.User) -> "User":
@@ -75,7 +75,7 @@ class User(UserOAuthProtocol[UUID, OauthAccount]):
             is_active=user.is_active,
             is_superuser=user.is_superuser,
             is_verified=user.is_verified,
-            oauth_accounts=[OauthAccount.from_orm(acc) for acc in user.oauth_accounts],
+            oauth_accounts=[OAuthAccount.from_orm(acc) for acc in user.oauth_accounts],
         )
 
     def to_orm(self) -> orm.User:

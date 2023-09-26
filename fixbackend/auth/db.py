@@ -21,7 +21,7 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.models import OauthAccount, User, orm
+from fixbackend.auth.models import OAuthAccount, User, orm
 from fixbackend.db import AsyncSessionDependency
 
 
@@ -92,7 +92,7 @@ class UserRepository(BaseUserDatabase[User, UUID]):
     async def update_oauth_account(
         self,
         user: User,
-        oauth_account: OauthAccount,  # type: ignore[override]
+        oauth_account: OAuthAccount,  # type: ignore[override]
         update_dict: Dict[str, Any],
     ) -> User:
         """Update an OAuth account on a user."""
