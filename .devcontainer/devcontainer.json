@@ -25,7 +25,8 @@
 				"ms-toolsai.jupyter",
 				"ms-python.black-formatter",
 				"ms-python.mypy-type-checker",
-				"ms-python.flake8"
+				"ms-python.flake8",
+				"ms-python.isort"
 			]
 		}
 	}

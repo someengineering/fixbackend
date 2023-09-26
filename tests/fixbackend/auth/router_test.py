@@ -12,19 +12,20 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncIterator, List, Tuple, Optional
+from typing import AsyncIterator, List, Optional, Tuple
 
 import pytest
 from fastapi import Request
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
-from fixbackend.config import config as get_config, Config
+from fixbackend.config import Config
+from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.dependencies import fix_dependencies, FixDependencies
+from fixbackend.dependencies import FixDependencies, fix_dependencies
 
 
 class InMemoryVerifier(UserVerifier):
