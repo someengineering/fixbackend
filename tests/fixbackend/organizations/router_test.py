@@ -20,15 +20,12 @@ from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.db import get_async_session
 from httpx import AsyncClient
-from tests.fixbackend.conftest import default_config  # noqa: F401
-from tests.fixbackend.organizations.service_test import session, db_engine  # noqa: F401
-from fixbackend.organizations.service import (
-    get_organization_service,
-    OrganizationService,
-)
+
+from fixbackend.organizations.dependencies import get_organization_service
+from fixbackend.organizations.service import OrganizationService
 from fixbackend.organizations.models import Organization, OrganizationOwners
 from fixbackend.config import config as get_config, Config
-from fixbackend.auth.dependencies import get_current_active_verified_user
+from fixbackend.auth.current_user_dependencies import get_current_active_verified_user
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 from uuid import UUID
