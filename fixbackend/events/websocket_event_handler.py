@@ -28,7 +28,6 @@ class WebsocketEventHandler:
         async def ignore_incoming_messages(websocket: WebSocket) -> None:
             while True:
                 await websocket.receive()
-                await websocket.send_text("Receiving messages is not supported yet.")
 
         async with RedisPubSubListener(
             redis=self.readonly_redis,
