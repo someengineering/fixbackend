@@ -12,9 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Annotated, Any, AsyncIterator, Dict, Optional
 from uuid import UUID
 
+from fastapi import Depends
 from fastapi_users.db.base import BaseUserDatabase
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -24,7 +25,7 @@ from fixbackend.auth.models import OauthAccount, User, orm
 from fixbackend.db import AsyncSessionDependency
 
 
-class UserDatabase(BaseUserDatabase[User, UUID]):
+class UserRepository(BaseUserDatabase[User, UUID]):
     def __init__(
         self,
         session: AsyncSession,
@@ -110,5 +111,8 @@ class UserDatabase(BaseUserDatabase[User, UUID]):
         return User.from_orm(orm_user)
 
 
-async def get_user_db(session: AsyncSessionDependency) -> AsyncIterator[UserDatabase]:
-    yield UserDatabase(session)
+async def get_user_repository(session: AsyncSessionDependency) -> AsyncIterator[UserRepository]:
+    yield UserRepository(session)
+
+
+UserRepositoryDependency = Annotated[UserRepository, Depends(get_user_repository)]
