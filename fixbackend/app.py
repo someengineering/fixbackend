@@ -35,6 +35,9 @@ from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies, ServiceNames as SN
 from fixbackend.events.router import websocket_router
+from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.router import inventory_router
 from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
@@ -50,6 +53,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
         deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
+        client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url))
+        deps.add(SN.inventory, InventoryService(client))
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
@@ -94,6 +99,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
     api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
     api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
+    api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
 
     app.include_router(api_router)
     app.include_router(websocket_router(cfg), prefix="/ws", tags=["events"])
@@ -120,5 +126,5 @@ def setup_process() -> FastAPI:
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
     """
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, force=True)
     return fast_api_app(config.get_config())

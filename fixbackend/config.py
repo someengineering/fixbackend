@@ -42,6 +42,7 @@ class Config(BaseSettings):
     static_assets: Optional[Path]
     session_ttl: int
     available_db_server: List[str]
+    inventory_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -83,6 +84,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
     )
+    parser.add_argument("--inventory-url", default=os.environ.get("INVENTORY_URL", "http://localhost:8980"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

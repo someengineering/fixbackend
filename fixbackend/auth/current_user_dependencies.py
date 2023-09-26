@@ -63,13 +63,12 @@ async def get_user_organization_ids(
 UserOrganizationsDependency = Annotated[Dict[OrganizationId, TenantId], Depends(get_user_organization_ids)]
 
 
-# TODO: do not use list_organization, but get_organization (cached) and make sure the user can only access "its" tenants
-async def get_tenant(
-    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
-) -> TenantId:
+# TODO: make sure the user is allowed to access this organization
+async def get_tenant(request: Request, organization_service: OrganizationServiceDependency) -> TenantId:
     current_organization_id = request.path_params["organization_id"]
-    orgs = await organization_service.list_organizations(user_context.user.id)
-    return [org.tenant_id for org in orgs if org.id == current_organization_id][0]
+    org = await organization_service.get_organization(current_organization_id)
+    assert org is not None
+    return org.tenant_id
 
 
 TenantDependency = Annotated[TenantId, Depends(get_tenant)]
