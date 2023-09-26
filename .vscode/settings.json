@@ -17,7 +17,6 @@
         "--max-line-length",
         "120"
     ],
-    "mypy-type-checker.path": ["/usr/local/py-utils/bin/mypy"],
     "mypy-type-checker.args": [
         "--python-version",
         "3.11",
