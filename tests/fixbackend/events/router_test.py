@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from fixbackend.auth.current_user_dependencies import get_user_organization_ids
+from fixbackend.auth.current_user_dependencies import get_user_tenants_ids
 from fixbackend.events.websocket_event_handler import (
     WebsocketEventHandler,
     get_websocket_event_handler,
@@ -32,10 +32,9 @@ import uuid
 
 from httpx_ws import aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
-from fixbackend.ids import TenantId, OrganizationId
+from fixbackend.ids import TenantId
 
 
-organization_id = OrganizationId(uuid.uuid4())
 tenant_id = TenantId(uuid.uuid4())
 
 
@@ -67,7 +66,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_user_organization_ids] = lambda: {organization_id: tenant_id}
+    app.dependency_overrides[get_user_tenants_ids] = lambda: {tenant_id}
     app.dependency_overrides[get_websocket_event_handler] = lambda: event_service
 
     async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:
@@ -76,7 +75,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
 @pytest.mark.asyncio
 async def test_websocket(websocket_client: AsyncClient) -> None:
-    async with aconnect_ws(f"/ws/events/{organization_id}", websocket_client) as ws:
+    async with aconnect_ws(f"/ws/events/{tenant_id}", websocket_client) as ws:
         await event_service.send_to_tenant(tenant_id, {"type": "foo"})
         message = await ws.receive_json()
         assert message["type"] == "foo"

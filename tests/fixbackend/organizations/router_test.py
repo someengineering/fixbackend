@@ -40,7 +40,6 @@ organization = Organization(
     name="org name",
     slug="org-slug",
     external_id=external_id,
-    tenant_id=uuid.uuid4(),
     owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
     members=[],
 )
