@@ -28,6 +28,7 @@ from fastapi.responses import StreamingResponse
 
 from fixbackend.auth.current_user_dependencies import CurrentGraphDbDependency
 from fixbackend.dependencies import FixDependencies
+from fixbackend.inventory.inventory_service import BenchmarkSummary
 from fixbackend.streaming_response import streaming_response
 
 log = logging.getLogger(__name__)
@@ -51,5 +52,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             graph_db, benchmark_name, accounts=accounts, severity=severity, only_failing=only_failing
         )
         return streaming_response(request.headers.get("accept", "application/json"), result)
+
+    @router.get("/{organization_id}/inventory/report-summary")
+    async def summary(organization_id: UUID, graph_db: CurrentGraphDbDependency) -> List[BenchmarkSummary]:  # noqa
+        result = await fix.inventory.summary(graph_db)
+        return result
 
     return router

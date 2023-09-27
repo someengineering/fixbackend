@@ -25,7 +25,16 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
 from fixbackend.inventory.inventory_client import InventoryClient
 
+db_access = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
+
 
 async def test_execute_single(inventory_client: InventoryClient) -> None:
-    db_access = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
     assert [a async for a in inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
+
+
+async def test_report_benchmarks(inventory_client: InventoryClient) -> None:
+    result = await inventory_client.benchmarks(db_access, short=True, with_checks=True)
+    assert len(result) == 2
+    for entry in result:
+        for prop in ["id", "title", "framework", "version", "clouds", "description", "report_checks"]:
+            assert prop in entry

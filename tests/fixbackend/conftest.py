@@ -91,7 +91,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     engine = create_async_engine(DATABASE_URL)
     alembic_config = AlembicConfig("alembic.ini")
     alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    await asyncio.to_thread(alembic_upgrade, alembic_config, "head")
+    await asyncio.to_thread(alembic_upgrade, alembic_config, "head")  # noqa
 
     yield engine
 
@@ -179,6 +179,21 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
             response = ""
             for a in benchmark_json:
+                response += json.dumps(a) + "\n"
+            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/report/benchmarks":
+            info = [
+                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": ["aws_c1", "aws_c2"], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": ["gcp_c1", "gcp_c2"], "title": "GCP Test", "version": "0.2"},  # fmt: skip
+            ]
+            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
+        elif request.url.path == "/graph/resoto/search/aggregate":
+            aggregated = [
+                {"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
+                {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}  # fmt: skip
+            ]
+            response = ""
+            for a in aggregated:
                 response += json.dumps(a) + "\n"
             return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
         else:
