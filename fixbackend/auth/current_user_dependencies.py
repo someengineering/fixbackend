@@ -19,7 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import uuid
+from uuid import UUID
 from typing import Annotated, Set
 
 from fastapi import Depends, HTTPException, Request, status
@@ -35,7 +35,7 @@ from fixbackend.ids import TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 
 # todo: use dependency injection
-fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_auth_backend(get_config())])
+fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
 
 # the value below is a dependency itself
 get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
@@ -67,12 +67,16 @@ UserTenantsDependency = Annotated[Set[TenantId], Depends(get_user_tenants_ids)]
 async def get_tenant(
     request: Request, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
 ) -> TenantId:
-    current_organization_id: TenantId = request.path_params["organization_id"]
+    organization_id = request.path_params.get("organization_id")
+    try:
+        tenant_id = TenantId(UUID(organization_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization id")
     orgs = await organization_service.list_organizations(user_context.user.id)
     org_ids: Set[TenantId] = {org.id for org in orgs}
-    if current_organization_id not in org_ids:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    return current_organization_id
+    if tenant_id not in org_ids:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="You're not a member of this organization")
+    return tenant_id
 
 
 TenantDependency = Annotated[TenantId, Depends(get_tenant)]
