@@ -22,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user
+from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, get_tenant
 from fixbackend.auth.models import orm
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
@@ -64,6 +64,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[get_tenant] = lambda: org_id
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -76,9 +77,12 @@ async def test_list_organizations(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cloudformation_link(client: AsyncClient) -> None:
+async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
-    assert response.json() == "https://example.com"
+    url = response.json()
+    assert str(default_config.cf_template_url) in url
+    assert str(org_id) in url
+    assert str(external_id) in url
 
 
 @pytest.mark.asyncio
