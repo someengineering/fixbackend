@@ -18,7 +18,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from fixbackend.cloud_accounts.models import AwsCloudAccount
+from fixbackend.cloud_accounts.models import CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.ids import ExternalId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
@@ -38,7 +38,7 @@ class CloudAccountService:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository
 
-    async def create_account(self, account: AwsCloudAccount, external_id: ExternalId) -> AwsCloudAccount:
+    async def create_account(self, account: CloudAccount, external_id: ExternalId) -> CloudAccount:
         """Create a cloud account."""
 
         organization = await self.organization_service.get_organization(account.tenant_id)
@@ -47,7 +47,9 @@ class CloudAccountService:
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
-        return await self.cloud_account_repository.create(account)
+        result = await self.cloud_account_repository.create(account)
+        # await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
+        return result
 
 
 def get_cloud_account_service(

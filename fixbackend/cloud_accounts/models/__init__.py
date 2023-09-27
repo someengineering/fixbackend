@@ -11,16 +11,29 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from typing import Union
 
 from attrs import frozen
-from uuid import UUID
 
-from fixbackend.ids import TenantId
+from fixbackend.ids import TenantId, CloudAccountId
 
 
 @frozen
-class AwsCloudAccount:
-    id: UUID
-    tenant_id: TenantId
+class AwsCloudAccess:
     account_id: str
     role_name: str
+
+
+@frozen
+class GcpCloudAccess:
+    project_id: str
+
+
+CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
+
+
+@frozen
+class CloudAccount:
+    id: CloudAccountId
+    tenant_id: TenantId
+    access: CloudAccess

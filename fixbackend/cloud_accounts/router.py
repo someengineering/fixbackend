@@ -17,7 +17,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from fixbackend.cloud_accounts.models import AwsCloudAccount
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
 from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
 from fixbackend.ids import CloudAccountId
@@ -32,11 +32,13 @@ def cloud_accounts_router() -> APIRouter:
     async def aws_cloudformation_callback(
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
-        cloud_account = AwsCloudAccount(
+        cloud_account = CloudAccount(
             id=CloudAccountId(uuid.uuid4()),
             tenant_id=payload.tenant_id,
-            account_id=payload.account_id,
-            role_name=payload.role_name,
+            access=AwsCloudAccess(
+                account_id=payload.account_id,
+                role_name=payload.role_name,
+            ),
         )
         await service.create_account(cloud_account, payload.external_id)
 

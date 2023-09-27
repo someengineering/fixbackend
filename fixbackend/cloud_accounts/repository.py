@@ -11,13 +11,12 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from typing import Annotated, List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
 
-from fixbackend.cloud_accounts.models import AwsCloudAccount, orm
+from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
 from fixbackend.db import AsyncSessionMaker
 from fixbackend.ids import CloudAccountId, TenantId
 
@@ -29,25 +28,30 @@ class CloudAccountRepository:
     ) -> None:
         self.session_maker = session_maker
 
-    async def create(self, cloud_account: AwsCloudAccount) -> AwsCloudAccount:
+    async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         """Create a cloud account."""
         async with self.session_maker() as session:
-            orm_cloud_account = orm.CloudAccount(
-                id=cloud_account.id,
-                tenant_id=cloud_account.tenant_id,
-                role_name=cloud_account.role_name,
-            )
+            if isinstance(cloud_account.access, AwsCloudAccess):
+                orm_cloud_account = orm.CloudAccount(
+                    id=cloud_account.id,
+                    tenant_id=cloud_account.tenant_id,
+                    cloud="aws",
+                    account_id=cloud_account.access.account_id,
+                    aws_role_name=cloud_account.access.role_name,
+                )
+            else:
+                raise ValueError(f"Unknown cloud {cloud_account.access}")
             session.add(orm_cloud_account)
             await session.commit()
             return orm_cloud_account.to_domain()
 
-    async def get(self, id: CloudAccountId) -> Optional[AwsCloudAccount]:
+    async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:
         """Get a single cloud account by id."""
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_domain() if cloud_account else None
 
-    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[AwsCloudAccount]:
+    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == tenant_id)
