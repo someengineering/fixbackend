@@ -35,4 +35,4 @@ class BenchmarkSummary(BaseModel):
 
 class ReportSummary(BaseModel):
     accounts: List[AccountSummary] = Field(description="The accounts in the inventory.")
-    benchmarks: List[BenchmarkSummary] = Field(description="The π.")
+    benchmarks: List[BenchmarkSummary] = Field(description="The performed benchmarks.")
