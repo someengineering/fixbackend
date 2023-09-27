@@ -14,30 +14,35 @@
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Sequence, Annotated
+from typing import Optional, Sequence
 
-from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fixbackend.auth.models import User
-from fixbackend.db import get_async_session
+from fixbackend.auth.models import User, orm
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import OrganizationId, TenantId
 from fixbackend.organizations import models
-from fixbackend.organizations.models import Organization, OrganizationInvite, OrganizationOwners, OrganizationMembers
+from fixbackend.organizations.models import Organization, OrganizationInvite, OrganizationMembers, OrganizationOwners
 
 
 class OrganizationService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
         self.session = session
+        self.graph_db_access_manager = graph_db_access_manager
 
     async def create_organization(self, name: str, slug: str, owner: User) -> models.Organization:
         """Create an organization."""
-        organization = Organization(name=name, slug=slug)
+        org_id = OrganizationId(uuid.uuid4())
+        tenant_id = TenantId(uuid.uuid4())
+        organization = Organization(id=org_id, name=name, slug=slug, tenant_id=tenant_id)
         owner_relationship = OrganizationOwners(user_id=owner.id)
         organization.owners.append(owner_relationship)
         self.session.add(organization)
+        # create a database access object for this organization in the same transaction
+        await self.graph_db_access_manager.create_database_access(tenant_id, session=self.session)
 
         await self.session.commit()
         await self.session.refresh(organization)
@@ -90,7 +95,7 @@ class OrganizationService:
 
     async def create_invitation(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> OrganizationInvite:
         """Create an invite for an organization."""
-        user = await self.session.get(User, user_id)
+        user = await self.session.get(orm.User, user_id)
         organization = await self.get_organization(organization_id, with_users=True)
 
         if user is None or organization is None:
@@ -149,10 +154,3 @@ class OrganizationService:
             raise ValueError(f"Invitation {invitation_id} does not exist.")
         await self.session.delete(invite)
         await self.session.commit()
-
-
-async def get_organization_service(session: Annotated[AsyncSession, Depends(get_async_session)]) -> OrganizationService:
-    return OrganizationService(session)
-
-
-OrganizationServiceDependency = Annotated[OrganizationService, Depends(get_organization_service)]

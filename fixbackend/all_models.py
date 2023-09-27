@@ -18,5 +18,6 @@
 # If you add a new model, you need to add it here,
 # otherwise alembic won't be able to detect it
 
-from fixbackend.auth.models import User, OAuthAccount  # noqa
+from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
 from fixbackend.organizations.models import Organization, OrganizationInvite  # noqa
+from fixbackend.graph_db.models import GraphDatabaseAccess  # noqa

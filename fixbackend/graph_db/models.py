@@ -11,20 +11,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from attrs import define
 
-from typing import List
-
-from fastapi_users_db_sqlalchemy import (
-    SQLAlchemyBaseOAuthAccountTableUUID,
-    SQLAlchemyBaseUserTableUUID,
-)
-from sqlalchemy.orm import Mapped, relationship
-from fixbackend.base_model import Base
-
-
-class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    pass
+from fixbackend.ids import TenantId
 
 
-class User(SQLAlchemyBaseUserTableUUID, Base):
-    oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
+@define
+class GraphDatabaseAccess:
+    tenant_id: TenantId
+    server: str
+    username: str
+    password: str
+    database: str

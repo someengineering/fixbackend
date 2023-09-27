@@ -13,16 +13,31 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import json
 from asyncio import AbstractEventLoop
-from typing import Iterator, AsyncIterator
+from typing import Iterator, AsyncIterator, List
 
 import pytest
+from alembic.command import upgrade as alembic_upgrade
+from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from fixcloudutils.types import Json
+from httpx import MockTransport, AsyncClient, Response, Request
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
+from sqlalchemy_utils import database_exists, drop_database, create_database
 
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
-from fixbackend.db_handler.graph_db_access import GraphDatabaseAccessHolder, GraphDatabaseAccessManager
+from fixbackend.db import AsyncSessionMaker
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.organizations.service import OrganizationService
+
+DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
+# only used to create/drop the database
+SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
 
 
 @pytest.fixture(scope="session")
@@ -37,10 +52,10 @@ def event_loop() -> Iterator[AbstractEventLoop]:
 def default_config() -> Config:
     return Config(
         instance_id="",
-        database_name="",
-        database_user="",
+        database_name="fixbackend-testdb",
+        database_user="root",
         database_password=None,
-        database_host="",
+        database_host="127.0.0.1",
         database_port=3306,
         secret="",
         google_oauth_client_id="",
@@ -55,17 +70,79 @@ def default_config() -> Config:
         fixui_sha="",
         static_assets=None,
         session_ttl=3600,
+        available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
+        inventory_url="http://localhost:8980",
     )
 
 
-@pytest.fixture
-def graph_database_access_holder() -> GraphDatabaseAccessHolder:
-    return GraphDatabaseAccessHolder()
+@pytest.fixture(scope="session")
+async def db_engine() -> AsyncIterator[AsyncEngine]:
+    """
+    Creates a new database for a test and runs the migrations.
+    """
+    # make sure the db exists and it is clean
+    if database_exists(SYNC_DATABASE_URL):
+        drop_database(SYNC_DATABASE_URL)
+    create_database(SYNC_DATABASE_URL)
+
+    while not database_exists(SYNC_DATABASE_URL):
+        await asyncio.sleep(0.1)
+
+    engine = create_async_engine(DATABASE_URL)
+    alembic_config = AlembicConfig("alembic.ini")
+    alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
+    await asyncio.to_thread(alembic_upgrade, alembic_config, "head")
+
+    yield engine
+
+    await engine.dispose()
+    try:
+        drop_database(SYNC_DATABASE_URL)
+    except Exception:
+        pass
 
 
 @pytest.fixture
-def graph_database_access_manager() -> GraphDatabaseAccessManager:
-    return GraphDatabaseAccessManager()
+async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    """
+    Creates a new database session for a test, that is bound to the
+    database transaction and rolled back after the test is done.
+
+    Allows for running tests in parallel.
+    """
+    connection = db_engine.connect()
+    await connection.start()
+    transaction = connection.begin()
+    await transaction.start()
+    session = AsyncSession(bind=connection)
+
+    yield session
+
+    await session.close()
+    await transaction.close()
+    await connection.close()
+
+
+@pytest.fixture
+def async_session_maker(session: AsyncSession) -> AsyncSessionMaker:
+    def get_session() -> AsyncSession:
+        return session
+
+    return get_session
+
+
+@pytest.fixture
+def graph_database_access_manager(
+    default_config: Config, async_session_maker: AsyncSessionMaker
+) -> GraphDatabaseAccessManager:
+    return GraphDatabaseAccessManager(default_config, async_session_maker)
+
+
+@pytest.fixture
+def organisation_service(
+    session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
+) -> OrganizationService:
+    return OrganizationService(session, graph_database_access_manager)
 
 
 @pytest.fixture
@@ -82,3 +159,37 @@ async def arq_redis() -> AsyncIterator[ArqRedis]:
 @pytest.fixture
 async def collect_queue(arq_redis: ArqRedis) -> RedisCollectQueue:
     return RedisCollectQueue(arq_redis)
+
+
+@pytest.fixture
+async def benchmark_json() -> List[Json]:
+    return [
+        {"id": "a", "type": "node", "reported": {"kind": "report_benchmark", "name": "benchmark_name"}},
+        {"id": "b", "type": "node", "reported": {"kind": "report_check_result", "title": "Something"}},
+        {"from": "a", "to": "b", "type": "edge", "edge_type": "default"},
+    ]
+
+
+@pytest.fixture
+async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[InventoryClient]:
+    async def app(request: Request) -> Response:
+        content = request.content.decode("utf-8")
+        if request.url.path == "/cli/execute" and content == "json [1,2,3]":
+            return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
+            response = ""
+            for a in benchmark_json:
+                response += json.dumps(a) + "\n"
+            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+        else:
+            raise Exception(f"Unexpected request: {request.url.path} with content {content}")
+
+    async_client = AsyncClient(transport=MockTransport(app))
+    async with InventoryClient("http://localhost:8980", client=async_client) as client:
+        yield client
+
+
+@pytest.fixture
+async def inventory_service(inventory_client: InventoryClient) -> AsyncIterator[InventoryService]:
+    async with InventoryService(inventory_client) as service:
+        yield service

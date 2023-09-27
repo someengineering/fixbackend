@@ -18,7 +18,7 @@ from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 
 from fixbackend.config import Config
-from fixbackend.auth.user_manager import UserManagerDependency
+from fixbackend.auth.dependencies import UserManagerDependency
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Response, Query

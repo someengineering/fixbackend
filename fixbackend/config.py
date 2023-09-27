@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence
+from typing import Annotated, Optional, Sequence, List
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -41,6 +41,8 @@ class Config(BaseSettings):
     fixui_sha: str
     static_assets: Optional[Path]
     session_ttl: int
+    available_db_server: List[str]
+    inventory_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -56,9 +58,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
     )
-    parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix-database"))
-    parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "mariadb"))
-    parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD"))
+    parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
+    parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
+    parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
     parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
     parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
     parser.add_argument("--secret", default="secret")
@@ -79,6 +81,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
     parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", 3600)))
+    parser.add_argument(
+        "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
+    )
+    parser.add_argument("--inventory-url", default=os.environ.get("INVENTORY_URL", "http://localhost:8980"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

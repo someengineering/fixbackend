@@ -20,7 +20,7 @@ from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import ForeignKey, String, DateTime
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
-from fixbackend.auth.models import User
+from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
 from fixbackend.ids import TenantId, OrganizationId
 
@@ -44,7 +44,7 @@ class OrganizationInvite(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
     organization: Mapped[Organization] = relationship(lazy="joined")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), nullable=False)
-    user: Mapped[User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship(lazy="joined")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -58,7 +58,7 @@ class OrganizationOwners(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), primary_key=True)
     organization: Mapped[Organization] = relationship(back_populates="owners", lazy="joined")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
-    user: Mapped[User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship(lazy="joined")
 
 
 class OrganizationMembers(Base):
@@ -71,4 +71,4 @@ class OrganizationMembers(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), primary_key=True)
     organization: Mapped[Organization] = relationship(back_populates="members", lazy="joined")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
-    user: Mapped[User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship(lazy="joined")

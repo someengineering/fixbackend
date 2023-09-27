@@ -11,14 +11,22 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from fixbackend.db_handler.graph_db_access import GraphDatabaseAccessHolder, GraphDatabaseAccessManager
 
 
-def test_access_holder(graph_database_access_holder: GraphDatabaseAccessHolder) -> None:
-    access = graph_database_access_holder.database_for_current_tenant()
-    assert access.tenant_id == "test"
+from typing import List
 
 
-def test_access_manager(graph_database_access_manager: GraphDatabaseAccessManager) -> None:
-    access = graph_database_access_manager.database_for_tenant("test")
-    assert access.tenant_id == "test"
+from fastapi_users_db_sqlalchemy import (
+    SQLAlchemyBaseOAuthAccountTableUUID,
+    SQLAlchemyBaseUserTableUUID,
+)
+from sqlalchemy.orm import Mapped, relationship
+from fixbackend.base_model import Base
+
+
+class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+    pass
+
+
+class User(SQLAlchemyBaseUserTableUUID, Base):
+    oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")

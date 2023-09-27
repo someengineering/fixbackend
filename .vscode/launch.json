@@ -21,6 +21,12 @@
             "env": {
                 "PYDEVD_DISABLE_FILE_VALIDATION": "1"
             }
-        }
+        },
+        {
+            "name": "Debug Unit Test",
+            "type": "python",
+            "request": "test",
+            "justMyCode": false,
+        },
     ]
 }
