@@ -8,7 +8,7 @@ from fixbackend.ids import TenantId
 def websocket_router(config: Config) -> APIRouter:
     router = APIRouter()
 
-    @router.websocket("/events/{organization_id}")
+    @router.websocket("/{organization_id}/events")
     async def events(
         websocket: WebSocket,
         organization_id: TenantId,

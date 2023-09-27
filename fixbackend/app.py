@@ -100,9 +100,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
     api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
     api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
     api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
+    api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
 
     app.include_router(api_router)
-    app.include_router(websocket_router(cfg), prefix="/ws", tags=["events"])
 
     if cfg.static_assets:
         app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
