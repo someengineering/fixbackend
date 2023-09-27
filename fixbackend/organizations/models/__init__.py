@@ -12,33 +12,31 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from typing import List, Optional
+from datetime import datetime
+from typing import List
 from uuid import UUID
 
 from attrs import frozen
-from fastapi_users.models import OAuthAccountProtocol, UserOAuthProtocol
 
-from fixbackend.ids import UserId
+from fixbackend.ids import TenantId, UserId
 
 
 @frozen
-class OAuthAccount(OAuthAccountProtocol[UUID]):
+class Organization:
+    id: TenantId
+    slug: str
+    name: str
+    external_id: UUID
+    owners: List[UserId]
+    members: List[UserId]
+
+    def all_users(self) -> List[UserId]:
+        return self.owners + self.members
+
+
+@frozen
+class OrganizationInvite:
     id: UUID
-    oauth_name: str
-    access_token: str
-    expires_at: Optional[int]
-    refresh_token: Optional[str]
-    account_id: str
-    account_email: str
-
-
-@frozen
-class User(UserOAuthProtocol[UUID, OAuthAccount]):
-    id: UserId
-    email: str
-    hashed_password: str
-    is_active: bool
-    is_superuser: bool
-    is_verified: bool
-    oauth_accounts: List[OAuthAccount]
+    organization_id: TenantId
+    user_id: UserId
+    expires_at: datetime

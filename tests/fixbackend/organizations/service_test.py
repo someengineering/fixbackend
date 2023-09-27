@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
+from fixbackend.ids import TenantId, UserId
 from fixbackend.organizations.service import OrganizationService
 
 
@@ -44,7 +45,7 @@ async def test_create_organization(organisation_service: OrganizationService, us
     assert organization.name == "Test Organization"
     assert organization.slug == "test-organization"
     for owner in organization.owners:
-        assert User.from_orm(owner.user) == user
+        assert owner == user.id
 
     assert len(organization.members) == 0
 
@@ -64,7 +65,7 @@ async def test_get_organization(organisation_service: OrganizationService, user:
     assert retrieved_organization == organization
 
     # if the organization does not exist, None should be returned
-    retrieved_organization = await organisation_service.get_organization(uuid.uuid4())
+    retrieved_organization = await organisation_service.get_organization(TenantId(uuid.uuid4()))
     assert retrieved_organization is None
 
 
@@ -78,7 +79,7 @@ async def test_list_organizations(organisation_service: OrganizationService, use
     organizations = await organisation_service.list_organizations(user.id, with_users=True)
     assert len(organizations) == 1
     assert organizations[0] == organization
-    assert User.from_orm(organizations[0].owners[0].user) == user
+    assert organizations[0].owners[0] == user.id
 
 
 @pytest.mark.asyncio
@@ -100,14 +101,14 @@ async def test_add_to_organization(
     retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
-    assert User.from_orm(next(iter(retrieved_organization.members)).user) == new_user
+    assert retrieved_organization.members[0] == new_user.id
 
     # when adding a user which is already a member of the organization, nothing should happen
     await organisation_service.add_to_organization(organization_id=org_id, user_id=new_user_id)
 
     # when adding a non-existing user to the organization, an exception should be raised
     with pytest.raises(Exception):
-        await organisation_service.add_to_organization(organization_id=org_id, user_id=uuid.uuid4())
+        await organisation_service.add_to_organization(organization_id=org_id, user_id=UserId(uuid.uuid4()))
 
 
 @pytest.mark.asyncio
@@ -154,7 +155,7 @@ async def test_accept_invitation(organisation_service: OrganizationService, sess
     retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
-    assert User.from_orm(next(iter(retrieved_organization.members)).user) == new_user
+    assert retrieved_organization.members[0] == new_user.id
 
 
 @pytest.mark.asyncio
