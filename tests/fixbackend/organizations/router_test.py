@@ -80,7 +80,7 @@ async def test_list_organizations(client: AsyncClient) -> None:
 async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
     url = response.json()
-    assert str(default_config.cloudformation_env) in url
+    assert str(default_config.cf_template_url) in url
     assert str(org_id) in url
     assert str(external_id) in url
 

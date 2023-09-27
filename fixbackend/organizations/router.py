@@ -176,10 +176,9 @@ def organizations_router() -> APIRouter:
         org = await organization_service.get_organization(organization_id)
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
-        env = config.cloudformation_env
         return (
             f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
-            f"?templateURL=https://fixpublic.s3.amazonaws.com/aws/fix-role-{env}.yaml"
+            f"?templateURL={config.cf_template_url}"
             "&stackName=FixAccess"
             f"&param_FixTenantId={tenant_id}"
             f"&param_FixExternalId={org.external_id}"
