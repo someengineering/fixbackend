@@ -33,3 +33,24 @@ async def test_benchmark_command(inventory_service: InventoryService, benchmark_
     db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
     response = [a async for a in await inventory_service.benchmark(db, "benchmark_name")]
     assert response == benchmark_json
+
+
+async def test_summary(inventory_service: InventoryService) -> None:
+    db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
+    summary = await inventory_service.summary(db)
+    assert len(summary.benchmarks) == 2
+    b1, b2 = summary.benchmarks
+    assert b1.id == "aws_test"
+    assert b1.clouds == ["aws"]
+    assert b1.failed_checks == {"123": {"low": 1}}
+    assert b2.id == "gcp_test"
+    assert b2.clouds == ["gcp"]
+    assert b2.failed_checks == {"234": {"critical": 1}}
+    assert len(summary.accounts) == 2
+    gcp, aws = summary.accounts
+    assert gcp.id == "234"
+    assert gcp.name == "account 1"
+    assert gcp.cloud == "gcp"
+    assert aws.id == "123"
+    assert aws.name == "account 2"
+    assert aws.cloud == "aws"
