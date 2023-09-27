@@ -187,6 +187,15 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
                 {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": ["gcp_c1", "gcp_c2"], "title": "GCP Test", "version": "0.2"},  # fmt: skip
             ]
             return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
+        elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
+            result_list = [
+                {"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
+                {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}  # fmt: skip
+            ]
+            response = ""
+            for a in result_list:
+                response += json.dumps(a) + "\n"
+            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
         elif request.url.path == "/graph/resoto/search/aggregate":
             aggregated = [
                 {"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip

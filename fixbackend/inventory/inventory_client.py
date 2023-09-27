@@ -54,6 +54,24 @@ class InventoryClient(Service):
         async for line in response.aiter_lines():
             yield json.loads(line)
 
+    async def search_list(
+        self,
+        access: GraphDatabaseAccess,
+        query: str,
+        *,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> AsyncIterator[Json]:
+        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        params = {"section": section}
+        response = await self.client.post(
+            self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
+        )
+        if response.is_error:
+            raise Exception(f"Inventory error: {response.status_code} {response.text}")
+        async for line in response.aiter_lines():
+            yield json.loads(line)
+
     async def aggregate(
         self,
         access: GraphDatabaseAccess,

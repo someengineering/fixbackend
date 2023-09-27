@@ -38,7 +38,6 @@ class AccountSummary(BaseModel):
     id: str
     name: str
     cloud: str
-    failed_by_severity: Dict[str, int]
 
 
 class BenchmarkSummary(BaseModel):
@@ -49,7 +48,12 @@ class BenchmarkSummary(BaseModel):
     clouds: List[str]
     description: str
     nr_of_checks: int
+    failed_checks: Dict[str, Dict[str, int]]
+
+
+class ReportSummary(BaseModel):
     accounts: List[AccountSummary]
+    benchmarks: List[BenchmarkSummary]
 
 
 class InventoryService(Service):
@@ -75,9 +79,18 @@ class InventoryService(Service):
 
         return self.client.execute_single(db, report + " | dump")
 
-    async def summary(self, db: GraphDatabaseAccess) -> List[BenchmarkSummary]:
-        async def account_summary() -> Tuple[Dict[str, AccountSummary], Dict[str, Set[str]], Dict[str, str]]:
-            summaries: Dict[str, AccountSummary] = {}
+    async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
+        async def account_summary() -> Dict[str, AccountSummary]:
+            return {
+                entry["reported"]["id"]: AccountSummary(
+                    id=entry["reported"]["id"],
+                    name=entry["reported"]["name"],
+                    cloud=entry["ancestors"]["cloud"]["reported"]["name"],
+                )
+                async for entry in self.client.search_list(db, "is (account)")
+            }
+
+        async def check_summary() -> Tuple[Dict[str, Set[str]], Dict[str, str]]:
             check_accounts: Dict[str, Set[str]] = defaultdict(set)
             check_severity: Dict[str, str] = {}
 
@@ -86,23 +99,15 @@ class InventoryService(Service):
                 "search /security.has_issues==true | aggregate "
                 "/security.issues[].check as check_id,"
                 "/security.issues[].severity as severity,"
-                "/ancestors.account.reported.id as account_id,"
-                "/ancestors.account.reported.name as account_name,"
-                "/ancestors.cloud.reported.name as cloud"
+                "/ancestors.account.reported.id as account_id"
                 ": sum(1)",
             ):
                 group = entry["group"]
                 check_id = group["check_id"]
                 account_id = group["account_id"]
-                account_name = group["account_name"]
-                cloud = group["cloud"]
-                if account_id is not None and account_id not in summaries:
-                    summaries[account_id] = AccountSummary(
-                        id=account_id, name=account_name, cloud=cloud, failed_by_severity={}
-                    )
                 check_accounts[check_id].add(account_id)
                 check_severity[check_id] = group["severity"]
-            return summaries, check_accounts, check_severity
+            return check_accounts, check_severity
 
         async def benchmark_summary() -> Tuple[Dict[str, BenchmarkSummary], Dict[str, List[str]]]:
             summaries: Dict[str, BenchmarkSummary] = {}
@@ -116,14 +121,14 @@ class InventoryService(Service):
                     clouds=b["clouds"],
                     description=b["description"],
                     nr_of_checks=len(b["report_checks"]),
-                    accounts=[],
+                    failed_checks={},
                 )
                 summaries[summary.id] = summary
                 benchmark_checks[summary.id] = b["report_checks"]
             return summaries, benchmark_checks
 
-        (benchmarks, checks), (accounts, failed_accounts_by_check_id, severity_by_check_id) = await asyncio.gather(
-            benchmark_summary(), account_summary()
+        (accounts, (benchmarks, checks), (failed_accounts_by_check_id, severity_by_check_id)) = await asyncio.gather(
+            account_summary(), benchmark_summary(), check_summary()
         )
         for bid, bench in benchmarks.items():
             failed_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -131,7 +136,5 @@ class InventoryService(Service):
                 if severity := severity_by_check_id.get(check):
                     for account_id in failed_accounts_by_check_id.get(check, []):
                         failed_counter[account_id][severity] += 1
-            for account_id, failed_by_severity in failed_counter.items():
-                if template := accounts.get(account_id):
-                    bench.accounts.append(template.model_copy(update=dict(failed_by_severity=failed_by_severity)))
-        return list(benchmarks.values())
+            bench.failed_checks = failed_counter
+        return ReportSummary(accounts=list(accounts.values()), benchmarks=list(benchmarks.values()))
