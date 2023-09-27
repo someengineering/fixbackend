@@ -4,3 +4,5 @@ from uuid import UUID
 TenantId = NewType("TenantId", UUID)
 InvitationId = NewType("InvitationId", UUID)
 UserId = NewType("UserId", UUID)
+CloudAccountId = NewType("CloudAccountId", UUID)
+ExternalId = NewType("ExternalId", UUID)

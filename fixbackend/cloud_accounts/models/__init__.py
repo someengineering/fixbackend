@@ -12,31 +12,15 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import List
+from attrs import frozen
 from uuid import UUID
 
-from attrs import frozen
-
-from fixbackend.ids import TenantId, UserId, ExternalId
+from fixbackend.ids import TenantId
 
 
 @frozen
-class Organization:
-    id: TenantId
-    slug: str
-    name: str
-    external_id: ExternalId
-    owners: List[UserId]
-    members: List[UserId]
-
-    def all_users(self) -> List[UserId]:
-        return self.owners + self.members
-
-
-@frozen
-class OrganizationInvite:
+class CloudAccount:
     id: UUID
-    organization_id: TenantId
-    user_id: UserId
-    expires_at: datetime
+    tenant_id: TenantId
+    account_id: str
+    role_name: str
