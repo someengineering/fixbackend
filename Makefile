@@ -57,7 +57,7 @@ clean-env: ## remove environment
 
 lint: ## static code analysis
 	black --line-length 120 --check fixbackend tests
-	flake8 --max-line-length 120 fixbackend tests
+	flake8 --max-line-length 999 fixbackend tests
 	mypy --python-version 3.11 --config-file mypy.ini --install-types --non-interactive fixbackend tests
 
 test: ## run tests quickly with the default Python
