@@ -14,7 +14,7 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Set, Any, cast, Tuple, ClassVar, Optional
+from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
 from arq import create_pool
@@ -29,11 +29,12 @@ from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
-from fixbackend.auth.router import auth_router
+from fixbackend.auth.router import auth_router, users_router
 from fixbackend.cloud_accounts.router import cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
-from fixbackend.dependencies import FixDependencies, ServiceNames as SN
+from fixbackend.dependencies import FixDependencies
+from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.events.router import websocket_router
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
@@ -118,6 +119,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
         api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
+        api_router.include_router(users_router(), prefix="/users", tags=["users"])
         app.include_router(api_router)
 
         if cfg.static_assets:
