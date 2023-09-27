@@ -28,7 +28,7 @@ def black(session: Session) -> None:
 
 @session(python=["3.11"])
 def flake8(session: Session) -> None:
-    opts = ["--max-line-length", "120"]
+    opts = ["--max-line-length", "999"]  # checked via black
     args = session.posargs or locations + opts
     session.install("flake8")
     session.run("flake8", *args)
