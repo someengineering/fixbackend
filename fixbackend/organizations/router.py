@@ -23,6 +23,7 @@ from fixbackend.auth.current_user_dependencies import AuthenticatedUser
 from fixbackend.auth.dependencies import UserManagerDependency
 from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite, ExternalId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
+from fixbackend.ids import TenantId
 
 
 def organizations_router() -> APIRouter:
@@ -39,14 +40,14 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}")
     async def get_organization(
-        organization_id: UUID, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+        organization_id: TenantId, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
     ) -> Organization | None:
         """Get an organization."""
         org = await organization_service.get_organization(organization_id, with_users=True)
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 
-        if user_context.user.email not in [owner.user.email for owner in org.owners]:
+        if user_context.user.id not in org.all_users():
             raise HTTPException(status_code=403, detail="You are not an owner of this organization")
 
         return Organization.from_orm(org)
@@ -69,14 +70,14 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}/invites/")
     async def list_invites(
-        organization_id: UUID, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+        organization_id: TenantId, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
     ) -> List[OrganizationInvite]:
         """List all pending invitations for an org."""
         org = await organization_service.get_organization(organization_id)
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 
-        if user_context.user.email not in [owner.user.email for owner in org.owners]:
+        if user_context.user.id not in org.all_users():
             raise HTTPException(
                 status_code=403, detail="You must be an owner of this organization to view the invitations"
             )
@@ -85,8 +86,8 @@ def organizations_router() -> APIRouter:
 
         return [
             OrganizationInvite(
-                organization_slug=invite.organization.slug,
-                email=invite.user.email,
+                organization_slug=org.slug,
+                user_id=invite.user_id,
                 expires_at=invite.expires_at,
             )
             for invite in invites
@@ -94,7 +95,7 @@ def organizations_router() -> APIRouter:
 
     @router.post("/{organization_id}/invites/")
     async def invite_to_organization(
-        organization_id: UUID,
+        organization_id: TenantId,
         user_email: EmailStr,
         user_context: AuthenticatedUser,
         organization_service: OrganizationServiceDependency,
@@ -109,7 +110,7 @@ def organizations_router() -> APIRouter:
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        if user_context.user.email not in [owner.user.email for owner in org.owners]:
+        if user_context.user.email not in org.all_users():
             raise HTTPException(
                 status_code=403, detail="You must be an owner of this organization to create an invitation"
             )
@@ -118,13 +119,13 @@ def organizations_router() -> APIRouter:
 
         return OrganizationInvite(
             organization_slug=org.slug,
-            email=user.email,
+            user_id=user.id,
             expires_at=invite.expires_at,
         )
 
     @router.delete("/{organization_id}/invites/{invite_id}")
     async def delete_invite(
-        organization_id: UUID,
+        organization_id: TenantId,
         invite_id: UUID,
         user_context: AuthenticatedUser,
         organization_service: OrganizationServiceDependency,
@@ -134,7 +135,7 @@ def organizations_router() -> APIRouter:
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 
-        if user_context.user.email not in [owner.user.email for owner in org.owners]:
+        if user_context.user.email not in org.all_users():
             raise HTTPException(
                 status_code=403, detail="You must be an owner of this organization to delete an invitation"
             )
@@ -143,7 +144,7 @@ def organizations_router() -> APIRouter:
 
     @router.get("/invites/{invite_id}/accept")
     async def accept_invitation(
-        organization_id: UUID,
+        organization_id: TenantId,
         invite_id: UUID,
         user_context: AuthenticatedUser,
         organization_service: OrganizationServiceDependency,
@@ -170,7 +171,7 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}/external_id")
     async def get_externa_id(
-        organization_id: UUID,
+        organization_id: TenantId,
         user_context: AuthenticatedUser,
         organization_service: OrganizationServiceDependency,
     ) -> ExternalId:
@@ -179,7 +180,7 @@ def organizations_router() -> APIRouter:
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 
-        if user_context.user.email not in [owner.user.email for owner in org.owners + org.members]:
+        if user_context.user.id not in org.all_users():
             raise HTTPException(
                 status_code=403, detail="You must be a member of this organization to get an external ID"
             )

@@ -23,24 +23,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
 from fixbackend.auth.current_user_dependencies import get_current_active_verified_user
-from fixbackend.auth.models import orm
+from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
+from fixbackend.ids import UserId, TenantId
 from fixbackend.organizations.dependencies import get_organization_service
-from fixbackend.organizations.models import Organization, OrganizationOwners
+from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
 
-org_id = uuid.uuid4()
+org_id = TenantId(uuid.uuid4())
 external_id = uuid.uuid4()
-user_id = uuid.uuid4()
-user = orm.User(id=user_id, email="foo@example.com", hashed_password="passord", is_verified=True, is_active=True)
+user_id = UserId(uuid.uuid4())
+user = User(
+    id=user_id,
+    email="foo@example.com",
+    hashed_password="passord",
+    is_verified=True,
+    is_active=True,
+    is_superuser=False,
+    oauth_accounts=[],
+)
 organization = Organization(
-    id=uuid.uuid4(),
+    id=org_id,
     name="org name",
     slug="org-slug",
     external_id=external_id,
-    owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
+    owners=[user.id],
     members=[],
 )
 
