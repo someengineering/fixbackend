@@ -15,7 +15,7 @@
 from datetime import datetime
 from typing import List
 from uuid import UUID
-from fixbackend.ids import OrganizationId
+from fixbackend.ids import TenantId
 
 from pydantic import BaseModel, Field, EmailStr
 
@@ -23,7 +23,7 @@ from fixbackend.organizations.models import Organization as OrganizationModel
 
 
 class Organization(BaseModel):
-    id: OrganizationId = Field(description="The organization's unique identifier")
+    id: TenantId = Field(description="The organization's unique identifier")
     slug: str = Field(description="The organization's unique slug, used in URLs")
     name: str = Field(description="The organization's name, a human-readable string")
     owners: List[EmailStr] = Field(description="The organization's owners, who can manage the organization")
