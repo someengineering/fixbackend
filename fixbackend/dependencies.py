@@ -19,12 +19,16 @@ from fixcloudutils.service import Dependencies
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from fixbackend.collect.collect_queue import RedisCollectQueue
+from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_service import InventoryService
 
 
 class ServiceNames:
     arg_redis = "arq_redis"
     collect_queue = "collect_queue"
     async_engine = "async_engine"
+    inventory = "inventory"
+    inventory_client = "inventory_client"
 
 
 class FixDependencies(Dependencies):
@@ -39,6 +43,14 @@ class FixDependencies(Dependencies):
     @property
     def async_engine(self) -> AsyncEngine:
         return self.service(ServiceNames.async_engine, AsyncEngine)
+
+    @property
+    def inventory(self) -> InventoryService:
+        return self.service(ServiceNames.inventory, InventoryService)
+
+    @property
+    def inventory_client(self) -> InventoryClient:
+        return self.service(ServiceNames.inventory, InventoryClient)
 
 
 # placeholder for dependencies, will be replaced during the app initialization
