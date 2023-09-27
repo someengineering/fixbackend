@@ -43,6 +43,7 @@ class Config(BaseSettings):
     session_ttl: int
     available_db_server: List[str]
     inventory_url: str
+    cf_template_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -85,6 +86,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
     )
     parser.add_argument("--inventory-url", default=os.environ.get("INVENTORY_URL", "http://localhost:8980"))
+    parser.add_argument(
+        "--cf-template-url",
+        default=os.environ.get("CF_TEMPLATE_URL", "https://fixpublic.s3.amazonaws.com/aws/fix-role-dev-eu.yaml"),
+    )
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

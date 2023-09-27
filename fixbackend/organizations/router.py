@@ -19,11 +19,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
-from fixbackend.auth.current_user_dependencies import AuthenticatedUser
+from fixbackend.auth.current_user_dependencies import AuthenticatedUser, TenantDependency
 from fixbackend.auth.dependencies import UserManagerDependency
 from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite, ExternalId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.ids import TenantId
+from fixbackend.config import ConfigDependency
 
 
 def organizations_router() -> APIRouter:
@@ -166,8 +167,23 @@ def organizations_router() -> APIRouter:
         return None
 
     @router.get("/{organization_id}/cf_url")
-    async def get_cf_url(organization_id: UUID, user_context: AuthenticatedUser) -> str:
-        return "https://example.com"
+    async def get_cf_url(
+        organization_id: TenantId,
+        user_context: AuthenticatedUser,
+        tenant_id: TenantDependency,
+        organization_service: OrganizationServiceDependency,
+        config: ConfigDependency,
+    ) -> str:
+        org = await organization_service.get_organization(organization_id)
+        if org is None:
+            raise HTTPException(status_code=404, detail="Organization not found")
+        return (
+            f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
+            f"?templateURL={config.cf_template_url}"
+            "&stackName=FixAccess"
+            f"&param_FixTenantId={tenant_id}"
+            f"&param_FixExternalId={org.external_id}"
+        )
 
     @router.get("/{organization_id}/external_id")
     async def get_externa_id(
