@@ -14,7 +14,7 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Set, Any
 
 import httpx
 from arq import create_pool
@@ -72,6 +72,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
+
+    class EndpointFilter(logging.Filter):
+        endpoints_to_filter: Set[Any] = {
+            "/health",
+            "/ready",
+            "/metrics",
+        }
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            return (
+                (record.args is not None) and len(record.args) >= 3 and record.args[2] not in self.endpoints_to_filter
+            )
+
+    # Add filter to the logger
+    logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:
