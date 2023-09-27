@@ -41,6 +41,7 @@ from fixbackend.inventory.router import inventory_router
 from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
+API_PREFIX = "/api"
 
 
 def fast_api_app(cfg: Config) -> FastAPI:
@@ -63,11 +64,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
         await arq_redis.close()
         log.info("Application services stopped.")
 
+    @asynccontextmanager
+    async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
+        yield None
+
     app = FastAPI(
         title="Fix Backend",
         summary="Backend for the FIX project",
         description="Backend for the FIX project",
-        lifespan=setup_teardown_application,
+        lifespan=setup_teardown_dispatcher if cfg.args.dispatcher else setup_teardown_application,
     )
 
     app.dependency_overrides[config.config] = lambda: cfg
@@ -106,31 +111,28 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     Instrumentator().instrument(app).expose(app)
 
-    API_PREFIX = "/api"
+    if not cfg.args.dispatcher:
+        api_router = APIRouter(prefix=API_PREFIX)
+        api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
+        api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
+        api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
+        api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
+        api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
+        app.include_router(api_router)
 
-    api_router = APIRouter(prefix=API_PREFIX)
+        if cfg.static_assets:
+            app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
 
-    api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
-    api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
-    api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
-    api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
-    api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
+        @app.get("/")
+        async def root(request: Request) -> Response:
+            body = await load_app_from_cdn()
+            return Response(content=body, media_type="text/html")
 
-    app.include_router(api_router)
-
-    if cfg.static_assets:
-        app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
-
-    @app.get("/")
-    async def root(request: Request) -> Response:
-        body = await load_app_from_cdn()
-        return Response(content=body, media_type="text/html")
-
-    @app.exception_handler(404)
-    async def not_found_handler(request: Request, exception: HTTPException) -> Response:
-        if request.url.path.startswith(API_PREFIX):
-            return await http_exception_handler(request, exception)
-        return await root(request)
+        @app.exception_handler(404)
+        async def not_found_handler(request: Request, exception: HTTPException) -> Response:
+            if request.url.path.startswith(API_PREFIX):
+                return await http_exception_handler(request, exception)
+            return await root(request)
 
     return app
 
