@@ -20,4 +20,4 @@
 
 from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
 from fixbackend.organizations.models import Organization, OrganizationInvite  # noqa
-from fixbackend.graph_db.models import GraphDatabaseAccess  # noqa
+from fixbackend.graph_db.service import GraphDatabaseAccessEntity  # noqa

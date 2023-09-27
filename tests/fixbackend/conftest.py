@@ -72,6 +72,7 @@ def default_config() -> Config:
         session_ttl=3600,
         available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
         inventory_url="http://localhost:8980",
+        cf_template_url="dev-eu",
     )
 
 

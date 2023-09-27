@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from fixbackend.auth.models import User, orm
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import OrganizationId, TenantId
+from fixbackend.ids import TenantId
 from fixbackend.organizations import models
 from fixbackend.organizations.models import Organization, OrganizationInvite, OrganizationMembers, OrganizationOwners
 
@@ -35,9 +35,8 @@ class OrganizationService:
 
     async def create_organization(self, name: str, slug: str, owner: User) -> models.Organization:
         """Create an organization."""
-        org_id = OrganizationId(uuid.uuid4())
         tenant_id = TenantId(uuid.uuid4())
-        organization = Organization(id=org_id, name=name, slug=slug, tenant_id=tenant_id)
+        organization = Organization(id=tenant_id, name=name, slug=slug)
         owner_relationship = OrganizationOwners(user_id=owner.id)
         organization.owners.append(owner_relationship)
         self.session.add(organization)
