@@ -26,34 +26,12 @@ from typing import AsyncIterator, List, Optional, Dict, Set, Tuple
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
-from pydantic import BaseModel
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.schemas import AccountSummary, ReportSummary, BenchmarkSummary
 
 log = logging.getLogger(__name__)
-
-
-class AccountSummary(BaseModel):
-    id: str
-    name: str
-    cloud: str
-
-
-class BenchmarkSummary(BaseModel):
-    id: str
-    title: str
-    framework: str
-    version: str
-    clouds: List[str]
-    description: str
-    nr_of_checks: int
-    failed_checks: Dict[str, Dict[str, int]]
-
-
-class ReportSummary(BaseModel):
-    accounts: List[AccountSummary]
-    benchmarks: List[BenchmarkSummary]
 
 
 class InventoryService(Service):

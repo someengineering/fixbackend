@@ -28,7 +28,7 @@ from fastapi.responses import StreamingResponse
 
 from fixbackend.auth.current_user_dependencies import CurrentGraphDbDependency
 from fixbackend.dependencies import FixDependencies
-from fixbackend.inventory.inventory_service import ReportSummary
+from fixbackend.inventory.schemas import ReportSummary
 from fixbackend.streaming_response import streaming_response
 
 log = logging.getLogger(__name__)
