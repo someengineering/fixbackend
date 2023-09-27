@@ -19,7 +19,7 @@ from fixbackend.ids import TenantId
 
 
 @frozen
-class CloudAccount:
+class AwsCloudAccount:
     id: UUID
     tenant_id: TenantId
     account_id: str

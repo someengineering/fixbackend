@@ -18,7 +18,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from fixbackend.cloud_accounts.models import CloudAccount
+from fixbackend.cloud_accounts.models import AwsCloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.ids import ExternalId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
@@ -38,7 +38,7 @@ class CloudAccountService:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository
 
-    async def create_account(self, account: CloudAccount, external_id: ExternalId) -> CloudAccount:
+    async def create_account(self, account: AwsCloudAccount, external_id: ExternalId) -> AwsCloudAccount:
         """Create a cloud account."""
 
         organization = await self.organization_service.get_organization(account.tenant_id)
