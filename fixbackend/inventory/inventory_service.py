@@ -33,6 +33,12 @@ from fixbackend.inventory.schemas import AccountSummary, ReportSummary, Benchmar
 
 log = logging.getLogger(__name__)
 
+# alias names for better readability
+BenchmarkById = Dict[str, BenchmarkSummary]
+ChecksByBenchmarkId = Dict[str, List[str]]
+ChecksByAccountId = Dict[str, Set[str]]
+SeverityByCheckId = Dict[str, str]
+
 
 class InventoryService(Service):
     def __init__(self, client: InventoryClient) -> None:
@@ -68,8 +74,8 @@ class InventoryService(Service):
                 async for entry in self.client.search_list(db, "is (account)")
             }
 
-        async def check_summary() -> Tuple[Dict[str, Set[str]], Dict[str, str]]:
-            check_accounts: Dict[str, Set[str]] = defaultdict(set)
+        async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
+            check_accounts: ChecksByAccountId = defaultdict(set)
             check_severity: Dict[str, str] = {}
 
             async for entry in self.client.aggregate(
@@ -87,9 +93,9 @@ class InventoryService(Service):
                 check_severity[check_id] = group["severity"]
             return check_accounts, check_severity
 
-        async def benchmark_summary() -> Tuple[Dict[str, BenchmarkSummary], Dict[str, List[str]]]:
-            summaries: Dict[str, BenchmarkSummary] = {}
-            benchmark_checks: Dict[str, List[str]] = {}
+        async def benchmark_summary() -> Tuple[BenchmarkById, ChecksByBenchmarkId]:
+            summaries: BenchmarkById = {}
+            benchmark_checks: ChecksByBenchmarkId = {}
             for b in await self.client.benchmarks(db, short=True, with_checks=True):
                 summary = BenchmarkSummary(
                     id=b["id"],
