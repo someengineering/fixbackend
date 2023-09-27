@@ -75,7 +75,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
 @pytest.mark.asyncio
 async def test_websocket(websocket_client: AsyncClient) -> None:
-    async with aconnect_ws(f"/ws/events/{tenant_id}", websocket_client) as ws:
+    async with aconnect_ws(f"/api/organizations/{tenant_id}/events", websocket_client) as ws:
         await event_service.send_to_tenant(tenant_id, {"type": "foo"})
         message = await ws.receive_json()
         assert message["type"] == "foo"
