@@ -30,7 +30,7 @@ from starlette.exceptions import HTTPException
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
-from fixbackend.cloud_accounts.router import cloud_accounts_router
+from fixbackend.cloud_accounts.router import cloud_accounts_router, cloud_accounts_callback_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies
@@ -116,7 +116,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
         api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
-        api_router.include_router(cloud_accounts_router(), prefix="/cloud", tags=["cloud_accounts"])
+        api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
+        api_router.include_router(cloud_accounts_router(), prefix="/organizations", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
         api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])

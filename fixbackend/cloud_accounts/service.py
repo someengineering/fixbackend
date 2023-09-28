@@ -19,9 +19,9 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
-from fixbackend.ids import ExternalId, TenantId, CloudAccountId
+from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.organizations.service import OrganizationService
 
@@ -59,6 +59,9 @@ class CloudAccountService:
         result = await self.cloud_account_repository.create(account)
         # await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
         return result
+
+    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId) -> None:
+        await self.cloud_account_repository.delete(cloud_accont_id)
 
 
 def get_cloud_account_service(
