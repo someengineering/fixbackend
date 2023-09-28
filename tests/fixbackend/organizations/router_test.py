@@ -27,13 +27,13 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import UserId, TenantId
+from fixbackend.ids import UserId, TenantId, ExternalId
 from fixbackend.organizations.dependencies import get_organization_service
 from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
 
 org_id = TenantId(uuid.uuid4())
-external_id = uuid.uuid4()
+external_id = ExternalId(uuid.uuid4())
 user_id = UserId(uuid.uuid4())
 user = User(
     id=user_id,

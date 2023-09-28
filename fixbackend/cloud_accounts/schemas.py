@@ -12,16 +12,16 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from uuid import UUID
-
 from pydantic import BaseModel, Field
+
+from fixbackend.ids import TenantId, ExternalId
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
-    tenant_id: UUID = Field(description="Identifier of the tenant")
-    external_id: UUID = Field(description="Secret that was provided by the tenant")
-    account_id: str = Field(description="AWS account ID")
-    role_name: str = Field(description="AWS role name")
+    tenant_id: TenantId = Field(description="Identifier of the tenant")
+    external_id: ExternalId = Field(description="Secret that was provided by the tenant")
+    account_id: str = Field(description="AWS account ID", pattern=r"^\d{12}$")
+    role_name: str = Field(description="AWS role name", max_length=64)
 
     model_config = {
         "json_schema_extra": {

@@ -19,5 +19,6 @@
 # otherwise alembic won't be able to detect it
 
 from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
-from fixbackend.organizations.models import Organization, OrganizationInvite  # noqa
+from fixbackend.organizations.models.orm import Organization, OrganizationInvite  # noqa
 from fixbackend.graph_db.service import GraphDatabaseAccessEntity  # noqa
+from fixbackend.cloud_accounts.models.orm import CloudAccount  # noqa
