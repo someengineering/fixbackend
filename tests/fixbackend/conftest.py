@@ -14,6 +14,7 @@
 
 import asyncio
 import json
+from argparse import Namespace
 from asyncio import AbstractEventLoop
 from typing import Iterator, AsyncIterator, List
 
@@ -65,7 +66,7 @@ def default_config() -> Config:
         redis_readwrite_url="redis://localhost:6379/0",
         redis_readonly_url="redis://localhost:6379/0",
         redis_queue_url="redis://localhost:6379/5",
-        cdn_enpoint="",
+        cdn_endpoint="",
         cdn_bucket="",
         fixui_sha="",
         static_assets=None,
@@ -73,6 +74,7 @@ def default_config() -> Config:
         available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
+        args=Namespace(dispatcher=False),
     )
 
 
