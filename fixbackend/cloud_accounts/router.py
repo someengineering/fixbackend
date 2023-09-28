@@ -38,7 +38,7 @@ def cloud_accounts_router() -> APIRouter:
         if organization_id not in user_tenants:
             raise HTTPException(status_code=403, detail="User does not have access to this organization")
 
-        await service.delete_cloud_account(cloud_account_id)
+        await service.delete_cloud_account(cloud_account_id, organization_id)
 
     return router
 
