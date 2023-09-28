@@ -29,7 +29,7 @@ from fixbackend.auth.dependencies import get_user_manager
 from fixbackend.auth.jwt import get_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.config import get_config
-from fixbackend.graph_db.dependencies import GraphDatabaseAccessManagerDependency
+from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
@@ -82,10 +82,8 @@ async def get_tenant(
 TenantDependency = Annotated[TenantId, Depends(get_tenant)]
 
 
-async def get_current_graph_db(
-    manager: GraphDatabaseAccessManagerDependency, tenant: TenantDependency
-) -> GraphDatabaseAccess:
-    access = await manager.get_database_access(tenant)
+async def get_current_graph_db(fix: FixDependency, tenant: TenantDependency) -> GraphDatabaseAccess:
+    access = await fix.graph_database_access.get_database_access(tenant)
     if access is None:
         raise AttributeError("No database access found for tenant")
     return access

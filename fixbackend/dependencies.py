@@ -16,19 +16,29 @@ from typing import Annotated
 from arq import ArqRedis
 from fastapi.params import Depends
 from fixcloudutils.service import Dependencies
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from fixbackend.collect.collect_queue import RedisCollectQueue
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.types import AsyncSessionMaker
 
 
 class ServiceNames:
     arg_redis = "arq_redis"
+    readonly_redis = "readonly_redis"
+    readwrite_redis = "readwrite_redis"
     collect_queue = "collect_queue"
     async_engine = "async_engine"
+    session_maker = "session_maker"
+    cloud_account_repo = "cloud_account_repo"
+    next_run_repo = "next_run_repo"
+    graph_db_access = "graph_db_access"
     inventory = "inventory"
     inventory_client = "inventory_client"
+    dispatching = "dispatching"
 
 
 class FixDependencies(Dependencies):
@@ -45,12 +55,24 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.async_engine, AsyncEngine)
 
     @property
+    def session_maker(self) -> AsyncSessionMaker:
+        return self.service(ServiceNames.async_engine, AsyncSessionMaker)  # type: ignore
+
+    @property
     def inventory(self) -> InventoryService:
         return self.service(ServiceNames.inventory, InventoryService)
 
     @property
     def inventory_client(self) -> InventoryClient:
         return self.service(ServiceNames.inventory, InventoryClient)
+
+    @property
+    def readonly_redis(self) -> Redis:
+        return self.service(ServiceNames.readonly_redis, Redis)
+
+    @property
+    def graph_database_access(self) -> GraphDatabaseAccessManager:
+        return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

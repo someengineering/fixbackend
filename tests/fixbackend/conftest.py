@@ -23,20 +23,28 @@ from alembic.command import upgrade as alembic_upgrade
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from fastapi import FastAPI
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
+from fixbackend.app import fast_api_app
+from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.collect.collect_queue import RedisCollectQueue
-from fixbackend.config import Config
-from fixbackend.db import AsyncSessionMaker
+from fixbackend.config import Config, get_config
+from fixbackend.db import get_async_session
+from fixbackend.dependencies import FixDependencies, ServiceNames, fix_dependencies
+from fixbackend.dispatcher.dispatcher_service import DispatcherService
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
+from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -158,9 +166,12 @@ async def user(session: AsyncSession) -> User:
         "hashed_password": "notreallyhashed",
         "is_verified": True,
     }
-    user = await user_db.create(user_dict)
+    return await user_db.create(user_dict)
 
-    return user
+
+@pytest.fixture
+async def organization(organization_repository: OrganizationService, user: User) -> Organization:
+    return await organization_repository.create_organization("foo", "foo", user)
 
 
 @pytest.fixture
@@ -235,3 +246,57 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
 async def inventory_service(inventory_client: InventoryClient) -> AsyncIterator[InventoryService]:
     async with InventoryService(inventory_client) as service:
         yield service
+
+
+@pytest.fixture
+async def next_run_repository(async_session_maker: AsyncSessionMaker) -> NextRunRepository:
+    return NextRunRepository(async_session_maker)
+
+
+@pytest.fixture
+async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> CloudAccountRepository:
+    return CloudAccountRepositoryImpl(async_session_maker)
+
+
+@pytest.fixture
+async def organization_repository(
+    session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
+) -> OrganizationService:
+    return OrganizationService(session, graph_database_access_manager)
+
+
+@pytest.fixture
+async def dispatcher(
+    arq_redis: ArqRedis,
+    cloud_account_repository: CloudAccountRepository,
+    next_run_repository: NextRunRepository,
+    collect_queue: RedisCollectQueue,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+) -> DispatcherService:
+    return DispatcherService(
+        arq_redis, cloud_account_repository, next_run_repository, collect_queue, graph_database_access_manager
+    )
+
+
+@pytest.fixture
+async def fix_deps(
+    db_engine: AsyncEngine, graph_database_access_manager: GraphDatabaseAccessManager
+) -> FixDependencies:
+    return FixDependencies(
+        **{ServiceNames.async_engine: db_engine, ServiceNames.graph_db_access: graph_database_access_manager}
+    )
+
+
+@pytest.fixture
+async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_config: Config) -> FastAPI:
+    app = fast_api_app(default_config)
+    app.dependency_overrides[get_async_session] = lambda: session
+    app.dependency_overrides[get_config] = lambda: default_config
+    app.dependency_overrides[fix_dependencies] = lambda: fix_deps
+    return app
+
+
+@pytest.fixture
+async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
+        yield ac

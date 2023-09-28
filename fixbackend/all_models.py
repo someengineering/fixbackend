@@ -22,3 +22,4 @@ from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
 from fixbackend.organizations.models.orm import Organization, OrganizationInvite  # noqa
 from fixbackend.graph_db.service import GraphDatabaseAccessEntity  # noqa
 from fixbackend.cloud_accounts.models.orm import CloudAccount  # noqa
+from fixbackend.dispatcher.next_run_repository import NextRun  # noqa
