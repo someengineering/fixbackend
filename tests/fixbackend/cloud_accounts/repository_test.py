@@ -42,7 +42,18 @@ async def test_create_cloud_account(
     )
 
     # create
-    await cloud_account_repository.create(cloud_account=account)
-    stored_account = await cloud_account_repository.get(id=account.id)
+    created = await cloud_account_repository.create(cloud_account=account)
+    assert created == account
 
+    # get
+    stored_account = await cloud_account_repository.get(id=account.id)
     assert account == stored_account
+
+    # list
+    accounts = await cloud_account_repository.list_by_tenant_id(tenant_id=tenant_id)
+    assert len(accounts) == 1
+    assert accounts[0] == account
+
+    # delete
+    await cloud_account_repository.delete(id=account.id)
+    assert await cloud_account_repository.get(id=account.id) is None
