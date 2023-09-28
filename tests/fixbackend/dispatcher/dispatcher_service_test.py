@@ -98,5 +98,6 @@ async def test_trigger_collect(
     # another run should not change anything
     await dispatcher.schedule_next_runs()
     again = await session.get(NextRun, cloud_account_id)
+    assert again is not None
     assert again.at == next_run.at
     assert len(await arq_redis.keys()) == 2
