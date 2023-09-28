@@ -38,6 +38,7 @@ class CloudAccountRepository:
                     cloud="aws",
                     account_id=cloud_account.access.account_id,
                     aws_role_name=cloud_account.access.role_name,
+                    aws_external_id=cloud_account.access.external_id,
                 )
             else:
                 raise ValueError(f"Unknown cloud {cloud_account.access}")

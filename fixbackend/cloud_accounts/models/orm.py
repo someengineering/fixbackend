@@ -21,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models as domain
 from fixbackend.cloud_accounts.models import CloudAccess
-from fixbackend.ids import TenantId, CloudAccountId
+from fixbackend.ids import TenantId, CloudAccountId, ExternalId
 
 
 class CloudAccount(Base):
@@ -31,6 +31,7 @@ class CloudAccount(Base):
     tenant_id: Mapped[TenantId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
     cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[str] = mapped_column(String(length=12), nullable=False)
+    aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
     aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
@@ -38,7 +39,9 @@ class CloudAccount(Base):
         def access() -> CloudAccess:
             match self.cloud:
                 case "aws":
-                    return domain.AwsCloudAccess(account_id=self.account_id, role_name=self.aws_role_name)
+                    return domain.AwsCloudAccess(
+                        account_id=self.account_id, external_id=self.aws_external_id, role_name=self.aws_role_name
+                    )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
 

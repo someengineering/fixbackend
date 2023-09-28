@@ -15,12 +15,13 @@ from typing import Union
 
 from attrs import frozen
 
-from fixbackend.ids import TenantId, CloudAccountId
+from fixbackend.ids import TenantId, CloudAccountId, ExternalId
 
 
 @frozen
 class AwsCloudAccess:
     account_id: str
+    external_id: ExternalId
     role_name: str
 
 

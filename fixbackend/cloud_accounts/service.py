@@ -13,14 +13,15 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import uuid
 from hmac import compare_digest
 from typing import Annotated
 
 from fastapi import Depends
 
-from fixbackend.cloud_accounts.models import CloudAccount
+from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
-from fixbackend.ids import ExternalId
+from fixbackend.ids import ExternalId, TenantId, CloudAccountId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.organizations.service import OrganizationService
 
@@ -38,14 +39,22 @@ class CloudAccountService:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository
 
-    async def create_account(self, account: CloudAccount, external_id: ExternalId) -> CloudAccount:
+    async def create_aws_account(
+        self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
+    ) -> CloudAccount:
         """Create a cloud account."""
 
-        organization = await self.organization_service.get_organization(account.tenant_id)
+        organization = await self.organization_service.get_organization(tenant_id)
         if organization is None:
             raise ValueError("Organization does not exist")
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
+
+        account = CloudAccount(
+            id=CloudAccountId(uuid.uuid4()),
+            tenant_id=tenant_id,
+            access=AwsCloudAccess(account_id=account_id, external_id=external_id, role_name=role_name),
+        )
 
         result = await self.cloud_account_repository.create(account)
         # await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
