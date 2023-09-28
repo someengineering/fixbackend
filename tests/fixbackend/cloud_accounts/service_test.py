@@ -77,15 +77,19 @@ async def test_create_aws_account() -> None:
     service = CloudAccountService(organisation_service, repository)
 
     # happy case
-    await service.create_aws_account(tenant_id, account_id, role_name, external_id)
-
+    acc = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
-    account = list(repository.accounts.values())[0]
+    account = repository.accounts.get(acc.id)
+    assert account is not None
     assert account.tenant_id == tenant_id
     assert isinstance(account.access, AwsCloudAccess)
     assert account.access.account_id == account_id
     assert account.access.role_name == role_name
     assert account.access.external_id == external_id
+
+    # account already exists
+    with pytest.raises(Exception):
+        await service.create_aws_account(tenant_id, account_id, role_name, external_id)
 
     # wrong external id
     with pytest.raises(Exception):
@@ -94,3 +98,23 @@ async def test_create_aws_account() -> None:
     # wrong tenant id
     with pytest.raises(Exception):
         await service.create_aws_account(TenantId(uuid.uuid4()), account_id, role_name, external_id)
+
+
+@pytest.mark.asyncio
+async def test_delete_aws_account() -> None:
+    repository = TestCloudAccountRepository()
+    organisation_service = TestOrganizationService()
+    service = CloudAccountService(organisation_service, repository)
+
+    # happy case
+    account = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    # deleting someone's else account
+    with pytest.raises(Exception):
+        await service.delete_cloud_account(account.id, TenantId(uuid.uuid4()))
+    assert len(repository.accounts) == 1
+
+    # success
+    await service.delete_cloud_account(account.id, tenant_id)
+    assert len(repository.accounts) == 0

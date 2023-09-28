@@ -45,7 +45,7 @@ class InMemoryCloudAccontService(CloudAccountService):
         self.accounts.append(account)
         return account
 
-    async def delete_cloud_account(self, cloud_account_id: CloudAccountId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, tenant_id: TenantId) -> None:
         self.accounts = [account for account in self.accounts if account.id != cloud_account_id]
 
 

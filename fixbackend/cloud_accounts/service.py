@@ -50,6 +50,17 @@ class CloudAccountService:
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
+        async def account_already_exists(tenant_id: TenantId, account_id: str) -> bool:
+            accounts = await self.cloud_account_repository.list_by_tenant_id(tenant_id)
+            return any(
+                account.access.account_id == account_id
+                for account in accounts
+                if isinstance(account.access, AwsCloudAccess)
+            )
+
+        if await account_already_exists(tenant_id, account_id):
+            raise ValueError("Cloud account already exists")
+
         account = CloudAccount(
             id=CloudAccountId(uuid.uuid4()),
             tenant_id=tenant_id,
@@ -60,7 +71,11 @@ class CloudAccountService:
         # await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
         return result
 
-    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId) -> None:
+    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
+        account = await self.cloud_account_repository.get(cloud_accont_id)
+        if not account or account.tenant_id != tenant_id:
+            raise ValueError("Cloud account does not exist")
+
         await self.cloud_account_repository.delete(cloud_accont_id)
 
 
