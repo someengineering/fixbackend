@@ -104,3 +104,7 @@ async def test_delete_cloud_accont(client: AsyncClient) -> None:
     response = await client.delete(f"/api/organizations/{tenant_id}/cloud_account/{cloud_accont_id}")
     assert response.status_code == 200
     assert len(cloud_accont_service.accounts) == 0
+
+    # deleting an account in a wrong organization should fail
+    response = await client.delete(f"/api/organizations/{TenantId(uuid.uuid4())}/cloud_account/{cloud_accont_id}")
+    assert response.status_code == 403
