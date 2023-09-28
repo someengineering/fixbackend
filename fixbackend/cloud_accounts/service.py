@@ -24,13 +24,28 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAc
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.organizations.service import OrganizationService
+from abc import ABC, abstractmethod
 
 
 class WrongExternalId(Exception):
     pass
 
 
-class CloudAccountService:
+class CloudAccountService(ABC):
+    @abstractmethod
+    async def create_aws_account(
+        self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
+    ) -> CloudAccount:
+        """Create a cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
+        """Delete a cloud account."""
+        raise NotImplementedError
+
+
+class CloudAccountServiceImpl(CloudAccountService):
     def __init__(
         self,
         organization_service: OrganizationService,
@@ -83,7 +98,7 @@ def get_cloud_account_service(
     organization_service_dependency: OrganizationServiceDependency,
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
 ) -> CloudAccountService:
-    return CloudAccountService(
+    return CloudAccountServiceImpl(
         organization_service_dependency,
         cloud_account_repository_dependency,
     )

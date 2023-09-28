@@ -20,7 +20,7 @@ import pytest
 
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.cloud_accounts.service import CloudAccountService
+from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
@@ -74,7 +74,7 @@ class OrganizationServiceMock(OrganizationService):
 async def test_create_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organisation_service = OrganizationServiceMock()
-    service = CloudAccountService(organisation_service, repository)
+    service = CloudAccountServiceImpl(organisation_service, repository)
 
     # happy case
     acc = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
@@ -104,7 +104,7 @@ async def test_create_aws_account() -> None:
 async def test_delete_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organisation_service = OrganizationServiceMock()
-    service = CloudAccountService(organisation_service, repository)
+    service = CloudAccountServiceImpl(organisation_service, repository)
 
     # happy case
     account = await service.create_aws_account(tenant_id, account_id, role_name, external_id)

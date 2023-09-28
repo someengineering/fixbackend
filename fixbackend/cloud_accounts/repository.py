@@ -19,9 +19,28 @@ from sqlalchemy import select
 from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
 from fixbackend.db import AsyncSessionMaker
 from fixbackend.ids import CloudAccountId, TenantId
+from abc import ABC, abstractmethod
 
 
-class CloudAccountRepository:
+class CloudAccountRepository(ABC):
+    @abstractmethod
+    async def create(self, cloud_account: CloudAccount) -> CloudAccount:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, id: CloudAccountId) -> None:
+        raise NotImplementedError
+
+
+class CloudAccountRepositoryImpl(CloudAccountRepository):
     def __init__(
         self,
         session_maker: AsyncSessionMaker,
@@ -71,7 +90,7 @@ class CloudAccountRepository:
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMaker) -> CloudAccountRepository:
-    return CloudAccountRepository(session_maker)
+    return CloudAccountRepositoryImpl(session_maker)
 
 
 CloudAccountRepositoryDependency = Annotated[CloudAccountRepository, Depends(get_cloud_account_repository)]
