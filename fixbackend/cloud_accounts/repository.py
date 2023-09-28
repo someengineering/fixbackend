@@ -63,6 +63,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 raise ValueError(f"Unknown cloud {cloud_account.access}")
             session.add(orm_cloud_account)
             await session.commit()
+            await session.refresh(orm_cloud_account)
             return orm_cloud_account.to_domain()
 
     async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:

@@ -16,7 +16,7 @@ import asyncio
 import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
-from typing import Iterator, AsyncIterator, List
+from typing import AsyncIterator, Iterator, List
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
@@ -24,10 +24,12 @@ from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fixcloudutils.types import Json
-from httpx import MockTransport, AsyncClient, Response, Request
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
-from sqlalchemy_utils import database_exists, drop_database, create_database
+from httpx import AsyncClient, MockTransport, Request, Response
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy_utils import create_database, database_exists, drop_database
 
+from fixbackend.auth.db import get_user_repository
+from fixbackend.auth.models import User
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.db import AsyncSessionMaker
@@ -146,6 +148,19 @@ def organisation_service(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> OrganizationService:
     return OrganizationService(session, graph_database_access_manager)
+
+
+@pytest.fixture
+async def user(session: AsyncSession) -> User:
+    user_db = await anext(get_user_repository(session))
+    user_dict = {
+        "email": "foo@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    user = await user_db.create(user_dict)
+
+    return user
 
 
 @pytest.fixture
