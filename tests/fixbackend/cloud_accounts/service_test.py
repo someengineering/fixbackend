@@ -26,7 +26,7 @@ from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
 
 
-class TestCloudAccountRepository(CloudAccountRepository):
+class CloudAccountRepositoryMock(CloudAccountRepository):
     def __init__(self) -> None:
         self.accounts: Dict[CloudAccountId, CloudAccount] = {}
 
@@ -60,7 +60,7 @@ organization = Organization(
 )
 
 
-class TestOrganizationService(OrganizationService):
+class OrganizationServiceMock(OrganizationService):
     def __init__(self) -> None:
         pass
 
@@ -72,8 +72,8 @@ class TestOrganizationService(OrganizationService):
 
 @pytest.mark.asyncio
 async def test_create_aws_account() -> None:
-    repository = TestCloudAccountRepository()
-    organisation_service = TestOrganizationService()
+    repository = CloudAccountRepositoryMock()
+    organisation_service = OrganizationServiceMock()
     service = CloudAccountService(organisation_service, repository)
 
     # happy case
@@ -102,8 +102,8 @@ async def test_create_aws_account() -> None:
 
 @pytest.mark.asyncio
 async def test_delete_aws_account() -> None:
-    repository = TestCloudAccountRepository()
-    organisation_service = TestOrganizationService()
+    repository = CloudAccountRepositoryMock()
+    organisation_service = OrganizationServiceMock()
     service = CloudAccountService(organisation_service, repository)
 
     # happy case
