@@ -73,15 +73,18 @@ async def test_get_organization(organization_repository: OrganizationRepository,
 
 @pytest.mark.asyncio
 async def test_list_organizations(organization_repository: OrganizationRepository, user: User) -> None:
-    organization = await organization_repository.create_organization(
-        name="Test Organization", slug="test-organization", owner=user
+    organization1 = await organization_repository.create_organization(
+        name="Test Organization 1", slug="test-organization-1", owner=user
+    )
+
+    organization2 = await organization_repository.create_organization(
+        name="Test Organization 2", slug="test-organization-2", owner=user
     )
 
     # the user should be the owner of the organization
-    organizations = await organization_repository.list_organizations(user.id, with_users=True)
-    assert len(organizations) == 1
-    assert organizations[0] == organization
-    assert organizations[0].owners[0] == user.id
+    organizations = await organization_repository.list_organizations(user.id)
+    assert len(organizations) == 2
+    assert set([o.id for o in organizations]) == {organization1.id, organization2.id}
 
 
 @pytest.mark.asyncio
@@ -100,7 +103,7 @@ async def test_add_to_organization(
     new_user_id = new_user.id
     await organization_repository.add_to_organization(organization_id=org_id, user_id=new_user.id)
 
-    retrieved_organization = await organization_repository.get_organization(org_id, with_users=True)
+    retrieved_organization = await organization_repository.get_organization(org_id)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id
@@ -158,7 +161,7 @@ async def test_accept_invitation(
     # accept the invitation
     await organization_repository.accept_invitation(invitation_id=invitation.id)
 
-    retrieved_organization = await organization_repository.get_organization(org_id, with_users=True)
+    retrieved_organization = await organization_repository.get_organization(org_id)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id

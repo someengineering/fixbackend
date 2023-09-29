@@ -35,7 +35,7 @@ def organizations_router() -> APIRouter:
         user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
     ) -> List[Organization]:
         """List all organizations."""
-        orgs = await organization_service.list_organizations(user_context.user.id, with_users=True)
+        orgs = await organization_service.list_organizations(user_context.user.id)
 
         return [Organization.from_orm(org) for org in orgs]
 
@@ -46,7 +46,7 @@ def organizations_router() -> APIRouter:
         organization_service: OrganizationRepositoryDependency,
     ) -> Organization | None:
         """Get an organization."""
-        org = await organization_service.get_organization(organization_id, with_users=True)
+        org = await organization_service.get_organization(organization_id)
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 

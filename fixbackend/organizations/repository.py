@@ -39,12 +39,12 @@ class OrganizationRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_organization(self, organization_id: TenantId, with_users: bool = False) -> Optional[Organization]:
+    async def get_organization(self, organization_id: TenantId) -> Optional[Organization]:
         """Get an organization."""
         raise NotImplementedError
 
     @abstractmethod
-    async def list_organizations(self, user_id: UserId, with_users: bool = False) -> Sequence[Organization]:
+    async def list_organizations(self, user_id: UserId) -> Sequence[Organization]:
         """List all organizations where the user is a member."""
         raise NotImplementedError
 
@@ -110,24 +110,20 @@ class OrganizationRepositoryImpl(OrganizationRepository):
         org = results.unique().scalar_one()
         return org.to_domain()
 
-    async def get_organization(self, organization_id: TenantId, with_users: bool = False) -> Optional[Organization]:
+    async def get_organization(self, organization_id: TenantId) -> Optional[Organization]:
         """Get an organization."""
         statement = select(orm.Organization).where(orm.Organization.id == organization_id)
-        if with_users:
-            statement = statement.options(selectinload(orm.Organization.owners), selectinload(orm.Organization.members))
         results = await self.session.execute(statement)
         org = results.unique().scalar_one_or_none()
         return org.to_domain() if org else None
 
-    async def list_organizations(self, user_id: UserId, with_users: bool = False) -> Sequence[Organization]:
+    async def list_organizations(self, user_id: UserId) -> Sequence[Organization]:
         """List all organizations where the user is an owner."""
         statement = (
             select(orm.Organization).join(orm.OrganizationOwners).where(orm.OrganizationOwners.user_id == user_id)
         )
-        if with_users:
-            statement = statement.options(selectinload(orm.Organization.owners), selectinload(orm.Organization.members))
         results = await self.session.execute(statement)
-        orgs = results.scalars().all()
+        orgs = results.unique().scalars().all()
         return [org.to_domain() for org in orgs]
 
     async def add_to_organization(self, organization_id: TenantId, user_id: UserId) -> None:
@@ -156,7 +152,7 @@ class OrganizationRepositoryImpl(OrganizationRepository):
     async def create_invitation(self, organization_id: TenantId, user_id: UserId) -> OrganizationInvite:
         """Create an invite for an organization."""
         user = await self.session.get(auth_orm.User, user_id)
-        organization = await self.get_organization(organization_id, with_users=True)
+        organization = await self.get_organization(organization_id)
 
         if user is None or organization is None:
             raise ValueError(f"User {user_id} or organization {organization_id} does not exist.")

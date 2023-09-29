@@ -58,10 +58,10 @@ class OrganizationServiceMock(OrganizationRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_organization(self, organization_id: UUID, with_users: bool = False) -> Organization | None:
+    async def get_organization(self, organization_id: UUID) -> Organization | None:
         return organization
 
-    async def list_organizations(self, owner_id: UUID, with_users: bool = False) -> Sequence[Organization]:
+    async def list_organizations(self, owner_id: UUID) -> Sequence[Organization]:
         return [organization]
 
 
