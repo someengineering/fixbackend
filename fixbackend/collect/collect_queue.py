@@ -88,7 +88,7 @@ class RedisCollectQueue(CollectQueue):
         wait_until_done: bool = False,
     ) -> None:
         collect_job = dict(
-            tenant_id=db.tenant_id,
+            tenant_id=str(db.tenant_id),
             graphdb_server=db.server,
             graphdb_database=db.database,
             graphdb_username=db.username,
