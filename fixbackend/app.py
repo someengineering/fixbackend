@@ -23,17 +23,17 @@ from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.cloud_accounts.router import cloud_accounts_router, cloud_accounts_callback_router
+from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies
@@ -61,7 +61,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
         deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url))
-        deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
+        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
         engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
@@ -71,6 +71,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url))
         deps.add(SN.inventory, InventoryService(client))
+        deps.add(
+            SN.cloudaccount_publisher,
+            RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
+        )
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
