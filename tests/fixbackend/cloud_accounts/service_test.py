@@ -23,7 +23,7 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationRepository
+from fixbackend.organizations.repository import OrganizationRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
 
@@ -62,7 +62,7 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationRepository):
+class OrganizationServiceMock(OrganizationRepositoryImpl):
     def __init__(self) -> None:
         pass
 
@@ -83,9 +83,9 @@ class RedisPublisherMock(RedisStreamPublisher):
 @pytest.mark.asyncio
 async def test_create_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
-    organisation_service = OrganizationServiceMock()
+    organization_repository = OrganizationServiceMock()
     publisher = RedisPublisherMock()
-    service = CloudAccountServiceImpl(organisation_service, repository, publisher)
+    service = CloudAccountServiceImpl(organization_repository, repository, publisher)
 
     # happy case
     acc = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
@@ -118,9 +118,9 @@ async def test_create_aws_account() -> None:
 @pytest.mark.asyncio
 async def test_delete_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
-    organisation_service = OrganizationServiceMock()
+    organization_repository = OrganizationServiceMock()
     publisher = RedisPublisherMock()
-    service = CloudAccountServiceImpl(organisation_service, repository, publisher)
+    service = CloudAccountServiceImpl(organization_repository, repository, publisher)
 
     account = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1

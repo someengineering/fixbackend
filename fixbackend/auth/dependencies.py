@@ -20,14 +20,14 @@ from fixbackend.auth.db import UserRepositoryDependency
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_verifier import UserVerifierDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.organizations.dependencies import OrganizationServiceDependency
+from fixbackend.organizations.repository import OrganizationRepositoryDependency
 
 
 async def get_user_manager(
     config: ConfigDependency,
     user_repository: UserRepositoryDependency,
     user_verifier: UserVerifierDependency,
-    organization_service: OrganizationServiceDependency,
+    organization_service: OrganizationRepositoryDependency,
 ) -> AsyncIterator[UserManager]:
     yield UserManager(config, user_repository, None, user_verifier, organization_service)
 

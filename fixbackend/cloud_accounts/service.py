@@ -23,8 +23,7 @@ from fastapi import Depends
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
-from fixbackend.organizations.dependencies import OrganizationServiceDependency
-from fixbackend.organizations.repository import OrganizationRepository
+from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryDependency
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixbackend.dependencies import FixDependency
 
@@ -100,7 +99,7 @@ class CloudAccountServiceImpl(CloudAccountService):
 
 
 def get_cloud_account_service(
-    organization_service_dependency: OrganizationServiceDependency,
+    organization_service_dependency: OrganizationRepositoryDependency,
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
     fix_dependency: FixDependency,
 ) -> CloudAccountService:

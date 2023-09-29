@@ -26,10 +26,10 @@ from fixbackend.auth.models import User
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, organisation_service: OrganizationRepository, user: User
+    async_session_maker: AsyncSessionMaker, organization_repository: OrganizationRepository, user: User
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
-    org = await organisation_service.create_organization("foo", "foo", user)
+    org = await organization_repository.create_organization("foo", "foo", user)
     tenant_id = org.id
     account = CloudAccount(
         id=CloudAccountId(uuid.uuid4()),
