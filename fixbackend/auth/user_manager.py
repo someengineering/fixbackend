@@ -24,7 +24,7 @@ from fixbackend.auth.db import UserRepository
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier
 from fixbackend.config import Config
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -34,7 +34,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user_repository: UserRepository,
         password_helper: PasswordHelperProtocol | None,
         user_verifier: UserVerifier,
-        organization_service: OrganizationService,
+        organization_service: OrganizationRepository,
     ):
         super().__init__(user_repository, password_helper)
         self.user_verifier = user_verifier

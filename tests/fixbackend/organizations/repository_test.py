@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import TenantId, UserId
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 
 
 @pytest.fixture
@@ -37,8 +37,8 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.mark.asyncio
-async def test_create_organization(organisation_service: OrganizationService, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_create_organization(organization_repository: OrganizationRepository, user: User) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
 
@@ -51,32 +51,34 @@ async def test_create_organization(organisation_service: OrganizationService, us
 
     # creating an organization with the same slug should raise an exception
     with pytest.raises(Exception):
-        await organisation_service.create_organization(name="Test Organization", slug="test-organization", owner=user)
+        await organization_repository.create_organization(
+            name="Test Organization", slug="test-organization", owner=user
+        )
 
 
 @pytest.mark.asyncio
-async def test_get_organization(organisation_service: OrganizationService, user: User) -> None:
+async def test_get_organization(organization_repository: OrganizationRepository, user: User) -> None:
     # we can get an existing organization by id
-    organization = await organisation_service.create_organization(
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
 
-    retrieved_organization = await organisation_service.get_organization(organization.id)
+    retrieved_organization = await organization_repository.get_organization(organization.id)
     assert retrieved_organization == organization
 
     # if the organization does not exist, None should be returned
-    retrieved_organization = await organisation_service.get_organization(TenantId(uuid.uuid4()))
+    retrieved_organization = await organization_repository.get_organization(TenantId(uuid.uuid4()))
     assert retrieved_organization is None
 
 
 @pytest.mark.asyncio
-async def test_list_organizations(organisation_service: OrganizationService, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_list_organizations(organization_repository: OrganizationRepository, user: User) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
 
     # the user should be the owner of the organization
-    organizations = await organisation_service.list_organizations(user.id, with_users=True)
+    organizations = await organization_repository.list_organizations(user.id, with_users=True)
     assert len(organizations) == 1
     assert organizations[0] == organization
     assert organizations[0].owners[0] == user.id
@@ -84,10 +86,10 @@ async def test_list_organizations(organisation_service: OrganizationService, use
 
 @pytest.mark.asyncio
 async def test_add_to_organization(
-    organisation_service: OrganizationService, session: AsyncSession, user: User
+    organization_repository: OrganizationRepository, session: AsyncSession, user: User
 ) -> None:
     # add an existing user to the organization
-    organization = await organisation_service.create_organization(
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
@@ -96,24 +98,26 @@ async def test_add_to_organization(
     new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
     new_user = await user_db.create(new_user_dict)
     new_user_id = new_user.id
-    await organisation_service.add_to_organization(organization_id=org_id, user_id=new_user.id)
+    await organization_repository.add_to_organization(organization_id=org_id, user_id=new_user.id)
 
-    retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
+    retrieved_organization = await organization_repository.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id
 
     # when adding a user which is already a member of the organization, nothing should happen
-    await organisation_service.add_to_organization(organization_id=org_id, user_id=new_user_id)
+    await organization_repository.add_to_organization(organization_id=org_id, user_id=new_user_id)
 
     # when adding a non-existing user to the organization, an exception should be raised
     with pytest.raises(Exception):
-        await organisation_service.add_to_organization(organization_id=org_id, user_id=UserId(uuid.uuid4()))
+        await organization_repository.add_to_organization(organization_id=org_id, user_id=UserId(uuid.uuid4()))
 
 
 @pytest.mark.asyncio
-async def test_create_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_create_invitation(
+    organization_repository: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
@@ -127,14 +131,16 @@ async def test_create_invitation(organisation_service: OrganizationService, sess
     new_user = await user_db.create(user_dict)
     new_user_id = new_user.id
 
-    invitation = await organisation_service.create_invitation(organization_id=org_id, user_id=new_user.id)
+    invitation = await organization_repository.create_invitation(organization_id=org_id, user_id=new_user.id)
     assert invitation.organization_id == org_id
     assert invitation.user_id == new_user_id
 
 
 @pytest.mark.asyncio
-async def test_accept_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_accept_invitation(
+    organization_repository: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
@@ -147,20 +153,22 @@ async def test_accept_invitation(organisation_service: OrganizationService, sess
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await organisation_service.create_invitation(organization_id=org_id, user_id=new_user.id)
+    invitation = await organization_repository.create_invitation(organization_id=org_id, user_id=new_user.id)
 
     # accept the invitation
-    await organisation_service.accept_invitation(invitation_id=invitation.id)
+    await organization_repository.accept_invitation(invitation_id=invitation.id)
 
-    retrieved_organization = await organisation_service.get_organization(org_id, with_users=True)
+    retrieved_organization = await organization_repository.get_organization(org_id, with_users=True)
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id
 
 
 @pytest.mark.asyncio
-async def test_list_invitations(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_list_invitations(
+    organization_repository: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
@@ -173,17 +181,19 @@ async def test_list_invitations(organisation_service: OrganizationService, sessi
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await organisation_service.create_invitation(organization_id=org_id, user_id=new_user.id)
+    invitation = await organization_repository.create_invitation(organization_id=org_id, user_id=new_user.id)
 
     # list the invitations
-    invitations = await organisation_service.list_invitations(organization_id=org_id)
+    invitations = await organization_repository.list_invitations(organization_id=org_id)
     assert len(invitations) == 1
     assert invitations[0] == invitation
 
 
 @pytest.mark.asyncio
-async def test_delete_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
-    organization = await organisation_service.create_organization(
+async def test_delete_invitation(
+    organization_repository: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
+    organization = await organization_repository.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
@@ -196,11 +206,11 @@ async def test_delete_invitation(organisation_service: OrganizationService, sess
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await organisation_service.create_invitation(organization_id=org_id, user_id=new_user.id)
+    invitation = await organization_repository.create_invitation(organization_id=org_id, user_id=new_user.id)
 
     # delete the invitation
-    await organisation_service.delete_invitation(invitation_id=invitation.id)
+    await organization_repository.delete_invitation(invitation_id=invitation.id)
 
     # the invitation should not exist anymore
-    invitations = await organisation_service.list_invitations(organization_id=org_id)
+    invitations = await organization_repository.list_invitations(organization_id=org_id)
     assert len(invitations) == 0
