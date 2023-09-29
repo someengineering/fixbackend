@@ -13,24 +13,16 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import uuid
-from typing import AsyncIterator, Sequence
-from uuid import UUID
+from typing import AsyncIterator
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, get_tenant
-from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import UserId, TenantId, ExternalId
-from fixbackend.organizations.dependencies import get_organization_service
-from fixbackend.organizations.models import Organization
-from fixbackend.organizations.service import OrganizationService
 
 
 @pytest.fixture
