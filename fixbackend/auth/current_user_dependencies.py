@@ -32,7 +32,7 @@ from fixbackend.config import get_config
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
-from fixbackend.organizations.dependencies import OrganizationServiceDependency
+from fixbackend.organizations.repository import OrganizationRepositoryDependency
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
@@ -54,7 +54,7 @@ AuthenticatedUser = Annotated[CurrentVerifiedActiveUserDependencies, Depends()]
 
 # todo: take this info from the user's JWT
 async def get_user_tenants_ids(
-    user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+    user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
 ) -> Set[TenantId]:
     orgs = await organization_service.list_organizations(user_context.user.id)
     return {org.id for org in orgs}
@@ -65,7 +65,7 @@ UserTenantsDependency = Annotated[Set[TenantId], Depends(get_user_tenants_ids)]
 
 # TODO: do not use list_organization, but get_organization (cached) and make sure the user can only access "its" tenants
 async def get_tenant(
-    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
 ) -> TenantId:
     organization_id = request.path_params.get("organization_id")
     try:

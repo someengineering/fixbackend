@@ -28,9 +28,9 @@ from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
 from fixbackend.ids import UserId, TenantId, ExternalId
-from fixbackend.organizations.dependencies import get_organization_service
+from fixbackend.organizations.repository import get_organization_repository
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepositoryImpl
 
 org_id = TenantId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
@@ -54,7 +54,7 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationService):
+class OrganizationServiceMock(OrganizationRepositoryImpl):
     def __init__(self) -> None:
         pass
 
@@ -72,7 +72,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[get_organization_repository] = lambda: OrganizationServiceMock()
     app.dependency_overrides[get_tenant] = lambda: org_id
 
     async with AsyncClient(app=app, base_url="http://test") as ac:

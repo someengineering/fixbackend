@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from fixbackend.auth.current_user_dependencies import AuthenticatedUser, TenantDependency
 from fixbackend.auth.dependencies import UserManagerDependency
 from fixbackend.organizations.schemas import Organization, CreateOrganization, OrganizationInvite, ExternalId
-from fixbackend.organizations.dependencies import OrganizationServiceDependency
+from fixbackend.organizations.repository import OrganizationRepositoryDependency
 from fixbackend.ids import TenantId
 from fixbackend.config import ConfigDependency
 
@@ -32,7 +32,7 @@ def organizations_router() -> APIRouter:
 
     @router.get("/")
     async def list_organizations(
-        user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+        user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
     ) -> List[Organization]:
         """List all organizations."""
         orgs = await organization_service.list_organizations(user_context.user.id, with_users=True)
@@ -41,7 +41,9 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}")
     async def get_organization(
-        organization_id: TenantId, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+        organization_id: TenantId,
+        user_context: AuthenticatedUser,
+        organization_service: OrganizationRepositoryDependency,
     ) -> Organization | None:
         """Get an organization."""
         org = await organization_service.get_organization(organization_id, with_users=True)
@@ -57,7 +59,7 @@ def organizations_router() -> APIRouter:
     async def create_organization(
         organization: CreateOrganization,
         user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
     ) -> Organization:
         """Create an organization."""
         try:
@@ -71,7 +73,9 @@ def organizations_router() -> APIRouter:
 
     @router.get("/{organization_id}/invites/")
     async def list_invites(
-        organization_id: TenantId, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+        organization_id: TenantId,
+        user_context: AuthenticatedUser,
+        organization_service: OrganizationRepositoryDependency,
     ) -> List[OrganizationInvite]:
         """List all pending invitations for an org."""
         org = await organization_service.get_organization(organization_id)
@@ -99,7 +103,7 @@ def organizations_router() -> APIRouter:
         organization_id: TenantId,
         user_email: EmailStr,
         user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
         user_manager: UserManagerDependency,
     ) -> OrganizationInvite:
         """Invite a user to an organization."""
@@ -129,7 +133,7 @@ def organizations_router() -> APIRouter:
         organization_id: TenantId,
         invite_id: UUID,
         user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
     ) -> None:
         """Invite a user to an organization."""
         org = await organization_service.get_organization(organization_id)
@@ -148,7 +152,7 @@ def organizations_router() -> APIRouter:
         organization_id: TenantId,
         invite_id: UUID,
         user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
     ) -> None:
         """Accept an invitation to an organization."""
         org = await organization_service.get_organization(organization_id)
@@ -171,7 +175,7 @@ def organizations_router() -> APIRouter:
         organization_id: TenantId,
         user_context: AuthenticatedUser,
         tenant_id: TenantDependency,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
         config: ConfigDependency,
     ) -> str:
         org = await organization_service.get_organization(organization_id)
@@ -189,7 +193,7 @@ def organizations_router() -> APIRouter:
     async def get_externa_id(
         organization_id: TenantId,
         user_context: AuthenticatedUser,
-        organization_service: OrganizationServiceDependency,
+        organization_service: OrganizationRepositoryDependency,
     ) -> ExternalId:
         """Get an organization's external id."""
         org = await organization_service.get_organization(organization_id)

@@ -43,7 +43,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
@@ -152,13 +152,6 @@ def graph_database_access_manager(
 
 
 @pytest.fixture
-def organisation_service(
-    session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
-) -> OrganizationService:
-    return OrganizationService(session, graph_database_access_manager)
-
-
-@pytest.fixture
 async def user(session: AsyncSession) -> User:
     user_db = await anext(get_user_repository(session))
     user_dict = {
@@ -170,7 +163,7 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def organization(organization_repository: OrganizationService, user: User) -> Organization:
+async def organization(organization_repository: OrganizationRepository, user: User) -> Organization:
     return await organization_repository.create_organization("foo", "foo", user)
 
 
@@ -261,8 +254,8 @@ async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> Cl
 @pytest.fixture
 async def organization_repository(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
-) -> OrganizationService:
-    return OrganizationService(session, graph_database_access_manager)
+) -> OrganizationRepository:
+    return OrganizationRepositoryImpl(session, graph_database_access_manager)
 
 
 @pytest.fixture
