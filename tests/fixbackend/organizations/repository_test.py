@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import TenantId, UserId
-from fixbackend.organizations.repository import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.mark.asyncio
-async def test_create_organization(organisation_service: OrganizationService, user: User) -> None:
+async def test_create_organization(organisation_service: OrganizationRepository, user: User) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -55,7 +55,7 @@ async def test_create_organization(organisation_service: OrganizationService, us
 
 
 @pytest.mark.asyncio
-async def test_get_organization(organisation_service: OrganizationService, user: User) -> None:
+async def test_get_organization(organisation_service: OrganizationRepository, user: User) -> None:
     # we can get an existing organization by id
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
@@ -70,7 +70,7 @@ async def test_get_organization(organisation_service: OrganizationService, user:
 
 
 @pytest.mark.asyncio
-async def test_list_organizations(organisation_service: OrganizationService, user: User) -> None:
+async def test_list_organizations(organisation_service: OrganizationRepository, user: User) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -84,7 +84,7 @@ async def test_list_organizations(organisation_service: OrganizationService, use
 
 @pytest.mark.asyncio
 async def test_add_to_organization(
-    organisation_service: OrganizationService, session: AsyncSession, user: User
+    organisation_service: OrganizationRepository, session: AsyncSession, user: User
 ) -> None:
     # add an existing user to the organization
     organization = await organisation_service.create_organization(
@@ -112,7 +112,9 @@ async def test_add_to_organization(
 
 
 @pytest.mark.asyncio
-async def test_create_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
+async def test_create_invitation(
+    organisation_service: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -133,7 +135,9 @@ async def test_create_invitation(organisation_service: OrganizationService, sess
 
 
 @pytest.mark.asyncio
-async def test_accept_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
+async def test_accept_invitation(
+    organisation_service: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -159,7 +163,9 @@ async def test_accept_invitation(organisation_service: OrganizationService, sess
 
 
 @pytest.mark.asyncio
-async def test_list_invitations(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
+async def test_list_invitations(
+    organisation_service: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -182,7 +188,9 @@ async def test_list_invitations(organisation_service: OrganizationService, sessi
 
 
 @pytest.mark.asyncio
-async def test_delete_invitation(organisation_service: OrganizationService, session: AsyncSession, user: User) -> None:
+async def test_delete_invitation(
+    organisation_service: OrganizationRepository, session: AsyncSession, user: User
+) -> None:
     organization = await organisation_service.create_organization(
         name="Test Organization", slug="test-organization", owner=user
     )

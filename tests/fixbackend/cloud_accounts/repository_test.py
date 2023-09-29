@@ -20,13 +20,13 @@ from fixbackend.ids import CloudAccountId, ExternalId
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
-from fixbackend.organizations.repository import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 from fixbackend.auth.models import User
 
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, organisation_service: OrganizationService, user: User
+    async_session_maker: AsyncSessionMaker, organisation_service: OrganizationRepository, user: User
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
     org = await organisation_service.create_organization("foo", "foo", user)

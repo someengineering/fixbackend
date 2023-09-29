@@ -27,7 +27,7 @@ from fixbackend.ids import TenantId, UserId
 from fixbackend.organizations.models import Organization, OrganizationInvite, orm
 
 
-class OrganizationService:
+class OrganizationRepository:
     def __init__(self, session: AsyncSession, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
         self.session = session
         self.graph_db_access_manager = graph_db_access_manager

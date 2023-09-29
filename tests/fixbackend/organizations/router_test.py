@@ -30,7 +30,7 @@ from fixbackend.db import get_async_session
 from fixbackend.ids import UserId, TenantId, ExternalId
 from fixbackend.organizations.dependencies import get_organization_service
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 
 org_id = TenantId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
@@ -54,7 +54,7 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationService):
+class OrganizationServiceMock(OrganizationRepository):
     def __init__(self) -> None:
         pass
 

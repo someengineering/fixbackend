@@ -23,7 +23,7 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
 
@@ -62,7 +62,7 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationService):
+class OrganizationServiceMock(OrganizationRepository):
     def __init__(self) -> None:
         pass
 

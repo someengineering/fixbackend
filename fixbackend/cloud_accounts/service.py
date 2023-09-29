@@ -24,7 +24,7 @@ from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
-from fixbackend.organizations.repository import OrganizationService
+from fixbackend.organizations.repository import OrganizationRepository
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixbackend.dependencies import FixDependency
 
@@ -50,7 +50,7 @@ class CloudAccountService(ABC):
 class CloudAccountServiceImpl(CloudAccountService):
     def __init__(
         self,
-        organization_service: OrganizationService,
+        organization_service: OrganizationRepository,
         cloud_account_repository: CloudAccountRepository,
         publisher: RedisStreamPublisher,
     ) -> None:
