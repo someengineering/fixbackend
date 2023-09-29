@@ -23,9 +23,9 @@ import uuid
 
 import pytest
 
-from fixbackend.db import AsyncSessionMaker
-from fixbackend.ids import TenantId
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import TenantId
+from fixbackend.types import AsyncSessionMaker
 
 
 @pytest.mark.asyncio

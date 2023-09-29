@@ -33,9 +33,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.config import Config
-from fixbackend.db import AsyncSessionMaker
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
+from fixbackend.types import AsyncSessionMaker
 
 log = logging.getLogger(__name__)
 PasswordLength = 20

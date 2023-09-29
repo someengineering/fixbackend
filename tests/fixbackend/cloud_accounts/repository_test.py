@@ -18,7 +18,7 @@ import pytest
 
 from fixbackend.ids import CloudAccountId, ExternalId
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.db import AsyncSessionMaker
+from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.organizations.service import OrganizationService
 from fixbackend.auth.models import User

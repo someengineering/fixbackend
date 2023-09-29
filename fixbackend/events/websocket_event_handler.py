@@ -1,18 +1,12 @@
-from typing import Dict, Any, Annotated
-from fastapi import WebSocket, Depends
-
 from datetime import datetime
-from redis.asyncio import Redis
+from typing import Dict, Any, Annotated
+
+from fastapi import WebSocket, Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubListener
-from fixbackend.config import ConfigDependency
+from redis.asyncio import Redis
+
+from fixbackend.dependencies import FixDependency
 from fixbackend.ids import TenantId
-
-
-def get_readonly_redis(config: ConfigDependency) -> Redis:
-    return Redis.from_url(config.redis_readonly_url)  # type: ignore
-
-
-ReadonlyRedisDependency = Annotated[Redis, Depends(get_readonly_redis)]
 
 
 class WebsocketEventHandler:
@@ -40,8 +34,8 @@ class WebsocketEventHandler:
                 pass
 
 
-def get_websocket_event_handler(readonly_redis: ReadonlyRedisDependency) -> WebsocketEventHandler:
-    return WebsocketEventHandler(readonly_redis)
+def get_websocket_event_handler(fix: FixDependency) -> WebsocketEventHandler:
+    return WebsocketEventHandler(fix.readonly_redis)
 
 
 WebsockedtEventHandlerDependency = Annotated[WebsocketEventHandler, Depends(get_websocket_event_handler)]

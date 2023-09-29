@@ -11,15 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from typing import Callable
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# The list of all models in the project
-# This is used by alembic to generate migrations
-#
-# If you add a new model, you need to add it here,
-# otherwise alembic won't be able to detect it
-
-from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
-from fixbackend.organizations.models.orm import Organization, OrganizationInvite  # noqa
-from fixbackend.graph_db.service import GraphDatabaseAccessEntity  # noqa
-from fixbackend.cloud_accounts.models.orm import CloudAccount  # noqa
-from fixbackend.dispatcher.next_run_repository import NextRun  # noqa
+AsyncSessionMaker = Callable[[], AsyncSession]

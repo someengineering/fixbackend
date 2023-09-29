@@ -19,20 +19,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-from typing import Annotated
-
-from fastapi import Depends
-
-from fixbackend.config import ConfigDependency
-from fixbackend.db import AsyncSessionMakerDependency
-from fixbackend.graph_db.service import GraphDatabaseAccessManager
-
-
-def get_graph_database_access_manager(
-    config: ConfigDependency, session_maker: AsyncSessionMakerDependency
-) -> GraphDatabaseAccessManager:
-    return GraphDatabaseAccessManager(config, session_maker)
-
-
-GraphDatabaseAccessManagerDependency = Annotated[GraphDatabaseAccessManager, Depends(get_graph_database_access_manager)]
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
