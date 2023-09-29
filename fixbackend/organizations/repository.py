@@ -13,21 +13,78 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Optional, Sequence
+from typing import Annotated, Optional, Sequence
 
+from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fixbackend.auth.models import User, orm as auth_orm
+from fixbackend.auth.models import User
+from fixbackend.auth.models import orm as auth_orm
+from fixbackend.db import AsyncSessionDependency
+from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import TenantId, UserId
 from fixbackend.organizations.models import Organization, OrganizationInvite, orm
 
 
-class OrganizationService:
+class OrganizationRepository(ABC):
+    @abstractmethod
+    async def create_organization(self, name: str, slug: str, owner: User) -> Organization:
+        """Create an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_organization(self, organization_id: TenantId, with_users: bool = False) -> Optional[Organization]:
+        """Get an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_organizations(self, user_id: UserId, with_users: bool = False) -> Sequence[Organization]:
+        """List all organizations where the user is a member."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_to_organization(self, organization_id: TenantId, user_id: UserId) -> None:
+        """Add a user to an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def remove_from_organization(self, organization_id: TenantId, user_id: UserId) -> None:
+        """Remove a user from an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create_invitation(self, organization_id: TenantId, user_id: UserId) -> OrganizationInvite:
+        """Create an invite for an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[OrganizationInvite]:
+        """Get an invitation by ID."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_invitations(self, organization_id: TenantId) -> Sequence[OrganizationInvite]:
+        """List all invitations for an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def accept_invitation(self, invitation_id: uuid.UUID) -> None:
+        """Accept an invitation to an organization."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_invitation(self, invitation_id: uuid.UUID) -> None:
+        """Delete an invitation."""
+        raise NotImplementedError
+
+
+class OrganizationRepositoryImpl(OrganizationRepository):
     def __init__(self, session: AsyncSession, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
         self.session = session
         self.graph_db_access_manager = graph_db_access_manager
@@ -159,3 +216,10 @@ class OrganizationService:
             raise ValueError(f"Invitation {invitation_id} does not exist.")
         await self.session.delete(invite)
         await self.session.commit()
+
+
+async def get_organization_repository(session: AsyncSessionDependency, fix: FixDependency) -> OrganizationRepository:
+    return OrganizationRepositoryImpl(session, fix.graph_database_access)
+
+
+OrganizationRepositoryDependency = Annotated[OrganizationRepository, Depends(get_organization_repository)]
