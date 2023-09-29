@@ -276,11 +276,17 @@ async def dispatcher(
     arq_redis: ArqRedis,
     cloud_account_repository: CloudAccountRepository,
     next_run_repository: NextRunRepository,
+    metering_repository: MeteringRepository,
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
 ) -> DispatcherService:
     return DispatcherService(
-        arq_redis, cloud_account_repository, next_run_repository, collect_queue, graph_database_access_manager
+        arq_redis,
+        cloud_account_repository,
+        next_run_repository,
+        metering_repository,
+        collect_queue,
+        graph_database_access_manager,
     )
 
 

@@ -35,6 +35,7 @@ class ServiceNames:
     session_maker = "session_maker"
     cloud_account_repo = "cloud_account_repo"
     next_run_repo = "next_run_repo"
+    metering_repo = "metering_repo"
     graph_db_access = "graph_db_access"
     inventory = "inventory"
     inventory_client = "inventory_client"
