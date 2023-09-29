@@ -30,7 +30,7 @@ from fixbackend.db import get_async_session
 from fixbackend.ids import UserId, TenantId, ExternalId
 from fixbackend.organizations.dependencies import get_organization_service
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationService
 
 org_id = TenantId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())

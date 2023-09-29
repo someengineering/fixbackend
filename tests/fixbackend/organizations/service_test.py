@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import TenantId, UserId
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationService
 
 
 @pytest.fixture

@@ -43,7 +43,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.organizations.models import Organization
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.organizations.repository import OrganizationService
 from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
