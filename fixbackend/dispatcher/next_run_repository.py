@@ -15,11 +15,12 @@ from datetime import datetime
 from typing import AsyncIterator
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import DATETIME, select
+from sqlalchemy import select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.ids import CloudAccountId
+from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 
 
@@ -27,7 +28,7 @@ class NextRun(Base):
     __tablename__ = "next_run"
 
     cloud_account_id: Mapped[CloudAccountId] = mapped_column(GUID, primary_key=True)
-    at: Mapped[datetime] = mapped_column(DATETIME, nullable=False, index=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
 
 
 class NextRunRepository:

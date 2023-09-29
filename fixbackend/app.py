@@ -45,6 +45,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
+from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.organizations.router import organizations_router
 
 log = logging.getLogger(__name__)
@@ -59,12 +60,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url))
-        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
+        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
+        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
         engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
+        deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url))
@@ -84,15 +86,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @asynccontextmanager
     async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url))
-        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
+        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
+        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
         engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
+        metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
-        deps.add(SN.dispatching, DispatcherService(rw_redis, cloud_accounts, next_run_repo, collect_queue, db_access))
+        deps.add(
+            SN.dispatching,
+            DispatcherService(rw_redis, cloud_accounts, next_run_repo, metering_repo, collect_queue, db_access),
+        )
 
         async with deps:
             log.info("Application services started.")

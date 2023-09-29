@@ -13,13 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import uuid
 from datetime import timedelta, datetime
 from typing import Any, Optional
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import RedisStreamListener, Json, MessageContext
 from fixcloudutils.service import Service
-from fixcloudutils.util import utc
+from fixcloudutils.util import utc, parse_utc_str
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
@@ -28,6 +29,8 @@ from fixbackend.collect.collect_queue import CollectQueue, AccountInformation, A
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudAccountId, TenantId
+from fixbackend.metering import MeteringRecord
+from fixbackend.metering.metering_repository import MeteringRepository
 
 log = logging.getLogger(__name__)
 
@@ -38,33 +41,46 @@ class DispatcherService(Service):
         readwrite_redis: Redis,
         cloud_account_repo: CloudAccountRepository,
         next_run_repo: NextRunRepository,
+        metering_repo: MeteringRepository,
         collect_queue: CollectQueue,
         access_manager: GraphDatabaseAccessManager,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.next_run_repo = next_run_repo
+        self.metering_repo = metering_repo
         self.collect_queue = collect_queue
         self.access_manager = access_manager
         self.periodic = Periodic("schedule_next_runs", self.schedule_next_runs, timedelta(minutes=1))
-        self.listener = RedisStreamListener(
+        self.cloudaccount_listener = RedisStreamListener(
             readwrite_redis,
             "fixbackend::cloudaccount",
             group="dispatching",
             listener="dispatching",
-            message_processor=self.process_message,
+            message_processor=self.process_cloud_account_changed_message,
+            consider_failed_after=timedelta(minutes=5),
+            batch_size=1,
+        )
+        self.collect_result_listener = RedisStreamListener(
+            readwrite_redis,
+            "collect-events",
+            group="dispatching",
+            listener="dispatching",
+            message_processor=self.process_collect_done_message,
             consider_failed_after=timedelta(minutes=5),
             batch_size=1,
         )
 
     async def start(self) -> Any:
-        await self.listener.start()
+        await self.collect_result_listener.start()
+        await self.cloudaccount_listener.start()
         await self.periodic.start()
 
     async def stop(self) -> None:
         await self.periodic.stop()
-        await self.listener.stop()
+        await self.cloudaccount_listener.stop()
+        await self.collect_result_listener.stop()
 
-    async def process_message(self, message: Json, context: MessageContext) -> None:
+    async def process_cloud_account_changed_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
             case "cloud_account_created":
                 await self.cloud_account_created(CloudAccountId(message["id"]))
@@ -72,6 +88,36 @@ class DispatcherService(Service):
                 await self.cloud_account_deleted(CloudAccountId(message["id"]))
             case _:
                 log.error(f"Don't know how to handle messages of kind {context.kind}")
+
+    async def process_collect_done_message(self, message: Json, context: MessageContext) -> None:
+        match context.kind:
+            case "collect-done":
+                await self.collect_job_finished(message)
+            case _:
+                log.info(f"Collect messages: will ignore messages of kine {context.kind}")
+
+    async def collect_job_finished(self, message: Json) -> None:
+        job_id = message["job_id"]
+        task_id = message["task_id"]
+        tenant_id = message["tenant_id"]
+        account_info = message["account_info"]
+        messages = message["messages"]
+        started_at = parse_utc_str(message["started_at"])
+        duration = message["duration"]
+        collected_resources = sum(sum(account_details["summary"].values()) for account_details in account_info.values())
+        record = MeteringRecord(
+            id=uuid.uuid4(),
+            tenant_id=TenantId(uuid.UUID(tenant_id)),
+            timestamp=utc(),
+            job_id=job_id,
+            task_id=task_id,
+            nr_of_accounts_collected=len(account_info),
+            nr_of_resources_collected=collected_resources,
+            nr_of_error_messages=len(messages),
+            started_at=started_at,
+            duration=duration,
+        )
+        await self.metering_repo.add(record)
 
     async def cloud_account_created(self, cid: CloudAccountId) -> None:
         if account := await self.cloud_account_repo.get(cid):
@@ -88,7 +134,7 @@ class DispatcherService(Service):
 
     async def compute_next_run(self, tenant: TenantId) -> datetime:
         # compute next run time dependent on the tenant.
-        result = datetime.now() + timedelta(hours=1)
+        result = utc() + timedelta(hours=1)
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
@@ -107,7 +153,9 @@ class DispatcherService(Service):
                     return None
 
         if (ai := account_information()) and (db := await self.access_manager.get_database_access(account.tenant_id)):
-            await self.collect_queue.enqueue(db, ai)  # TODO: create a unique identifier for this run
+            job_id = str(uuid.uuid4())
+            log.info(f"Trigger collect for tenant: {account.tenant_id} and account: {account.id} with job_id: {job_id}")
+            await self.collect_queue.enqueue(db, ai, job_id=job_id)
 
     async def schedule_next_runs(self) -> None:
         now = utc()

@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta, datetime, timezone
 
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
@@ -26,11 +26,12 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextRun
 from fixbackend.ids import CloudAccountId
+from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.organizations.models import Organization
 
 
 @pytest.mark.asyncio
-async def test_receive_created(
+async def test_receive_cloud_account_created(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
@@ -43,19 +44,19 @@ async def test_receive_created(
         CloudAccount(cloud_account_id, organization.id, AwsCloudAccess("123", organization.external_id, "test"))
     )
     # signal to the dispatcher that the cloud account was created
-    await dispatcher.process_message(
+    await dispatcher.process_cloud_account_changed_message(
         {"id": str(cloud_account_id)}, MessageContext("test", "cloud_account_created", "test", utc(), utc())
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextRun, cloud_account_id)
     assert next_run is not None
-    assert next_run.at > datetime.now()  # next run is in the future
+    assert next_run.at > utc()  # next run is in the future
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 2
 
 
 @pytest.mark.asyncio
-async def test_receive_deleted(
+async def test_receive_cloud_account_deleted(
     dispatcher: DispatcherService, session: AsyncSession, next_run_repository: NextRunRepository
 ) -> None:
     # create cloud
@@ -63,7 +64,7 @@ async def test_receive_deleted(
     # create a next run entry
     await next_run_repository.create(cloud_account_id, utc())
     # signal to the dispatcher that the cloud account was created
-    await dispatcher.process_message(
+    await dispatcher.process_cloud_account_changed_message(
         {"id": str(cloud_account_id)}, MessageContext("test", "cloud_account_deleted", "test", utc(), utc())
     )
     # check that a new entry was created in the next_run table
@@ -91,7 +92,7 @@ async def test_trigger_collect(
     await dispatcher.schedule_next_runs()
     next_run = await session.get(NextRun, cloud_account_id)
     assert next_run is not None
-    assert next_run.at > datetime.now()  # next run is in the future
+    assert next_run.at > utc()  # next run is in the future
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 2
 
@@ -101,3 +102,39 @@ async def test_trigger_collect(
     assert again is not None
     assert again.at == next_run.at
     assert len(await arq_redis.keys()) == 2
+
+
+@pytest.mark.asyncio
+async def test_receive_collect_done_message(
+    dispatcher: DispatcherService, metering_repository: MeteringRepository, organization: Organization
+) -> None:
+    message = {
+        "job_id": "j1",
+        "task_id": "t1",
+        "tenant_id": str(organization.id),
+        "account_info": {
+            "account1": dict(
+                id="account1",
+                name="test",
+                cloud="aws",
+                exported_at="2023-09-29T09:00:18Z",
+                summary={"instance": 23, "volume": 12},
+            )
+        },
+        "messages": ["m1", "m2"],
+        "started_at": "2023-09-29T09:00:00Z",
+        "duration": 18,
+    }
+    context = MessageContext("test", "collect-done", "test", utc(), utc())
+    await dispatcher.process_collect_done_message(message, context)
+    result = [n async for n in metering_repository.list(organization.id)]
+    assert len(result) == 1
+    mr = result[0]
+    assert mr.tenant_id == organization.id
+    assert mr.job_id == "j1"
+    assert mr.task_id == "t1"
+    assert mr.nr_of_accounts_collected == 1
+    assert mr.nr_of_resources_collected == 35
+    assert mr.nr_of_error_messages == 2
+    assert mr.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
+    assert mr.duration == 18

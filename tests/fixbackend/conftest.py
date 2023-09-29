@@ -42,6 +42,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.organizations.models import Organization
 from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
@@ -252,6 +253,11 @@ async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> Cl
 
 
 @pytest.fixture
+async def metering_repository(async_session_maker: AsyncSessionMaker) -> MeteringRepository:
+    return MeteringRepository(async_session_maker)
+
+
+@pytest.fixture
 async def organization_repository(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> OrganizationRepository:
@@ -263,11 +269,17 @@ async def dispatcher(
     arq_redis: ArqRedis,
     cloud_account_repository: CloudAccountRepository,
     next_run_repository: NextRunRepository,
+    metering_repository: MeteringRepository,
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
 ) -> DispatcherService:
     return DispatcherService(
-        arq_redis, cloud_account_repository, next_run_repository, collect_queue, graph_database_access_manager
+        arq_redis,
+        cloud_account_repository,
+        next_run_repository,
+        metering_repository,
+        collect_queue,
+        graph_database_access_manager,
     )
 
 
