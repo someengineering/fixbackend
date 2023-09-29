@@ -60,8 +60,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url))
-        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
+        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
+        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
         engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
@@ -86,8 +86,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @asynccontextmanager
     async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url))
-        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url))
+        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
+        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
         engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))

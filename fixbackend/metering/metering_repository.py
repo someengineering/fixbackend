@@ -18,7 +18,7 @@ from typing import AsyncIterator, Optional
 from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import select, INT, String, UUID as UID
+from sqlalchemy import select, INT, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
@@ -31,7 +31,7 @@ from fixbackend.types import AsyncSessionMaker
 class MeteringRecordEntity(Base):
     __tablename__ = "metering"
 
-    id: Mapped[UUID] = mapped_column(UID, primary_key=True)
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
     tenant_id: Mapped[TenantId] = mapped_column(GUID, nullable=False, index=True)
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False)
