@@ -15,7 +15,7 @@ from typing import Annotated
 
 from arq import ArqRedis
 from fastapi.params import Depends
-from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.service import Dependencies
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -77,8 +77,8 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
     @property
-    def cloudaccount_publisher(self) -> RedisPubSubPublisher:
-        return self.service(ServiceNames.cloudaccount_publisher, RedisPubSubPublisher)
+    def cloudaccount_publisher(self) -> RedisStreamPublisher:
+        return self.service(ServiceNames.cloudaccount_publisher, RedisStreamPublisher)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

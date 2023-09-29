@@ -25,7 +25,7 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAc
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.organizations.service import OrganizationService
-from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixbackend.dependencies import FixDependency
 
 
@@ -52,7 +52,7 @@ class CloudAccountServiceImpl(CloudAccountService):
         self,
         organization_service: OrganizationService,
         cloud_account_repository: CloudAccountRepository,
-        publisher: RedisPubSubPublisher,
+        publisher: RedisStreamPublisher,
     ) -> None:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository

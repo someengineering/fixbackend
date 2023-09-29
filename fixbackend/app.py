@@ -23,7 +23,7 @@ from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
-from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -71,7 +71,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.inventory, InventoryService(client))
         deps.add(
             SN.cloudaccount_publisher,
-            RedisPubSubPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
+            RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
         if not cfg.static_assets:
             await load_app_from_cdn()
