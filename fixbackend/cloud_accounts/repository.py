@@ -17,7 +17,7 @@ from fastapi import Depends
 from sqlalchemy import select
 
 from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
-from fixbackend.db import AsyncSessionMaker
+from fixbackend.db import AsyncSessionMaker, AsyncSessionMakerDependency
 from fixbackend.ids import CloudAccountId, TenantId
 from abc import ABC, abstractmethod
 
@@ -90,7 +90,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             await session.commit()
 
 
-def get_cloud_account_repository(session_maker: AsyncSessionMaker) -> CloudAccountRepository:
+def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:
     return CloudAccountRepositoryImpl(session_maker)
 
 
