@@ -11,16 +11,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import datetime
+from uuid import UUID
 
-# The list of all models in the project
-# This is used by alembic to generate migrations
-#
-# If you add a new model, you need to add it here,
-# otherwise alembic won't be able to detect it
+from attrs import frozen
 
-from fixbackend.auth.models.orm import User, OAuthAccount  # noqa
-from fixbackend.organizations.models.orm import Organization, OrganizationInvite  # noqa
-from fixbackend.graph_db.service import GraphDatabaseAccessEntity  # noqa
-from fixbackend.cloud_accounts.models.orm import CloudAccount  # noqa
-from fixbackend.dispatcher.next_run_repository import NextRun  # noqa
-from fixbackend.metering.metering_repository import MeteringRecordEntity  # noqa
+from fixbackend.ids import TenantId
+
+
+@frozen
+class MeteringRecord:
+    id: UUID
+    tenant_id: TenantId
+    timestamp: datetime
+    job_id: str
+    task_id: str
+    nr_of_accounts_collected: int
+    nr_of_resources_collected: int
+    nr_of_error_messages: int
+    started_at: datetime
+    duration: int

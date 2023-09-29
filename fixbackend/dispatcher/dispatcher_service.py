@@ -88,7 +88,7 @@ class DispatcherService(Service):
 
     async def compute_next_run(self, tenant: TenantId) -> datetime:
         # compute next run time dependent on the tenant.
-        result = datetime.now() + timedelta(hours=1)
+        result = utc() + timedelta(hours=1)
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 

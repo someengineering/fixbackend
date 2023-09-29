@@ -42,6 +42,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
 from fixbackend.types import AsyncSessionMaker
@@ -256,6 +257,11 @@ async def next_run_repository(async_session_maker: AsyncSessionMaker) -> NextRun
 @pytest.fixture
 async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> CloudAccountRepository:
     return CloudAccountRepositoryImpl(async_session_maker)
+
+
+@pytest.fixture
+async def metering_repository(async_session_maker: AsyncSessionMaker) -> MeteringRepository:
+    return MeteringRepository(async_session_maker)
 
 
 @pytest.fixture

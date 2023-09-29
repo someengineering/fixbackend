@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
@@ -49,7 +49,7 @@ async def test_receive_created(
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextRun, cloud_account_id)
     assert next_run is not None
-    assert next_run.at > datetime.now()  # next run is in the future
+    assert next_run.at > utc()  # next run is in the future
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 2
 
@@ -91,7 +91,7 @@ async def test_trigger_collect(
     await dispatcher.schedule_next_runs()
     next_run = await session.get(NextRun, cloud_account_id)
     assert next_run is not None
-    assert next_run.at > datetime.now()  # next run is in the future
+    assert next_run.at > utc()  # next run is in the future
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 2
 
