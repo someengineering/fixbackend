@@ -11,12 +11,18 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import pickle
 import uuid
+from typing import Any, Sequence, Mapping
 
 import pytest
 from redis.asyncio import Redis
 
-from fixbackend.collect.collect_queue import RedisCollectQueue, JobAlreadyEnqueued, AwsAccountInformation
+from fixbackend.collect.collect_queue import (
+    RedisCollectQueue,
+    JobAlreadyEnqueued,
+    AwsAccountInformation,
+)
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
 
@@ -45,6 +51,22 @@ async def test_redis_collect_queue(
     # enqueue again will fail
     with pytest.raises(JobAlreadyEnqueued):
         await collect_queue.enqueue(graph_db_access, aws_account, job_id="test")
+
+    # make sure the job is valid json
+    def assert_json(obj: Any) -> None:
+        if obj is None or isinstance(obj, (str, int, bool)):
+            pass
+        elif isinstance(obj, Sequence):
+            for item in obj:
+                assert_json(item)
+        elif isinstance(obj, Mapping):
+            for k, v in obj.items():
+                assert isinstance(k, str)
+                assert_json(v)
+        else:
+            raise TypeError(f"Unexpected type {type(obj)}")
+
+    assert_json(pickle.loads(await arq_redis.get("arq:job:test")))
 
 
 async def test_aws_account_info_json() -> None:
