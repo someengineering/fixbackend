@@ -14,7 +14,7 @@
 
 
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import pytest
 
@@ -24,6 +24,8 @@ from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.models import Organization
 from fixbackend.organizations.service import OrganizationService
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixcloudutils.types import Json
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -70,11 +72,20 @@ class OrganizationServiceMock(OrganizationService):
         return organization
 
 
+class RedisPubSubPublisherMock(RedisPubSubPublisher):
+    def __init__(self) -> None:
+        self.last_message: Optional[Tuple[str, Json, Optional[str]]] = None
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.last_message = (kind, message, channel)
+
+
 @pytest.mark.asyncio
 async def test_create_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organisation_service = OrganizationServiceMock()
-    service = CloudAccountServiceImpl(organisation_service, repository)
+    publisher = RedisPubSubPublisherMock()
+    service = CloudAccountServiceImpl(organisation_service, repository, publisher)
 
     # happy case
     acc = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
@@ -86,6 +97,11 @@ async def test_create_aws_account() -> None:
     assert account.access.account_id == account_id
     assert account.access.role_name == role_name
     assert account.access.external_id == external_id
+
+    assert publisher.last_message is not None
+    assert publisher.last_message[0] == "cloud_account_created"
+    assert publisher.last_message[1] == {"id": str(account.id)}
+    assert publisher.last_message[2] is None
 
     # account already exists
     with pytest.raises(Exception):
@@ -104,9 +120,9 @@ async def test_create_aws_account() -> None:
 async def test_delete_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organisation_service = OrganizationServiceMock()
-    service = CloudAccountServiceImpl(organisation_service, repository)
+    publisher = RedisPubSubPublisherMock()
+    service = CloudAccountServiceImpl(organisation_service, repository, publisher)
 
-    # happy case
     account = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
 
@@ -118,3 +134,8 @@ async def test_delete_aws_account() -> None:
     # success
     await service.delete_cloud_account(account.id, tenant_id)
     assert len(repository.accounts) == 0
+
+    assert publisher.last_message is not None
+    assert publisher.last_message[0] == "cloud_account_deleted"
+    assert publisher.last_message[1] == {"id": str(account.id)}
+    assert publisher.last_message[2] is None

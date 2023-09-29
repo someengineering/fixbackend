@@ -14,6 +14,7 @@
 
 
 import uuid
+from abc import ABC, abstractmethod
 from hmac import compare_digest
 from typing import Annotated
 
@@ -24,7 +25,8 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAc
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.dependencies import OrganizationServiceDependency
 from fixbackend.organizations.service import OrganizationService
-from abc import ABC, abstractmethod
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixbackend.dependencies import FixDependency
 
 
 class WrongExternalId(Exception):
@@ -50,9 +52,11 @@ class CloudAccountServiceImpl(CloudAccountService):
         self,
         organization_service: OrganizationService,
         cloud_account_repository: CloudAccountRepository,
+        publisher: RedisPubSubPublisher,
     ) -> None:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository
+        self.publisher = publisher
 
     async def create_aws_account(
         self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
@@ -83,7 +87,7 @@ class CloudAccountServiceImpl(CloudAccountService):
         )
 
         result = await self.cloud_account_repository.create(account)
-        # await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
+        await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
         return result
 
     async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
@@ -92,15 +96,16 @@ class CloudAccountServiceImpl(CloudAccountService):
             raise ValueError("Cloud account does not exist")
 
         await self.cloud_account_repository.delete(cloud_accont_id)
+        await self.publisher.publish("cloud_account_deleted", {"id": str(cloud_accont_id)})
 
 
 def get_cloud_account_service(
     organization_service_dependency: OrganizationServiceDependency,
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
+    fix_dependency: FixDependency,
 ) -> CloudAccountService:
     return CloudAccountServiceImpl(
-        organization_service_dependency,
-        cloud_account_repository_dependency,
+        organization_service_dependency, cloud_account_repository_dependency, fix_dependency.cloudaccount_publisher
     )
 
 
