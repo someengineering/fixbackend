@@ -22,7 +22,7 @@
 from uuid import UUID
 from typing import Annotated, Set
 
-from fastapi import Depends, HTTPException, Request, Header, HTTPException, status, status
+from fastapi import Depends, HTTPException, Request, Header, status
 from fastapi_users import FastAPIUsers
 
 from fixbackend.auth.dependencies import get_user_manager
