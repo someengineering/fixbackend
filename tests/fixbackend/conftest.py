@@ -86,6 +86,8 @@ def default_config() -> Config:
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
         args=Namespace(dispatcher=False),
+        aws_access_key_id="",
+        aws_secret_access_key="",
     )
 
 
