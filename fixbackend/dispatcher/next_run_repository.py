@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
-from typing import AsyncIterator
+from typing import AsyncIterator, Tuple
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import select
@@ -53,7 +53,7 @@ class NextRunRepository:
                 await session.delete(run)
                 await session.commit()
 
-    async def older_than(self, at: datetime) -> AsyncIterator[CloudAccountId]:
+    async def older_than(self, at: datetime) -> AsyncIterator[Tuple[CloudAccountId, datetime]]:
         async with self.session_maker() as session:
             async for (entry,) in await session.stream(select(NextRun).where(NextRun.at < at)):
-                yield entry.cloud_account_id
+                yield entry.cloud_account_id, entry.at

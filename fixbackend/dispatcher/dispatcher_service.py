@@ -132,9 +132,16 @@ class DispatcherService(Service):
         # delete the entry from the scheduler table
         await self.next_run_repo.delete(cid)
 
-    async def compute_next_run(self, tenant: TenantId) -> datetime:
-        # compute next run time dependent on the tenant.
-        result = utc() + timedelta(hours=1)
+    async def compute_next_run(self, tenant: TenantId, last_run: Optional[datetime] = None) -> datetime:
+        now = utc()
+        delta = timedelta(hours=1)  # TODO: compute delta dependent on the tenant.
+        initial_time = last_run or now
+        diff = now - initial_time
+        if diff.total_seconds() > 0:  # if the last run is in the past, make sure the next run is in the future
+            periods = (diff // delta) + 1
+            result = initial_time + (delta * periods)
+        else:  # next run is already in the future. compute offset.
+            result = initial_time + delta
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
@@ -159,10 +166,10 @@ class DispatcherService(Service):
 
     async def schedule_next_runs(self) -> None:
         now = utc()
-        async for cid in self.next_run_repo.older_than(now):
+        async for cid, at in self.next_run_repo.older_than(now):
             if account := await self.cloud_account_repo.get(cid):
                 await self.trigger_collect(account)
-                next_run_at = await self.compute_next_run(account.tenant_id)
+                next_run_at = await self.compute_next_run(account.tenant_id, at)
                 await self.next_run_repo.update_next_run_at(cid, next_run_at)
             else:
                 log.error("Received a message, that a cloud account is created, but it does not exist in the database")

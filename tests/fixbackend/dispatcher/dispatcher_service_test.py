@@ -14,8 +14,10 @@
 
 import uuid
 from datetime import timedelta, datetime, timezone
+from typing import Optional
 
 import pytest
+from pytest import approx
 from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.util import utc
 from redis.asyncio import Redis
@@ -25,7 +27,7 @@ from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextRun
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import CloudAccountId, TenantId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.organizations.models import Organization
 
@@ -138,3 +140,21 @@ async def test_receive_collect_done_message(
     assert mr.nr_of_error_messages == 2
     assert mr.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
     assert mr.duration == 18
+
+
+@pytest.mark.asyncio
+async def test_compute_next_run(dispatcher: DispatcherService) -> None:
+    tenant = TenantId(uuid.uuid4())
+    delta = timedelta(hours=1)
+
+    async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
+        assert (await dispatcher.compute_next_run(tenant, last_run)).timestamp() == approx(expected.timestamp(), abs=2)
+
+    now = utc()
+    await assert_next_is(None, now + delta)
+    await assert_next_is(now, now + delta)
+    await assert_next_is(now + timedelta(seconds=10), now + delta + timedelta(seconds=10))
+    await assert_next_is(now - timedelta(seconds=10), now + delta - timedelta(seconds=10))
+    await assert_next_is(now + 3 * delta, now + 4 * delta)
+    await assert_next_is(now - 3 * delta, now + delta)
+    await assert_next_is(now - 123 * delta, now + delta)
