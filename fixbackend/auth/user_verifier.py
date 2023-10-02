@@ -20,6 +20,7 @@ import boto3
 from fastapi import Depends, Request
 
 from fixbackend.auth.models import User
+from fixbackend.config import Config, ConfigDependency
 
 
 class UserVerifier(ABC):
@@ -39,15 +40,20 @@ class ConsoleUserVerifier(UserVerifier):
 
 
 class EMailUserVerifier(UserVerifier):
-    def __init__(self) -> None:
-        self.client = boto3.client("ses", "eu-central-1")
+    def __init__(self, config: Config) -> None:
+        self.client = boto3.client(
+            "ses",
+            "eu-central-1",
+            aws_access_key_id=config.aws_access_key_id,
+            aws_secret_access_key=config.aws_secret_access_key,
+        )
 
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         destination = user.email
         assert request
 
         verification_link = request.base_url
-        verification_link = verification_link.replace(fragment=f"verify={token}")
+        verification_link = verification_link.replace(path="/verify-email", query=f"token={token}")
 
         def send_email(destination: str, token: str) -> None:
             body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
@@ -70,13 +76,15 @@ class EMailUserVerifier(UserVerifier):
                         "Data": "FIX: verify your e-mail address",
                     },
                 },
-                Source="FIX team <noreply@fix.tt>",
+                Source="noreply@fix.tt",
             )
 
         await asyncio.to_thread(lambda: send_email(destination, token))
 
 
-def get_user_verifier() -> UserVerifier:
+def get_user_verifier(config: ConfigDependency) -> UserVerifier:
+    if config.aws_access_key_id and config.aws_secret_access_key:
+        return EMailUserVerifier(config)
     return ConsoleUserVerifier()
 
 
