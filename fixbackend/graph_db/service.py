@@ -33,9 +33,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.config import Config
-from fixbackend.db import AsyncSessionMaker
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
+from fixbackend.types import AsyncSessionMaker
 
 log = logging.getLogger(__name__)
 PasswordLength = 20
@@ -47,7 +47,7 @@ class GraphDatabaseAccessEntity(Base):
     server: Mapped[str] = mapped_column(String(length=256), nullable=False)
     username: Mapped[str] = mapped_column(String(length=36), nullable=False)
     password: Mapped[str] = mapped_column(String(length=PasswordLength), nullable=False)
-    database: Mapped[str] = mapped_column(String(length=36), nullable=False)
+    database: Mapped[str] = mapped_column(String(length=40), nullable=False)
 
     def access(self) -> GraphDatabaseAccess:
         return GraphDatabaseAccess(
@@ -81,7 +81,7 @@ class GraphDatabaseAccessManager(Service):
             server=self._database_for(tenant_id),
             username=str(tenant_id),
             password=self._generate_password(PasswordLength),
-            database=str(tenant_id),
+            database=f"db-{tenant_id}",  # name needs to start with a letter!
         )
         db_access = db_access_entity.access()
 

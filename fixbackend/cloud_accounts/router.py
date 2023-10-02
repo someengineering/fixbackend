@@ -12,11 +12,15 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from fastapi import APIRouter
 import logging
 
-from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
+from fastapi import APIRouter, HTTPException
 
+from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
+from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
+from fixbackend.ids import CloudAccountId
+from fixbackend.auth.current_user_dependencies import UserTenantsDependency
+from fixbackend.ids import TenantId
 
 log = logging.getLogger(__name__)
 
@@ -24,8 +28,29 @@ log = logging.getLogger(__name__)
 def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
 
+    @router.delete("/{organization_id}/cloud_account/{cloud_account_id}")
+    async def delete_cloud_accont(
+        organization_id: TenantId,
+        cloud_account_id: CloudAccountId,
+        user_tenants: UserTenantsDependency,
+        service: CloudAccountServiceDependency,
+    ) -> None:
+        if organization_id not in user_tenants:
+            raise HTTPException(status_code=403, detail="User does not have access to this organization")
+
+        await service.delete_cloud_account(cloud_account_id, organization_id)
+
+    return router
+
+
+def cloud_accounts_callback_router() -> APIRouter:
+    router = APIRouter()
+
     @router.post("/callbacks/aws/cf")
-    def aws_cloudformation_callback(payload: AwsCloudFormationLambdaCallbackParameters) -> None:
-        log.info((f"AWS cloudformation callback: {payload}"))
+    async def aws_cloudformation_callback(
+        payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
+    ) -> None:
+        await service.create_aws_account(payload.tenant_id, payload.account_id, payload.role_name, payload.external_id)
+        return None
 
     return router

@@ -19,23 +19,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import uuid
-from typing import Annotated, Dict
+from uuid import UUID
+from typing import Annotated, Set
 
-from fastapi import Depends, Request, Header, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Header, HTTPException, status, status
 from fastapi_users import FastAPIUsers
 
 from fixbackend.auth.dependencies import get_user_manager
 from fixbackend.auth.jwt import get_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.config import get_config
-from fixbackend.graph_db.dependencies import GraphDatabaseAccessManagerDependency
+from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import OrganizationId, TenantId
-from fixbackend.organizations.dependencies import OrganizationServiceDependency
+from fixbackend.ids import TenantId
+from fixbackend.organizations.repository import OrganizationRepositoryDependency
 
 # todo: use dependency injection
-fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [get_auth_backend(get_config())])
+fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
 
 # the value below is a dependency itself
 get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
@@ -59,32 +59,37 @@ AuthenticatedUser = Annotated[CurrentVerifiedActiveUserDependencies, Depends()]
 
 
 # todo: take this info from the user's JWT
-async def get_user_organization_ids(
-    user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
-) -> Dict[OrganizationId, TenantId]:
+async def get_user_tenants_ids(
+    user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
+) -> Set[TenantId]:
     orgs = await organization_service.list_organizations(user_context.user.id)
-    return {org.id: org.tenant_id for org in orgs}
+    return {org.id for org in orgs}
 
 
-UserOrganizationsDependency = Annotated[Dict[OrganizationId, TenantId], Depends(get_user_organization_ids)]
+UserTenantsDependency = Annotated[Set[TenantId], Depends(get_user_tenants_ids)]
 
 
 # TODO: do not use list_organization, but get_organization (cached) and make sure the user can only access "its" tenants
 async def get_tenant(
-    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationServiceDependency
+    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
 ) -> TenantId:
-    current_organization_id = request.path_params["organization_id"]
+    organization_id = request.path_params.get("organization_id")
+    try:
+        tenant_id = TenantId(UUID(organization_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization id")
     orgs = await organization_service.list_organizations(user_context.user.id)
-    return [org.tenant_id for org in orgs if org.id == current_organization_id][0]
+    org_ids: Set[TenantId] = {org.id for org in orgs}
+    if tenant_id not in org_ids:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="You're not a member of this organization")
+    return tenant_id
 
 
 TenantDependency = Annotated[TenantId, Depends(get_tenant)]
 
 
-async def get_current_graph_db(
-    manager: GraphDatabaseAccessManagerDependency, tenant: TenantDependency
-) -> GraphDatabaseAccess:
-    access = await manager.get_database_access(tenant)
+async def get_current_graph_db(fix: FixDependency, tenant: TenantDependency) -> GraphDatabaseAccess:
+    access = await fix.graph_database_access.get_database_access(tenant)
     if access is None:
         raise AttributeError("No database access found for tenant")
     return access

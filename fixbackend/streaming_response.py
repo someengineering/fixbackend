@@ -19,20 +19,32 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
+from typing import AsyncIterator
 
-from typing import Annotated
-
-from fastapi import Depends
-
-from fixbackend.config import ConfigDependency
-from fixbackend.db import AsyncSessionMakerDependency
-from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fastapi.responses import StreamingResponse
+from fixcloudutils.types import Json
 
 
-def get_graph_database_access_manager(
-    config: ConfigDependency, session_maker: AsyncSessionMakerDependency
-) -> GraphDatabaseAccessManager:
-    return GraphDatabaseAccessManager(config, session_maker)
+async def json_serializer(input_iterator: AsyncIterator[Json]) -> AsyncIterator[str]:
+    yield "["
+    flag = False
+    async for item in input_iterator:
+        pre = "," if flag else ""
+        yield pre + json.dumps(item)
+        flag = True
+    yield "]"
 
 
-GraphDatabaseAccessManagerDependency = Annotated[GraphDatabaseAccessManager, Depends(get_graph_database_access_manager)]
+async def ndjson_serializer(input_iterator: AsyncIterator[Json]) -> AsyncIterator[str]:
+    async for item in input_iterator:
+        yield json.dumps(item) + "\n"
+
+
+def streaming_response(accept: str, gen: AsyncIterator[Json]) -> StreamingResponse:
+    if accept in ["application/x-ndjson", "application/ndjson"]:
+        return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson")
+    elif accept == "application/json":
+        return StreamingResponse(json_serializer(gen), media_type="application/json")
+    else:
+        return StreamingResponse(json_serializer(gen), media_type="application/json")

@@ -1,0 +1,59 @@
+#  Copyright (c) 2023. Some Engineering
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import uuid
+
+import pytest
+
+from fixbackend.ids import CloudAccountId, ExternalId
+from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
+from fixbackend.types import AsyncSessionMaker
+from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
+from fixbackend.organizations.repository import OrganizationRepository
+from fixbackend.auth.models import User
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_account(
+    async_session_maker: AsyncSessionMaker, organization_repository: OrganizationRepository, user: User
+) -> None:
+    cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
+    org = await organization_repository.create_organization("foo", "foo", user)
+    tenant_id = org.id
+    account = CloudAccount(
+        id=CloudAccountId(uuid.uuid4()),
+        tenant_id=tenant_id,
+        access=AwsCloudAccess(
+            account_id="123456789012",
+            role_name="foo",
+            external_id=ExternalId(uuid.uuid4()),
+        ),
+    )
+
+    # create
+    created = await cloud_account_repository.create(cloud_account=account)
+    assert created == account
+
+    # get
+    stored_account = await cloud_account_repository.get(id=account.id)
+    assert account == stored_account
+
+    # list
+    accounts = await cloud_account_repository.list_by_tenant_id(tenant_id=tenant_id)
+    assert len(accounts) == 1
+    assert accounts[0] == account
+
+    # delete
+    await cloud_account_repository.delete(id=account.id)
+    assert await cloud_account_repository.get(id=account.id) is None

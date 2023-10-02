@@ -22,38 +22,45 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, check_csrf_token
-from fixbackend.auth.models import orm
+from fixbackend.auth.current_user_dependencies import check_csrf_token, get_current_active_verified_user, get_tenant
+from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.organizations.dependencies import get_organization_service
-from fixbackend.organizations.models import Organization, OrganizationOwners
-from fixbackend.organizations.service import OrganizationService
+from fixbackend.ids import ExternalId, TenantId, UserId
+from fixbackend.organizations.models import Organization
+from fixbackend.organizations.repository import OrganizationRepositoryImpl, get_organization_repository
 
-org_id = uuid.uuid4()
-external_id = uuid.uuid4()
-user_id = uuid.uuid4()
-user = orm.User(id=user_id, email="foo@example.com", hashed_password="passord", is_verified=True, is_active=True)
+org_id = TenantId(uuid.uuid4())
+external_id = ExternalId(uuid.uuid4())
+user_id = UserId(uuid.uuid4())
+user = User(
+    id=user_id,
+    email="foo@example.com",
+    hashed_password="passord",
+    is_verified=True,
+    is_active=True,
+    is_superuser=False,
+    oauth_accounts=[],
+)
 organization = Organization(
-    id=uuid.uuid4(),
+    id=org_id,
     name="org name",
     slug="org-slug",
     external_id=external_id,
-    tenant_id=uuid.uuid4(),
-    owners=[OrganizationOwners(organization_id=org_id, user_id=user_id, user=user)],
+    owners=[user.id],
     members=[],
 )
 
 
-class OrganizationServiceMock(OrganizationService):
+class OrganizationServiceMock(OrganizationRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_organization(self, organization_id: UUID, with_users: bool = False) -> Organization | None:
+    async def get_organization(self, organization_id: UUID) -> Organization | None:
         return organization
 
-    async def list_organizations(self, owner_id: UUID, with_users: bool = False) -> Sequence[Organization]:
+    async def list_organizations(self, owner_id: UUID) -> Sequence[Organization]:
         return [organization]
 
 
@@ -64,8 +71,9 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_organization_service] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[get_organization_repository] = lambda: OrganizationServiceMock()
     app.dependency_overrides[check_csrf_token] = lambda: None
+    app.dependency_overrides[get_tenant] = lambda: org_id
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -78,9 +86,12 @@ async def test_list_organizations(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cloudformation_link(client: AsyncClient) -> None:
+async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
-    assert response.json() == "https://example.com"
+    url = response.json()
+    assert str(default_config.cf_template_url) in url
+    assert str(org_id) in url
+    assert str(external_id) in url
 
 
 @pytest.mark.asyncio

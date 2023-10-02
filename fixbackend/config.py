@@ -36,20 +36,26 @@ class Config(BaseSettings):
     redis_readwrite_url: str
     redis_readonly_url: str
     redis_queue_url: str
-    cdn_enpoint: str
+    cdn_endpoint: str
     cdn_bucket: str
     fixui_sha: str
     static_assets: Optional[Path]
     session_ttl: int
     available_db_server: List[str]
+    inventory_url: str
+    cf_template_url: str
+    args: Namespace
 
     def frontend_cdn_origin(self) -> str:
-        return f"{self.cdn_enpoint}/{self.cdn_bucket}/{self.fixui_sha}"
+        return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
 
     @property
     def database_url(self) -> str:
         password = f":{self.database_password}" if self.database_password else ""
         return f"mysql+aiomysql://{self.database_user}{password}@{self.database_host}:{self.database_port}/{self.database_name}"  # noqa
+
+    class Config:
+        extra = "ignore"  # allow extra fields in the config
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
@@ -75,13 +81,21 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--redis-queue-url", default=os.environ.get("REDIS_QUEUE_URL", "redis://localhost:6379/5"))
     parser.add_argument("--skip-migrations", default=False, action="store_true")
-    parser.add_argument("--cdn-enpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://cdn.some.engineering"))
+    parser.add_argument("--cdn-endpoint", default=os.environ.get("FIXUI_CDN_ENDPOINT", "https://cdn.some.engineering"))
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
-    parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", ""))
+    parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", "edge"))
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
     parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", 3600)))
     parser.add_argument(
         "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
+    )
+    parser.add_argument("--inventory-url", default=os.environ.get("INVENTORY_URL", "http://localhost:8980"))
+    parser.add_argument(
+        "--cf-template-url",
+        default=os.environ.get("CF_TEMPLATE_URL", "https://fixpublic.s3.amazonaws.com/aws/fix-role-dev-eu.yaml"),
+    )
+    parser.add_argument(
+        "--dispatcher", action="store_true", default=False, help="Run the dispatcher instead of the web server"
     )
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
@@ -89,8 +103,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
 
 def get_config(argv: Optional[Sequence[str]] = None) -> Config:
     args = parse_args(argv)
-    delattr(args, "skip_migrations")  # this is not a valid config option
-    return Config(**vars(args))
+    args_dict = vars(args)
+    args_dict["args"] = args
+    return Config(**args_dict)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

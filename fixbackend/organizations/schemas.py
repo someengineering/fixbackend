@@ -15,19 +15,19 @@
 from datetime import datetime
 from typing import List
 from uuid import UUID
-from fixbackend.ids import OrganizationId
+from fixbackend.ids import TenantId, UserId
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 
 from fixbackend.organizations.models import Organization as OrganizationModel
 
 
 class Organization(BaseModel):
-    id: OrganizationId = Field(description="The organization's unique identifier")
+    id: TenantId = Field(description="The organization's unique identifier")
     slug: str = Field(description="The organization's unique slug, used in URLs")
     name: str = Field(description="The organization's name, a human-readable string")
-    owners: List[EmailStr] = Field(description="The organization's owners, who can manage the organization")
-    members: List[EmailStr] = Field(description="The organization's members, who can view the organizatione")
+    owners: List[UserId] = Field(description="The organization's owners, who can manage the organization")
+    members: List[UserId] = Field(description="The organization's members, who can view the organizatione")
 
     model_config = {
         "json_schema_extra": {
@@ -36,8 +36,8 @@ class Organization(BaseModel):
                     "id": "00000000-0000-0000-0000-000000000000",
                     "slug": "my-org",
                     "name": "My Organization",
-                    "owners": ["owner@example.com"],
-                    "members": ["member@example.com"],
+                    "owners": ["00000000-0000-0000-0000-000000000000"],
+                    "members": ["00000000-0000-0000-0000-000000000000"],
                 }
             ]
         }
@@ -49,8 +49,8 @@ class Organization(BaseModel):
             id=model.id,
             slug=model.slug,
             name=model.name,
-            owners=[o.user.email for o in model.owners],
-            members=[m.user.email for m in model.members],
+            owners=model.owners,
+            members=model.members,
         )
 
 
@@ -72,7 +72,7 @@ class CreateOrganization(BaseModel):
 
 class OrganizationInvite(BaseModel):
     organization_slug: str = Field(description="The slug of the organization to invite the user to")
-    email: EmailStr = Field(description="The email address of the user to invite")
+    user_id: UserId = Field(description="The id of the user to invite")
     expires_at: datetime = Field(description="The time at which the invitation expires")
 
     model_config = {
@@ -80,7 +80,7 @@ class OrganizationInvite(BaseModel):
             "examples": [
                 {
                     "organization_slug": "my-org",
-                    "email": "invitee@example.com",
+                    "user_id": "00000000-0000-0000-0000-000000000000",
                     "expires_at": "2021-01-01T00:00:00Z",
                 }
             ]

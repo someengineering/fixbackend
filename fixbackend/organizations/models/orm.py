@@ -22,19 +22,29 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
-from fixbackend.ids import TenantId, OrganizationId
+from fixbackend.ids import TenantId, UserId, ExternalId
+from fixbackend.organizations import models as domain
 
 
 class Organization(Base):
     __tablename__ = "organization"
 
-    id: Mapped[OrganizationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    id: Mapped[TenantId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
-    external_id: Mapped[uuid.UUID] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
-    tenant_id: Mapped[TenantId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
-    owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization")
-    members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization")
+    external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
+    owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization", lazy="joined")
+    members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
+
+    def to_domain(self) -> domain.Organization:
+        return domain.Organization(
+            id=self.id,
+            slug=self.slug,
+            name=self.name,
+            external_id=self.external_id,
+            owners=[UserId(owner.user_id) for owner in self.owners],
+            members=[UserId(member.user_id) for member in self.members],
+        )
 
 
 class OrganizationInvite(Base):
@@ -42,10 +52,18 @@ class OrganizationInvite(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
-    organization: Mapped[Organization] = relationship(lazy="joined")
+    organization: Mapped[Organization] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), nullable=False)
-    user: Mapped[orm.User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    def to_domain(self) -> domain.OrganizationInvite:
+        return domain.OrganizationInvite(
+            id=self.id,
+            organization_id=TenantId(self.organization_id),
+            user_id=UserId(self.user_id),
+            expires_at=self.expires_at,
+        )
 
 
 class OrganizationOwners(Base):
@@ -56,9 +74,9 @@ class OrganizationOwners(Base):
     __tablename__ = "organization_owners"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), primary_key=True)
-    organization: Mapped[Organization] = relationship(back_populates="owners", lazy="joined")
+    organization: Mapped[Organization] = relationship(back_populates="owners")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
-    user: Mapped[orm.User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship()
 
 
 class OrganizationMembers(Base):
@@ -69,6 +87,6 @@ class OrganizationMembers(Base):
     __tablename__ = "organization_members"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), primary_key=True)
-    organization: Mapped[Organization] = relationship(back_populates="members", lazy="joined")
+    organization: Mapped[Organization] = relationship(back_populates="members")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
-    user: Mapped[orm.User] = relationship(lazy="joined")
+    user: Mapped[orm.User] = relationship()

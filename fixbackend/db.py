@@ -12,14 +12,13 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, Annotated, Callable
+from typing import AsyncGenerator, Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fixbackend.dependencies import FixDependency
-
-AsyncSessionMaker = Callable[[], AsyncSession]
+from fixbackend.types import AsyncSessionMaker
 
 
 async def get_async_session_maker(fix: FixDependency) -> AsyncSessionMaker:
