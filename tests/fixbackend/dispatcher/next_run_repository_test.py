@@ -32,11 +32,11 @@ async def test_create(next_run_repository: NextRunRepository) -> None:
     entries = [entry async for entry in next_run_repository.older_than(now - timedelta(hours=1))]
     assert len(entries) == 0
     # one entry that is older than now
-    assert [entry async for entry in next_run_repository.older_than(now)] == [cid]
+    assert [entry[0] async for entry in next_run_repository.older_than(now)] == [cid]
     # update the entry to run in 1 hour
     await next_run_repository.update_next_run_at(cid, now + timedelta(hours=1))
-    assert [entry async for entry in next_run_repository.older_than(now)] == []
-    assert [entry async for entry in next_run_repository.older_than(now + timedelta(hours=2))] == [cid]
+    assert [entry[0] async for entry in next_run_repository.older_than(now)] == []
+    assert [entry[0] async for entry in next_run_repository.older_than(now + timedelta(hours=2))] == [cid]
     # delete the entry
     await next_run_repository.delete(cid)
     assert [entry async for entry in next_run_repository.older_than(now + timedelta(days=365))] == []
