@@ -14,7 +14,7 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast, List
+from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
 from arq import create_pool
@@ -183,9 +183,12 @@ def setup_process() -> FastAPI:
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
     """
-    handlers: List[logging.Handler] = setup_logger("fixbackend")  # type: ignore # list is not covariant
+    setup_logger("fixbackend")
+
     # Replace all special uvicorn handlers
-    logging.getLogger("uvicorn").handlers = handlers
-    logging.getLogger("uvicorn.error").handlers = handlers
-    logging.getLogger("uvicorn.access").handlers = handlers
+    for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+        lg = logging.getLogger(logger)
+        lg.handlers.clear()  # remove handlers
+        lg.propagate = True  # propagate to root, so the handlers there are used
+
     return fast_api_app(config.get_config())
