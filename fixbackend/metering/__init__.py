@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from attrs import frozen
@@ -23,10 +24,12 @@ from fixbackend.ids import TenantId
 class MeteringRecord:
     id: UUID
     tenant_id: TenantId
+    cloud: str
+    account_id: str
+    account_name: Optional[str]
     timestamp: datetime
     job_id: str
     task_id: str
-    nr_of_accounts_collected: int
     nr_of_resources_collected: int
     nr_of_error_messages: int
     started_at: datetime

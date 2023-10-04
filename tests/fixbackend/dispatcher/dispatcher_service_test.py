@@ -121,7 +121,14 @@ async def test_receive_collect_done_message(
                 cloud="aws",
                 exported_at="2023-09-29T09:00:18Z",
                 summary={"instance": 23, "volume": 12},
-            )
+            ),
+            "account2": dict(
+                id="account2",
+                name="foo",
+                cloud="k8s",
+                exported_at="2023-09-29T09:00:18Z",
+                summary={"instance": 12, "volume": 13},
+            ),
         },
         "messages": ["m1", "m2"],
         "started_at": "2023-09-29T09:00:00Z",
@@ -130,16 +137,28 @@ async def test_receive_collect_done_message(
     context = MessageContext("test", "collect-done", "test", utc(), utc())
     await dispatcher.process_collect_done_message(message, context)
     result = [n async for n in metering_repository.list(organization.id)]
-    assert len(result) == 1
-    mr = result[0]
-    assert mr.tenant_id == organization.id
-    assert mr.job_id == "j1"
-    assert mr.task_id == "t1"
-    assert mr.nr_of_accounts_collected == 1
-    assert mr.nr_of_resources_collected == 35
-    assert mr.nr_of_error_messages == 2
-    assert mr.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
-    assert mr.duration == 18
+    assert len(result) == 2
+    mr_1, mr_2 = result if result[0].account_name == "test" else list(reversed(result))
+    assert mr_1.tenant_id == organization.id
+    assert mr_1.job_id == "j1"
+    assert mr_1.task_id == "t1"
+    assert mr_1.cloud == "aws"
+    assert mr_1.account_id == "account1"
+    assert mr_1.account_name == "test"
+    assert mr_1.nr_of_resources_collected == 35
+    assert mr_1.nr_of_error_messages == 2
+    assert mr_1.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
+    assert mr_1.duration == 18
+    assert mr_2.tenant_id == organization.id
+    assert mr_2.job_id == "j1"
+    assert mr_2.task_id == "t1"
+    assert mr_2.cloud == "k8s"
+    assert mr_2.account_id == "account2"
+    assert mr_2.account_name == "foo"
+    assert mr_2.nr_of_resources_collected == 25
+    assert mr_2.nr_of_error_messages == 2
+    assert mr_2.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
+    assert mr_2.duration == 18
 
 
 @pytest.mark.asyncio
