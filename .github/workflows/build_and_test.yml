@@ -28,8 +28,5 @@ jobs:
       - name: Build and run dev container task
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/someengineering/fixbackend-devcontainer
-          cacheFrom: ghcr.io/someengineering/fixbackend-devcontainer
-          push: always
           # Change this to be your CI task/script
           runCmd: nox --envdir /tmp/.nox
