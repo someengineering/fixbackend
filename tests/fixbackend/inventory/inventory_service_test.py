@@ -23,20 +23,23 @@ import uuid
 from typing import List
 
 from fixcloudutils.types import Json
+from httpx import AsyncClient, Response, Request, MockTransport
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import TenantId
+from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.schemas import ReportSummary
+
+db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
 
 
 async def test_benchmark_command(inventory_service: InventoryService, benchmark_json: List[Json]) -> None:
-    db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
     response = [a async for a in await inventory_service.benchmark(db, "benchmark_name")]
     assert response == benchmark_json
 
 
 async def test_summary(inventory_service: InventoryService) -> None:
-    db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
     summary = await inventory_service.summary(db)
     assert len(summary.benchmarks) == 2
     b1, b2 = summary.benchmarks
@@ -54,3 +57,13 @@ async def test_summary(inventory_service: InventoryService) -> None:
     assert aws.id == "123"
     assert aws.name == "account 2"
     assert aws.cloud == "aws"
+
+
+async def test_no_graph_db_access() -> None:
+    async def app(_: Request) -> Response:
+        return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
+
+    async_client = AsyncClient(transport=MockTransport(app))
+    async with InventoryClient("http://localhost:8980", client=async_client) as client:
+        async with InventoryService(client) as service:
+            assert await service.summary(db) == ReportSummary(accounts=[], benchmarks=[])
