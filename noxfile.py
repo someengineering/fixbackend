@@ -48,6 +48,7 @@ def test(session: Session) -> None:
         "pytest-asyncio",
         "sqlalchemy-utils",
         "git+https://github.com/frankie567/httpx-ws.git@f9f2555603f40053f84adf6890e6cda245294b18#egg=httpx-ws",
+        "types-requests",
         ".",
     )
     session.run("pytest", *args)
