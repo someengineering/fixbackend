@@ -43,7 +43,7 @@ class EMailUserVerifier(UserVerifier):
     def __init__(self, config: Config) -> None:
         self.client = boto3.client(
             "ses",
-            "eu-central-1",
+            config.aws_region,
             aws_access_key_id=config.aws_access_key_id,
             aws_secret_access_key=config.aws_secret_access_key,
         )
