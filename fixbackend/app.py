@@ -14,7 +14,7 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
+from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast, List
 
 import httpx
 from arq import create_pool
@@ -23,6 +23,7 @@ from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
+from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
@@ -182,5 +183,9 @@ def setup_process() -> FastAPI:
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
     """
-    logging.basicConfig(level=logging.INFO, force=True)
+    handlers: List[logging.Handler] = setup_logger("fixbackend")  # type: ignore # list is not covariant
+    # Replace all special uvicorn handlers
+    logging.getLogger("uvicorn").handlers = handlers
+    logging.getLogger("uvicorn.error").handlers = handlers
+    logging.getLogger("uvicorn.access").handlers = handlers
     return fast_api_app(config.get_config())

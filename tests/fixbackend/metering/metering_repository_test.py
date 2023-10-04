@@ -30,7 +30,9 @@ def metering_record() -> MeteringRecord:
         timestamp=ts,
         job_id="123e4567-e89b-12d3-a456-426614174000",
         task_id="123e4567-e89b-12d3-a456-426614174000",
-        nr_of_accounts_collected=1,
+        cloud="aws",
+        account_id="123456789012",
+        account_name="test",
         nr_of_resources_collected=1,
         nr_of_error_messages=1,
         started_at=ts,
@@ -43,5 +45,5 @@ async def test_create_load(metering_repository: MeteringRepository, metering_rec
     # make sure there are no entries for the tenant
     assert [e async for e in metering_repository.list(metering_record.tenant_id)] == []
     # create the entry
-    await metering_repository.add(metering_record)
+    await metering_repository.add([metering_record])
     assert [e async for e in metering_repository.list(metering_record.tenant_id)] == [metering_record]
