@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Optional, List
 from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -33,10 +33,12 @@ class MeteringRecordEntity(Base):
 
     id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
     tenant_id: Mapped[TenantId] = mapped_column(GUID, nullable=False, index=True)
+    cloud: Mapped[str] = mapped_column(String(10), nullable=False, default="aws")
+    account_id: Mapped[str] = mapped_column(String(36), nullable=False, default="")
+    account_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False)
     task_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    nr_of_accounts_collected: Mapped[int] = mapped_column(INT, nullable=False)
     nr_of_resources_collected: Mapped[int] = mapped_column(INT, nullable=False)
     nr_of_error_messages: Mapped[int] = mapped_column(INT, nullable=False)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
@@ -50,7 +52,9 @@ class MeteringRecordEntity(Base):
             timestamp=model.timestamp,
             job_id=model.job_id,
             task_id=model.task_id,
-            nr_of_accounts_collected=model.nr_of_accounts_collected,
+            cloud=model.cloud,
+            account_id=model.account_id,
+            account_name=model.account_name,
             nr_of_resources_collected=model.nr_of_resources_collected,
             nr_of_error_messages=model.nr_of_error_messages,
             started_at=model.started_at,
@@ -64,7 +68,9 @@ class MeteringRecordEntity(Base):
             timestamp=self.timestamp,
             job_id=self.job_id,
             task_id=self.task_id,
-            nr_of_accounts_collected=self.nr_of_accounts_collected,
+            cloud=self.cloud,
+            account_id=self.account_id,
+            account_name=self.account_name,
             nr_of_resources_collected=self.nr_of_resources_collected,
             nr_of_error_messages=self.nr_of_error_messages,
             started_at=self.started_at,
@@ -76,9 +82,12 @@ class MeteringRepository:
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
-    async def add(self, record: MeteringRecord) -> None:
+    async def add(self, records: List[MeteringRecord]) -> None:
+        if len(records) == 0:
+            return
         async with self.session_maker() as session:
-            session.add(MeteringRecordEntity.from_model(record))
+            for record in records:
+                session.add(MeteringRecordEntity.from_model(record))
             await session.commit()
 
     async def list(
