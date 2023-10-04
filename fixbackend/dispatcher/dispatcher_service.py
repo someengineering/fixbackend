@@ -104,20 +104,24 @@ class DispatcherService(Service):
         messages = message["messages"]
         started_at = parse_utc_str(message["started_at"])
         duration = message["duration"]
-        collected_resources = sum(sum(account_details["summary"].values()) for account_details in account_info.values())
-        record = MeteringRecord(
-            id=uuid.uuid4(),
-            tenant_id=TenantId(uuid.UUID(tenant_id)),
-            timestamp=utc(),
-            job_id=job_id,
-            task_id=task_id,
-            nr_of_accounts_collected=len(account_info),
-            nr_of_resources_collected=collected_resources,
-            nr_of_error_messages=len(messages),
-            started_at=started_at,
-            duration=duration,
-        )
-        await self.metering_repo.add(record)
+        records = [
+            MeteringRecord(
+                id=uuid.uuid4(),
+                tenant_id=TenantId(uuid.UUID(tenant_id)),
+                cloud=account_details["cloud"],
+                account_id=account_id,
+                account_name=account_details["name"],
+                timestamp=utc(),
+                job_id=job_id,
+                task_id=task_id,
+                nr_of_resources_collected=sum(account_details["summary"].values()),
+                nr_of_error_messages=len(messages),
+                started_at=started_at,
+                duration=duration,
+            )
+            for account_id, account_details in account_info.items()
+        ]
+        await self.metering_repo.add(records)
 
     async def cloud_account_created(self, cid: CloudAccountId) -> None:
         if account := await self.cloud_account_repo.get(cid):
