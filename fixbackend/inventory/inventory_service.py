@@ -28,7 +28,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable
 from fixbackend.inventory.schemas import AccountSummary, ReportSummary, BenchmarkSummary
 
 log = logging.getLogger(__name__)
@@ -111,14 +111,20 @@ class InventoryService(Service):
                 benchmark_checks[summary.id] = b["report_checks"]
             return summaries, benchmark_checks
 
-        (accounts, (benchmarks, checks), (failed_accounts_by_check_id, severity_by_check_id)) = await asyncio.gather(
-            account_summary(), benchmark_summary(), check_summary()
-        )
-        for bid, bench in benchmarks.items():
-            failed_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            for check in checks.get(bid, []):
-                if severity := severity_by_check_id.get(check):
-                    for account_id in failed_accounts_by_check_id.get(check, []):
-                        failed_counter[account_id][severity] += 1
-            bench.failed_checks = failed_counter
-        return ReportSummary(accounts=list(accounts.values()), benchmarks=list(benchmarks.values()))
+        try:
+            (
+                accounts,
+                (benchmarks, checks),
+                (failed_accounts_by_check_id, severity_by_check_id),
+            ) = await asyncio.gather(account_summary(), benchmark_summary(), check_summary())
+            for bid, bench in benchmarks.items():
+                failed_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+                for check in checks.get(bid, []):
+                    if severity := severity_by_check_id.get(check):
+                        for account_id in failed_accounts_by_check_id.get(check, []):
+                            failed_counter[account_id][severity] += 1
+                bench.failed_checks = failed_counter
+            return ReportSummary(accounts=list(accounts.values()), benchmarks=list(benchmarks.values()))
+        except GraphDatabaseNotAvailable:
+            log.warning("Graph database not available yet. Returning empty summary.")
+            return ReportSummary(accounts=[], benchmarks=[])
