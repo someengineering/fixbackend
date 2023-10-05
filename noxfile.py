@@ -42,7 +42,7 @@ def test(session: Session) -> None:
 
 @session(python=["3.11"])
 def mypy(session: Session) -> None:
-    opts = ["--install-type", "--non-interactive", "--python-version", "3.11"]
+    opts = ["--python-version", "3.11"]
     args = session.posargs or locations + opts
     session.install("mypy", ".")
     session.run("mypy", *args)
