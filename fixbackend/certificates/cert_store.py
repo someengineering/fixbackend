@@ -60,10 +60,12 @@ class CertificateStore:
         """
         Returns the two signing certificates and their private keys, ordered by expiration date, newest first.
         """
-        return (
+        bundle = [
             self.load_cert_key_pair(self.signing_cert_1_path, self.signing_key_1_path),
             self.load_cert_key_pair(self.signing_cert_2_path, self.signing_key_2_path),
-        )
+        ]
+        bundle.sort(key=lambda pair: pair.cert.not_valid_after)
+        return (bundle[1], bundle[0])
 
 
 def get_certificate_store(config: ConfigDependency) -> CertificateStore:
