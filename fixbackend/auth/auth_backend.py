@@ -51,7 +51,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
     def kid(self, key: RSAPublicKey) -> str:
         return hashlib.sha256(
             key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.PKCS1)
-        ).hexdigest()
+        ).hexdigest()[0:8]
 
     async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UUID]) -> Optional[User]:
         if token is None:
