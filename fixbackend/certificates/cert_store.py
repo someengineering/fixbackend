@@ -12,84 +12,62 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Annotated, Tuple
 
+from attrs import frozen
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.x509 import Certificate, CertificateSigningRequest, CertificateSigningRequestBuilder
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from cryptography.x509 import Certificate
+from fastapi import Depends
 
-from fixbackend.certificates.ca_client import FixCaClient
-from fixbackend.keyvalue.json_kv import JsonStore
+from fixbackend.config import Config, ConfigDependency
 
-CERT_KEY = "cert_manager:certificate"
+
+@frozen
+class CertKeyPair:
+    cert: Certificate
+    private_key: RSAPrivateKey
 
 
 class CertificateStore:
-    def __init__(self, fixca_client: FixCaClient, json_store: JsonStore) -> None:
-        self.fixca_client = fixca_client
-        self.store = json_store
+    def __init__(self, config: Config) -> None:
+        self.host_cert_path = config.host_cert
+        self.host_key_path = config.host_key
+        self.signing_cert_1_path = config.signing_cert_1
+        self.signing_key_1_path = config.signing_key_1
+        self.signing_cert_2_path = config.signing_cert_2
+        self.signing_key_2_path = config.signing_key_2
 
-    async def _store_cert(self, cert: Certificate, private_key: Ed25519PrivateKey) -> None:
-        cert_bytes_str = cert.public_bytes(serialization.Encoding.PEM)
-        key = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+    def load_cert_key_pair(self, cert_path: Path, key_path: Path) -> CertKeyPair:
+        # blocking, but will be cached by the OS on the second call
+        with open(self.host_cert_path, "rb") as f:
+            cert_bytes = f.read()
+        with open(self.host_key_path, "rb") as f:
+            key_bytes = f.read()
+        cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+        key = serialization.load_pem_private_key(key_bytes, password=None, backend=default_backend())
+        if not isinstance(key, RSAPrivateKey):
+            raise ValueError("Expected RSA private key")
+        return CertKeyPair(cert=cert, private_key=key)
+
+    async def get_host_cert_key_pair(self) -> CertKeyPair:
+        return self.load_cert_key_pair(self.host_cert_path, self.host_key_path)
+
+    async def get_signing_cert_key_pair(self) -> Tuple[CertKeyPair, CertKeyPair]:
+        """
+        Returns the two signing certificates and their private keys, ordered by expiration date, newest first.
+        """
+        return (
+            self.load_cert_key_pair(self.signing_cert_1_path, self.signing_key_1_path),
+            self.load_cert_key_pair(self.signing_cert_2_path, self.signing_key_2_path),
         )
 
-        json = {
-            "cert": cert_bytes_str.decode("utf-8"),
-            "private_key": key.decode("utf-8"),
-        }
 
-        await self.store.set(CERT_KEY, json)
+def get_certificate_store(config: ConfigDependency) -> CertificateStore:
+    return CertificateStore(config)
 
-    def _generate_private_key(self) -> Ed25519PrivateKey:
-        key = Ed25519PrivateKey.generate()
-        return key
 
-    def _get_ceritificate_signing_request(
-        self, private_key: Ed25519PrivateKey, common_name: str = "fixcloud.io"
-    ) -> CertificateSigningRequest:
-        csr = (
-            CertificateSigningRequestBuilder(
-                subject_name=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
-            )
-            .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]), critical=False)
-            .sign(private_key, algorithm=None)
-        )
-        return csr
-
-    async def generate_signing_certificate(
-        self,
-    ) -> Tuple[Certificate, Ed25519PrivateKey]:
-        """
-        Generate a new certificate for signing JWT tokens.
-        """
-        if cached := await self.get_cached_certificate():
-            return cached
-        key = self._generate_private_key()
-        csr = self._get_ceritificate_signing_request(key)
-        cert = await self.fixca_client.sign(csr)
-        await self._store_cert(cert, key)
-        return cert, key
-
-    async def get_cached_certificate(self) -> Optional[Tuple[Certificate, Ed25519PrivateKey]]:
-        json = await self.store.get(CERT_KEY)
-        match json:
-            case {"cert": cert, "private_key": private_key} if isinstance(cert, str) and isinstance(private_key, str):
-                cert_bytes = cert.encode("utf-8")
-                cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
-
-                key_bytes = private_key.encode("utf-8")
-                key = serialization.load_pem_private_key(key_bytes, password=None, backend=default_backend())
-                if not isinstance(key, Ed25519PrivateKey):
-                    raise ValueError("Expected Ed25519PrivateKey")
-
-                return cert, key
-            case _:
-                return None
-        return None
+CertificateStoreDependency = Annotated[CertificateStore, Depends(get_certificate_store)]
