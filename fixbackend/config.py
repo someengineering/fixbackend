@@ -48,6 +48,7 @@ class Config(BaseSettings):
     aws_access_key_id: str
     aws_secret_access_key: str
     aws_region: str
+    ca_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -103,6 +104,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID", ""))
     parser.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
     parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "eu-central-1"))
+
+    parser.add_argument("--ca-url", default=os.environ.get("CA_URL", "http://ca:80"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
