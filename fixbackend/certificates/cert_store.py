@@ -66,6 +66,9 @@ class CertificateStore:
     async def generate_signing_certificate(
         self,
     ) -> Tuple[Certificate, Ed25519PrivateKey]:
+        """
+        Generate a new certificate for signing JWT tokens.
+        """
         if cached := await self.get_cached_certificate():
             return cached
         key = self._generate_private_key()
