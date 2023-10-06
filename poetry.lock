@@ -2609,6 +2609,17 @@ docs = ["myst-parser", "pydata-sphinx-theme", "sphinx"]
 test = ["argcomplete (>=3.0.3)", "mypy (>=1.5.1)", "pre-commit", "pytest (>=7.0,<7.5)", "pytest-mock", "pytest-mypy-testing"]
 
 [[package]]
+name = "types-aiofiles"
+version = "23.2.0.0"
+description = "Typing stubs for aiofiles"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-aiofiles-23.2.0.0.tar.gz", hash = "sha256:b6a7127bd232e0802532837b84140b1cd5df19ee60bea3a5699720d2b583361b"},
+    {file = "types_aiofiles-23.2.0.0-py3-none-any.whl", hash = "sha256:5d6719e8148cb2a9c4ea46dad86d50d3b675c46a940adca698533a8d2216d53d"},
+]
+
+[[package]]
 name = "types-pymysql"
 version = "1.1.0.1"
 description = "Typing stubs for PyMySQL"
@@ -2966,4 +2977,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "0fdb8f20fd99a1ba53e3dc9cbac9fd0e49c338c2bf24a22a8a40279c78cfb497"
+content-hash = "886393db7e83c9af139a25ccb1c01e048c357f65e2b468feff83accf9a2105eb"
