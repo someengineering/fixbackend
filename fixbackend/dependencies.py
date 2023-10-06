@@ -30,7 +30,7 @@ from fixbackend.certificates.cert_store import CertificateStore
 
 class ServiceNames:
     http_client = "http_client"
-    arg_redis = "arq_redis"
+    arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
     readwrite_redis = "readwrite_redis"
     collect_queue = "collect_queue"
@@ -50,7 +50,7 @@ class ServiceNames:
 class FixDependencies(Dependencies):
     @property
     def arq_redis(self) -> ArqRedis:
-        return self.service(ServiceNames.arg_redis, ArqRedis)
+        return self.service(ServiceNames.arq_redis, ArqRedis)
 
     @property
     def collect_queue(self) -> RedisCollectQueue:
