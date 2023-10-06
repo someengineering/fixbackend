@@ -64,7 +64,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        http_client = deps.add(SN.http_client, AsyncClient(cert=ca_cert_path))
+        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path))
         arq_redis = deps.add(
             SN.arq_redis,
             await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
