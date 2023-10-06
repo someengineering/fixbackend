@@ -48,12 +48,12 @@ class Config(BaseSettings):
     aws_access_key_id: str
     aws_secret_access_key: str
     aws_region: str
-    host_cert: Path
-    host_key: Path
-    signing_cert_1: Path
-    signing_key_1: Path
-    signing_cert_2: Path
-    signing_key_2: Path
+    host_cert: Optional[Path]
+    host_key: Optional[Path]
+    signing_cert_1: Optional[Path]
+    signing_key_1: Optional[Path]
+    signing_cert_2: Optional[Path]
+    signing_key_2: Optional[Path]
     env: Literal["local", "dev", "prd"]
 
     def frontend_cdn_origin(self) -> str:
@@ -110,12 +110,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID", ""))
     parser.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
     parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "us-east-1"))
-    parser.add_argument("--host-cert", type=Path, default=os.environ.get("HOST_CERT", "certs/host.crt"))
-    parser.add_argument("--host-key", type=Path, default=os.environ.get("HOST_KEY", "certs/host.key"))
-    parser.add_argument("--signing-cert-1", type=Path, default=os.environ.get("SIGNING_CERT_1", "certs/signing1.crt"))
-    parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1", "certs/signing1.key"))
-    parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2", "certs/signing2.crt"))
-    parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2", "certs/signing2.key"))
+    parser.add_argument("--host-cert", type=Path, default=os.environ.get("HOST_CERT"))
+    parser.add_argument("--host-key", type=Path, default=os.environ.get("HOST_KEY"))
+    parser.add_argument("--signing-cert-1", type=Path, default=os.environ.get("SIGNING_CERT_1"))
+    parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
+    parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
+    parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
     parser.add_argument("--env", default=os.environ.get("ENV", "local"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
