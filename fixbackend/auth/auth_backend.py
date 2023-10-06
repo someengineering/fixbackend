@@ -32,7 +32,7 @@ from fastapi_users.manager import BaseUserManager
 
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
-from fixbackend.certificates.cert_store import CertificateStoreDependency
+from fixbackend.dependencies import FixDependency
 from fixbackend.config import ConfigDependency
 
 # copied from jwt package
@@ -108,11 +108,11 @@ class FixJWTStrategy(Strategy[User, UUID]):
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-async def get_jwt_strategy(config: ConfigDependency, cert_store: CertificateStoreDependency) -> Strategy[User, UUID]:
+async def get_jwt_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
     if config.env == "local":
         return JWTStrategy(secret=config.secret, lifetime_seconds=None)
     else:
-        cert_key_pairs = await cert_store.get_signing_cert_key_pair()
+        cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
         return FixJWTStrategy(
             public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
             private_key=cert_key_pairs[0].private_key,

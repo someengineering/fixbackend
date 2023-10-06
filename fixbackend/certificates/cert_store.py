@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from typing import Annotated, List
+from typing import List
 
 from aiofiles import open
 from async_lru import alru_cache
@@ -23,9 +23,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.x509 import Certificate
-from fastapi import Depends
 
-from fixbackend.config import Config, ConfigDependency
+from fixbackend.config import Config
 
 
 @frozen
@@ -69,10 +68,3 @@ class CertificateStore:
         ]
         bundle.sort(key=lambda pair: pair.cert.not_valid_after, reverse=True)
         return bundle
-
-
-def get_certificate_store(config: ConfigDependency) -> CertificateStore:
-    return CertificateStore(config)
-
-
-CertificateStoreDependency = Annotated[CertificateStore, Depends(get_certificate_store)]
