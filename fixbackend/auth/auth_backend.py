@@ -19,7 +19,12 @@ from uuid import UUID
 
 import jwt
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric import (
+    ec,
+    ed448,
+    ed25519,
+    rsa,
+)
 from fastapi_users import exceptions
 from fastapi_users.authentication import AuthenticationBackend, JWTStrategy
 from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroyNotSupportedError
@@ -30,12 +35,16 @@ from fixbackend.auth.transport import CookieTransport
 from fixbackend.certificates.cert_store import CertificateStoreDependency
 from fixbackend.config import ConfigDependency
 
+# copied from jwt package
+AllowedPrivateKeys = rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey | ed25519.Ed25519PrivateKey | ed448.Ed448PrivateKey
+AllowedPublicKeys = rsa.RSAPublicKey | ec.EllipticCurvePublicKey | ed25519.Ed25519PublicKey | ed448.Ed448PublicKey
+
 
 class FixJWTStrategy(Strategy[User, UUID]):
     def __init__(
         self,
-        public_keys: List[RSAPublicKey],
-        private_key: RSAPrivateKey,
+        public_keys: List[AllowedPublicKeys],
+        private_key: AllowedPrivateKeys,
         lifetime_seconds: Optional[int],
         token_audience: List[str] = ["fastapi-users:auth"],
         algorithm: str = "RS256",
@@ -46,7 +55,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
         self.token_audience = token_audience
         self.algorithm = algorithm
 
-    def kid(self, key: RSAPublicKey) -> str:
+    def kid(self, key: AllowedPublicKeys) -> str:
         return hashlib.sha256(
             key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.PKCS1)
         ).hexdigest()[0:8]
