@@ -99,3 +99,9 @@ async def test_external_id(client: AsyncClient) -> None:
     # organization is created by default
     response = await client.get(f"/api/organizations/{org_id}/external_id")
     assert response.json().get("external_id") == str(external_id)
+
+
+@pytest.mark.asyncio
+async def test_cloudformation_template_url(client: AsyncClient, default_config: Config) -> None:
+    response = await client.get(f"/api/organizations/{org_id}/cf_template")
+    assert response.json() == str(default_config.cf_template_url)

@@ -189,6 +189,12 @@ def organizations_router() -> APIRouter:
             f"&param_FixExternalId={org.external_id}"
         )
 
+    @router.get("/{organization_id}/cf_template")
+    async def get_cf_template(
+        config: ConfigDependency,
+    ) -> str:
+        return config.cf_template_url
+
     @router.get("/{organization_id}/external_id")
     async def get_externa_id(
         organization_id: TenantId,
