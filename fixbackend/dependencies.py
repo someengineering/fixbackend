@@ -29,6 +29,7 @@ from fixbackend.certificates.cert_store import CertificateStore
 
 
 class ServiceNames:
+    http_client = "http_client"
     arg_redis = "arq_redis"
     readonly_redis = "readonly_redis"
     readwrite_redis = "readwrite_redis"

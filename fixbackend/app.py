@@ -14,6 +14,7 @@
 
 import logging
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
@@ -25,6 +26,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from httpx import AsyncClient
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -58,29 +60,39 @@ def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
     deps = FixDependencies()
+    ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
-        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
-        engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
+        http_client = deps.add(SN.http_client, AsyncClient(cert=ca_cert_path))
+        arq_redis = deps.add(
+            SN.arg_redis,
+            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+        )
+        deps.add(
+            SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True, ssl_ca_certs=ca_cert_path)
+        )
+        readwrite_redis = deps.add(
+            SN.readwrite_redis,
+            Redis.from_url(cfg.redis_readwrite_url, decode_responses=True, ssl_ca_certs=ca_cert_path),
+        )
+        engine = deps.add(
+            SN.async_engine,
+            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
+        )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
-        client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url))
-        deps.add(SN.inventory, InventoryService(client))
+        inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
+        deps.add(SN.inventory, InventoryService(inventory_client))
         deps.add(
             SN.cloudaccount_publisher,
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
-        deps.add(
-            SN.certificate_store,
-            CertificateStore(cfg),
-        )
+        deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
@@ -91,10 +103,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
-        arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
-        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
-        engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
+        arq_redis = deps.add(
+            SN.arg_redis,
+            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+        )
+        deps.add(
+            SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True, ssl_ca_certs=ca_cert_path)
+        )
+        rw_redis = deps.add(
+            SN.readwrite_redis,
+            Redis.from_url(cfg.redis_readwrite_url, decode_responses=True, ssl_ca_certs=ca_cert_path),
+        )
+        engine = deps.add(
+            SN.async_engine,
+            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
+        )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
