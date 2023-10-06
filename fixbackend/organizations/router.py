@@ -174,7 +174,7 @@ def organizations_router() -> APIRouter:
     async def get_cf_url(
         organization_id: TenantId,
         user_context: AuthenticatedUser,
-        tenant_id: TenantDependency,
+        workspace_id: TenantDependency,
         organization_service: OrganizationRepositoryDependency,
         config: ConfigDependency,
     ) -> str:
@@ -185,8 +185,8 @@ def organizations_router() -> APIRouter:
             f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
             f"?templateURL={config.cf_template_url}"
             "&stackName=FixAccess"
-            f"&param_FixTenantId={tenant_id}"
-            f"&param_FixExternalId={org.external_id}"
+            f"&param_WorkspaceId={workspace_id}"
+            f"&param_ExternalId={org.external_id}"
         )
 
     @router.get("/{organization_id}/cf_template")

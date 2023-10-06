@@ -50,7 +50,9 @@ def cloud_accounts_callback_router() -> APIRouter:
     async def aws_cloudformation_callback(
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
-        await service.create_aws_account(payload.tenant_id, payload.account_id, payload.role_name, payload.external_id)
+        await service.create_aws_account(
+            payload.workspace_id, payload.account_id, payload.role_name, payload.external_id
+        )
         return None
 
     return router

@@ -77,7 +77,7 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
         "account_id": account_id,
         "external_id": str(external_id),
         "role_name": role_name,
-        "tenant_id": str(tenant_id),
+        "workspace_id": str(tenant_id),
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
     assert response.status_code == 200
