@@ -12,8 +12,6 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
-import uuid
 from fastapi import Request
 
 import pytest
@@ -21,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
-from fixbackend.ids import TenantId, UserId
 from fixbackend.organizations.repository import OrganizationRepository
 from fixbackend.auth.auth_backend import FixJWTStrategy
 from cryptography.hazmat.primitives.asymmetric import rsa

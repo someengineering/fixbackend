@@ -29,7 +29,7 @@ def black(session: Session) -> None:
 def flake8(session: Session) -> None:
     opts = ["--max-line-length", "999"]  # checked via black
     args = session.posargs or locations + opts
-    session.install("flake8")
+    session.install("flake8", "types-aiofiles")
     session.run("flake8", *args)
 
 
@@ -42,7 +42,7 @@ def test(session: Session) -> None:
 
 @session(python=["3.11"])
 def mypy(session: Session) -> None:
-    opts = ["--python-version", "3.11"]
-    args = session.posargs or locations + opts
+    opts = ["--install-types", "--non-interactive"]
+    args = session.posargs or opts + locations
     session.install("mypy", ".")
     session.run("mypy", *args)
