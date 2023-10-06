@@ -18,8 +18,8 @@ from fixbackend.ids import TenantId, ExternalId
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
-    tenant_id: TenantId = Field(description="Identifier of the tenant")
-    external_id: ExternalId = Field(description="Secret that was provided by the tenant")
+    workspace_id: TenantId = Field(description="Your FIX-assigned Workspace ID")
+    external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: str = Field(description="AWS account ID", pattern=r"^\d{12}$")
     role_name: str = Field(description="AWS role name", max_length=64)
 
@@ -27,7 +27,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "tenant_id": "00000000-0000-0000-0000-000000000000",
+                    "workspace_id": "00000000-0000-0000-0000-000000000000",
                     "external_id": "00000000-0000-0000-0000-000000000000",
                     "account_id": "123456789012",
                     "role_name": "FooBarRole",
