@@ -97,12 +97,14 @@ class FixJWTStrategy(Strategy[User, UUID]):
         payload: Dict[str, Any] = {
             "sub": str(user.id),
             "aud": self.token_audience,
+        }
+        headers = {
             "kid": self.kid(self.private_key.public_key()),
         }
         if self.lifetime_seconds:
             expire = datetime.utcnow() + timedelta(seconds=self.lifetime_seconds)
             payload["exp"] = expire
-        return jwt.encode(payload, self.private_key, algorithm=self.algorithm)
+        return jwt.encode(payload, self.private_key, algorithm=self.algorithm, headers=headers)
 
     async def destroy_token(self, token: str, user: User) -> None:
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
