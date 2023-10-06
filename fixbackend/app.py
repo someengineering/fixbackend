@@ -33,6 +33,7 @@ from starlette.exceptions import HTTPException
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
+from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -75,6 +76,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(
             SN.cloudaccount_publisher,
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
+        )
+        deps.add(
+            SN.certificate_store,
+            CertificateStore(cfg),
         )
         if not cfg.static_assets:
             await load_app_from_cdn()

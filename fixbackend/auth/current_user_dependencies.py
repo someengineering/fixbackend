@@ -26,7 +26,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import FastAPIUsers
 
 from fixbackend.auth.dependencies import get_user_manager
-from fixbackend.auth.jwt import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.config import get_config
 from fixbackend.dependencies import FixDependency

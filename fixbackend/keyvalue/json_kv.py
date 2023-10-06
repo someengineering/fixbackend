@@ -28,7 +28,7 @@ from fixbackend.types import AsyncSessionMaker
 
 class JsonStore(ABC):
     @abstractmethod
-    async def get(self, key: str) -> JsonElement:
+    async def get(self, key: str) -> Optional[JsonElement]:
         pass
 
     @abstractmethod
@@ -61,9 +61,7 @@ class JsonStoreImpl(JsonStore):
     async def set(self, key: str, value: JsonElement) -> None:
         async with self.session_maker() as session:
             insert_statement = insert(JsonEntry).values(key=key, value=value)
-            upsert_statement = insert_statement.on_duplicate_key_update(
-                value=insert_statement.inserted.value, status="U"
-            )
+            upsert_statement = insert_statement.on_duplicate_key_update(value=insert_statement.inserted.value)
             await session.execute(upsert_statement)
 
     async def delete(self, key: str) -> None:

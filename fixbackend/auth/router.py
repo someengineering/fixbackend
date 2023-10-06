@@ -22,7 +22,7 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
 from fixbackend.auth.current_user_dependencies import fastapi_users
-from fixbackend.auth.jwt import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.oauth import get_oauth_router
 from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate, OAuthProviderAuthUrl
 from fixbackend.config import Config
