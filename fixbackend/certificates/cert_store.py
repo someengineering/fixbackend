@@ -13,8 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from typing import Annotated, Tuple
+from typing import Annotated, List
 
+from aiofiles import open
+from async_lru import alru_cache
 from attrs import frozen
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -41,12 +43,13 @@ class CertificateStore:
         self.signing_cert_2_path = config.signing_cert_2
         self.signing_key_2_path = config.signing_key_2
 
-    def load_cert_key_pair(self, cert_path: Path, key_path: Path) -> CertKeyPair:
+    @alru_cache(maxsize=1, ttl=60)
+    async def load_cert_key_pair(self, cert_path: Path, key_path: Path) -> CertKeyPair:
         # blocking, but will be cached by the OS on the second call
-        with open(self.host_cert_path, "rb") as f:
-            cert_bytes = f.read()
-        with open(self.host_key_path, "rb") as f:
-            key_bytes = f.read()
+        async with open(self.host_cert_path, "rb") as f:
+            cert_bytes = await f.read()
+        async with open(self.host_key_path, "rb") as f:
+            key_bytes = await f.read()
         cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
         key = serialization.load_pem_private_key(key_bytes, password=None, backend=default_backend())
         if not isinstance(key, RSAPrivateKey):
@@ -54,18 +57,18 @@ class CertificateStore:
         return CertKeyPair(cert=cert, private_key=key)
 
     async def get_host_cert_key_pair(self) -> CertKeyPair:
-        return self.load_cert_key_pair(self.host_cert_path, self.host_key_path)
+        return await self.load_cert_key_pair(self.host_cert_path, self.host_key_path)
 
-    async def get_signing_cert_key_pair(self) -> Tuple[CertKeyPair, CertKeyPair]:
+    async def get_signing_cert_key_pair(self) -> List[CertKeyPair]:
         """
         Returns the two signing certificates and their private keys, ordered by expiration date, newest first.
         """
         bundle = [
-            self.load_cert_key_pair(self.signing_cert_1_path, self.signing_key_1_path),
-            self.load_cert_key_pair(self.signing_cert_2_path, self.signing_key_2_path),
+            await self.load_cert_key_pair(self.signing_cert_1_path, self.signing_key_1_path),
+            await self.load_cert_key_pair(self.signing_cert_2_path, self.signing_key_2_path),
         ]
-        bundle.sort(key=lambda pair: pair.cert.not_valid_after)
-        return (bundle[1], bundle[0])
+        bundle.sort(key=lambda pair: pair.cert.not_valid_after, reverse=True)
+        return bundle
 
 
 def get_certificate_store(config: ConfigDependency) -> CertificateStore:

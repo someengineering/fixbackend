@@ -34,15 +34,13 @@ from fixbackend.config import ConfigDependency
 class FixJWTStrategy(Strategy[User, UUID]):
     def __init__(
         self,
-        public_key_1: RSAPublicKey,
-        public_key_2: RSAPublicKey,
+        public_keys: List[RSAPublicKey],
         private_key: RSAPrivateKey,
         lifetime_seconds: Optional[int],
         token_audience: List[str] = ["fastapi-users:auth"],
         algorithm: str = "RS256",
     ):
-        self.public_key_1 = public_key_1
-        self.public_key_2 = public_key_2
+        self.public_keys = public_keys
         self.private_key = private_key
         self.lifetime_seconds = lifetime_seconds
         self.token_audience = token_audience
@@ -64,7 +62,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
         public_key = None
 
         # poor man JWKS
-        available_keys = {self.kid(key): key for key in [self.public_key_1, self.public_key_2]}
+        available_keys = {self.kid(key): key for key in self.public_keys}
 
         if not (key_id in available_keys):
             raise ValueError("Token signed with unknown key")
@@ -105,11 +103,10 @@ async def get_jwt_strategy(config: ConfigDependency, cert_store: CertificateStor
     if config.env == "local":
         return JWTStrategy(secret=config.secret, lifetime_seconds=None)
     else:
-        cert_key_pair_1, cert_key_pair_2 = await cert_store.get_signing_cert_key_pair()
+        cert_key_pairs = await cert_store.get_signing_cert_key_pair()
         return FixJWTStrategy(
-            public_key_1=cert_key_pair_1.private_key.public_key(),
-            public_key_2=cert_key_pair_2.private_key.public_key(),
-            private_key=cert_key_pair_1.private_key,
+            public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
+            private_key=cert_key_pairs[0].private_key,
             lifetime_seconds=config.session_ttl,
         )
 
