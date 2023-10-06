@@ -102,7 +102,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID", ""))
     parser.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
-    parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "eu-central-1"))
+    parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "us-east-1"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
