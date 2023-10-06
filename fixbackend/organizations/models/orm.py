@@ -22,22 +22,22 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
-from fixbackend.ids import TenantId, UserId, ExternalId
-from fixbackend.organizations import models as domain
+from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.organizations import models
 
 
 class Organization(Base):
     __tablename__ = "organization"
 
-    id: Mapped[TenantId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization", lazy="joined")
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
 
-    def to_domain(self) -> domain.Organization:
-        return domain.Organization(
+    def to_model(self) -> models.Workspace:
+        return models.Workspace(
             id=self.id,
             slug=self.slug,
             name=self.name,
@@ -57,10 +57,10 @@ class OrganizationInvite(Base):
     user: Mapped[orm.User] = relationship()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    def to_domain(self) -> domain.OrganizationInvite:
-        return domain.OrganizationInvite(
+    def to_model(self) -> models.WorkspaceInvite:
+        return models.WorkspaceInvite(
             id=self.id,
-            organization_id=TenantId(self.organization_id),
+            workspace_id=WorkspaceId(self.organization_id),
             user_id=UserId(self.user_id),
             expires_at=self.expires_at,
         )

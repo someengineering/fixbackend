@@ -19,30 +19,29 @@ from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.cloud_accounts import models as domain
-from fixbackend.cloud_accounts.models import CloudAccess
-from fixbackend.ids import TenantId, CloudAccountId, ExternalId
+from fixbackend.cloud_accounts import models
+from fixbackend.ids import WorkspaceId, CloudAccountId, ExternalId
 
 
 class CloudAccount(Base):
     __tablename__ = "cloud_account"
 
     id: Mapped[CloudAccountId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[TenantId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
+    tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
     cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[str] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
     aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
-    def to_domain(self) -> domain.CloudAccount:
-        def access() -> CloudAccess:
+    def to_model(self) -> models.CloudAccount:
+        def access() -> models.CloudAccess:
             match self.cloud:
                 case "aws":
-                    return domain.AwsCloudAccess(
+                    return models.AwsCloudAccess(
                         account_id=self.account_id, external_id=self.aws_external_id, role_name=self.aws_role_name
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
 
-        return domain.CloudAccount(id=self.id, tenant_id=self.tenant_id, access=access())
+        return models.CloudAccount(id=self.id, workspace_id=self.tenant_id, access=access())

@@ -18,12 +18,12 @@ from uuid import UUID
 
 from attrs import frozen
 
-from fixbackend.ids import TenantId, UserId, ExternalId
+from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
 
 @frozen
-class Organization:
-    id: TenantId
+class Workspace:
+    id: WorkspaceId
     slug: str
     name: str
     external_id: ExternalId
@@ -35,8 +35,8 @@ class Organization:
 
 
 @frozen
-class OrganizationInvite:
+class WorkspaceInvite:
     id: UUID
-    organization_id: TenantId
+    workspace_id: WorkspaceId
     user_id: UserId
     expires_at: datetime

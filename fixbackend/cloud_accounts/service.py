@@ -22,8 +22,8 @@ from fastapi import Depends
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
-from fixbackend.ids import CloudAccountId, ExternalId, TenantId
-from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryDependency
+from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.organizations.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixbackend.dependencies import FixDependency
 
@@ -35,13 +35,13 @@ class WrongExternalId(Exception):
 class CloudAccountService(ABC):
     @abstractmethod
     async def create_aws_account(
-        self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         """Create a cloud account."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
+    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
         """Delete a cloud account."""
         raise NotImplementedError
 
@@ -49,39 +49,39 @@ class CloudAccountService(ABC):
 class CloudAccountServiceImpl(CloudAccountService):
     def __init__(
         self,
-        organization_service: OrganizationRepository,
+        workspace_repository: WorkspaceRepository,
         cloud_account_repository: CloudAccountRepository,
         publisher: RedisStreamPublisher,
     ) -> None:
-        self.organization_service = organization_service
+        self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.publisher = publisher
 
     async def create_aws_account(
-        self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         """Create a cloud account."""
 
-        organization = await self.organization_service.get_organization(tenant_id)
+        organization = await self.workspace_repository.get_workspace(workspace_id)
         if organization is None:
             raise ValueError("Organization does not exist")
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
-        async def account_already_exists(tenant_id: TenantId, account_id: str) -> bool:
-            accounts = await self.cloud_account_repository.list_by_tenant_id(tenant_id)
+        async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> bool:
+            accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
             return any(
                 account.access.account_id == account_id
                 for account in accounts
                 if isinstance(account.access, AwsCloudAccess)
             )
 
-        if await account_already_exists(tenant_id, account_id):
+        if await account_already_exists(workspace_id, account_id):
             raise ValueError("Cloud account already exists")
 
         account = CloudAccount(
             id=CloudAccountId(uuid.uuid4()),
-            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             access=AwsCloudAccess(account_id=account_id, external_id=external_id, role_name=role_name),
         )
 
@@ -89,9 +89,9 @@ class CloudAccountServiceImpl(CloudAccountService):
         await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
         return result
 
-    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
+    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
         account = await self.cloud_account_repository.get(cloud_accont_id)
-        if not account or account.tenant_id != tenant_id:
+        if not account or account.workspace_id != workspace_id:
             raise ValueError("Cloud account does not exist")
 
         await self.cloud_account_repository.delete(cloud_accont_id)
@@ -99,12 +99,12 @@ class CloudAccountServiceImpl(CloudAccountService):
 
 
 def get_cloud_account_service(
-    organization_service_dependency: OrganizationRepositoryDependency,
+    workspace_repository_dependency: WorkspaceRepositoryDependency,
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
     fix_dependency: FixDependency,
 ) -> CloudAccountService:
     return CloudAccountServiceImpl(
-        organization_service_dependency, cloud_account_repository_dependency, fix_dependency.cloudaccount_publisher
+        workspace_repository_dependency, cloud_account_repository_dependency, fix_dependency.cloudaccount_publisher
     )
 
 

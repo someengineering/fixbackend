@@ -22,10 +22,10 @@
 import uuid
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
 
-db_access = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
+db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
 
 async def test_execute_single(inventory_client: InventoryClient) -> None:

@@ -20,14 +20,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import Optional, List
-from uuid import UUID
+from typing import List, Optional
 
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from fixbackend.auth.current_user_dependencies import CurrentGraphDbDependency
 from fixbackend.dependencies import FixDependencies
+from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.schemas import ReportSummary
 from fixbackend.streaming_response import streaming_response
 
@@ -37,9 +37,9 @@ log = logging.getLogger(__name__)
 def inventory_router(fix: FixDependencies) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/{organization_id}/inventory/report/{benchmark_name}")
+    @router.get("/{workspace_id}/inventory/report/{benchmark_name}")
     async def report(
-        organization_id: UUID,  # noqa
+        workspace_id: WorkspaceId,
         benchmark_name: str,
         graph_db: CurrentGraphDbDependency,
         request: Request,
@@ -47,14 +47,14 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         severity: Optional[str] = Query(None, enum=["info", "low", "medium", "high", "critical"]),
         only_failing: bool = Query(False),
     ) -> StreamingResponse:
-        log.info(f"Show benchmark {benchmark_name} for tenant {graph_db.tenant_id}")
+        log.info(f"Show benchmark {benchmark_name} for tenant {graph_db.workspace_id}")
         result = await fix.inventory.benchmark(
             graph_db, benchmark_name, accounts=accounts, severity=severity, only_failing=only_failing
         )
         return streaming_response(request.headers.get("accept", "application/json"), result)
 
-    @router.get("/{organization_id}/inventory/report-summary")
-    async def summary(organization_id: UUID, graph_db: CurrentGraphDbDependency) -> ReportSummary:  # noqa
+    @router.get("/{workspace_id}/inventory/report-summary")
+    async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
     return router

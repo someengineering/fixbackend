@@ -24,7 +24,7 @@ from fixbackend.auth.db import UserRepository
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier
 from fixbackend.config import Config
-from fixbackend.organizations.repository import OrganizationRepository
+from fixbackend.organizations.repository import WorkspaceRepository
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -34,13 +34,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user_repository: UserRepository,
         password_helper: PasswordHelperProtocol | None,
         user_verifier: UserVerifier,
-        organization_repository: OrganizationRepository,
+        workspace_repository: WorkspaceRepository,
     ):
         super().__init__(user_repository, password_helper)
         self.user_verifier = user_verifier
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
-        self.organization_repository = organization_repository
+        self.workspace_repository = workspace_repository
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if user.is_verified:  # oauth2 users are already verified
@@ -56,4 +56,4 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def create_default_organization(self, user: User) -> None:
         org_slug = re.sub("[^a-zA-Z0-9-]", "-", user.email)
-        await self.organization_repository.create_organization(user.email, org_slug, user)
+        await self.workspace_repository.create_workspace(user.email, org_slug, user)

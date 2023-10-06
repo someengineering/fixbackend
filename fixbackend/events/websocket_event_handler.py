@@ -6,14 +6,14 @@ from fixcloudutils.redis.pub_sub import RedisPubSubListener
 from redis.asyncio import Redis
 
 from fixbackend.dependencies import FixDependency
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 
 
 class WebsocketEventHandler:
     def __init__(self, readonly_redis: Redis) -> None:
         self.readonly_redis = readonly_redis
 
-    async def handle_websocket(self, tenant_id: TenantId, websocket: WebSocket) -> None:
+    async def handle_websocket(self, workspace_id: WorkspaceId, websocket: WebSocket) -> None:
         async def redis_message_handler(id: str, at: datetime, publisher: str, kind: str, data: Dict[str, Any]) -> None:
             await websocket.send_json(
                 {"type": "event", "id": id, "at": at, "publisher": publisher, "kind": kind, "data": data}
@@ -25,7 +25,7 @@ class WebsocketEventHandler:
 
         async with RedisPubSubListener(
             redis=self.readonly_redis,
-            channel=f"tenant-events::{tenant_id}",
+            channel=f"tenant-events::{workspace_id}",
             handler=redis_message_handler,
         ):
             try:
