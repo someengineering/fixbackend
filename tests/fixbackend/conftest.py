@@ -17,7 +17,6 @@ import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from typing import AsyncIterator, Iterator, List
-from pathlib import Path
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
@@ -90,12 +89,13 @@ def default_config() -> Config:
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_region="",
-        host_cert=Path(),
-        host_key=Path(),
-        signing_cert_1=Path(),
-        signing_key_1=Path(),
-        signing_cert_2=Path(),
-        signing_key_2=Path(),
+        ca_cert=None,
+        host_cert=None,
+        host_key=None,
+        signing_cert_1=None,
+        signing_key_1=None,
+        signing_cert_2=None,
+        signing_key_2=None,
         env="local",
     )
 
