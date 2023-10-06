@@ -25,7 +25,7 @@ def main() -> None:
         alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
         command.upgrade(alembic_cfg, "head")
 
-    if args.env != "local":
+    if args.host_cert and args.host_key:
         uvicorn.run(
             "fixbackend.app:setup_process",
             host="0.0.0.0",
