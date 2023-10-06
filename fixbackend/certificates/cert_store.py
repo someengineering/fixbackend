@@ -43,7 +43,7 @@ class CertificateStore:
         self.signing_cert_2_path = config.signing_cert_2
         self.signing_key_2_path = config.signing_key_2
 
-    @alru_cache(maxsize=1, ttl=60)
+    @alru_cache(maxsize=100, ttl=60)
     async def load_cert_key_pair(self, cert_path: Path, key_path: Path) -> CertKeyPair:
         # blocking, but will be cached by the OS on the second call
         async with open(self.host_cert_path, "rb") as f:
