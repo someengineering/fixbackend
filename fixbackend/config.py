@@ -120,7 +120,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
     parser.add_argument("--env", default=os.environ.get("ENV", "local"))
 
-    return parser.parse_args(argv if argv is not None else sys.argv[1:])
+    return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
 def get_config(argv: Optional[Sequence[str]] = None) -> Config:
