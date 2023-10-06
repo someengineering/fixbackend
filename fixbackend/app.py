@@ -62,20 +62,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
     deps = FixDependencies()
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
 
+    def create_redis(url: str) -> Redis:
+        kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
+        return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
+
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path))
+        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
         arq_redis = deps.add(
             SN.arq_redis,
             await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
         )
-        deps.add(
-            SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True, ssl_ca_certs=ca_cert_path)
-        )
-        readwrite_redis = deps.add(
-            SN.readwrite_redis,
-            Redis.from_url(cfg.redis_readwrite_url, decode_responses=True, ssl_ca_certs=ca_cert_path),
-        )
+        deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
+        readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         engine = deps.add(
             SN.async_engine,
             create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
@@ -107,13 +106,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.arq_redis,
             await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
         )
-        deps.add(
-            SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True, ssl_ca_certs=ca_cert_path)
-        )
-        rw_redis = deps.add(
-            SN.readwrite_redis,
-            Redis.from_url(cfg.redis_readwrite_url, decode_responses=True, ssl_ca_certs=ca_cert_path),
-        )
+        rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         engine = deps.add(
             SN.async_engine,
             create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
