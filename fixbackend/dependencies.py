@@ -25,6 +25,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.certificates.cert_store import CertificateStore
 
 
 class ServiceNames:
@@ -42,6 +43,7 @@ class ServiceNames:
     inventory_client = "inventory_client"
     dispatching = "dispatching"
     cloudaccount_publisher = "cloudaccount_publisher"
+    certificate_store = "certificate_store"
 
 
 class FixDependencies(Dependencies):
@@ -80,6 +82,10 @@ class FixDependencies(Dependencies):
     @property
     def cloudaccount_publisher(self) -> RedisStreamPublisher:
         return self.service(ServiceNames.cloudaccount_publisher, RedisStreamPublisher)
+
+    @property
+    def certificate_store(self) -> CertificateStore:
+        return self.service(ServiceNames.certificate_store, CertificateStore)
 
 
 # placeholder for dependencies, will be replaced during the app initialization
