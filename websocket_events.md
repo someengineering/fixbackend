@@ -41,13 +41,13 @@ When a new cloud account is discovered by AWS CF template, we publish a `cloud_a
 Example:
 ```json
 {
-    "id": ""00000000-0000-0000-0000-000000000000"",
+    "id": "00000000-0000-0000-0000-000000000000",
     "at": "2023-10-23T12:21:12Z",
     "publisher": "cloud-account-service",
     "kind": "cloud_account_created",
     "data": {
-      "cloud_account_id": ""00000000-0000-0000-0000-000000000000"",
-      "workspace_id": ""00000000-0000-0000-0000-000000000000"",
+      "cloud_account_id": "00000000-0000-0000-0000-000000000000",
+      "workspace_id": "00000000-0000-0000-0000-000000000000",
       "aws_account_id": "123456789012",
     }  
 }
