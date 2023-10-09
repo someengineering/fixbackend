@@ -19,13 +19,14 @@ from hmac import compare_digest
 from typing import Annotated
 
 from fastapi import Depends
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
+from fixbackend.dependencies import FixDependency
 from fixbackend.ids import CloudAccountId, ExternalId, TenantId
 from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryDependency
-from fixcloudutils.redis.event_stream import RedisStreamPublisher
-from fixbackend.dependencies import FixDependency
 
 
 class WrongExternalId(Exception):
@@ -52,10 +53,12 @@ class CloudAccountServiceImpl(CloudAccountService):
         organization_service: OrganizationRepository,
         cloud_account_repository: CloudAccountRepository,
         publisher: RedisStreamPublisher,
+        pubsub_publisher: RedisPubSubPublisher,
     ) -> None:
         self.organization_service = organization_service
         self.cloud_account_repository = cloud_account_repository
         self.publisher = publisher
+        self.pubsub_publisher = pubsub_publisher
 
     async def create_aws_account(
         self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
@@ -86,7 +89,14 @@ class CloudAccountServiceImpl(CloudAccountService):
         )
 
         result = await self.cloud_account_repository.create(account)
-        await self.publisher.publish("cloud_account_created", {"id": str(result.id)})
+        message = {
+            "id": str(result.id),
+            "tenant_id": str(result.tenant_id),
+        }
+        await self.publisher.publish(kind="cloud_account_created", message=message)
+        await self.pubsub_publisher.publish(
+            kind="cloud_account_created", message=message, channel=f"tenant-events::{tenant_id}"
+        )
         return result
 
     async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
@@ -103,8 +113,14 @@ def get_cloud_account_service(
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
     fix_dependency: FixDependency,
 ) -> CloudAccountService:
+    redis_publisher = RedisPubSubPublisher(
+        redis=fix_dependency.readwrite_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
+    )
     return CloudAccountServiceImpl(
-        organization_service_dependency, cloud_account_repository_dependency, fix_dependency.cloudaccount_publisher
+        organization_service_dependency,
+        cloud_account_repository_dependency,
+        fix_dependency.cloudaccount_publisher,
+        redis_publisher,
     )
 
 
