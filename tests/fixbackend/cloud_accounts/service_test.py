@@ -25,6 +25,7 @@ from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
 from fixbackend.organizations.models import Workspace
 from fixbackend.organizations.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
 
 
@@ -72,7 +73,7 @@ class OrganizationServiceMock(WorkspaceRepositoryImpl):
         return organization
 
 
-class RedisPublisherMock(RedisStreamPublisher):
+class RedisStreamPublisherMock(RedisStreamPublisher):
     def __init__(self) -> None:
         self.last_message: Optional[Tuple[str, Json]] = None
 
@@ -80,12 +81,21 @@ class RedisPublisherMock(RedisStreamPublisher):
         self.last_message = (kind, message)
 
 
+class RedisPubSubPublisherMock(RedisPubSubPublisher):
+    def __init__(self) -> None:
+        self.last_message: Optional[Tuple[str, Json, Optional[str]]] = None
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.last_message = (kind, message, channel)
+
+
 @pytest.mark.asyncio
 async def test_create_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
-    publisher = RedisPublisherMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, publisher)
+    stream_publisher = RedisStreamPublisherMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    service = CloudAccountServiceImpl(organization_repository, repository, stream_publisher, pubsub_publisher)
 
     # happy case
     acc = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -98,9 +108,20 @@ async def test_create_aws_account() -> None:
     assert account.access.role_name == role_name
     assert account.access.external_id == external_id
 
-    assert publisher.last_message is not None
-    assert publisher.last_message[0] == "cloud_account_created"
-    assert publisher.last_message[1] == {"id": str(account.id)}
+    message = {
+        "cloud_account_id": str(account.id),
+        "workspace_id": str(account.workspace_id),
+        "aws_account_id": account_id,
+    }
+
+    assert stream_publisher.last_message is not None
+    assert stream_publisher.last_message[0] == "cloud_account_created"
+    assert stream_publisher.last_message[1] == message
+
+    assert pubsub_publisher.last_message is not None
+    assert pubsub_publisher.last_message[0] == "cloud_account_created"
+    assert pubsub_publisher.last_message[1] == message
+    assert pubsub_publisher.last_message[2] == f"tenant-events::{test_workspace_id}"
 
     # account already exists
     with pytest.raises(Exception):
@@ -119,8 +140,9 @@ async def test_create_aws_account() -> None:
 async def test_delete_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
-    publisher = RedisPublisherMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, publisher)
+    stream_publisher = RedisStreamPublisherMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    service = CloudAccountServiceImpl(organization_repository, repository, stream_publisher, pubsub_publisher)
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
@@ -134,6 +156,6 @@ async def test_delete_aws_account() -> None:
     await service.delete_cloud_account(account.id, test_workspace_id)
     assert len(repository.accounts) == 0
 
-    assert publisher.last_message is not None
-    assert publisher.last_message[0] == "cloud_account_deleted"
-    assert publisher.last_message[1] == {"id": str(account.id)}
+    assert stream_publisher.last_message is not None
+    assert stream_publisher.last_message[0] == "cloud_account_deleted"
+    assert stream_publisher.last_message[1] == {"id": str(account.id)}

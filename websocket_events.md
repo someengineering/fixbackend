@@ -34,6 +34,26 @@ Example:
 }
 ```
 
+## `cloud_account_created` event
+
+When a new cloud account is discovered by AWS CF template, we publish a `cloud_account_created` event.
+
+Example:
+```json
+{
+    "id": "B5382C1D-2288-4B0E-8CF7-41370FB18232",
+    "at": "2023-10-23T12:21:12Z",
+    "publisher": "cloud-account-service",
+    "kind": "cloud_account_created",
+    "data": {
+      "cloud_account_id": "B5382C1D-2288-4B0E-8CF7-41370FB18232",
+      "tenant_id": "B5382C1D-2288-4B0E-8CF7-41370FB18232",
+      "aws_account_id": "123456789012",
+    }  
+}
+
+```
+
 
 ## `collect-progress` event
 

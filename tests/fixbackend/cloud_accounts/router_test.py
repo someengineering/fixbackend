@@ -30,7 +30,7 @@ from fixbackend.db import get_async_session
 from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
 
 
-class InMemoryCloudAccontService(CloudAccountService):
+class InMemoryCloudAccountService(CloudAccountService):
     def __init__(self) -> None:
         self.accounts: List[CloudAccount] = []
 
@@ -49,7 +49,7 @@ class InMemoryCloudAccontService(CloudAccountService):
         self.accounts = [account for account in self.accounts if account.id != cloud_account_id]
 
 
-cloud_accont_service = InMemoryCloudAccontService()
+cloud_account_service = InMemoryCloudAccountService()
 
 workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
@@ -63,7 +63,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_cloud_account_service] = lambda: cloud_accont_service
+    app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
     app.dependency_overrides[get_user_workspaces_ids] = lambda: {workspace_id}
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -72,7 +72,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 
 @pytest.mark.asyncio
 async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
-    cloud_accont_service.accounts = []
+    cloud_account_service.accounts = []
     payload = {
         "account_id": account_id,
         "external_id": str(external_id),
@@ -81,7 +81,7 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
     assert response.status_code == 200
-    saved_account = cloud_accont_service.accounts[0]
+    saved_account = cloud_account_service.accounts[0]
     assert saved_account.workspace_id == workspace_id
     match saved_account.access:
         case AwsCloudAccess(a_id, e_id, r_name):
@@ -91,20 +91,20 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_cloud_accont(client: AsyncClient) -> None:
-    cloud_accont_service.accounts = []
-    cloud_accont_id = CloudAccountId(uuid.uuid4())
-    cloud_accont_service.accounts.append(
+async def test_delete_cloud_account(client: AsyncClient) -> None:
+    cloud_account_service.accounts = []
+    cloud_account_id = CloudAccountId(uuid.uuid4())
+    cloud_account_service.accounts.append(
         CloudAccount(
-            id=cloud_accont_id,
+            id=cloud_account_id,
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
         )
     )
-    response = await client.delete(f"/api/organizations/{workspace_id}/cloud_account/{cloud_accont_id}")
+    response = await client.delete(f"/api/organizations/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
-    assert len(cloud_accont_service.accounts) == 0
+    assert len(cloud_account_service.accounts) == 0
 
     # deleting an account in a wrong organization should fail
-    response = await client.delete(f"/api/organizations/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_accont_id}")
+    response = await client.delete(f"/api/organizations/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_account_id}")
     assert response.status_code == 403

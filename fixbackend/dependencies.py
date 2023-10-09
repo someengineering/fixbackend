@@ -77,6 +77,10 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.readonly_redis, Redis)
 
     @property
+    def readwrite_redis(self) -> Redis:
+        return self.service(ServiceNames.readwrite_redis, Redis)
+
+    @property
     def graph_database_access(self) -> GraphDatabaseAccessManager:
         return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
