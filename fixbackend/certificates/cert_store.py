@@ -45,9 +45,9 @@ class CertificateStore:
     @alru_cache(maxsize=100, ttl=60)
     async def load_cert_key_pair(self, cert_path: Path, key_path: Path) -> CertKeyPair:
         # blocking, but will be cached by the OS on the second call
-        async with open(self.host_cert_path, "rb") as f:
+        async with open(cert_path, "rb") as f:
             cert_bytes = await f.read()
-        async with open(self.host_key_path, "rb") as f:
+        async with open(key_path, "rb") as f:
             key_bytes = await f.read()
         cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
         key = serialization.load_pem_private_key(key_bytes, password=None, backend=default_backend())
@@ -56,6 +56,8 @@ class CertificateStore:
         return CertKeyPair(cert=cert, private_key=key)
 
     async def get_host_cert_key_pair(self) -> CertKeyPair:
+        assert self.host_cert_path is not None
+        assert self.host_key_path is not None
         return await self.load_cert_key_pair(self.host_cert_path, self.host_key_path)
 
     async def get_signing_cert_key_pair(self) -> List[CertKeyPair]:

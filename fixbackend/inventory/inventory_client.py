@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import Optional, Dict, AsyncIterator, Any, List, cast, Union
+from typing import Optional, Dict, AsyncIterator, List, cast, Union
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
@@ -42,15 +42,9 @@ class GraphDatabaseForbidden(GraphDatabaseException):
 
 
 class InventoryClient(Service):
-    def __init__(self, inventory_url: str, client: Optional[AsyncClient] = None) -> None:
+    def __init__(self, inventory_url: str, client: AsyncClient) -> None:
         self.inventory_url = inventory_url
-        self.client = client or AsyncClient()
-
-    async def start(self) -> Any:
-        await self.client.__aenter__()
-
-    async def stop(self) -> None:
-        await self.client.__aexit__(None, None, None)
+        self.client = client
 
     async def execute_single(
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
