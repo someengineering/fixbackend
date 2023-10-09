@@ -21,9 +21,9 @@ import pytest
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
-from fixbackend.ids import CloudAccountId, ExternalId, TenantId
-from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationRepositoryImpl
+from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.organizations.models import Workspace
+from fixbackend.organizations.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
@@ -40,21 +40,21 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
     async def get(self, id: CloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
 
-    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[CloudAccount]:
-        return [account for account in self.accounts.values() if account.tenant_id == tenant_id]
+    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+        return [account for account in self.accounts.values() if account.workspace_id == workspace_id]
 
     async def delete(self, id: CloudAccountId) -> None:
         self.accounts.pop(id)
 
 
-tenant_id = TenantId(uuid.uuid4())
+test_workspace_id = WorkspaceId(uuid.uuid4())
 
 account_id = "foobar"
 role_name = "FooBarRole"
 external_id = ExternalId(uuid.uuid4())
 
-organization = Organization(
-    id=tenant_id,
+organization = Workspace(
+    id=test_workspace_id,
     name="Test Organization",
     slug="test-organization",
     external_id=external_id,
@@ -63,12 +63,12 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationRepositoryImpl):
+class OrganizationServiceMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_organization(self, organization_id: TenantId, with_users: bool = False) -> Organization | None:
-        if organization_id != tenant_id:
+    async def get_workspace(self, workspace_id: WorkspaceId, with_users: bool = False) -> Workspace | None:
+        if workspace_id != test_workspace_id:
             return None
         return organization
 
@@ -98,11 +98,11 @@ async def test_create_aws_account() -> None:
     service = CloudAccountServiceImpl(organization_repository, repository, stream_publisher, pubsub_publisher)
 
     # happy case
-    acc = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
+    acc = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
     account = repository.accounts.get(acc.id)
     assert account is not None
-    assert account.tenant_id == tenant_id
+    assert account.workspace_id == test_workspace_id
     assert isinstance(account.access, AwsCloudAccess)
     assert account.access.account_id == account_id
     assert account.access.role_name == role_name
@@ -110,7 +110,7 @@ async def test_create_aws_account() -> None:
 
     message = {
         "cloud_account_id": str(account.id),
-        "tenant_id": str(account.tenant_id),
+        "workspace_id": str(account.workspace_id),
         "aws_account_id": account_id,
     }
 
@@ -121,19 +121,19 @@ async def test_create_aws_account() -> None:
     assert pubsub_publisher.last_message is not None
     assert pubsub_publisher.last_message[0] == "cloud_account_created"
     assert pubsub_publisher.last_message[1] == message
-    assert pubsub_publisher.last_message[2] == f"tenant-events::{tenant_id}"
+    assert pubsub_publisher.last_message[2] == f"workspace-events::{test_workspace_id}"
 
     # account already exists
     with pytest.raises(Exception):
-        await service.create_aws_account(tenant_id, account_id, role_name, external_id)
+        await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
 
     # wrong external id
     with pytest.raises(Exception):
-        await service.create_aws_account(tenant_id, account_id, role_name, ExternalId(uuid.uuid4()))
+        await service.create_aws_account(test_workspace_id, account_id, role_name, ExternalId(uuid.uuid4()))
 
     # wrong tenant id
     with pytest.raises(Exception):
-        await service.create_aws_account(TenantId(uuid.uuid4()), account_id, role_name, external_id)
+        await service.create_aws_account(WorkspaceId(uuid.uuid4()), account_id, role_name, external_id)
 
 
 @pytest.mark.asyncio
@@ -144,16 +144,16 @@ async def test_delete_aws_account() -> None:
     pubsub_publisher = RedisPubSubPublisherMock()
     service = CloudAccountServiceImpl(organization_repository, repository, stream_publisher, pubsub_publisher)
 
-    account = await service.create_aws_account(tenant_id, account_id, role_name, external_id)
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
 
     # deleting someone's else account
     with pytest.raises(Exception):
-        await service.delete_cloud_account(account.id, TenantId(uuid.uuid4()))
+        await service.delete_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
     assert len(repository.accounts) == 1
 
     # success
-    await service.delete_cloud_account(account.id, tenant_id)
+    await service.delete_cloud_account(account.id, test_workspace_id)
     assert len(repository.accounts) == 0
 
     assert stream_publisher.last_message is not None

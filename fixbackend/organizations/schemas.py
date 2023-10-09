@@ -15,19 +15,19 @@
 from datetime import datetime
 from typing import List
 from uuid import UUID
-from fixbackend.ids import TenantId, UserId
+from fixbackend.ids import WorkspaceId, UserId
 
 from pydantic import BaseModel, Field
 
-from fixbackend.organizations.models import Organization as OrganizationModel
+from fixbackend.organizations.models import Workspace
 
 
-class Organization(BaseModel):
-    id: TenantId = Field(description="The organization's unique identifier")
-    slug: str = Field(description="The organization's unique slug, used in URLs")
-    name: str = Field(description="The organization's name, a human-readable string")
-    owners: List[UserId] = Field(description="The organization's owners, who can manage the organization")
-    members: List[UserId] = Field(description="The organization's members, who can view the organizatione")
+class WorkspaceRead(BaseModel):
+    id: WorkspaceId = Field(description="The workspace's unique identifier")
+    slug: str = Field(description="The workspace's unique slug, used in URLs")
+    name: str = Field(description="The workspace's name, a human-readable string")
+    owners: List[UserId] = Field(description="The workspace's owners, who can manage the organization")
+    members: List[UserId] = Field(description="The workspace's members, who can view the organizatione")
 
     model_config = {
         "json_schema_extra": {
@@ -44,8 +44,8 @@ class Organization(BaseModel):
     }
 
     @classmethod
-    def from_orm(cls, model: OrganizationModel) -> "Organization":
-        return Organization(
+    def from_model(cls, model: Workspace) -> "WorkspaceRead":
+        return WorkspaceRead(
             id=model.id,
             slug=model.slug,
             name=model.name,
@@ -54,9 +54,9 @@ class Organization(BaseModel):
         )
 
 
-class CreateOrganization(BaseModel):
-    name: str = Field(description="The organization's name, a human-readable string")
-    slug: str = Field(description="The organization's unique slug, used in URLs", pattern="^[a-z0-9-]+$")
+class WorkspaceCreate(BaseModel):
+    name: str = Field(description="Workspace name, a human-readable string")
+    slug: str = Field(description="Workspace unique slug, used in URLs", pattern="^[a-z0-9-]+$")
 
     model_config = {
         "json_schema_extra": {
@@ -70,8 +70,8 @@ class CreateOrganization(BaseModel):
     }
 
 
-class OrganizationInvite(BaseModel):
-    organization_slug: str = Field(description="The slug of the organization to invite the user to")
+class WorkspaceInviteRead(BaseModel):
+    organization_slug: str = Field(description="The slug of the workspace to invite the user to")
     user_id: UserId = Field(description="The id of the user to invite")
     expires_at: datetime = Field(description="The time at which the invitation expires")
 

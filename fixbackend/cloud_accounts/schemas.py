@@ -14,11 +14,11 @@
 
 from pydantic import BaseModel, Field
 
-from fixbackend.ids import TenantId, ExternalId
+from fixbackend.ids import WorkspaceId, ExternalId
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
-    workspace_id: TenantId = Field(description="Your FIX-assigned Workspace ID")
+    workspace_id: WorkspaceId = Field(description="Your FIX-assigned Workspace ID")
     external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: str = Field(description="AWS account ID", pattern=r"^\d{12}$")
     role_name: str = Field(description="AWS role name", max_length=64)

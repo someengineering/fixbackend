@@ -1,7 +1,7 @@
 from typing import NewType
 from uuid import UUID
 
-TenantId = NewType("TenantId", UUID)
+WorkspaceId = NewType("WorkspaceId", UUID)
 InvitationId = NewType("InvitationId", UUID)
 UserId = NewType("UserId", UUID)
 CloudAccountId = NewType("CloudAccountId", UUID)

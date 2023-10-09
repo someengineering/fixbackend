@@ -20,16 +20,16 @@ from fixbackend.auth.db import UserRepositoryDependency
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_verifier import UserVerifierDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.organizations.repository import OrganizationRepositoryDependency
+from fixbackend.organizations.repository import WorkspaceRepositoryDependency
 
 
 async def get_user_manager(
     config: ConfigDependency,
     user_repository: UserRepositoryDependency,
     user_verifier: UserVerifierDependency,
-    organization_service: OrganizationRepositoryDependency,
+    workspace_repository: WorkspaceRepositoryDependency,
 ) -> AsyncIterator[UserManager]:
-    yield UserManager(config, user_repository, None, user_verifier, organization_service)
+    yield UserManager(config, user_repository, None, user_verifier, workspace_repository)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]
