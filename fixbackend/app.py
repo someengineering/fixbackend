@@ -15,6 +15,7 @@
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from ssl import create_default_context, Purpose
 from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
@@ -61,6 +62,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
     github = github_client(cfg)
     deps = FixDependencies()
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
+    client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
+    if ca_cert_path:
+        client_context.load_verify_locations(ca_cert_path)
 
     def create_redis(url: str) -> Redis:
         kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
@@ -77,7 +81,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         engine = deps.add(
             SN.async_engine,
-            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
+            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl=client_context)),
         )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
@@ -109,7 +113,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         engine = deps.add(
             SN.async_engine,
-            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl_ca=ca_cert_path)),
+            create_async_engine(cfg.database_url, pool_size=10, connect_args=dict(ssl=client_context)),
         )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
