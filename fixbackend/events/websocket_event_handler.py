@@ -25,7 +25,7 @@ class WebsocketEventHandler:
 
         async with RedisPubSubListener(
             redis=self.readonly_redis,
-            channel=f"workspace-events::{workspace_id}",
+            channel=f"tenant-events::{workspace_id}",
             handler=redis_message_handler,
         ):
             try:

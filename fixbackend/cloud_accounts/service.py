@@ -96,7 +96,7 @@ class CloudAccountServiceImpl(CloudAccountService):
         }
         await self.publisher.publish(kind="cloud_account_created", message=message)
         await self.pubsub_publisher.publish(
-            kind="cloud_account_created", message=message, channel=f"workspace-events::{workspace_id}"
+            kind="cloud_account_created", message=message, channel=f"tenant-events::{workspace_id}"
         )
         return result
 

@@ -121,7 +121,7 @@ async def test_create_aws_account() -> None:
     assert pubsub_publisher.last_message is not None
     assert pubsub_publisher.last_message[0] == "cloud_account_created"
     assert pubsub_publisher.last_message[1] == message
-    assert pubsub_publisher.last_message[2] == f"workspace-events::{test_workspace_id}"
+    assert pubsub_publisher.last_message[2] == f"tenant-events::{test_workspace_id}"
 
     # account already exists
     with pytest.raises(Exception):
