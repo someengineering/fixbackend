@@ -27,10 +27,9 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import UserId, WorkspaceId, ExternalId
-from fixbackend.organizations.repository import get_workspace_repository
-from fixbackend.organizations.models import Workspace
-from fixbackend.organizations.repository import WorkspaceRepositoryImpl
+from fixbackend.ids import ExternalId, UserId, WorkspaceId
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
 org_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
@@ -82,12 +81,16 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 @pytest.mark.asyncio
 async def test_list_organizations(client: AsyncClient) -> None:
     response = await client.get("/api/organizations/")
+    ws_response = await client.get("/api/workspaces/")
+    assert response.json() == ws_response.json()
     assert response.json()[0] is not None
 
 
 @pytest.mark.asyncio
 async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/cf_url")
+    assert response.json() == ws_response.json()
     url = response.json()
     assert str(default_config.cf_template_url) in url
     assert str(org_id) in url
@@ -98,10 +101,14 @@ async def test_cloudformation_link(client: AsyncClient, default_config: Config) 
 async def test_external_id(client: AsyncClient) -> None:
     # organization is created by default
     response = await client.get(f"/api/organizations/{org_id}/external_id")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/external_id")
+    assert response.json() == ws_response.json()
     assert response.json().get("external_id") == str(external_id)
 
 
 @pytest.mark.asyncio
 async def test_cloudformation_template_url(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_template")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/cf_template")
+    assert response.json() == ws_response.json()
     assert response.json() == str(default_config.cf_template_url)

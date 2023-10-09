@@ -22,8 +22,8 @@ from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
 from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-from fixbackend.organizations.models import Workspace
-from fixbackend.organizations.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json

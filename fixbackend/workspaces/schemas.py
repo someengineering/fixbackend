@@ -19,7 +19,7 @@ from fixbackend.ids import WorkspaceId, UserId
 
 from pydantic import BaseModel, Field
 
-from fixbackend.organizations.models import Workspace
+from fixbackend.workspaces.models import Workspace
 
 
 class WorkspaceRead(BaseModel):

@@ -43,8 +43,8 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.models import Workspace
-from fixbackend.organizations.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
@@ -175,8 +175,8 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def organization(organization_repository: WorkspaceRepository, user: User) -> Workspace:
-    return await organization_repository.create_workspace("foo", "foo", user)
+async def organization(workspace_repository: WorkspaceRepository, user: User) -> Workspace:
+    return await workspace_repository.create_workspace("foo", "foo", user)
 
 
 @pytest.fixture
@@ -269,7 +269,7 @@ async def metering_repository(async_session_maker: AsyncSessionMaker) -> Meterin
 
 
 @pytest.fixture
-async def organization_repository(
+async def workspace_repository(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(session, graph_database_access_manager)

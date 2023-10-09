@@ -17,6 +17,9 @@
         "--max-line-length",
         "120"
     ],
+    "search.exclude": {
+        ".nox": true
+    },
     "mypy-type-checker.args": [
         "--python-version",
         "3.11",

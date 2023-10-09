@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
-from fixbackend.organizations.repository import WorkspaceRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.auth_backend import FixJWTStrategy
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fixbackend.auth.user_manager import UserManager
@@ -47,7 +47,7 @@ class UserVerifierMock(UserVerifier):
 
 @pytest.mark.asyncio
 async def test_token_validation(
-    organization_repository: WorkspaceRepository, user: User, default_config: Config, session: AsyncSession
+    workspace_repository: WorkspaceRepository, user: User, default_config: Config, session: AsyncSession
 ) -> None:
     private_key_1 = rsa.generate_private_key(65537, 2048)
     private_key_2 = rsa.generate_private_key(65537, 2048)
@@ -56,7 +56,7 @@ async def test_token_validation(
 
     user_repo = await anext(get_user_repository(session))
 
-    user_manager = UserManager(default_config, user_repo, None, UserVerifierMock(), organization_repository)
+    user_manager = UserManager(default_config, user_repo, None, UserVerifierMock(), workspace_repository)
 
     token1 = await strategy1.write_token(user)
     token2 = await strategy2.write_token(user)

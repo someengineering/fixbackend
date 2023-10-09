@@ -101,10 +101,10 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
             access=AwsCloudAccess(account_id, external_id, role_name),
         )
     )
-    response = await client.delete(f"/api/organizations/{workspace_id}/cloud_account/{cloud_account_id}")
+    response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
     assert len(cloud_account_service.accounts) == 0
 
-    # deleting an account in a wrong organization should fail
-    response = await client.delete(f"/api/organizations/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_account_id}")
+    # deleting an account in a wrong workspace should fail
+    response = await client.delete(f"/api/workspaces/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_account_id}")
     assert response.status_code == 403

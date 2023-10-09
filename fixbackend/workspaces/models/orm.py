@@ -23,7 +23,7 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
 from fixbackend.ids import WorkspaceId, UserId, ExternalId
-from fixbackend.organizations import models
+from fixbackend.workspaces import models
 
 
 class Organization(Base):

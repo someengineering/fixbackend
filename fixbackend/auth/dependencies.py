@@ -20,7 +20,7 @@ from fixbackend.auth.db import UserRepositoryDependency
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_verifier import UserVerifierDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.organizations.repository import WorkspaceRepositoryDependency
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 
 
 async def get_user_manager(
