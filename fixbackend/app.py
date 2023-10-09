@@ -186,11 +186,25 @@ def fast_api_app(cfg: Config) -> FastAPI:
     if not cfg.args.dispatcher:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
-        api_router.include_router(workspaces_router(), prefix="/organizations", tags=["organizations"])
+
+        # organizations path is deprecated, use /workspaces instead
+        api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
+        api_router.include_router(workspaces_router(), prefix="/organizations", include_in_schema=False)  # deprecated
+
+        api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
+        api_router.include_router(
+            cloud_accounts_router(), prefix="/organizations", include_in_schema=False
+        )  # deprecated
+
+        api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
+        api_router.include_router(
+            inventory_router(deps), prefix="/organizations", include_in_schema=False
+        )  # deprecated
+
+        api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
+        api_router.include_router(websocket_router(cfg), prefix="/organizations", include_in_schema=False)  # deprecated
+
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
-        api_router.include_router(cloud_accounts_router(), prefix="/organizations", tags=["cloud_accounts"])
-        api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
-        api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         app.include_router(api_router)
 

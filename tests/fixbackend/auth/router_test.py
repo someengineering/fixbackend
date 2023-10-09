@@ -74,5 +74,5 @@ async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> 
     assert auth_cookie is not None
 
     # organization is created by default
-    response = await api_client.get("/api/organizations/", cookies={"fix.auth": auth_cookie})
+    response = await api_client.get("/api/workspaces/", cookies={"fix.auth": auth_cookie})
     assert response.json()[0].get("name") == user.email

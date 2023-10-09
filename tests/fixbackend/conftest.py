@@ -175,8 +175,8 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def organization(organization_repository: WorkspaceRepository, user: User) -> Workspace:
-    return await organization_repository.create_workspace("foo", "foo", user)
+async def organization(workspace_repository: WorkspaceRepository, user: User) -> Workspace:
+    return await workspace_repository.create_workspace("foo", "foo", user)
 
 
 @pytest.fixture
@@ -269,7 +269,7 @@ async def metering_repository(async_session_maker: AsyncSessionMaker) -> Meterin
 
 
 @pytest.fixture
-async def organization_repository(
+async def workspace_repository(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(session, graph_database_access_manager)

@@ -26,10 +26,10 @@ from fixbackend.auth.models import User
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, organization_repository: WorkspaceRepository, user: User
+    async_session_maker: AsyncSessionMaker, workspace_repository: WorkspaceRepository, user: User
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
-    org = await organization_repository.create_workspace("foo", "foo", user)
+    org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
     account = CloudAccount(
         id=CloudAccountId(uuid.uuid4()),
