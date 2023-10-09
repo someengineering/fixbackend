@@ -29,7 +29,7 @@ from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextRun
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.models import Workspace
+from fixbackend.workspaces.models import Workspace
 
 
 @pytest.mark.asyncio

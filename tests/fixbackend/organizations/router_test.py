@@ -27,10 +27,9 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import UserId, WorkspaceId, ExternalId
-from fixbackend.organizations.repository import get_workspace_repository
-from fixbackend.organizations.models import Workspace
-from fixbackend.organizations.repository import WorkspaceRepositoryImpl
+from fixbackend.ids import ExternalId, UserId, WorkspaceId
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
 org_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())

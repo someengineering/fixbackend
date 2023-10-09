@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
-from fixbackend.organizations.repository import WorkspaceRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.auth_backend import FixJWTStrategy
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fixbackend.auth.user_manager import UserManager

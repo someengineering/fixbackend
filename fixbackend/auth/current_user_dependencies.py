@@ -32,7 +32,7 @@ from fixbackend.config import get_config
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
-from fixbackend.organizations.repository import WorkspaceRepositoryDependency
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])

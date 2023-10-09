@@ -29,7 +29,7 @@ from fixbackend.db import AsyncSessionDependency
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, UserId
-from fixbackend.organizations.models import Workspace, WorkspaceInvite, orm
+from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
 
 
 class WorkspaceRepository(ABC):

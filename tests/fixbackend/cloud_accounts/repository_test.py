@@ -20,7 +20,7 @@ from fixbackend.ids import CloudAccountId, ExternalId
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
-from fixbackend.organizations.repository import WorkspaceRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.models import User
 
 

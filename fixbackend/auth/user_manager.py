@@ -24,7 +24,7 @@ from fixbackend.auth.db import UserRepository
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier
 from fixbackend.config import Config
-from fixbackend.organizations.repository import WorkspaceRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):

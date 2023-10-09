@@ -26,7 +26,7 @@ from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.dependencies import FixDependency
 from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-from fixbackend.organizations.repository import WorkspaceRepository, WorkspaceRepositoryDependency
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
 class WrongExternalId(Exception):

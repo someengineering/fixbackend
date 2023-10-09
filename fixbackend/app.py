@@ -51,7 +51,7 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.router import organizations_router
+from fixbackend.workspaces.router import workspaces_router
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -186,7 +186,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     if not cfg.args.dispatcher:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
-        api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
+        api_router.include_router(workspaces_router(), prefix="/organizations", tags=["organizations"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(cloud_accounts_router(), prefix="/organizations", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
