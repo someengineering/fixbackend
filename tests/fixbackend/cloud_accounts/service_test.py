@@ -109,8 +109,9 @@ async def test_create_aws_account() -> None:
     assert account.access.external_id == external_id
 
     message = {
-        "id": str(account.id),
+        "cloud_account_id": str(account.id),
         "tenant_id": str(account.tenant_id),
+        "aws_account_id": account_id,
     }
 
     assert stream_publisher.last_message is not None

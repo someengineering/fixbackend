@@ -29,7 +29,7 @@ def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
 
     @router.delete("/{organization_id}/cloud_account/{cloud_account_id}")
-    async def delete_cloud_accont(
+    async def delete_cloud_account(
         organization_id: TenantId,
         cloud_account_id: CloudAccountId,
         user_tenants: UserTenantsDependency,

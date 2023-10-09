@@ -42,7 +42,7 @@ class CloudAccountService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, tenant_id: TenantId) -> None:
         """Delete a cloud account."""
         raise NotImplementedError
 
@@ -90,8 +90,9 @@ class CloudAccountServiceImpl(CloudAccountService):
 
         result = await self.cloud_account_repository.create(account)
         message = {
-            "id": str(result.id),
+            "cloud_account_id": str(result.id),
             "tenant_id": str(result.tenant_id),
+            "aws_account_id": account_id,
         }
         await self.publisher.publish(kind="cloud_account_created", message=message)
         await self.pubsub_publisher.publish(
@@ -99,13 +100,13 @@ class CloudAccountServiceImpl(CloudAccountService):
         )
         return result
 
-    async def delete_cloud_account(self, cloud_accont_id: CloudAccountId, tenant_id: TenantId) -> None:
-        account = await self.cloud_account_repository.get(cloud_accont_id)
+    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, tenant_id: TenantId) -> None:
+        account = await self.cloud_account_repository.get(cloud_account_id)
         if not account or account.tenant_id != tenant_id:
             raise ValueError("Cloud account does not exist")
 
-        await self.cloud_account_repository.delete(cloud_accont_id)
-        await self.publisher.publish("cloud_account_deleted", {"id": str(cloud_accont_id)})
+        await self.cloud_account_repository.delete(cloud_account_id)
+        await self.publisher.publish("cloud_account_deleted", {"id": str(cloud_account_id)})
 
 
 def get_cloud_account_service(
