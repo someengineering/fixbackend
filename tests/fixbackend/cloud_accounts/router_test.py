@@ -21,13 +21,13 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_user_tenants_ids
+from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.service import CloudAccountService, get_cloud_account_service
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import CloudAccountId, ExternalId, TenantId
+from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
 
 
 class InMemoryCloudAccontService(CloudAccountService):
@@ -35,23 +35,23 @@ class InMemoryCloudAccontService(CloudAccountService):
         self.accounts: List[CloudAccount] = []
 
     async def create_aws_account(
-        self, tenant_id: TenantId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         account = CloudAccount(
             id=CloudAccountId(uuid.uuid4()),
-            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
         )
         self.accounts.append(account)
         return account
 
-    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, tenant_id: TenantId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
         self.accounts = [account for account in self.accounts if account.id != cloud_account_id]
 
 
 cloud_accont_service = InMemoryCloudAccontService()
 
-tenant_id = TenantId(uuid.uuid4())
+workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
 role_name = "FooBarRole"
 account_id = "123456789012"
@@ -64,7 +64,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_cloud_account_service] = lambda: cloud_accont_service
-    app.dependency_overrides[get_user_tenants_ids] = lambda: {tenant_id}
+    app.dependency_overrides[get_user_workspaces_ids] = lambda: {workspace_id}
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -77,12 +77,12 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
         "account_id": account_id,
         "external_id": str(external_id),
         "role_name": role_name,
-        "workspace_id": str(tenant_id),
+        "workspace_id": str(workspace_id),
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
     assert response.status_code == 200
     saved_account = cloud_accont_service.accounts[0]
-    assert saved_account.tenant_id == tenant_id
+    assert saved_account.workspace_id == workspace_id
     match saved_account.access:
         case AwsCloudAccess(a_id, e_id, r_name):
             assert a_id == account_id
@@ -97,14 +97,14 @@ async def test_delete_cloud_accont(client: AsyncClient) -> None:
     cloud_accont_service.accounts.append(
         CloudAccount(
             id=cloud_accont_id,
-            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
         )
     )
-    response = await client.delete(f"/api/organizations/{tenant_id}/cloud_account/{cloud_accont_id}")
+    response = await client.delete(f"/api/organizations/{workspace_id}/cloud_account/{cloud_accont_id}")
     assert response.status_code == 200
     assert len(cloud_accont_service.accounts) == 0
 
     # deleting an account in a wrong organization should fail
-    response = await client.delete(f"/api/organizations/{TenantId(uuid.uuid4())}/cloud_account/{cloud_accont_id}")
+    response = await client.delete(f"/api/organizations/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_accont_id}")
     assert response.status_code == 403

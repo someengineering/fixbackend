@@ -88,7 +88,7 @@ class RedisCollectQueue(CollectQueue):
         wait_until_done: bool = False,
     ) -> None:
         collect_job = dict(
-            tenant_id=str(db.tenant_id),
+            tenant_id=str(db.workspace_id),
             graphdb_server=db.server,
             graphdb_database=db.database,
             graphdb_username=db.username,
@@ -99,7 +99,7 @@ class RedisCollectQueue(CollectQueue):
         job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id)
         if job is None:
             raise JobAlreadyEnqueued(f"Failed to enqueue collect job {job_id}")
-        log.info(f"Enqueuing collect job {job.job_id} for tenant={db.tenant_id}")
+        log.info(f"Enqueuing collect job {job.job_id} for tenant={db.workspace_id}")
         if wait_until_done:
             # this will either return none or throw an exception (reraised from the worker)
             log.debug("Waiting for collect job to finish.")

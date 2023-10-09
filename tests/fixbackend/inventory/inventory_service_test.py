@@ -26,12 +26,12 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient, Response, Request, MockTransport
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.schemas import ReportSummary
 
-db = GraphDatabaseAccess(TenantId(uuid.uuid1()), "server", "database", "username", "password")
+db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
 
 async def test_benchmark_command(inventory_service: InventoryService, benchmark_json: List[Json]) -> None:

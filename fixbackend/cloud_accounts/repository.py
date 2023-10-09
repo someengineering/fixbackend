@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
 from fixbackend.db import AsyncSessionMakerDependency
-from fixbackend.ids import CloudAccountId, TenantId
+from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
 from abc import ABC, abstractmethod
 
@@ -33,7 +33,7 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[CloudAccount]:
+    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
@@ -51,7 +51,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             if isinstance(cloud_account.access, AwsCloudAccess):
                 orm_cloud_account = orm.CloudAccount(
                     id=cloud_account.id,
-                    tenant_id=cloud_account.tenant_id,
+                    tenant_id=cloud_account.workspace_id,
                     cloud="aws",
                     account_id=cloud_account.access.account_id,
                     aws_role_name=cloud_account.access.role_name,
@@ -62,21 +62,21 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             session.add(orm_cloud_account)
             await session.commit()
             await session.refresh(orm_cloud_account)
-            return orm_cloud_account.to_domain()
+            return orm_cloud_account.to_model()
 
     async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:
         """Get a single cloud account by id."""
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
-            return cloud_account.to_domain() if cloud_account else None
+            return cloud_account.to_model() if cloud_account else None
 
-    async def list_by_tenant_id(self, tenant_id: TenantId) -> List[CloudAccount]:
+    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
-            statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == tenant_id)
+            statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
             results = await session.execute(statement)
             accounts = results.scalars().all()
-            return [acc.to_domain() for acc in accounts]
+            return [acc.to_model() for acc in accounts]
 
     async def delete(self, id: CloudAccountId) -> None:
         """Delete a cloud account."""

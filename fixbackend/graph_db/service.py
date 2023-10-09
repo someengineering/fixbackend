@@ -34,7 +34,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.base_model import Base
 from fixbackend.config import Config
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 from fixbackend.types import AsyncSessionMaker
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ PasswordLength = 20
 
 class GraphDatabaseAccessEntity(Base):
     __tablename__ = "graph_database_access"
-    tenant_id: Mapped[TenantId] = mapped_column(GUID, primary_key=True)
+    tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True)
     server: Mapped[str] = mapped_column(String(length=256), nullable=False)
     username: Mapped[str] = mapped_column(String(length=36), nullable=False)
     password: Mapped[str] = mapped_column(String(length=PasswordLength), nullable=False)
@@ -51,7 +51,7 @@ class GraphDatabaseAccessEntity(Base):
 
     def access(self) -> GraphDatabaseAccess:
         return GraphDatabaseAccess(
-            tenant_id=self.tenant_id,
+            workspace_id=self.tenant_id,
             server=self.server,
             username=self.username,
             password=self.password,
@@ -65,23 +65,23 @@ class GraphDatabaseAccessManager(Service):
         self.session_maker = session_maker
 
     async def create_database_access(
-        self, tenant_id: TenantId, *, session: Optional[AsyncSession] = None
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
     ) -> GraphDatabaseAccess:
         """
         Create a new database-access for the given tenant.
 
-        :param tenant_id: The id of the tenant.
+        :param workspace_id: The id of the tenant.
         :param session: The optional session object to join an existing transaction.
         :return: The database access.
         """
 
-        log.info(f"Create new database access for tenant {tenant_id}")
+        log.info(f"Create new database access for tenant {workspace_id}")
         db_access_entity = GraphDatabaseAccessEntity(
-            tenant_id=tenant_id,
-            server=self._database_for(tenant_id),
-            username=str(tenant_id),
+            tenant_id=workspace_id,
+            server=self._database_for(workspace_id),
+            username=str(workspace_id),
             password=self._generate_password(PasswordLength),
-            database=f"db-{tenant_id}",  # name needs to start with a letter!
+            database=f"db-{workspace_id}",  # name needs to start with a letter!
         )
         db_access = db_access_entity.access()
 
@@ -93,15 +93,15 @@ class GraphDatabaseAccessManager(Service):
                 await session.commit()
         return db_access
 
-    async def get_database_access(self, tenant_id: TenantId) -> Optional[GraphDatabaseAccess]:
+    async def get_database_access(self, workspace_id: WorkspaceId) -> Optional[GraphDatabaseAccess]:
         async with self.session_maker() as session:
-            if entity := await session.get(GraphDatabaseAccessEntity, tenant_id):
+            if entity := await session.get(GraphDatabaseAccessEntity, workspace_id):
                 return entity.access()
             return None
 
-    def _database_for(self, tenant_id: TenantId) -> str:
+    def _database_for(self, workspace_id: WorkspaceId) -> str:
         # use consistent hashing to select a server from the list of available servers
-        hashed_key = int(hashlib.sha256(str(tenant_id).encode()).hexdigest(), 16)
+        hashed_key = int(hashlib.sha256(str(workspace_id).encode()).hexdigest(), 16)
         return self.config.available_db_server[hashed_key % len(self.config.available_db_server)]
 
     def _generate_password(self, length: int) -> str:

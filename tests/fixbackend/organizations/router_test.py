@@ -27,12 +27,12 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import UserId, TenantId, ExternalId
-from fixbackend.organizations.repository import get_organization_repository
-from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationRepositoryImpl
+from fixbackend.ids import UserId, WorkspaceId, ExternalId
+from fixbackend.organizations.repository import get_workspace_repository
+from fixbackend.organizations.models import Workspace
+from fixbackend.organizations.repository import WorkspaceRepositoryImpl
 
-org_id = TenantId(uuid.uuid4())
+org_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
 user_id = UserId(uuid.uuid4())
 user = User(
@@ -44,7 +44,7 @@ user = User(
     is_superuser=False,
     oauth_accounts=[],
 )
-organization = Organization(
+organization = Workspace(
     id=org_id,
     name="org name",
     slug="org-slug",
@@ -54,14 +54,14 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationRepositoryImpl):
+class OrganizationServiceMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_organization(self, organization_id: UUID) -> Organization | None:
+    async def get_workspace(self, workspace_id: UUID) -> Workspace | None:
         return organization
 
-    async def list_organizations(self, owner_id: UUID) -> Sequence[Organization]:
+    async def list_workspaces(self, owner_id: UUID) -> Sequence[Workspace]:
         return [organization]
 
 
@@ -72,7 +72,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_organization_repository] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[get_workspace_repository] = lambda: OrganizationServiceMock()
     app.dependency_overrides[get_tenant] = lambda: org_id
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
