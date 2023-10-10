@@ -15,7 +15,7 @@ from typing import Union
 
 from attrs import frozen
 
-from fixbackend.ids import TenantId, CloudAccountId, ExternalId
+from fixbackend.ids import WorkspaceId, CloudAccountId, ExternalId
 
 
 @frozen
@@ -36,5 +36,5 @@ CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
 @frozen
 class CloudAccount:
     id: CloudAccountId
-    tenant_id: TenantId
+    workspace_id: WorkspaceId
     access: CloudAccess

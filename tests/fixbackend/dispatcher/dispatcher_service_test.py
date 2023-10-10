@@ -27,9 +27,9 @@ from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextRun
-from fixbackend.ids import CloudAccountId, TenantId
+from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.models import Organization
+from fixbackend.workspaces.models import Workspace
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_receive_cloud_account_created(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
-    organization: Organization,
+    organization: Workspace,
     arq_redis: Redis,
 ) -> None:
     # create a cloud account
@@ -80,7 +80,7 @@ async def test_trigger_collect(
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
     next_run_repository: NextRunRepository,
-    organization: Organization,
+    organization: Workspace,
     arq_redis: Redis,
 ) -> None:
     # create a cloud account and next_run entry
@@ -108,7 +108,7 @@ async def test_trigger_collect(
 
 @pytest.mark.asyncio
 async def test_receive_collect_done_message(
-    dispatcher: DispatcherService, metering_repository: MeteringRepository, organization: Organization
+    dispatcher: DispatcherService, metering_repository: MeteringRepository, organization: Workspace
 ) -> None:
     message = {
         "job_id": "j1",
@@ -139,7 +139,7 @@ async def test_receive_collect_done_message(
     result = [n async for n in metering_repository.list(organization.id)]
     assert len(result) == 2
     mr_1, mr_2 = result if result[0].account_name == "test" else list(reversed(result))
-    assert mr_1.tenant_id == organization.id
+    assert mr_1.workspace_id == organization.id
     assert mr_1.job_id == "j1"
     assert mr_1.task_id == "t1"
     assert mr_1.cloud == "aws"
@@ -149,7 +149,7 @@ async def test_receive_collect_done_message(
     assert mr_1.nr_of_error_messages == 2
     assert mr_1.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
     assert mr_1.duration == 18
-    assert mr_2.tenant_id == organization.id
+    assert mr_2.workspace_id == organization.id
     assert mr_2.job_id == "j1"
     assert mr_2.task_id == "t1"
     assert mr_2.cloud == "k8s"
@@ -163,7 +163,7 @@ async def test_receive_collect_done_message(
 
 @pytest.mark.asyncio
 async def test_compute_next_run(dispatcher: DispatcherService) -> None:
-    tenant = TenantId(uuid.uuid4())
+    tenant = WorkspaceId(uuid.uuid4())
     delta = timedelta(hours=1)
 
     async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:

@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence, List
+from typing import Annotated, Optional, Sequence, List, Literal
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -45,6 +45,17 @@ class Config(BaseSettings):
     inventory_url: str
     cf_template_url: str
     args: Namespace
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    aws_region: str
+    ca_cert: Optional[Path]
+    host_cert: Optional[Path]
+    host_key: Optional[Path]
+    signing_cert_1: Optional[Path]
+    signing_key_1: Optional[Path]
+    signing_cert_2: Optional[Path]
+    signing_key_2: Optional[Path]
+    env: Literal["local", "dev", "prd"]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -97,6 +108,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--dispatcher", action="store_true", default=False, help="Run the dispatcher instead of the web server"
     )
+    parser.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID", ""))
+    parser.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
+    parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "us-east-1"))
+    parser.add_argument("--ca-cert", type=Path, default=os.environ.get("CA_CERT"))
+    parser.add_argument("--host-cert", type=Path, default=os.environ.get("HOST_CERT"))
+    parser.add_argument("--host-key", type=Path, default=os.environ.get("HOST_KEY"))
+    parser.add_argument("--signing-cert-1", type=Path, default=os.environ.get("SIGNING_CERT_1"))
+    parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
+    parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
+    parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
+    parser.add_argument("--env", default=os.environ.get("ENV", "local"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

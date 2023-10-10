@@ -14,7 +14,9 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast, List
+from dataclasses import replace
+from ssl import create_default_context, Purpose
+from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
 from arq import create_pool
@@ -25,6 +27,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from httpx import AsyncClient
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -33,6 +36,7 @@ from starlette.exceptions import HTTPException
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
+from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -47,7 +51,7 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.router import organizations_router
+from fixbackend.workspaces.router import workspaces_router
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -57,25 +61,45 @@ def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
     deps = FixDependencies()
+    ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
+    client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
+    if ca_cert_path:
+        client_context.load_verify_locations(ca_cert_path)
+
+    def create_redis(url: str) -> Redis:
+        kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
+        return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
-        readwrite_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
-        engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
+        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
+        arq_redis = deps.add(
+            SN.arq_redis,
+            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+        )
+        deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
+        readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        engine = deps.add(
+            SN.async_engine,
+            create_async_engine(
+                cfg.database_url,
+                pool_size=10,
+                # connect_args=dict(ssl=client_context)
+            ),
+        )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
-        client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url))
-        deps.add(SN.inventory, InventoryService(client))
+        inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
+        deps.add(SN.inventory, InventoryService(inventory_client))
         deps.add(
             SN.cloudaccount_publisher,
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
+        deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
@@ -86,10 +110,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
-        arq_redis = deps.add(SN.arg_redis, await create_pool(RedisSettings.from_dsn(cfg.redis_queue_url)))
-        deps.add(SN.readonly_redis, Redis.from_url(cfg.redis_readonly_url, decode_responses=True))
-        rw_redis = deps.add(SN.readwrite_redis, Redis.from_url(cfg.redis_readwrite_url, decode_responses=True))
-        engine = deps.add(SN.async_engine, create_async_engine(cfg.database_url, pool_size=10))
+        arq_redis = deps.add(
+            SN.arq_redis,
+            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+        )
+        rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        engine = deps.add(
+            SN.async_engine,
+            create_async_engine(
+                cfg.database_url,
+                pool_size=10,
+                # connect_args=dict(ssl=client_context)
+            ),
+        )
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
@@ -153,11 +186,25 @@ def fast_api_app(cfg: Config) -> FastAPI:
     if not cfg.args.dispatcher:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
-        api_router.include_router(organizations_router(), prefix="/organizations", tags=["organizations"])
+
+        # organizations path is deprecated, use /workspaces instead
+        api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
+        api_router.include_router(workspaces_router(), prefix="/organizations", include_in_schema=False)  # deprecated
+
+        api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
+        api_router.include_router(
+            cloud_accounts_router(), prefix="/organizations", include_in_schema=False
+        )  # deprecated
+
+        api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
+        api_router.include_router(
+            inventory_router(deps), prefix="/organizations", include_in_schema=False
+        )  # deprecated
+
+        api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
+        api_router.include_router(websocket_router(cfg), prefix="/organizations", include_in_schema=False)  # deprecated
+
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
-        api_router.include_router(cloud_accounts_router(), prefix="/organizations", tags=["cloud_accounts"])
-        api_router.include_router(inventory_router(deps), prefix="/organizations", tags=["inventory"])
-        api_router.include_router(websocket_router(cfg), prefix="/organizations", tags=["events"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         app.include_router(api_router)
 
@@ -183,9 +230,12 @@ def setup_process() -> FastAPI:
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
     """
-    handlers: List[logging.Handler] = setup_logger("fixbackend")  # type: ignore # list is not covariant
+    setup_logger("fixbackend")
+
     # Replace all special uvicorn handlers
-    logging.getLogger("uvicorn").handlers = handlers
-    logging.getLogger("uvicorn.error").handlers = handlers
-    logging.getLogger("uvicorn.access").handlers = handlers
+    for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+        lg = logging.getLogger(logger)
+        lg.handlers.clear()  # remove handlers
+        lg.propagate = True  # propagate to root, so the handlers there are used
+
     return fast_api_app(config.get_config())

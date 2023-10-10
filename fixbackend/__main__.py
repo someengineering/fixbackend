@@ -32,6 +32,9 @@ def main() -> None:
         forwarded_allow_ips="*",
         ws_ping_interval=1,
         ws_ping_timeout=5,
+        ssl_ca_certs=args.ca_cert,
+        ssl_certfile=args.host_cert,
+        ssl_keyfile=args.host_key,
     )
 
 

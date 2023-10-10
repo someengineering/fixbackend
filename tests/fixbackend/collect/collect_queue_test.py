@@ -24,13 +24,13 @@ from fixbackend.collect.collect_queue import (
     AwsAccountInformation,
 )
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 
 
 @pytest.fixture
 def graph_db_access() -> GraphDatabaseAccess:
     return GraphDatabaseAccess(
-        tenant_id=TenantId(uuid.uuid4()),
+        workspace_id=WorkspaceId(uuid.uuid4()),
         server="http://localhost:8529",
         username="test",
         password="test",

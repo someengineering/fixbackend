@@ -26,13 +26,13 @@ from fastapi import Depends, HTTPException, Request, Header, status
 from fastapi_users import FastAPIUsers
 
 from fixbackend.auth.dependencies import get_user_manager
-from fixbackend.auth.jwt import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.config import get_config
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import TenantId
-from fixbackend.organizations.repository import OrganizationRepositoryDependency
+from fixbackend.ids import WorkspaceId
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
@@ -59,33 +59,33 @@ AuthenticatedUser = Annotated[CurrentVerifiedActiveUserDependencies, Depends()]
 
 
 # todo: take this info from the user's JWT
-async def get_user_tenants_ids(
-    user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
-) -> Set[TenantId]:
-    orgs = await organization_service.list_organizations(user_context.user.id)
+async def get_user_workspaces_ids(
+    user_context: AuthenticatedUser, workspace_repository: WorkspaceRepositoryDependency
+) -> Set[WorkspaceId]:
+    orgs = await workspace_repository.list_workspaces(user_context.user.id)
     return {org.id for org in orgs}
 
 
-UserTenantsDependency = Annotated[Set[TenantId], Depends(get_user_tenants_ids)]
+UserWorkspacesDependency = Annotated[Set[WorkspaceId], Depends(get_user_workspaces_ids)]
 
 
 # TODO: do not use list_organization, but get_organization (cached) and make sure the user can only access "its" tenants
 async def get_tenant(
-    request: Request, user_context: AuthenticatedUser, organization_service: OrganizationRepositoryDependency
-) -> TenantId:
-    organization_id = request.path_params.get("organization_id")
+    request: Request, user_context: AuthenticatedUser, workspace_repository: WorkspaceRepositoryDependency
+) -> WorkspaceId:
+    workspace_id = request.path_params.get("workspace_id")
     try:
-        tenant_id = TenantId(UUID(organization_id))
+        workspace_id = WorkspaceId(UUID(workspace_id))
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization id")
-    orgs = await organization_service.list_organizations(user_context.user.id)
-    org_ids: Set[TenantId] = {org.id for org in orgs}
-    if tenant_id not in org_ids:
+    workspaces = await workspace_repository.list_workspaces(user_context.user.id)
+    ws_ids: Set[WorkspaceId] = {org.id for org in workspaces}
+    if workspace_id not in ws_ids:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="You're not a member of this organization")
-    return tenant_id
+    return workspace_id
 
 
-TenantDependency = Annotated[TenantId, Depends(get_tenant)]
+TenantDependency = Annotated[WorkspaceId, Depends(get_tenant)]
 
 
 async def get_current_graph_db(fix: FixDependency, tenant: TenantDependency) -> GraphDatabaseAccess:

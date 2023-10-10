@@ -28,54 +28,54 @@ from fixbackend.auth.models import orm as auth_orm
 from fixbackend.db import AsyncSessionDependency
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import TenantId, UserId
-from fixbackend.organizations.models import Organization, OrganizationInvite, orm
+from fixbackend.ids import WorkspaceId, UserId
+from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
 
 
-class OrganizationRepository(ABC):
+class WorkspaceRepository(ABC):
     @abstractmethod
-    async def create_organization(self, name: str, slug: str, owner: User) -> Organization:
-        """Create an organization."""
+    async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
+        """Create a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_organization(self, organization_id: TenantId) -> Optional[Organization]:
-        """Get an organization."""
+    async def get_workspace(self, workspace_id: WorkspaceId) -> Optional[Workspace]:
+        """Get a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def list_organizations(self, user_id: UserId) -> Sequence[Organization]:
-        """List all organizations where the user is a member."""
+    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
+        """List all workspaces where the user is a member."""
         raise NotImplementedError
 
     @abstractmethod
-    async def add_to_organization(self, organization_id: TenantId, user_id: UserId) -> None:
-        """Add a user to an organization."""
+    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+        """Add a user to a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def remove_from_organization(self, organization_id: TenantId, user_id: UserId) -> None:
-        """Remove a user from an organization."""
+    async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+        """Remove a user from a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def create_invitation(self, organization_id: TenantId, user_id: UserId) -> OrganizationInvite:
-        """Create an invite for an organization."""
+    async def create_invitation(self, workspace_id: WorkspaceId, user_id: UserId) -> WorkspaceInvite:
+        """Create an invite for a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[OrganizationInvite]:
+    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[WorkspaceInvite]:
         """Get an invitation by ID."""
         raise NotImplementedError
 
     @abstractmethod
-    async def list_invitations(self, organization_id: TenantId) -> Sequence[OrganizationInvite]:
-        """List all invitations for an organization."""
+    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
+        """List all invitations for a workspace."""
         raise NotImplementedError
 
     @abstractmethod
     async def accept_invitation(self, invitation_id: uuid.UUID) -> None:
-        """Accept an invitation to an organization."""
+        """Accept an invitation to a workspace."""
         raise NotImplementedError
 
     @abstractmethod
@@ -84,20 +84,19 @@ class OrganizationRepository(ABC):
         raise NotImplementedError
 
 
-class OrganizationRepositoryImpl(OrganizationRepository):
+class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(self, session: AsyncSession, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
         self.session = session
         self.graph_db_access_manager = graph_db_access_manager
 
-    async def create_organization(self, name: str, slug: str, owner: User) -> Organization:
-        """Create an organization."""
-        tenant_id = TenantId(uuid.uuid4())
-        organization = orm.Organization(id=tenant_id, name=name, slug=slug)
+    async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
+        workspace_id = WorkspaceId(uuid.uuid4())
+        organization = orm.Organization(id=workspace_id, name=name, slug=slug)
         owner_relationship = orm.OrganizationOwners(user_id=owner.id)
         organization.owners.append(owner_relationship)
         self.session.add(organization)
         # create a database access object for this organization in the same transaction
-        await self.graph_db_access_manager.create_database_access(tenant_id, session=self.session)
+        await self.graph_db_access_manager.create_database_access(workspace_id, session=self.session)
 
         await self.session.commit()
         await self.session.refresh(organization)
@@ -108,71 +107,64 @@ class OrganizationRepositoryImpl(OrganizationRepository):
         )
         results = await self.session.execute(statement)
         org = results.unique().scalar_one()
-        return org.to_domain()
+        return org.to_model()
 
-    async def get_organization(self, organization_id: TenantId) -> Optional[Organization]:
-        """Get an organization."""
-        statement = select(orm.Organization).where(orm.Organization.id == organization_id)
+    async def get_workspace(self, workspace_id: WorkspaceId) -> Optional[Workspace]:
+        statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
         results = await self.session.execute(statement)
         org = results.unique().scalar_one_or_none()
-        return org.to_domain() if org else None
+        return org.to_model() if org else None
 
-    async def list_organizations(self, user_id: UserId) -> Sequence[Organization]:
-        """List all organizations where the user is an owner."""
+    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         statement = (
             select(orm.Organization).join(orm.OrganizationOwners).where(orm.OrganizationOwners.user_id == user_id)
         )
         results = await self.session.execute(statement)
         orgs = results.unique().scalars().all()
-        return [org.to_domain() for org in orgs]
+        return [org.to_model() for org in orgs]
 
-    async def add_to_organization(self, organization_id: TenantId, user_id: UserId) -> None:
-        """Add a user to an organization."""
-
-        existing_membership = await self.session.get(orm.OrganizationMembers, (organization_id, user_id))
+    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+        existing_membership = await self.session.get(orm.OrganizationMembers, (workspace_id, user_id))
         if existing_membership is not None:
             # user is already a member of the organization, do nothing
             return None
 
-        member_relationship = orm.OrganizationMembers(user_id=user_id, organization_id=organization_id)
+        member_relationship = orm.OrganizationMembers(user_id=user_id, organization_id=workspace_id)
         self.session.add(member_relationship)
         try:
             await self.session.commit()
         except IntegrityError:
-            raise ValueError("Can't add user to organization.")
+            raise ValueError("Can't add user to workspace.")
 
-    async def remove_from_organization(self, organization_id: TenantId, user_id: UserId) -> None:
-        """Remove a user from an organization."""
-        membership = await self.session.get(orm.OrganizationMembers, (organization_id, user_id))
+    async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+        membership = await self.session.get(orm.OrganizationMembers, (workspace_id, user_id))
         if membership is None:
-            raise ValueError(f"User {uuid} is not a member of organization {organization_id}")
+            raise ValueError(f"User {uuid} is not a member of workspace {workspace_id}")
         await self.session.delete(membership)
         await self.session.commit()
 
-    async def create_invitation(self, organization_id: TenantId, user_id: UserId) -> OrganizationInvite:
-        """Create an invite for an organization."""
+    async def create_invitation(self, workspace_id: WorkspaceId, user_id: UserId) -> WorkspaceInvite:
         user = await self.session.get(auth_orm.User, user_id)
-        organization = await self.get_organization(organization_id)
+        organization = await self.get_workspace(workspace_id)
 
         if user is None or organization is None:
-            raise ValueError(f"User {user_id} or organization {organization_id} does not exist.")
+            raise ValueError(f"User {user_id} or organization {workspace_id} does not exist.")
 
         if user.id in [owner for owner in organization.owners]:
-            raise ValueError(f"User {user_id} is already an owner of organization {organization_id}")
+            raise ValueError(f"User {user_id} is already an owner of workspace {workspace_id}")
 
         if user.id in [member for member in organization.members]:
-            raise ValueError(f"User {user_id} is already a member of organization {organization_id}")
+            raise ValueError(f"User {user_id} is already a member of workspace {workspace_id}")
 
         invite = orm.OrganizationInvite(
-            user_id=user_id, organization_id=organization_id, expires_at=datetime.utcnow() + timedelta(days=7)
+            user_id=user_id, organization_id=workspace_id, expires_at=datetime.utcnow() + timedelta(days=7)
         )
         self.session.add(invite)
         await self.session.commit()
         await self.session.refresh(invite)
-        return invite.to_domain()
+        return invite.to_model()
 
-    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[OrganizationInvite]:
-        """Get an invitation by ID."""
+    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[WorkspaceInvite]:
         statement = (
             select(orm.OrganizationInvite)
             .where(orm.OrganizationInvite.id == invitation_id)
@@ -180,21 +172,19 @@ class OrganizationRepositoryImpl(OrganizationRepository):
         )
         results = await self.session.execute(statement)
         invite = results.unique().scalar_one_or_none()
-        return invite.to_domain() if invite else None
+        return invite.to_model() if invite else None
 
-    async def list_invitations(self, organization_id: TenantId) -> Sequence[OrganizationInvite]:
-        """List all invitations for an organization."""
+    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
         statement = (
             select(orm.OrganizationInvite)
-            .where(orm.OrganizationInvite.organization_id == organization_id)
+            .where(orm.OrganizationInvite.organization_id == workspace_id)
             .options(selectinload(orm.OrganizationInvite.user), selectinload(orm.OrganizationInvite.organization))
         )
         results = await self.session.execute(statement)
         invites = results.scalars().all()
-        return [invite.to_domain() for invite in invites]
+        return [invite.to_model() for invite in invites]
 
     async def accept_invitation(self, invitation_id: uuid.UUID) -> None:
-        """Accept an invitation to an organization."""
         invite = await self.session.get(orm.OrganizationInvite, invitation_id)
         if invite is None:
             raise ValueError(f"Invitation {invitation_id} does not exist.")
@@ -206,7 +196,6 @@ class OrganizationRepositoryImpl(OrganizationRepository):
         await self.session.commit()
 
     async def delete_invitation(self, invitation_id: uuid.UUID) -> None:
-        """Delete an invitation."""
         invite = await self.session.get(orm.OrganizationInvite, invitation_id)
         if invite is None:
             raise ValueError(f"Invitation {invitation_id} does not exist.")
@@ -214,8 +203,8 @@ class OrganizationRepositoryImpl(OrganizationRepository):
         await self.session.commit()
 
 
-async def get_organization_repository(session: AsyncSessionDependency, fix: FixDependency) -> OrganizationRepository:
-    return OrganizationRepositoryImpl(session, fix.graph_database_access)
+async def get_workspace_repository(session: AsyncSessionDependency, fix: FixDependency) -> WorkspaceRepository:
+    return WorkspaceRepositoryImpl(session, fix.graph_database_access)
 
 
-OrganizationRepositoryDependency = Annotated[OrganizationRepository, Depends(get_organization_repository)]
+WorkspaceRepositoryDependency = Annotated[WorkspaceRepository, Depends(get_workspace_repository)]

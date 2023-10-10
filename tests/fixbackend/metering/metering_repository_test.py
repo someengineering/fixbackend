@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 
@@ -26,7 +26,7 @@ def metering_record() -> MeteringRecord:
     ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     return MeteringRecord(
         id=uuid.uuid1(),
-        tenant_id=TenantId(uuid.uuid1()),
+        workspace_id=WorkspaceId(uuid.uuid1()),
         timestamp=ts,
         job_id="123e4567-e89b-12d3-a456-426614174000",
         task_id="123e4567-e89b-12d3-a456-426614174000",
@@ -43,7 +43,7 @@ def metering_record() -> MeteringRecord:
 @pytest.mark.asyncio
 async def test_create_load(metering_repository: MeteringRepository, metering_record: MeteringRecord) -> None:
     # make sure there are no entries for the tenant
-    assert [e async for e in metering_repository.list(metering_record.tenant_id)] == []
+    assert [e async for e in metering_repository.list(metering_record.workspace_id)] == []
     # create the entry
     await metering_repository.add([metering_record])
-    assert [e async for e in metering_repository.list(metering_record.tenant_id)] == [metering_record]
+    assert [e async for e in metering_repository.list(metering_record.workspace_id)] == [metering_record]

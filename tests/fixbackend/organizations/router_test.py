@@ -27,11 +27,11 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import ExternalId, TenantId, UserId
-from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationRepositoryImpl, get_organization_repository
+from fixbackend.ids import ExternalId, UserId, WorkspaceId
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
-org_id = TenantId(uuid.uuid4())
+org_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
 user_id = UserId(uuid.uuid4())
 user = User(
@@ -43,7 +43,7 @@ user = User(
     is_superuser=False,
     oauth_accounts=[],
 )
-organization = Organization(
+organization = Workspace(
     id=org_id,
     name="org name",
     slug="org-slug",
@@ -53,14 +53,14 @@ organization = Organization(
 )
 
 
-class OrganizationServiceMock(OrganizationRepositoryImpl):
+class OrganizationServiceMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_organization(self, organization_id: UUID) -> Organization | None:
+    async def get_workspace(self, workspace_id: UUID) -> Workspace | None:
         return organization
 
-    async def list_organizations(self, owner_id: UUID) -> Sequence[Organization]:
+    async def list_workspaces(self, owner_id: UUID) -> Sequence[Workspace]:
         return [organization]
 
 
@@ -71,7 +71,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_organization_repository] = lambda: OrganizationServiceMock()
+    app.dependency_overrides[get_workspace_repository] = lambda: OrganizationServiceMock()
     app.dependency_overrides[check_csrf_token] = lambda: None
     app.dependency_overrides[get_tenant] = lambda: org_id
 
@@ -82,12 +82,16 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 @pytest.mark.asyncio
 async def test_list_organizations(client: AsyncClient) -> None:
     response = await client.get("/api/organizations/")
+    ws_response = await client.get("/api/workspaces/")
+    assert response.json() == ws_response.json()
     assert response.json()[0] is not None
 
 
 @pytest.mark.asyncio
 async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/organizations/{org_id}/cf_url")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/cf_url")
+    assert response.json() == ws_response.json()
     url = response.json()
     assert str(default_config.cf_template_url) in url
     assert str(org_id) in url
@@ -98,4 +102,14 @@ async def test_cloudformation_link(client: AsyncClient, default_config: Config) 
 async def test_external_id(client: AsyncClient) -> None:
     # organization is created by default
     response = await client.get(f"/api/organizations/{org_id}/external_id")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/external_id")
+    assert response.json() == ws_response.json()
     assert response.json().get("external_id") == str(external_id)
+
+
+@pytest.mark.asyncio
+async def test_cloudformation_template_url(client: AsyncClient, default_config: Config) -> None:
+    response = await client.get(f"/api/organizations/{org_id}/cf_template")
+    ws_response = await client.get(f"/api/workspaces/{org_id}/cf_template")
+    assert response.json() == ws_response.json()
+    assert response.json() == str(default_config.cf_template_url)

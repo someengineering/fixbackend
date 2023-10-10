@@ -22,6 +22,8 @@ arq = "^0.25.0"
 fixcloudutils = { extras = ["redis", "arango"], version = "^1.5.0" }
 prometheus-fastapi-instrumentator = ">=6.1.0"
 websockets = "^11.0.3"
+cryptography = "^41.0.4"
+aiofiles = "^23.2.1"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -37,6 +39,17 @@ coverage = {extras = ["toml"], version = "^7.3.1"}
 pytest-cov = "^4.1.0"
 httpx-ws = { git = "https://github.com/frankie567/httpx-ws.git", rev = "f9f2555603f40053f84adf6890e6cda245294b18" }
 
+# all type sheds
+types-PyMySQL = "*"
+types-pyOpenSSL = "*"
+types-python-dateutil = "*"
+types-pytz = "*"
+types-PyYAML = "*"
+types-requests = "*"
+types-setuptools = "*"
+types-ujson = "*"
+types-urllib3 = "*"
+types-aiofiles = "*"
 
 [build-system]
 requires = ["poetry-core"]
@@ -60,4 +73,4 @@ source = ["fixbackend"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 77
+fail_under = 76

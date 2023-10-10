@@ -19,8 +19,8 @@ from fastapi import APIRouter, HTTPException
 from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
 from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
 from fixbackend.ids import CloudAccountId
-from fixbackend.auth.current_user_dependencies import UserTenantsDependency
-from fixbackend.ids import TenantId
+from fixbackend.auth.current_user_dependencies import UserWorkspacesDependency
+from fixbackend.ids import WorkspaceId
 
 log = logging.getLogger(__name__)
 
@@ -28,17 +28,17 @@ log = logging.getLogger(__name__)
 def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
 
-    @router.delete("/{organization_id}/cloud_account/{cloud_account_id}")
-    async def delete_cloud_accont(
-        organization_id: TenantId,
+    @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
+    async def delete_cloud_account(
+        workspace_id: WorkspaceId,
         cloud_account_id: CloudAccountId,
-        user_tenants: UserTenantsDependency,
+        user_tenants: UserWorkspacesDependency,
         service: CloudAccountServiceDependency,
     ) -> None:
-        if organization_id not in user_tenants:
+        if workspace_id not in user_tenants:
             raise HTTPException(status_code=403, detail="User does not have access to this organization")
 
-        await service.delete_cloud_account(cloud_account_id, organization_id)
+        await service.delete_cloud_account(cloud_account_id, workspace_id)
 
     return router
 
@@ -50,7 +50,9 @@ def cloud_accounts_callback_router() -> APIRouter:
     async def aws_cloudformation_callback(
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
-        await service.create_aws_account(payload.tenant_id, payload.account_id, payload.role_name, payload.external_id)
+        await service.create_aws_account(
+            payload.workspace_id, payload.account_id, payload.role_name, payload.external_id
+        )
         return None
 
     return router

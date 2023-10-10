@@ -25,10 +25,12 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.certificates.cert_store import CertificateStore
 
 
 class ServiceNames:
-    arg_redis = "arq_redis"
+    http_client = "http_client"
+    arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
     readwrite_redis = "readwrite_redis"
     collect_queue = "collect_queue"
@@ -42,12 +44,13 @@ class ServiceNames:
     inventory_client = "inventory_client"
     dispatching = "dispatching"
     cloudaccount_publisher = "cloudaccount_publisher"
+    certificate_store = "certificate_store"
 
 
 class FixDependencies(Dependencies):
     @property
     def arq_redis(self) -> ArqRedis:
-        return self.service(ServiceNames.arg_redis, ArqRedis)
+        return self.service(ServiceNames.arq_redis, ArqRedis)
 
     @property
     def collect_queue(self) -> RedisCollectQueue:
@@ -74,12 +77,20 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.readonly_redis, Redis)
 
     @property
+    def readwrite_redis(self) -> Redis:
+        return self.service(ServiceNames.readwrite_redis, Redis)
+
+    @property
     def graph_database_access(self) -> GraphDatabaseAccessManager:
         return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
     @property
     def cloudaccount_publisher(self) -> RedisStreamPublisher:
         return self.service(ServiceNames.cloudaccount_publisher, RedisStreamPublisher)
+
+    @property
+    def certificate_store(self) -> CertificateStore:
+        return self.service(ServiceNames.certificate_store, CertificateStore)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

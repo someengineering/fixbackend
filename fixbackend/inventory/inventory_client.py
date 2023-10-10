@@ -20,25 +20,31 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import Optional, Dict, AsyncIterator, Any, List, cast, Union
+from typing import Optional, Dict, AsyncIterator, List, cast, Union
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 
 
+class GraphDatabaseException(Exception):
+    pass
+
+
+class GraphDatabaseNotAvailable(GraphDatabaseException):
+    pass
+
+
+class GraphDatabaseForbidden(GraphDatabaseException):
+    pass
+
+
 class InventoryClient(Service):
-    def __init__(self, inventory_url: str, client: Optional[AsyncClient] = None) -> None:
+    def __init__(self, inventory_url: str, client: AsyncClient) -> None:
         self.inventory_url = inventory_url
-        self.client = client or AsyncClient()
-
-    async def start(self) -> Any:
-        await self.client.__aenter__()
-
-    async def stop(self) -> None:
-        await self.client.__aexit__(None, None, None)
+        self.client = client
 
     async def execute_single(
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
@@ -47,6 +53,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + "/cli/execute", content=command, params=env, headers=headers
         )
+        self.__raise_on_error(response)
         if response.is_error:
             raise Exception(f"Inventory error: {response.status_code} {response.text}")
         content_type: str = response.headers.get("content-type", "")
@@ -67,8 +74,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
         )
-        if response.is_error:
-            raise Exception(f"Inventory error: {response.status_code} {response.text}")
+        self.__raise_on_error(response)
         async for line in response.aiter_lines():
             yield json.loads(line)
 
@@ -85,8 +91,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/aggregate", content=query, params=params, headers=headers
         )
-        if response.is_error:
-            raise Exception(f"Inventory error: {response.status_code} {response.text}")
+        self.__raise_on_error(response)
         async for line in response.aiter_lines():
             yield json.loads(line)
 
@@ -107,8 +112,7 @@ class InventoryClient(Service):
             params["with_checks"] = with_checks
         headers = self.__headers(access)
         response = await self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers)
-        if response.is_error:
-            raise Exception(f"Inventory error: {response.status_code} {response.text}")
+        self.__raise_on_error(response)
         return cast(List[Json], response.json())
 
     def __headers(
@@ -128,3 +132,13 @@ class InventoryClient(Service):
         if content_type:
             result["Content-Type"] = content_type
         return result
+
+    def __raise_on_error(self, response: Response, message: Optional[str] = None) -> None:
+        if response.is_error:
+            msg = message or f"Inventory error: {response.status_code} {response.text}"
+            if response.status_code == 401:
+                raise GraphDatabaseForbidden(msg)
+            elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
+                raise GraphDatabaseNotAvailable(msg)
+            else:
+                raise GraphDatabaseException(msg)

@@ -43,8 +43,8 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.organizations.models import Organization
-from fixbackend.organizations.repository import OrganizationRepository, OrganizationRepositoryImpl
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
@@ -86,6 +86,17 @@ def default_config() -> Config:
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
         args=Namespace(dispatcher=False),
+        aws_access_key_id="",
+        aws_secret_access_key="",
+        aws_region="",
+        ca_cert=None,
+        host_cert=None,
+        host_key=None,
+        signing_cert_1=None,
+        signing_key_1=None,
+        signing_cert_2=None,
+        signing_key_2=None,
+        env="local",
     )
 
 
@@ -164,8 +175,8 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def organization(organization_repository: OrganizationRepository, user: User) -> Organization:
-    return await organization_repository.create_organization("foo", "foo", user)
+async def organization(workspace_repository: WorkspaceRepository, user: User) -> Workspace:
+    return await workspace_repository.create_workspace("foo", "foo", user)
 
 
 @pytest.fixture
@@ -258,10 +269,10 @@ async def metering_repository(async_session_maker: AsyncSessionMaker) -> Meterin
 
 
 @pytest.fixture
-async def organization_repository(
+async def workspace_repository(
     session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
-) -> OrganizationRepository:
-    return OrganizationRepositoryImpl(session, graph_database_access_manager)
+) -> WorkspaceRepository:
+    return WorkspaceRepositoryImpl(session, graph_database_access_manager)
 
 
 @pytest.fixture

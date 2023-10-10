@@ -28,7 +28,7 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import CollectQueue, AccountInformation, AwsAccountInformation
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, TenantId
+from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 
@@ -99,7 +99,7 @@ class DispatcherService(Service):
     async def collect_job_finished(self, message: Json) -> None:
         job_id = message["job_id"]
         task_id = message["task_id"]
-        tenant_id = message["tenant_id"]
+        workspace_id = message["tenant_id"]
         account_info = message["account_info"]
         messages = message["messages"]
         started_at = parse_utc_str(message["started_at"])
@@ -107,7 +107,7 @@ class DispatcherService(Service):
         records = [
             MeteringRecord(
                 id=uuid.uuid4(),
-                tenant_id=TenantId(uuid.UUID(tenant_id)),
+                workspace_id=WorkspaceId(uuid.UUID(workspace_id)),
                 cloud=account_details["cloud"],
                 account_id=account_id,
                 account_name=account_details["name"],
@@ -127,7 +127,7 @@ class DispatcherService(Service):
         if account := await self.cloud_account_repo.get(cid):
             await self.trigger_collect(account)
             # store an entry in the next_run table
-            next_run_at = await self.compute_next_run(account.tenant_id)
+            next_run_at = await self.compute_next_run(account.workspace_id)
             await self.next_run_repo.create(cid, next_run_at)
         else:
             log.error("Received a message, that a cloud account is created, but it does not exist in the database")
@@ -136,7 +136,7 @@ class DispatcherService(Service):
         # delete the entry from the scheduler table
         await self.next_run_repo.delete(cid)
 
-    async def compute_next_run(self, tenant: TenantId, last_run: Optional[datetime] = None) -> datetime:
+    async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
         now = utc()
         delta = timedelta(hours=1)  # TODO: compute delta dependent on the tenant.
         initial_time = last_run or now
@@ -163,9 +163,13 @@ class DispatcherService(Service):
                     log.error(f"Don't know how to handle this cloud access {account.access}. Ignore it.")
                     return None
 
-        if (ai := account_information()) and (db := await self.access_manager.get_database_access(account.tenant_id)):
+        if (ai := account_information()) and (
+            db := await self.access_manager.get_database_access(account.workspace_id)
+        ):
             job_id = str(uuid.uuid4())
-            log.info(f"Trigger collect for tenant: {account.tenant_id} and account: {account.id} with job_id: {job_id}")
+            log.info(
+                f"Trigger collect for tenant: {account.workspace_id} and account: {account.id} with job_id: {job_id}"
+            )
             await self.collect_queue.enqueue(db, ai, job_id=job_id)
 
     async def schedule_next_runs(self) -> None:
@@ -173,7 +177,7 @@ class DispatcherService(Service):
         async for cid, at in self.next_run_repo.older_than(now):
             if account := await self.cloud_account_repo.get(cid):
                 await self.trigger_collect(account)
-                next_run_at = await self.compute_next_run(account.tenant_id, at)
+                next_run_at = await self.compute_next_run(account.workspace_id, at)
                 await self.next_run_repo.update_next_run_at(cid, next_run_at)
             else:
                 log.error("Received a message, that a cloud account is created, but it does not exist in the database")

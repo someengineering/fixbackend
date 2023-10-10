@@ -13,7 +13,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from nox_poetry import session, Session
-from tempfile import TemporaryDirectory
 
 locations = ["fixbackend", "tests", "noxfile.py"]
 
@@ -30,32 +29,20 @@ def black(session: Session) -> None:
 def flake8(session: Session) -> None:
     opts = ["--max-line-length", "999"]  # checked via black
     args = session.posargs or locations + opts
-    session.install("flake8")
+    session.install("flake8", "types-aiofiles")
     session.run("flake8", *args)
 
 
 @session(python=["3.11"])
 def test(session: Session) -> None:
     args = session.posargs or ["--cov"]
-    # workaround for CI to create a wheel outside the project folder
-    with TemporaryDirectory() as tmpdir:
-        session.run("cp", "-R", ".", str(tmpdir), external=True)
-        with session.chdir(tmpdir):
-            session.poetry.installroot()
-    session.install(
-        "pytest",
-        "pytest-cov",
-        "pytest-asyncio",
-        "sqlalchemy-utils",
-        "git+https://github.com/frankie567/httpx-ws.git@f9f2555603f40053f84adf6890e6cda245294b18#egg=httpx-ws",
-        ".",
-    )
+    session.run_always("poetry", "install", external=True)
     session.run("pytest", *args)
 
 
 @session(python=["3.11"])
 def mypy(session: Session) -> None:
-    opts = ["--install-type", "--non-interactive", "--python-version", "3.11"]
-    args = session.posargs or locations + opts
+    opts = ["--install-types", "--non-interactive"]
+    args = session.posargs or opts + locations
     session.install("mypy", ".")
     session.run("mypy", *args)

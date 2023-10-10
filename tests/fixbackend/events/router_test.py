@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from fixbackend.auth.current_user_dependencies import get_user_tenants_ids
+from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
 from fixbackend.events.websocket_event_handler import (
     WebsocketEventHandler,
     get_websocket_event_handler,
@@ -32,24 +32,24 @@ import uuid
 
 from httpx_ws import aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 
 
-tenant_id = TenantId(uuid.uuid4())
+workspace_id = WorkspaceId(uuid.uuid4())
 
 
 class WebsocketHandlerMock(WebsocketEventHandler):
     def __init__(
         self,
     ) -> None:
-        self.tenants: Dict[TenantId, WebSocket] = {}
+        self.tenants: Dict[WorkspaceId, WebSocket] = {}
 
-    async def send_to_tenant(self, tenant_id: TenantId, message: Any) -> None:
-        websocket = self.tenants[tenant_id]
+    async def send_to_workspace(self, workspace_id: WorkspaceId, message: Any) -> None:
+        websocket = self.tenants[workspace_id]
         await websocket.send_json(message)
 
-    async def handle_websocket(self, tenant_id: TenantId, websocket: WebSocket) -> None:
-        self.tenants[tenant_id] = websocket
+    async def handle_websocket(self, workspace_id: WorkspaceId, websocket: WebSocket) -> None:
+        self.tenants[workspace_id] = websocket
         try:
             while True:
                 await websocket.receive_json()
@@ -66,7 +66,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_user_tenants_ids] = lambda: {tenant_id}
+    app.dependency_overrides[get_user_workspaces_ids] = lambda: {workspace_id}
     app.dependency_overrides[get_websocket_event_handler] = lambda: event_service
 
     async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:
@@ -75,7 +75,12 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
 @pytest.mark.asyncio
 async def test_websocket(websocket_client: AsyncClient) -> None:
-    async with aconnect_ws(f"/api/organizations/{tenant_id}/events", websocket_client) as ws:
-        await event_service.send_to_tenant(tenant_id, {"type": "foo"})
+    async with aconnect_ws(f"/api/organizations/{workspace_id}/events", websocket_client) as ws:
+        await event_service.send_to_workspace(workspace_id, {"type": "foo"})
+        message = await ws.receive_json()
+        assert message["type"] == "foo"
+
+    async with aconnect_ws(f"/api/workspaces/{workspace_id}/events", websocket_client) as ws:
+        await event_service.send_to_workspace(workspace_id, {"type": "foo"})
         message = await ws.receive_json()
         assert message["type"] == "foo"

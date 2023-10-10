@@ -20,20 +20,20 @@ from fixbackend.ids import CloudAccountId, ExternalId
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
-from fixbackend.organizations.repository import OrganizationRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.models import User
 
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, organization_repository: OrganizationRepository, user: User
+    async_session_maker: AsyncSessionMaker, workspace_repository: WorkspaceRepository, user: User
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
-    org = await organization_repository.create_organization("foo", "foo", user)
-    tenant_id = org.id
+    org = await workspace_repository.create_workspace("foo", "foo", user)
+    workspace_id = org.id
     account = CloudAccount(
         id=CloudAccountId(uuid.uuid4()),
-        tenant_id=tenant_id,
+        workspace_id=workspace_id,
         access=AwsCloudAccess(
             account_id="123456789012",
             role_name="foo",
@@ -50,7 +50,7 @@ async def test_create_cloud_account(
     assert account == stored_account
 
     # list
-    accounts = await cloud_account_repository.list_by_tenant_id(tenant_id=tenant_id)
+    accounts = await cloud_account_repository.list_by_workspace_id(workspace_id=workspace_id)
     assert len(accounts) == 1
     assert accounts[0] == account
 

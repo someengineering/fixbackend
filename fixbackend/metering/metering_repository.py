@@ -22,7 +22,7 @@ from sqlalchemy import select, INT, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
@@ -32,9 +32,9 @@ class MeteringRecordEntity(Base):
     __tablename__ = "metering"
 
     id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
-    tenant_id: Mapped[TenantId] = mapped_column(GUID, nullable=False, index=True)
-    cloud: Mapped[str] = mapped_column(String(10), nullable=False, default="aws")
-    account_id: Mapped[str] = mapped_column(String(36), nullable=False, default="")
+    tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, index=True)
+    cloud: Mapped[str] = mapped_column(String(10), nullable=True, default="aws")
+    account_id: Mapped[str] = mapped_column(String(36), nullable=True, default="")
     account_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -48,7 +48,7 @@ class MeteringRecordEntity(Base):
     def from_model(model: MeteringRecord) -> MeteringRecordEntity:
         return MeteringRecordEntity(
             id=model.id,
-            tenant_id=model.tenant_id,
+            tenant_id=model.workspace_id,
             timestamp=model.timestamp,
             job_id=model.job_id,
             task_id=model.task_id,
@@ -64,7 +64,7 @@ class MeteringRecordEntity(Base):
     def to_model(self) -> MeteringRecord:
         return MeteringRecord(
             id=self.id,
-            tenant_id=self.tenant_id,
+            workspace_id=self.tenant_id,
             timestamp=self.timestamp,
             job_id=self.job_id,
             task_id=self.task_id,
@@ -92,7 +92,7 @@ class MeteringRepository:
 
     async def list(
         self,
-        tenant_id: TenantId,
+        workspace_id: WorkspaceId,
         *,
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
@@ -102,7 +102,7 @@ class MeteringRepository:
         async with self.session_maker() as session:
             query = (
                 select(MeteringRecordEntity)
-                .where(MeteringRecordEntity.tenant_id == tenant_id)
+                .where(MeteringRecordEntity.tenant_id == workspace_id)
                 .limit(limit)
                 .offset(offset)
             )

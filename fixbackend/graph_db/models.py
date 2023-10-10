@@ -21,12 +21,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from attrs import define
 
-from fixbackend.ids import TenantId
+from fixbackend.ids import WorkspaceId
 
 
 @define
 class GraphDatabaseAccess:
-    tenant_id: TenantId
+    workspace_id: WorkspaceId
     server: str
     username: str
     password: str
