@@ -1,0 +1,51 @@
+openapi: 3.0.0
+servers:
+  - url: ../
+    description: current system
+info:
+  title: Fix Domain events
+  version: V1
+
+components:
+  schemas:
+    Event:
+      description: Domain event emitted by fixbackend
+      type: object
+      properties:
+        event:
+          oneOf:
+          - $ref: "#/components/schemas/UserRegistered"
+        at:
+          type: string
+          description: The time of the event in IS0 8601 date time.
+
+    UserRegistered:
+      description: "This event emitted when a new user has registered."
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: Id of the user.
+        email:
+          type: string
+          description: Email of the user.
+        workspace_id:
+          type: string
+          description: Id of the defaut workspace.
+    
+    AwsAccountDiscovered:
+      description: "This event emitted when a new aws account has been discovered."
+      type: object
+      properties:
+        cloud_account_id:
+          type: string
+          description: Id of the cloud account.
+        workspace_id:
+          type: string
+          description: Id of the workspace.
+        cloud:
+          type: string
+          description: Name of the cloud.
+        aws_account_id:
+          type: string
+          description: Id of the aws account.
