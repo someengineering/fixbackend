@@ -20,11 +20,11 @@ from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.current_user_dependencies import AuthenticatedUser, TenantDependency
-from fixbackend.auth.dependencies import UserManagerDependency
-from fixbackend.workspaces.schemas import WorkspaceRead, WorkspaceCreate, WorkspaceInviteRead, ExternalId
-from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
-from fixbackend.ids import WorkspaceId
+from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import ConfigDependency
+from fixbackend.ids import WorkspaceId
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
+from fixbackend.workspaces.schemas import ExternalId, WorkspaceCreate, WorkspaceInviteRead, WorkspaceRead
 
 
 def workspaces_router() -> APIRouter:

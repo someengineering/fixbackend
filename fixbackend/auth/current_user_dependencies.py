@@ -19,15 +19,15 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from uuid import UUID
 from typing import Annotated, Set
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import FastAPIUsers
 
-from fixbackend.auth.dependencies import get_user_manager
 from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.models import User
+from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
 from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
