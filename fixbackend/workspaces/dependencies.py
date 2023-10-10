@@ -35,14 +35,14 @@ WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized"]
 
 async def get_optional_user_workspace(
     workspace_id: Annotated[WorkspaceId, Path()],
-    user_context: AuthenticatedUser,
+    user: AuthenticatedUser,
     workspace_repository: WorkspaceRepositoryDependency,
 ) -> Workspace | WorkspaceError:
     workspace = await workspace_repository.get_workspace(workspace_id)
     if workspace is None:
         return "WorkspaceNotFound"
 
-    if user_context.user.id not in workspace.all_users():
+    if user.id not in workspace.all_users():
         return "Unauthorized"
 
     return workspace

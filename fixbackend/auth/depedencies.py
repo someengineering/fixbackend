@@ -38,12 +38,4 @@ fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get
 get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
 
 
-class CurrentVerifiedActiveUserDependencies:
-    def __init__(
-        self,
-        user: Annotated[User, Depends(get_current_active_verified_user)],
-    ) -> None:
-        self.user = user
-
-
-AuthenticatedUser = Annotated[CurrentVerifiedActiveUserDependencies, Depends()]
+AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
