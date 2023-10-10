@@ -25,7 +25,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
-from fixbackend.auth.current_user_dependencies import CurrentGraphDbDependency
+from fixbackend.auth.depedencies import CurrentGraphDbDependency
 from fixbackend.dependencies import FixDependencies
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.schemas import ReportSummary

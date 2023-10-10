@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
-from fixbackend.auth.current_user_dependencies import AuthenticatedUser, TenantDependency
+from fixbackend.auth.depedencies import AuthenticatedUser, TenantDependency
 from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import WorkspaceId

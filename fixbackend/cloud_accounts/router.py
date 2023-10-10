@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
 from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
 from fixbackend.ids import CloudAccountId
-from fixbackend.auth.current_user_dependencies import UserWorkspacesDependency
+from fixbackend.auth.depedencies import UserWorkspacesDependency
 from fixbackend.ids import WorkspaceId
 
 log = logging.getLogger(__name__)

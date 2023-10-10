@@ -21,7 +21,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
+from fixbackend.auth.depedencies import get_user_workspaces_ids
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.service import CloudAccountService, get_cloud_account_service
 from fixbackend.config import Config

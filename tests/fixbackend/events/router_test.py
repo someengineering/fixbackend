@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from fixbackend.config import config as get_config, Config
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
+from fixbackend.auth.depedencies import get_user_workspaces_ids
 from fixbackend.events.websocket_event_handler import (
     WebsocketEventHandler,
     get_websocket_event_handler,

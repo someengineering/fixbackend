@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket
 from fixbackend.config import Config
-from fixbackend.auth.current_user_dependencies import UserWorkspacesDependency
+from fixbackend.auth.depedencies import UserWorkspacesDependency
 from fixbackend.events.websocket_event_handler import WebsockedtEventHandlerDependency
 from fixbackend.ids import WorkspaceId
 

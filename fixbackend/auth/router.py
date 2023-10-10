@@ -21,7 +21,7 @@ from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
-from fixbackend.auth.current_user_dependencies import fastapi_users
+from fixbackend.auth.depedencies import fastapi_users
 from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.oauth import get_oauth_router
 from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate, OAuthProviderAuthUrl

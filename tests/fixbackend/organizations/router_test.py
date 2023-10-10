@@ -22,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, get_tenant
+from fixbackend.auth.depedencies import get_current_active_verified_user, get_tenant
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
