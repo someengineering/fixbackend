@@ -22,7 +22,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_current_active_verified_user, get_tenant
+from fixbackend.auth.depedencies import get_current_active_verified_user
+from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
@@ -43,7 +44,7 @@ user = User(
     is_superuser=False,
     oauth_accounts=[],
 )
-organization = Workspace(
+workspace = Workspace(
     id=org_id,
     name="org name",
     slug="org-slug",
@@ -53,15 +54,15 @@ organization = Workspace(
 )
 
 
-class OrganizationServiceMock(WorkspaceRepositoryImpl):
+class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
     async def get_workspace(self, workspace_id: UUID) -> Workspace | None:
-        return organization
+        return workspace
 
     async def list_workspaces(self, owner_id: UUID) -> Sequence[Workspace]:
-        return [organization]
+        return [workspace]
 
 
 @pytest.fixture
@@ -71,8 +72,8 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_workspace_repository] = lambda: OrganizationServiceMock()
-    app.dependency_overrides[get_tenant] = lambda: org_id
+    app.dependency_overrides[get_workspace_repository] = lambda: WorkspaceRepositoryMock()
+    app.dependency_overrides[get_user_workspace] = lambda: workspace
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac

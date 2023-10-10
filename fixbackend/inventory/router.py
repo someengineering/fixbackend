@@ -20,18 +20,30 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import List, Optional
+from typing import List, Optional, Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, Depends
 from fastapi.responses import StreamingResponse
 
-from fixbackend.auth.current_user_dependencies import CurrentGraphDbDependency
-from fixbackend.dependencies import FixDependencies
+from fixbackend.dependencies import FixDependencies, FixDependency
+from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.schemas import ReportSummary
 from fixbackend.streaming_response import streaming_response
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 log = logging.getLogger(__name__)
+
+
+async def get_current_graph_db(fix: FixDependency, workspace: UserWorkspaceDependency) -> GraphDatabaseAccess:
+    access = await fix.graph_database_access.get_database_access(workspace.id)
+    if access is None:
+        raise AttributeError("No database access found for tenant")
+    return access
+
+
+# This is the dependency that should be used in most parts of the application.
+CurrentGraphDbDependency = Annotated[GraphDatabaseAccess, Depends(get_current_graph_db)]
 
 
 def inventory_router(fix: FixDependencies) -> APIRouter:

@@ -14,17 +14,17 @@
 
 import re
 import uuid
-from typing import Optional
+from typing import Annotated, AsyncIterator, Optional
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.password import PasswordHelperProtocol
 
-from fixbackend.auth.db import UserRepository
+from fixbackend.auth.db import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
-from fixbackend.auth.user_verifier import UserVerifier
-from fixbackend.config import Config
-from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.auth.user_verifier import UserVerifier, UserVerifierDependency
+from fixbackend.config import Config, ConfigDependency
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -57,3 +57,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def create_default_organization(self, user: User) -> None:
         org_slug = re.sub("[^a-zA-Z0-9-]", "-", user.email)
         await self.workspace_repository.create_workspace(user.email, org_slug, user)
+
+
+async def get_user_manager(
+    config: ConfigDependency,
+    user_repository: UserRepositoryDependency,
+    user_verifier: UserVerifierDependency,
+    workspace_repository: WorkspaceRepositoryDependency,
+) -> AsyncIterator[UserManager]:
+    yield UserManager(config, user_repository, None, user_verifier, workspace_repository)
+
+
+UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

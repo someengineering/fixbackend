@@ -19,12 +19,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
-from fixbackend.auth.current_user_dependencies import AuthenticatedUser, TenantDependency
-from fixbackend.auth.dependencies import UserManagerDependency
-from fixbackend.workspaces.schemas import WorkspaceRead, WorkspaceCreate, WorkspaceInviteRead, ExternalId
-from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
-from fixbackend.ids import WorkspaceId
+from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import ConfigDependency
+from fixbackend.ids import WorkspaceId
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from fixbackend.workspaces.schemas import ExternalId, WorkspaceCreate, WorkspaceInviteRead, WorkspaceRead
 
 
 def workspaces_router() -> APIRouter:
@@ -32,17 +33,17 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/")
     async def list_workspaces(
-        user_context: AuthenticatedUser, workspace_repository: WorkspaceRepositoryDependency
+        user: AuthenticatedUser, workspace_repository: WorkspaceRepositoryDependency
     ) -> List[WorkspaceRead]:
         """List all workspaces."""
-        orgs = await workspace_repository.list_workspaces(user_context.user.id)
+        orgs = await workspace_repository.list_workspaces(user.id)
 
         return [WorkspaceRead.from_model(org) for org in orgs]
 
     @router.get("/{workspace_id}")
     async def get_workspace(
         workspace_id: WorkspaceId,
-        user_context: AuthenticatedUser,
+        user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> WorkspaceRead | None:
         """Get a workspace."""
@@ -50,7 +51,7 @@ def workspaces_router() -> APIRouter:
         if org is None:
             raise HTTPException(status_code=404, detail="Organization not found")
 
-        if user_context.user.id not in org.all_users():
+        if user.id not in org.all_users():
             raise HTTPException(status_code=403, detail="You are not an owner of this organization")
 
         return WorkspaceRead.from_model(org)
@@ -58,13 +59,13 @@ def workspaces_router() -> APIRouter:
     @router.post("/")
     async def create_workspace(
         organization: WorkspaceCreate,
-        user_context: AuthenticatedUser,
+        user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> WorkspaceRead:
         """Create a workspace."""
         try:
             org = await workspace_repository.create_workspace(
-                name=organization.name, slug=organization.slug, owner=user_context.user
+                name=organization.name, slug=organization.slug, owner=user
             )
         except IntegrityError:
             raise HTTPException(status_code=409, detail="Organization with this slug already exists")
@@ -73,25 +74,14 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
-        workspace_id: WorkspaceId,
-        user_context: AuthenticatedUser,
+        workspace: UserWorkspaceDependency,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> List[WorkspaceInviteRead]:
-        """List all pending invitations to the workspace."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user_context.user.id not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to view the invitations"
-            )
-
-        invites = await workspace_repository.list_invitations(workspace_id=workspace_id)
+        invites = await workspace_repository.list_invitations(workspace_id=workspace.id)
 
         return [
             WorkspaceInviteRead(
-                organization_slug=org.slug,
+                organization_slug=workspace.slug,
                 user_id=invite.user_id,
                 expires_at=invite.expires_at,
             )
@@ -100,58 +90,39 @@ def workspaces_router() -> APIRouter:
 
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(
-        workspace_id: WorkspaceId,
+        workspace: UserWorkspaceDependency,
         user_email: EmailStr,
-        user_context: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
         user_manager: UserManagerDependency,
     ) -> WorkspaceInviteRead:
         """Invite a user to the workspace."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
 
         user = await user_manager.get_by_email(user_email)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        if user_context.user.email not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to create an invitation"
-            )
-
-        invite = await workspace_repository.create_invitation(workspace_id=workspace_id, user_id=user.id)
+        invite = await workspace_repository.create_invitation(workspace_id=workspace.id, user_id=user.id)
 
         return WorkspaceInviteRead(
-            organization_slug=org.slug,
+            organization_slug=workspace.slug,
             user_id=user.id,
             expires_at=invite.expires_at,
         )
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
     async def delete_invite(
-        workspace_id: WorkspaceId,
+        workspace: UserWorkspaceDependency,
         invite_id: UUID,
-        user_context: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> None:
         """Delete invite."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user_context.user.email not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to delete an invitation"
-            )
-
         await workspace_repository.delete_invitation(invite_id)
 
     @router.get("{workspace_id}/invites/{invite_id}/accept")
     async def accept_invitation(
         workspace_id: WorkspaceId,
         invite_id: UUID,
-        user_context: AuthenticatedUser,
+        user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> None:
         """Accept an invitation to the workspace."""
@@ -163,7 +134,7 @@ def workspaces_router() -> APIRouter:
         if invite is None:
             raise HTTPException(status_code=404, detail="Invitation not found")
 
-        if user_context.user.id != invite.user_id:
+        if user.id != invite.user_id:
             raise HTTPException(status_code=403, detail="You can only accept invitations for your own account")
 
         await workspace_repository.accept_invitation(invite_id)
@@ -172,21 +143,15 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(
-        workspace_id: WorkspaceId,
-        workspace_repository: WorkspaceRepositoryDependency,
+        workspace: UserWorkspaceDependency,
         config: ConfigDependency,
-        user_context: AuthenticatedUser,
-        user_workspace_id: TenantDependency,
     ) -> str:
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
         return (
             f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
             f"?templateURL={config.cf_template_url}"
             "&stackName=FixAccess"
-            f"&param_WorkspaceId={workspace_id}"
-            f"&param_ExternalId={org.external_id}"
+            f"&param_WorkspaceId={workspace.id}"
+            f"&param_ExternalId={workspace.external_id}"
         )
 
     @router.get("/{workspace_id}/cf_template")
@@ -196,21 +161,10 @@ def workspaces_router() -> APIRouter:
         return config.cf_template_url
 
     @router.get("/{workspace_id}/external_id")
-    async def get_externa_id(
-        workspace_id: WorkspaceId,
-        user_context: AuthenticatedUser,
-        workspace_repository: WorkspaceRepositoryDependency,
+    async def get_external_id(
+        workspace: UserWorkspaceDependency,
     ) -> ExternalId:
-        """Get an workspace's external id."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user_context.user.id not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be a member of this organization to get an external ID"
-            )
-
-        return ExternalId(external_id=org.external_id)
+        """Get a workspaces external id."""
+        return ExternalId(external_id=workspace.external_id)
 
     return router
