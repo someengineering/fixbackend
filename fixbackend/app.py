@@ -111,7 +111,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             RedisStreamPublisher(
                 readwrite_redis,
                 "fixbackend::domain_events",
-                "fixbackend-domain-events",
+                "fixbackend",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
