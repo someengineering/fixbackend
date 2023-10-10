@@ -27,6 +27,7 @@ components:
         version:
           type: string
           description: The version of the event.
+          nullable: true
         data:
           $ref: "#/components/schemas/Event"
 
