@@ -8,16 +8,32 @@ info:
 
 components:
   schemas:
-    Event:
-      description: Domain event emitted by fixbackend
+    Envelope:
+      description: Envelope for all domain events.
       type: object
       properties:
-        event:
-          oneOf:
-          - $ref: "#/components/schemas/UserRegistered"
+        id:
+          type: string
+          description: The id of the event.
         at:
           type: string
           description: The time of the event in IS0 8601 date time.
+        publisher:
+          type: string
+          description: The publisher of the event.
+        kind:
+          type: string
+          description: The kind of the event, e.g. 'UserRegistered' or 'AwsAccountDiscovered'.
+        version:
+          type: string
+          description: The version of the event.
+        data:
+          $ref: "#/components/schemas/Event"
+
+    Event:
+      oneOf:
+        - $ref: "#/components/schemas/UserRegistered"
+        - $ref: "#/components/schemas/AwsAccountDiscovered"
 
     UserRegistered:
       description: "This event emitted when a new user has registered."
