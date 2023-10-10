@@ -14,13 +14,12 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
 from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
 from fixbackend.ids import CloudAccountId
-from fixbackend.auth.depedencies import UserWorkspacesDependency
-from fixbackend.ids import WorkspaceId
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 log = logging.getLogger(__name__)
 
@@ -30,15 +29,11 @@ def cloud_accounts_router() -> APIRouter:
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def delete_cloud_account(
-        workspace_id: WorkspaceId,
+        workspace: UserWorkspaceDependency,
         cloud_account_id: CloudAccountId,
-        user_tenants: UserWorkspacesDependency,
         service: CloudAccountServiceDependency,
     ) -> None:
-        if workspace_id not in user_tenants:
-            raise HTTPException(status_code=403, detail="User does not have access to this organization")
-
-        await service.delete_cloud_account(cloud_account_id, workspace_id)
+        await service.delete_cloud_account(cloud_account_id, workspace.id)
 
     return router
 

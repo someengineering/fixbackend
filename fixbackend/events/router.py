@@ -1,8 +1,9 @@
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, Depends
 from fixbackend.config import Config
-from fixbackend.auth.depedencies import UserWorkspacesDependency
+from fixbackend.workspaces.dependencies import get_optional_user_workspace, WorkspaceError
+from fixbackend.workspaces.models import Workspace
 from fixbackend.events.websocket_event_handler import WebsockedtEventHandlerDependency
-from fixbackend.ids import WorkspaceId
+from typing import Annotated, Union
 
 
 def websocket_router(config: Config) -> APIRouter:
@@ -11,17 +12,16 @@ def websocket_router(config: Config) -> APIRouter:
     @router.websocket("/{workspace_id}/events")
     async def events(
         websocket: WebSocket,
-        workspace_id: WorkspaceId,
-        workspaces: UserWorkspacesDependency,
+        workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
         event_handler: WebsockedtEventHandlerDependency,
     ) -> None:
         await websocket.accept()
         # check if the user is authorized to listen to this tenant
-        if workspace_id not in workspaces:
-            await websocket.send_json({"error": "Unauthorized"})
+        if isinstance(workspace, str):
+            await websocket.send_json({"error": workspace})
             await websocket.close()
             return
 
-        await event_handler.handle_websocket(workspace_id, websocket)
+        await event_handler.handle_websocket(workspace.id, websocket)
 
     return router

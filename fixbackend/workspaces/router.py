@@ -19,11 +19,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
-from fixbackend.auth.depedencies import AuthenticatedUser, TenantDependency
+from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import ExternalId, WorkspaceCreate, WorkspaceInviteRead, WorkspaceRead
 
 
@@ -172,21 +173,15 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(
-        workspace_id: WorkspaceId,
-        workspace_repository: WorkspaceRepositoryDependency,
+        workspace: UserWorkspaceDependency,
         config: ConfigDependency,
-        user_context: AuthenticatedUser,
-        user_workspace_id: TenantDependency,
     ) -> str:
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
         return (
             f"https://console.aws.amazon.com/cloudformation/home#/stacks/create/review"
             f"?templateURL={config.cf_template_url}"
             "&stackName=FixAccess"
-            f"&param_WorkspaceId={workspace_id}"
-            f"&param_ExternalId={org.external_id}"
+            f"&param_WorkspaceId={workspace.id}"
+            f"&param_ExternalId={workspace.external_id}"
         )
 
     @router.get("/{workspace_id}/cf_template")
