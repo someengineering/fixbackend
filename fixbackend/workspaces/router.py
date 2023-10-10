@@ -74,25 +74,14 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
-        workspace_id: WorkspaceId,
-        user: AuthenticatedUser,
+        workspace: UserWorkspaceDependency,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> List[WorkspaceInviteRead]:
-        """List all pending invitations to the workspace."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user.id not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to view the invitations"
-            )
-
-        invites = await workspace_repository.list_invitations(workspace_id=workspace_id)
+        invites = await workspace_repository.list_invitations(workspace_id=workspace.id)
 
         return [
             WorkspaceInviteRead(
-                organization_slug=org.slug,
+                organization_slug=workspace.slug,
                 user_id=invite.user_id,
                 expires_at=invite.expires_at,
             )
@@ -101,51 +90,32 @@ def workspaces_router() -> APIRouter:
 
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(
-        workspace_id: WorkspaceId,
+        workspace: UserWorkspaceDependency,
         user_email: EmailStr,
-        authenticated_user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
         user_manager: UserManagerDependency,
     ) -> WorkspaceInviteRead:
         """Invite a user to the workspace."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
 
         user = await user_manager.get_by_email(user_email)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        if authenticated_user.email not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to create an invitation"
-            )
-
-        invite = await workspace_repository.create_invitation(workspace_id=workspace_id, user_id=user.id)
+        invite = await workspace_repository.create_invitation(workspace_id=workspace.id, user_id=user.id)
 
         return WorkspaceInviteRead(
-            organization_slug=org.slug,
+            organization_slug=workspace.slug,
             user_id=user.id,
             expires_at=invite.expires_at,
         )
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
     async def delete_invite(
-        workspace_id: WorkspaceId,
+        workspace: UserWorkspaceDependency,
         invite_id: UUID,
-        user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> None:
         """Delete invite."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user.email not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be an owner of this organization to delete an invitation"
-            )
-
         await workspace_repository.delete_invitation(invite_id)
 
     @router.get("{workspace_id}/invites/{invite_id}/accept")
@@ -192,20 +162,9 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/external_id")
     async def get_external_id(
-        workspace_id: WorkspaceId,
-        user: AuthenticatedUser,
-        workspace_repository: WorkspaceRepositoryDependency,
+        workspace: UserWorkspaceDependency,
     ) -> ExternalId:
         """Get a workspaces external id."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        if user.id not in org.all_users():
-            raise HTTPException(
-                status_code=403, detail="You must be a member of this organization to get an external ID"
-            )
-
-        return ExternalId(external_id=org.external_id)
+        return ExternalId(external_id=workspace.external_id)
 
     return router
