@@ -15,7 +15,7 @@
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from ssl import create_default_context, Purpose
+from ssl import Purpose, create_default_context
 from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
 import httpx
@@ -24,6 +24,8 @@ from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
@@ -181,6 +183,18 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def ready() -> Response:
         return Response(status_code=200)
 
+    @app.get("/docs/events", include_in_schema=False)
+    async def domain_events_swagger_ui_html(req: Request) -> HTMLResponse:
+        root_path = req.scope.get("root_path", "").rstrip("/")
+        openapi_url = root_path + "/static/openapi-events.yaml"
+        return get_swagger_ui_html(
+            openapi_url=openapi_url,
+            title="Fix Domain Events - Swagger UI",
+            oauth2_redirect_url=None,
+            init_oauth=None,
+            swagger_ui_parameters=None,
+        )
+
     Instrumentator().instrument(app).expose(app)
 
     if not cfg.args.dispatcher:
@@ -207,6 +221,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         app.include_router(api_router)
+
+        app.mount("/static", StaticFiles(directory="static"), name="static")
 
         if cfg.static_assets:
             app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")

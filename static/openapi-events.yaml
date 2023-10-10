@@ -1,0 +1,68 @@
+openapi: 3.0.0
+servers:
+  - url: ../
+    description: current system
+info:
+  title: Fix Domain events
+  version: V1
+
+components:
+  schemas:
+    Envelope:
+      description: Envelope for all domain events.
+      type: object
+      properties:
+        id:
+          type: string
+          description: The id of the event.
+        at:
+          type: string
+          description: The time of the event in IS0 8601 date time.
+        publisher:
+          type: string
+          description: The publisher of the event.
+        kind:
+          type: string
+          description: The kind of the event, e.g. 'UserRegistered' or 'AwsAccountDiscovered'.
+        version:
+          type: string
+          description: The version of the event.
+          nullable: true
+        data:
+          $ref: "#/components/schemas/Event"
+
+    Event:
+      oneOf:
+        - $ref: "#/components/schemas/UserRegistered"
+        - $ref: "#/components/schemas/AwsAccountDiscovered"
+
+    UserRegistered:
+      description: "This event emitted when a new user has registered."
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: Id of the user.
+        email:
+          type: string
+          description: Email of the user.
+        workspace_id:
+          type: string
+          description: Id of the defaut workspace.
+    
+    AwsAccountDiscovered:
+      description: "This event emitted when a new aws account has been discovered."
+      type: object
+      properties:
+        cloud_account_id:
+          type: string
+          description: Id of the cloud account.
+        workspace_id:
+          type: string
+          description: Id of the workspace.
+        cloud:
+          type: string
+          description: Name of the cloud.
+        aws_account_id:
+          type: string
+          description: Id of the aws account.
