@@ -46,7 +46,7 @@ components:
         email:
           type: string
           description: Email of the user.
-        workspace_id:
+        tenant_id:
           type: string
           description: Id of the defaut workspace.
     
@@ -57,7 +57,7 @@ components:
         cloud_account_id:
           type: string
           description: Id of the cloud account.
-        workspace_id:
+        tenant_id:
           type: string
           description: Id of the workspace.
         cloud:

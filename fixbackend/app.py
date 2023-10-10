@@ -15,6 +15,7 @@
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from datetime import timedelta
 from ssl import Purpose, create_default_context
 from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
@@ -47,6 +48,8 @@ from fixbackend.dependencies import FixDependencies
 from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
+from fixbackend.domain_events.sender import get_domain_event_sender
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -54,6 +57,7 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.router import workspaces_router
+
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -73,7 +77,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
 
     @asynccontextmanager
-    async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
+    async def setup_teardown_application(app: FastAPI) -> AsyncIterator[None]:
         http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
         arq_redis = deps.add(
             SN.arq_redis,
@@ -101,6 +105,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.cloudaccount_publisher,
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
+
+        domain_event_redis_publisher = deps.add(
+            SN.domain_event_redis_stream_publisher,
+            RedisStreamPublisher(
+                readwrite_redis,
+                "fixbackend::domain_events",
+                "fixbackend-domain-events",
+                keep_unprocessed_messages_for=timedelta(days=7),
+            ),
+        )
+        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
+        app.dependency_overrides[get_domain_event_sender] = lambda: domain_event_sender
+
         deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:
             await load_app_from_cdn()

@@ -24,6 +24,8 @@ from fixbackend.auth.db import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, UserVerifierDependency
 from fixbackend.config import Config, ConfigDependency
+from fixbackend.domain_events.events import UserRegistered
+from fixbackend.domain_events.sender import DomainEventSender, DomainEventSenderDependency
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
@@ -35,16 +37,18 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         password_helper: PasswordHelperProtocol | None,
         user_verifier: UserVerifier,
         workspace_repository: WorkspaceRepository,
+        domain_events_sender: DomainEventSender,
     ):
         super().__init__(user_repository, password_helper)
         self.user_verifier = user_verifier
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
         self.workspace_repository = workspace_repository
+        self.domain_events_sender = domain_events_sender
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if user.is_verified:  # oauth2 users are already verified
-            await self.create_default_organization(user)
+            await self.create_default_workspace(user)
         else:
             await self.request_verify(user, request)
 
@@ -52,11 +56,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         await self.user_verifier.verify(user, token, request)
 
     async def on_after_verify(self, user: User, request: Request | None = None) -> None:
-        await self.create_default_organization(user)
+        await self.create_default_workspace(user)
 
-    async def create_default_organization(self, user: User) -> None:
+    async def create_default_workspace(self, user: User) -> None:
         org_slug = re.sub("[^a-zA-Z0-9-]", "-", user.email)
-        await self.workspace_repository.create_workspace(user.email, org_slug, user)
+        org = await self.workspace_repository.create_workspace(user.email, org_slug, user)
+        await self.domain_events_sender.publish(UserRegistered(user_id=user.id, email=user.email, tenant_id=org.id))
 
 
 async def get_user_manager(
@@ -64,8 +69,9 @@ async def get_user_manager(
     user_repository: UserRepositoryDependency,
     user_verifier: UserVerifierDependency,
     workspace_repository: WorkspaceRepositoryDependency,
+    domain_event_sender: DomainEventSenderDependency,
 ) -> AsyncIterator[UserManager]:
-    yield UserManager(config, user_repository, None, user_verifier, workspace_repository)
+    yield UserManager(config, user_repository, None, user_verifier, workspace_repository, domain_event_sender)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

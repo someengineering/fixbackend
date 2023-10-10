@@ -27,6 +27,8 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAc
 from fixbackend.dependencies import FixDependency
 from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
+from fixbackend.domain_events.sender import DomainEventSender, DomainEventSenderDependency
+from fixbackend.domain_events.events import AwsAccountDiscovered
 
 
 class WrongExternalId(Exception):
@@ -54,11 +56,13 @@ class CloudAccountServiceImpl(CloudAccountService):
         cloud_account_repository: CloudAccountRepository,
         publisher: RedisStreamPublisher,
         pubsub_publisher: RedisPubSubPublisher,
+        domain_event_sender: DomainEventSender,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.publisher = publisher
         self.pubsub_publisher = pubsub_publisher
+        self.domain_event_sender = domain_event_sender
 
     async def create_aws_account(
         self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
@@ -98,6 +102,11 @@ class CloudAccountServiceImpl(CloudAccountService):
         await self.pubsub_publisher.publish(
             kind="cloud_account_created", message=message, channel=f"tenant-events::{workspace_id}"
         )
+        await self.domain_event_sender.publish(
+            AwsAccountDiscovered(
+                cloud_account_id=result.id, tenant_id=workspace_id, cloud_id="aws", aws_account_id=account_id
+            )
+        )
         return result
 
     async def delete_cloud_account(self, cloud_account_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
@@ -113,6 +122,7 @@ def get_cloud_account_service(
     workspace_repository_dependency: WorkspaceRepositoryDependency,
     cloud_account_repository_dependency: CloudAccountRepositoryDependency,
     fix_dependency: FixDependency,
+    domain_event_sender_dependency: DomainEventSenderDependency,
 ) -> CloudAccountService:
     redis_publisher = RedisPubSubPublisher(
         redis=fix_dependency.readwrite_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
@@ -122,6 +132,7 @@ def get_cloud_account_service(
         cloud_account_repository_dependency,
         fix_dependency.cloudaccount_publisher,
         redis_publisher,
+        domain_event_sender_dependency,
     )
 
 

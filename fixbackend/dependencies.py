@@ -45,6 +45,8 @@ class ServiceNames:
     dispatching = "dispatching"
     cloudaccount_publisher = "cloudaccount_publisher"
     certificate_store = "certificate_store"
+    domain_event_redis_stream_publisher = "domain_event_redis_stream_publisher"
+    domain_event_sender = "domain_event_sender"
 
 
 class FixDependencies(Dependencies):
