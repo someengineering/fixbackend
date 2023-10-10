@@ -26,7 +26,7 @@ class DomainEventSender(ABC):
 
 
 def get_domain_event_sender() -> DomainEventSender:
-    raise NotImplementedError("")
+    raise NotImplementedError("This component should be injected during setup_teardown_application call in app.py")
 
 
 DomainEventSenderDependency = Annotated[DomainEventSender, Depends(get_domain_event_sender)]
