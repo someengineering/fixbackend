@@ -23,6 +23,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from datetime import timedelta
+from itertools import islice
 from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal
 
 from fixcloudutils.service import Service
@@ -49,6 +50,9 @@ SeverityByCheckId = Dict[str, str]
 
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 7, "medium": 13, "high": 27, "critical": 53}  # the sum is 100
+)
+ReportSeverityPriority: Dict[str, int] = defaultdict(
+    lambda: 0, **{n: idx for idx, n in enumerate(["info", "low", "medium", "high", "critical"])}
 )
 
 
@@ -148,6 +152,11 @@ class InventoryService(Service):
                 benchmark_checks[summary.id] = b["report_checks"]
             return summaries, benchmark_checks
 
+        async def top_issues(checks_by_severity: Dict[str, Set[str]], num: int) -> List[Json]:
+            list_gen = sorted(checks_by_severity.items(), key=lambda x: ReportSeverityPriority[x[0]], reverse=True)
+            top = list(islice((id for _, check_ids in list_gen for id in check_ids), num))
+            return await self.client.issues(db, check_ids=top)
+
         def account_score(failing_checks: Dict[str, int]) -> int:
             # for the moment we ignore the count of failing checks and only look at the severity
             return max(0, 100 - sum(ReportSeverityScore[severity] for severity in failing_checks.keys()))
@@ -174,7 +183,9 @@ class InventoryService(Service):
                 issues_since(default_time_since, "node_compliant"),
             )
 
+            # combine benchmark and account data
             account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
             for bid, bench in benchmarks.items():
                 benchmark_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
                 for check in checks.get(bid, []):
@@ -182,9 +193,15 @@ class InventoryService(Service):
                         for account_id in failed_accounts_by_check_id.get(check, []):
                             benchmark_counter[account_id][severity] += 1
                             account_counter[account_id][severity] += 1
+                            failed_checks_by_severity[severity].add(check)
                 bench.failed_checks = benchmark_counter
+
+            # compute a score for every account
             for account_id, failing in account_counter.items():
                 accounts[account_id].score = account_score(failing)
+
+            # get issues for the top 5 issue_ids
+            tops = await top_issues(failed_checks_by_severity, num=5)
 
             return ReportSummary(
                 overall_score=overall_score(accounts),
@@ -192,6 +209,7 @@ class InventoryService(Service):
                 benchmarks=list(benchmarks.values()),
                 changed_vulnerable=vulnerable_changed,
                 changed_compliant=compliant_changed,
+                top_checks=tops,
             )
 
         except GraphDatabaseNotAvailable:
@@ -202,4 +220,5 @@ class InventoryService(Service):
                 benchmarks=[],
                 changed_vulnerable=NoVulnerabilitiesChanged,
                 changed_compliant=NoVulnerabilitiesChanged,
+                top_checks=[],
             )

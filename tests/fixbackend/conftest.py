@@ -225,6 +225,9 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
             for a in benchmark_json:
                 response += json.dumps(a) + "\n"
             return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/report/checks":
+            info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
+            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
         elif request.url.path == "/report/benchmarks":
             info = [
                 {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": ["aws_c1", "aws_c2"], "title": "AWS Test", "version": "0.1"},  # fmt: skip

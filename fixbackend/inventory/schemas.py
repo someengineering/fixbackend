@@ -14,6 +14,7 @@
 from datetime import timedelta
 from typing import List, Dict, Set
 
+from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
 
 
@@ -53,3 +54,4 @@ class ReportSummary(BaseModel):
     benchmarks: List[BenchmarkSummary] = Field(description="The performed benchmarks.")
     changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
     changed_compliant: VulnerabilitiesChanged = Field(description="Accounts and resources became compliant.")
+    top_checks: List[Json] = Field(description="The top issues.")  # rename
