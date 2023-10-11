@@ -25,6 +25,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.config import Config
 from fixbackend.auth.user_verifier import UserVerifier
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.events import Event
 
 
 @pytest.fixture
@@ -45,6 +47,11 @@ class UserVerifierMock(UserVerifier):
         return None
 
 
+class DomainEventSenderMock(DomainEventSender):
+    async def publish(self, event: Event) -> None:
+        pass
+
+
 @pytest.mark.asyncio
 async def test_token_validation(
     workspace_repository: WorkspaceRepository, user: User, default_config: Config, session: AsyncSession
@@ -56,7 +63,9 @@ async def test_token_validation(
 
     user_repo = await anext(get_user_repository(session))
 
-    user_manager = UserManager(default_config, user_repo, None, UserVerifierMock(), workspace_repository)
+    user_manager = UserManager(
+        default_config, user_repo, None, UserVerifierMock(), workspace_repository, DomainEventSenderMock()
+    )
 
     token1 = await strategy1.write_token(user)
     token2 = await strategy2.write_token(user)
