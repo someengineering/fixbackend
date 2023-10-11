@@ -11,8 +11,10 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import List, Dict
+from datetime import timedelta
+from typing import List, Dict, Set, Optional
 
+from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
 
 
@@ -20,6 +22,12 @@ class AccountSummary(BaseModel):
     id: str = Field(description="The account id")
     name: str = Field(description="The account name")
     cloud: str = Field(description="The name of the cloud provider")
+    score: int = Field(description="The score of the account", default=100)
+
+
+class BenchmarkAccountSummary(BaseModel):
+    score: int = Field(description="The score of the account", default=0)
+    failed_checks: Optional[Dict[str, int]] = Field(description="The number of failed checks by severity.")
 
 
 class BenchmarkSummary(BaseModel):
@@ -30,9 +38,34 @@ class BenchmarkSummary(BaseModel):
     clouds: List[str] = Field(description="The clouds the benchmark is available for.")
     description: str = Field(description="The description of the benchmark.")
     nr_of_checks: int = Field(description="The number of checks in the benchmark.")
-    failed_checks: Dict[str, Dict[str, int]] = Field(description="The number of failed checks per account/severity.")
+    account_summary: Dict[str, BenchmarkAccountSummary] = Field(
+        description="Information of the account with respect to this benchmark.", default_factory=dict
+    )
+
+
+class CheckSummary(BaseModel):
+    available_checks: int
+    failed_checks: int
+    failed_checks_by_severity: Dict[str, int]
+
+
+class VulnerabilitiesChanged(BaseModel):
+    since: timedelta = Field(description="The time since the last report.")
+    accounts_by_severity: Dict[str, Set[str]]
+    resource_count_by_severity: Dict[str, int]
+    resource_count_by_kind: Dict[str, int]
+
+
+NoVulnerabilitiesChanged = VulnerabilitiesChanged(
+    since=timedelta(0), accounts_by_severity={}, resource_count_by_severity={}, resource_count_by_kind={}
+)
 
 
 class ReportSummary(BaseModel):
+    overall_score: int
+    check_summary: CheckSummary = Field(description="Overall summary of all available checks.")
     accounts: List[AccountSummary] = Field(description="The accounts in the inventory.")
     benchmarks: List[BenchmarkSummary] = Field(description="The performed benchmarks.")
+    changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
+    changed_compliant: VulnerabilitiesChanged = Field(description="Accounts and resources became compliant.")
+    top_checks: List[Json] = Field(description="The most relevant report check definitions.")

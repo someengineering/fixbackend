@@ -210,11 +210,24 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
+            result_list = [
+                {"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},
+                {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}},
+            ]
+            response = ""
+            for a in result_list:
+                response += json.dumps(a) + "\n"
+            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
             response = ""
             for a in benchmark_json:
                 response += json.dumps(a) + "\n"
             return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/report/checks":
+            info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
+            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
         elif request.url.path == "/report/benchmarks":
             info = [
                 {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": ["aws_c1", "aws_c2"], "title": "AWS Test", "version": "0.1"},  # fmt: skip
@@ -303,9 +316,10 @@ async def fix_deps(
     )
 
 
+# noinspection PyUnresolvedReferences
 @pytest.fixture
 async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_config: Config) -> FastAPI:
-    app = fast_api_app(default_config)
+    app: FastAPI = fast_api_app(default_config)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[fix_dependencies] = lambda: fix_deps

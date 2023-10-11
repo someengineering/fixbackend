@@ -115,6 +115,32 @@ class InventoryClient(Service):
         self.__raise_on_error(response)
         return cast(List[Json], response.json())
 
+    async def issues(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        provider: Optional[str] = None,
+        service: Optional[str] = None,
+        category: Optional[str] = None,
+        kind: Optional[str] = None,
+        check_ids: Optional[List[str]] = None,
+    ) -> List[Json]:
+        params: Dict[str, Union[str, bool]] = {}
+        if provider is not None:
+            params["provider"] = provider
+        if service is not None:
+            params["service"] = service
+        if category is not None:
+            params["category"] = category
+        if kind is not None:
+            params["kind"] = kind
+        if check_ids:
+            params["id"] = ",".join(check_ids)
+        headers = self.__headers(access)
+        response = await self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers)
+        self.__raise_on_error(response)
+        return cast(List[Json], response.json())
+
     def __headers(
         self,
         access: GraphDatabaseAccess,
