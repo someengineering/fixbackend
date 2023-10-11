@@ -37,6 +37,8 @@ from fixbackend.inventory.schemas import (
     BenchmarkSummary,
     VulnerabilitiesChanged,
     NoVulnerabilitiesChanged,
+    BenchmarkAccountSummary,
+    CheckSummary,
 )
 
 log = logging.getLogger(__name__)
@@ -146,7 +148,6 @@ class InventoryService(Service):
                     clouds=b["clouds"],
                     description=b["description"],
                     nr_of_checks=len(b["report_checks"]),
-                    failed_checks={},
                 )
                 summaries[summary.id] = summary
                 benchmark_checks[summary.id] = b["report_checks"]
@@ -185,16 +186,25 @@ class InventoryService(Service):
 
             # combine benchmark and account data
             account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            severity_counter: Dict[str, int] = defaultdict(int)
             failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
+            available_checks = 0
             for bid, bench in benchmarks.items():
                 benchmark_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
                 for check in checks.get(bid, []):
+                    available_checks += 1
                     if severity := severity_by_check_id.get(check):
+                        severity_counter[severity] += 1
                         for account_id in failed_accounts_by_check_id.get(check, []):
                             benchmark_counter[account_id][severity] += 1
                             account_counter[account_id][severity] += 1
                             failed_checks_by_severity[severity].add(check)
-                bench.failed_checks = benchmark_counter
+                for account_id, account in accounts.items():
+                    if account.cloud in bench.clouds:
+                        failing = benchmark_counter.get(account_id)
+                        bench.account_summary[account_id] = BenchmarkAccountSummary(
+                            score=account_score(failing) if failing else 100, failed_checks=failing
+                        )
 
             # compute a score for every account
             for account_id, failing in account_counter.items():
@@ -204,6 +214,11 @@ class InventoryService(Service):
             tops = await top_issues(failed_checks_by_severity, num=5)
 
             return ReportSummary(
+                check_summary=CheckSummary(
+                    available_checks=available_checks,
+                    failed_checks=sum(v for v in severity_counter.values()),
+                    failed_checks_by_severity=severity_counter,
+                ),
                 overall_score=overall_score(accounts),
                 accounts=list(accounts.values()),
                 benchmarks=list(benchmarks.values()),
@@ -215,6 +230,7 @@ class InventoryService(Service):
         except GraphDatabaseNotAvailable:
             log.warning("Graph database not available yet. Returning empty summary.")
             return ReportSummary(
+                check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],

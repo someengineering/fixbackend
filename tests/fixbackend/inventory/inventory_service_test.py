@@ -29,7 +29,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.schemas import ReportSummary, NoVulnerabilitiesChanged
+from fixbackend.inventory.schemas import ReportSummary, NoVulnerabilitiesChanged, BenchmarkAccountSummary, CheckSummary
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -43,14 +43,18 @@ async def test_summary(inventory_service: InventoryService) -> None:
     summary = await inventory_service.summary(db)
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 70
+    # checks summary
+    assert summary.check_summary.available_checks == 4
+    assert summary.check_summary.failed_checks == 2
+    assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
     assert b1.clouds == ["aws"]
-    assert b1.failed_checks == {"123": {"low": 1}}
+    assert b1.account_summary == {"123": BenchmarkAccountSummary(score=93, failed_checks={"low": 1})}
     assert b2.id == "gcp_test"
     assert b2.clouds == ["gcp"]
-    assert b2.failed_checks == {"234": {"critical": 1}}
+    assert b2.account_summary == {"234": BenchmarkAccountSummary(score=47, failed_checks={"critical": 1})}
     assert len(summary.accounts) == 2
     # check accounts
     gcp, aws = summary.accounts
@@ -81,6 +85,7 @@ async def test_no_graph_db_access() -> None:
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
         async with InventoryService(client) as service:
             assert await service.summary(db) == ReportSummary(
+                check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],
