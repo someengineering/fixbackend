@@ -13,29 +13,27 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import uuid
 from typing import Any, AsyncIterator, Dict
 
-from fastapi import WebSocket
-
-from fixbackend.app import fast_api_app
-from fixbackend.db import get_async_session
-from httpx import AsyncClient
-from fixbackend.config import config as get_config, Config
-from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
-from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
-from fixbackend.events.websocket_event_handler import (
-    WebsocketEventHandler,
-    get_websocket_event_handler,
-)
-import uuid
-
+from fastapi import WebSocket
+from httpx import AsyncClient
 from httpx_ws import aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
-from fixbackend.ids import WorkspaceId
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.app import fast_api_app
+from fixbackend.config import Config
+from fixbackend.config import config as get_config
+from fixbackend.db import get_async_session
+from fixbackend.events.websocket_event_handler import WebsocketEventHandler, get_websocket_event_handler
+from fixbackend.ids import ExternalId, WorkspaceId
+from fixbackend.workspaces.dependencies import get_optional_user_workspace
+from fixbackend.workspaces.models import Workspace
 
 workspace_id = WorkspaceId(uuid.uuid4())
+workspace = Workspace(workspace_id, "foo", "foo", ExternalId(uuid.uuid4()), [], [])
 
 
 class WebsocketHandlerMock(WebsocketEventHandler):
@@ -66,7 +64,7 @@ async def websocket_client(session: AsyncSession, default_config: Config) -> Asy
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_user_workspaces_ids] = lambda: {workspace_id}
+    app.dependency_overrides[get_optional_user_workspace] = lambda: workspace
     app.dependency_overrides[get_websocket_event_handler] = lambda: event_service
 
     async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:

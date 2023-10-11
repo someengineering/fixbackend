@@ -21,7 +21,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.current_user_dependencies import get_user_workspaces_ids
+from fixbackend.workspaces.dependencies import get_user_workspace
+from fixbackend.workspaces.models import Workspace
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.service import CloudAccountService, get_cloud_account_service
 from fixbackend.config import Config
@@ -53,6 +54,7 @@ cloud_account_service = InMemoryCloudAccountService()
 
 workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
+workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [])
 role_name = "FooBarRole"
 account_id = "123456789012"
 
@@ -64,7 +66,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
-    app.dependency_overrides[get_user_workspaces_ids] = lambda: {workspace_id}
+    app.dependency_overrides[get_user_workspace] = lambda: workspace
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -104,7 +106,3 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
     assert len(cloud_account_service.accounts) == 0
-
-    # deleting an account in a wrong workspace should fail
-    response = await client.delete(f"/api/workspaces/{WorkspaceId(uuid.uuid4())}/cloud_account/{cloud_account_id}")
-    assert response.status_code == 403

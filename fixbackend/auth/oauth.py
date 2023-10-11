@@ -13,25 +13,24 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, Optional, Tuple, List
-from httpx_oauth.clients.github import GitHubOAuth2
-from httpx_oauth.clients.google import GoogleOAuth2
-
-from fixbackend.config import Config
-from fixbackend.auth.dependencies import UserManagerDependency
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Response, Query
-from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallback
-from httpx_oauth.oauth2 import BaseOAuth2, OAuth2Token
-from pydantic import BaseModel
-
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
 from fastapi_users.jwt import SecretType, decode_jwt, generate_jwt
 from fastapi_users.router.common import ErrorCode, ErrorModel
-from urllib.parse import quote
+from httpx_oauth.clients.github import GitHubOAuth2
+from httpx_oauth.clients.google import GoogleOAuth2
+from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallback
+from httpx_oauth.oauth2 import BaseOAuth2, OAuth2Token
+from pydantic import BaseModel
+
+from fixbackend.auth.user_manager import UserManagerDependency
+from fixbackend.config import Config
 
 
 def google_client(config: Config) -> GoogleOAuth2:
