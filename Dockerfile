@@ -17,5 +17,6 @@ RUN  apt-get update \
 # migrations needs to run too
 ADD migrations /app/migrations
 ADD alembic.ini /app/alembic.ini
+ADD static /app/static
 EXPOSE 8000
 ENTRYPOINT ["/bin/dumb-init", "--", "fixbackend"]
