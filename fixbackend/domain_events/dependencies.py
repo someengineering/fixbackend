@@ -33,4 +33,5 @@ def get_domain_event_sender(fix: FixDependency) -> DomainEventSender:
     return fix.domain_event_sender
 
 
+# convenient way to depend on the domain sender and override in tests
 DomainEventSenderDependency = Annotated[DomainEventSender, Depends(get_domain_event_sender)]
