@@ -83,9 +83,9 @@ class DispatcherService(Service):
     async def process_cloud_account_changed_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
             case "cloud_account_created":
-                await self.cloud_account_created(CloudAccountId(message["id"]))
+                await self.cloud_account_created(CloudAccountId(message["cloud_account_id"]))
             case "cloud_account_deleted":
-                await self.cloud_account_deleted(CloudAccountId(message["id"]))
+                await self.cloud_account_deleted(CloudAccountId(message["cloud_account_id"]))
             case _:
                 log.error(f"Don't know how to handle messages of kind {context.kind}")
 
