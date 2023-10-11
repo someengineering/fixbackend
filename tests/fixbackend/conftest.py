@@ -210,6 +210,16 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
+            result_list = [
+                {"count": 1, "group": {"account_id": "123", "severity": "critical"}},
+                {"count": 87, "group": {"account_id": "234", "severity": "medium"}},
+            ]
+            response = ""
+            for a in result_list:
+                response += json.dumps(a) + "\n"
+            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
             response = ""
             for a in benchmark_json:
@@ -303,9 +313,10 @@ async def fix_deps(
     )
 
 
+# noinspection PyUnresolvedReferences
 @pytest.fixture
 async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_config: Config) -> FastAPI:
-    app = fast_api_app(default_config)
+    app: FastAPI = fast_api_app(default_config)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[fix_dependencies] = lambda: fix_deps

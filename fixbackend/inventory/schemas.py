@@ -11,7 +11,8 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import List, Dict
+from datetime import timedelta
+from typing import List, Dict, Set
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +21,7 @@ class AccountSummary(BaseModel):
     id: str = Field(description="The account id")
     name: str = Field(description="The account name")
     cloud: str = Field(description="The name of the cloud provider")
+    score: int = Field(description="The score of the account", default=0)
 
 
 class BenchmarkSummary(BaseModel):
@@ -33,6 +35,20 @@ class BenchmarkSummary(BaseModel):
     failed_checks: Dict[str, Dict[str, int]] = Field(description="The number of failed checks per account/severity.")
 
 
+class VulnerabilitiesChanged(BaseModel):
+    since: timedelta = Field(description="The time since the last report.")
+    accounts_by_severity: Dict[str, Set[str]]
+    resource_count_by_severity: Dict[str, int]
+
+
+NoVulnerabilitiesChanged = VulnerabilitiesChanged(
+    since=timedelta(0), accounts_by_severity={}, resource_count_by_severity={}
+)
+
+
 class ReportSummary(BaseModel):
+    overall_score: int
     accounts: List[AccountSummary] = Field(description="The accounts in the inventory.")
     benchmarks: List[BenchmarkSummary] = Field(description="The performed benchmarks.")
+    changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
+    changed_compliant: VulnerabilitiesChanged = Field(description="Accounts and resources became compliant.")
