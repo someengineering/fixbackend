@@ -49,6 +49,7 @@ class ServiceNames:
     certificate_store = "certificate_store"
     domain_event_redis_stream_publisher = "domain_event_redis_stream_publisher"
     domain_event_sender = "domain_event_sender"
+    customerio_consumer = "customerio_consumer"
 
 
 class FixDependencies(Dependencies):

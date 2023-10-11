@@ -18,9 +18,9 @@ import uuid
 import pytest
 from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
 from fixbackend.domain_events.events import AwsAccountDiscovered
+from fixbackend.domain_events.converter import converter
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
-from cattrs import unstructure
 from fixbackend.ids import CloudAccountId, WorkspaceId
 
 
@@ -46,4 +46,4 @@ async def test_publish_event() -> None:
 
     assert stream_publisher.last_message is not None
     assert stream_publisher.last_message[0] == event.kind
-    assert stream_publisher.last_message[1] == unstructure(event)
+    assert stream_publisher.last_message[1] == converter.unstructure(event)

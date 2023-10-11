@@ -97,6 +97,9 @@ def default_config() -> Config:
         signing_cert_2=None,
         signing_key_2=None,
         env="local",
+        customerio_baseurl="",
+        customerio_site_id=None,
+        customerio_api_key=None,
     )
 
 

@@ -21,17 +21,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from cattrs import Converter
 
-from fixbackend.domain_events.events import Event
-from fixbackend.domain_events.sender import DomainEventSender
-from fixbackend.domain_events.converter import converter
+from uuid import UUID
 
+converter = Converter()
 
-class DomainEventSenderImpl(DomainEventSender):
-    def __init__(self, publisher: RedisStreamPublisher) -> None:
-        self.publisher = publisher
-
-    async def publish(self, event: Event) -> None:
-        message = converter.unstructure(event)
-        await self.publisher.publish(kind=event.kind, message=message)
+converter.register_unstructure_hook(UUID, lambda id: str(id))
+converter.register_structure_hook(UUID, lambda ojb, typ: UUID(ojb))

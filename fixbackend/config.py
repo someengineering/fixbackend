@@ -57,6 +57,9 @@ class Config(BaseSettings):
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
     env: Literal["local", "dev", "prd"]
+    customerio_baseurl: str
+    customerio_site_id: Optional[str]
+    customerio_api_key: Optional[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -120,6 +123,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
     parser.add_argument("--env", default=os.environ.get("ENV", "local"))
+    parser.add_argument(
+        "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
+    )
+    parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
+    parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

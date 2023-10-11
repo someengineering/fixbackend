@@ -56,6 +56,7 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.router import workspaces_router
+from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 
 
 log = logging.getLogger(__name__)
@@ -105,16 +106,20 @@ def fast_api_app(cfg: Config) -> FastAPI:
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
 
+        domai_events_stream_name = "fixbackend::domain_events"
         domain_event_redis_publisher = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
-                "fixbackend::domain_events",
+                domai_events_stream_name,
                 "fixbackend",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
         deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
+        deps.add(
+            SN.customerio_consumer, CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domai_events_stream_name)
+        )
 
         deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:
