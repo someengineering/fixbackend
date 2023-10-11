@@ -26,6 +26,8 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.certificates.cert_store import CertificateStore
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
 
 
 class ServiceNames:
@@ -93,6 +95,10 @@ class FixDependencies(Dependencies):
     @property
     def certificate_store(self) -> CertificateStore:
         return self.service(ServiceNames.certificate_store, CertificateStore)
+
+    @property
+    def domain_event_sender(self) -> DomainEventSender:
+        return self.service(ServiceNames.domain_event_sender, DomainEventSenderImpl)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

@@ -14,8 +14,6 @@
 
 
 from abc import ABC, abstractmethod
-from fastapi import Depends
-from typing import Annotated
 from fixbackend.domain_events.events import Event
 
 
@@ -23,10 +21,3 @@ class DomainEventSender(ABC):
     @abstractmethod
     async def publish(self, event: Event) -> None:
         pass
-
-
-def get_domain_event_sender() -> DomainEventSender:
-    raise NotImplementedError("This component should be injected during setup_teardown_application call in app.py")
-
-
-DomainEventSenderDependency = Annotated[DomainEventSender, Depends(get_domain_event_sender)]

@@ -20,7 +20,8 @@ from httpx import AsyncClient
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
-from fixbackend.domain_events.sender import DomainEventSender, get_domain_event_sender
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.dependencies import get_domain_event_sender
 from fixbackend.domain_events.events import Event, UserRegistered
 
 

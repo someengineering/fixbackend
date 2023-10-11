@@ -49,7 +49,6 @@ from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
-from fixbackend.domain_events.sender import get_domain_event_sender
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -115,8 +114,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
-        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
-        app.dependency_overrides[get_domain_event_sender] = lambda: domain_event_sender
+        deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
 
         deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:

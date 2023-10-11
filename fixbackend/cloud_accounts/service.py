@@ -27,7 +27,8 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAc
 from fixbackend.dependencies import FixDependency
 from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
-from fixbackend.domain_events.sender import DomainEventSender, DomainEventSenderDependency
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.dependencies import DomainEventSenderDependency
 from fixbackend.domain_events.events import AwsAccountDiscovered
 
 

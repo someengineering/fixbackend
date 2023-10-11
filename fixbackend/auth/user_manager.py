@@ -25,7 +25,8 @@ from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, UserVerifierDependency
 from fixbackend.config import Config, ConfigDependency
 from fixbackend.domain_events.events import UserRegistered
-from fixbackend.domain_events.sender import DomainEventSender, DomainEventSenderDependency
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.dependencies import DomainEventSenderDependency
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
