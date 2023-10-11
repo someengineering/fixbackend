@@ -15,10 +15,11 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence, List, Literal
+from typing import Annotated, Optional, Sequence, List, Literal, Tuple
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
+from functools import lru_cache
 
 
 class Config(BaseSettings):
@@ -123,7 +124,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
-def get_config(argv: Optional[Sequence[str]] = None) -> Config:
+@lru_cache()
+def get_config(argv: Optional[Tuple[str, ...]] = None) -> Config:
     args = parse_args(argv)
     args_dict = vars(args)
     args_dict["args"] = args

@@ -20,6 +20,9 @@ from httpx import AsyncClient
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.dependencies import get_domain_event_sender
+from fixbackend.domain_events.events import Event, UserRegistered
 
 
 class InMemoryVerifier(UserVerifier):
@@ -30,10 +33,20 @@ class InMemoryVerifier(UserVerifier):
         return self.verification_requests.append((user, token))
 
 
+class InMemoryDomainSender(DomainEventSender):
+    def __init__(self) -> None:
+        self.events: List[Event] = []
+
+    async def publish(self, event: Event) -> None:
+        return self.events.append(event)
+
+
 @pytest.mark.asyncio
 async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> None:
     verifier = InMemoryVerifier()
+    domain_event_sender = InMemoryDomainSender()
     fast_api.dependency_overrides[get_user_verifier] = lambda: verifier
+    fast_api.dependency_overrides[get_domain_event_sender] = lambda: domain_event_sender
 
     registration_json = {
         "email": "user@example.com",
@@ -75,4 +88,13 @@ async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> 
 
     # organization is created by default
     response = await api_client.get("/api/workspaces/", cookies={"fix.auth": auth_cookie})
-    assert response.json()[0].get("name") == user.email
+    workspace_json = response.json()[0]
+    assert workspace_json.get("name") == user.email
+
+    # domain event is sent
+    assert len(domain_event_sender.events) == 1
+    event = domain_event_sender.events[0]
+    assert isinstance(event, UserRegistered)
+    assert event.user_id == user.id
+    assert event.email == user.email
+    assert str(event.tenant_id) == workspace_json["id"]
