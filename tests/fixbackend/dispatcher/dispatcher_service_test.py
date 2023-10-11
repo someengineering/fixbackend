@@ -47,7 +47,8 @@ async def test_receive_cloud_account_created(
     )
     # signal to the dispatcher that the cloud account was created
     await dispatcher.process_cloud_account_changed_message(
-        {"id": str(cloud_account_id)}, MessageContext("test", "cloud_account_created", "test", utc(), utc())
+        {"cloud_account_id": str(cloud_account_id)},
+        MessageContext("test", "cloud_account_created", "test", utc(), utc()),
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextRun, cloud_account_id)
@@ -67,7 +68,8 @@ async def test_receive_cloud_account_deleted(
     await next_run_repository.create(cloud_account_id, utc())
     # signal to the dispatcher that the cloud account was created
     await dispatcher.process_cloud_account_changed_message(
-        {"id": str(cloud_account_id)}, MessageContext("test", "cloud_account_deleted", "test", utc(), utc())
+        {"cloud_account_id": str(cloud_account_id)},
+        MessageContext("test", "cloud_account_deleted", "test", utc(), utc()),
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextRun, cloud_account_id)
