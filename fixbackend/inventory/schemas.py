@@ -39,10 +39,11 @@ class VulnerabilitiesChanged(BaseModel):
     since: timedelta = Field(description="The time since the last report.")
     accounts_by_severity: Dict[str, Set[str]]
     resource_count_by_severity: Dict[str, int]
+    resource_count_by_kind: Dict[str, int]
 
 
 NoVulnerabilitiesChanged = VulnerabilitiesChanged(
-    since=timedelta(0), accounts_by_severity={}, resource_count_by_severity={}
+    since=timedelta(0), accounts_by_severity={}, resource_count_by_severity={}, resource_count_by_kind={}
 )
 
 

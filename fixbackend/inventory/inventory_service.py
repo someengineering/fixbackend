@@ -81,19 +81,24 @@ class InventoryService(Service):
         ) -> VulnerabilitiesChanged:
             accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
             resource_count_by_severity: Dict[str, int] = defaultdict(int)
+            resource_count_by_kind: Dict[str, int] = defaultdict(int)
             async for elem in self.client.execute_single(
                 db,
-                f"history --change {change} --after {duration.total_seconds()}s | "
-                f"aggregate /ancestors.account.reported.id as account_id, "
-                f"/security.severity as severity: count(name) as count",
+                f"history --change {change} --after {duration.total_seconds()}s | aggregate "
+                f"/ancestors.account.reported.id as account_id, "
+                f"/security.severity as severity,"
+                f"kind as kind"
+                ": count(name) as count",
             ):
                 severity = elem["group"]["severity"]
                 accounts_by_severity[severity].add(elem["group"]["account_id"])
                 resource_count_by_severity[severity] += elem["count"]
+                resource_count_by_kind[elem["group"]["kind"]] += elem["count"]
             return VulnerabilitiesChanged(
                 since=duration,
                 accounts_by_severity=accounts_by_severity,
                 resource_count_by_severity=resource_count_by_severity,
+                resource_count_by_kind=resource_count_by_kind,
             )
 
         async def account_summary() -> Dict[str, AccountSummary]:

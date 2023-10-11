@@ -212,8 +212,8 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
         elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
             result_list = [
-                {"count": 1, "group": {"account_id": "123", "severity": "critical"}},
-                {"count": 87, "group": {"account_id": "234", "severity": "medium"}},
+                {"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},
+                {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}},
             ]
             response = ""
             for a in result_list:

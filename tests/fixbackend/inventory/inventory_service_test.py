@@ -65,8 +65,10 @@ async def test_summary(inventory_service: InventoryService) -> None:
     # check becoming vulnerable
     assert summary.changed_vulnerable.accounts_by_severity == {"critical": {"123"}, "medium": {"234"}}
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
+    assert summary.changed_vulnerable.resource_count_by_kind == {"aws_instance": 87, "gcp_disk": 1}
     assert summary.changed_compliant.accounts_by_severity == {"critical": {"123"}, "medium": {"234"}}
     assert summary.changed_compliant.resource_count_by_severity == {"critical": 1, "medium": 87}
+    assert summary.changed_compliant.resource_count_by_kind == {"aws_instance": 87, "gcp_disk": 1}
 
 
 async def test_no_graph_db_access() -> None:
