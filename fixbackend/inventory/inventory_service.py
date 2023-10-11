@@ -47,16 +47,9 @@ ChecksByAccountId = Dict[str, Set[str]]
 SeverityByCheckId = Dict[str, str]
 
 
-ReportSeverityPriority: Dict[str, int] = defaultdict(
-    lambda: 0, **{n: idx for idx, n in enumerate(["info", "low", "medium", "high", "critical"])}
-)
 ReportSeverityScore: Dict[str, int] = defaultdict(
-    lambda: 0, **{"info": 0, "low": 7, "medium": 13, "high": 27, "critical": 53}  # sum is 100
+    lambda: 0, **{"info": 0, "low": 7, "medium": 13, "high": 27, "critical": 53}  # the sum is 100
 )
-
-
-def higher_severity(left: str, right: str) -> str:
-    return left if ReportSeverityPriority[left] > ReportSeverityPriority[right] else right
 
 
 class InventoryService(Service):
