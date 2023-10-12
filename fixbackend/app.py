@@ -63,6 +63,7 @@ log = logging.getLogger(__name__)
 API_PREFIX = "/api"
 
 
+# noinspection PyUnresolvedReferences
 def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
@@ -74,6 +75,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     def create_redis(url: str) -> Redis:
         kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
+        if cfg.args.redis_password:
+            kwargs["password"] = cfg.args.redis_password
         return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
 
     @asynccontextmanager
@@ -81,7 +84,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
         http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
         arq_redis = deps.add(
             SN.arq_redis,
-            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+            await create_pool(
+                replace(
+                    RedisSettings.from_dsn(cfg.redis_queue_url),
+                    ssl_ca_certs=ca_cert_path,
+                    password=cfg.args.redis_password,
+                )
+            ),
         )
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
@@ -135,7 +144,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def setup_teardown_dispatcher(_: FastAPI) -> AsyncIterator[None]:
         arq_redis = deps.add(
             SN.arq_redis,
-            await create_pool(replace(RedisSettings.from_dsn(cfg.redis_queue_url), ssl_ca_certs=ca_cert_path)),
+            await create_pool(
+                replace(
+                    RedisSettings.from_dsn(cfg.redis_queue_url),
+                    ssl_ca_certs=ca_cert_path,
+                    password=cfg.args.redis_password,
+                )
+            ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         engine = deps.add(
