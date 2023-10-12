@@ -232,11 +232,13 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
             info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
             return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
         elif request.url.path == "/report/benchmarks":
-            info = [
-                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": ["aws_c1", "aws_c2"], "title": "AWS Test", "version": "0.1"},  # fmt: skip
-                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": ["gcp_c1", "gcp_c2"], "title": "GCP Test", "version": "0.2"},  # fmt: skip
+            benchmarks = [
+                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
             ]
-            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
+            return Response(
+                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
+            )
         elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
             result_list = [
                 {"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
