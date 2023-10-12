@@ -76,7 +76,7 @@ class CustomerIoEventConsumer(Service):
 
     async def process_user_registered_event(self, event: UserRegistered) -> None:
         if self.site_id is None or self.api_key is None:
-            log.info(f"No custemer.io credential confugured, skipping registration. Event: {event}")
+            log.warning(f"No custemer.io credential configured, skipping registration. Event: {event}")
             return
         endpoint = f"{self.customerio_baseurl}/api/v2/entity"
         payload = {
