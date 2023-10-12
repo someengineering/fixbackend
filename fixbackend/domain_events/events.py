@@ -23,13 +23,25 @@
 
 from typing import ClassVar
 from attrs import frozen
-from abc import ABC
+from abc import ABC, abstractmethod
 from fixbackend.ids import UserId, WorkspaceId, CloudAccountId
+from fixcloudutils.types import Json
+
+from fixbackend.domain_events.converter import converter
 
 
 @frozen
 class Event(ABC):
     kind: ClassVar[str]
+
+    @abstractmethod
+    def to_json(self) -> Json:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def from_json(json: Json) -> "Event":
+        ...
 
 
 @frozen
@@ -40,6 +52,13 @@ class UserRegistered(Event):
     email: str
     tenant_id: WorkspaceId
 
+    def to_json(self) -> Json:
+        return converter.unstructure(self)  # type: ignore
+
+    @staticmethod
+    def from_json(json: Json) -> "UserRegistered":
+        return converter.structure(json, UserRegistered)
+
 
 @frozen
 class AwsAccountDiscovered(Event):
@@ -49,3 +68,10 @@ class AwsAccountDiscovered(Event):
     tenant_id: WorkspaceId
     cloud_id: str
     aws_account_id: str
+
+    def to_json(self) -> Json:
+        return converter.unstructure(self)  # type: ignore
+
+    @staticmethod
+    def from_json(json: Json) -> "AwsAccountDiscovered":
+        return converter.structure(json, AwsAccountDiscovered)
