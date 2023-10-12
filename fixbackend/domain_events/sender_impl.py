@@ -25,7 +25,6 @@ from fixcloudutils.redis.event_stream import RedisStreamPublisher
 
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.sender import DomainEventSender
-from fixbackend.domain_events.converter import converter
 
 
 class DomainEventSenderImpl(DomainEventSender):
@@ -33,5 +32,5 @@ class DomainEventSenderImpl(DomainEventSender):
         self.publisher = publisher
 
     async def publish(self, event: Event) -> None:
-        message = converter.unstructure(event)
+        message = event.to_json()
         await self.publisher.publish(kind=event.kind, message=message)

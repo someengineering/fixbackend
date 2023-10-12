@@ -31,7 +31,6 @@ from httpx import AsyncClient, BasicAuth, Request
 from redis.asyncio import Redis
 
 from fixbackend.config import Config
-from fixbackend.domain_events.converter import converter
 from fixbackend.domain_events.events import UserRegistered
 
 log = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ class CustomerIoEventConsumer(Service):
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         match context.kind:
             case UserRegistered.kind:
-                event = converter.structure(message, UserRegistered)
+                event = UserRegistered.from_json(message)
                 await self.process_user_registered_event(event)
 
             case _:

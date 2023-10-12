@@ -106,19 +106,20 @@ def fast_api_app(cfg: Config) -> FastAPI:
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
 
-        domai_events_stream_name = "fixbackend::domain_events"
+        domain_events_stream_name = "fixbackend::domain_events"
         domain_event_redis_publisher = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
-                domai_events_stream_name,
+                domain_events_stream_name,
                 "fixbackend",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
         deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
         deps.add(
-            SN.customerio_consumer, CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domai_events_stream_name)
+            SN.customerio_consumer,
+            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domain_events_stream_name),
         )
 
         deps.add(SN.certificate_store, CertificateStore(cfg))
