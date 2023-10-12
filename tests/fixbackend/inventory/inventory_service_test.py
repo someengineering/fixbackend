@@ -28,7 +28,7 @@ from httpx import AsyncClient, Response, Request, MockTransport
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
-from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import ReportSummary, NoVulnerabilitiesChanged, BenchmarkAccountSummary, CheckSummary
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
@@ -67,12 +67,12 @@ async def test_summary(inventory_service: InventoryService) -> None:
     assert aws.cloud == "aws"
     assert aws.score == 93
     # check becoming vulnerable
-    assert summary.changed_vulnerable.accounts_by_severity == {"critical": {"123"}, "medium": {"234"}}
+    assert summary.changed_vulnerable.accounts_selection == ["123", "234"]
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
-    assert summary.changed_vulnerable.resource_count_by_kind == {"aws_instance": 87, "gcp_disk": 1}
-    assert summary.changed_compliant.accounts_by_severity == {"critical": {"123"}, "medium": {"234"}}
+    assert summary.changed_vulnerable.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
+    assert summary.changed_compliant.accounts_selection == ["123", "234"]
     assert summary.changed_compliant.resource_count_by_severity == {"critical": 1, "medium": 87}
-    assert summary.changed_compliant.resource_count_by_kind == {"aws_instance": 87, "gcp_disk": 1}
+    assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
     assert len(summary.top_checks) == 1
 
@@ -93,3 +93,13 @@ async def test_no_graph_db_access() -> None:
                 changed_compliant=NoVulnerabilitiesChanged,
                 top_checks=[],
             )
+
+
+async def test_dict_values_by() -> None:
+    # check order
+    inv = {1: [11, 12, 13], 2: [21, 22, 23], 0: [1, 2, 3]}
+    assert [a for a in dict_values_by(inv, lambda x: x)] == [21, 22, 23, 11, 12, 13, 1, 2, 3]
+    assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
+    # make sure the result is unique
+    inv = {1: [1, 2, 3, 11, 12, 13], 2: [1, 2, 3, 11, 12, 13, 21, 22, 23], 0: [1, 2, 3]}
+    assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
