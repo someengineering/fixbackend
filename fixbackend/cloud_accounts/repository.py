@@ -33,6 +33,10 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         raise NotImplementedError
 
@@ -69,6 +73,27 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_model() if cloud_account else None
+
+    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+        async with self.session_maker() as session:
+            stored_account = await session.get(orm.CloudAccount, id)
+            if stored_account is None:
+                raise ValueError(f"Cloud account {id} not found")
+
+            match cloud_account.access:
+                case AwsCloudAccess(account_id, external_id, role_name):
+                    stored_account.tenant_id = cloud_account.workspace_id
+                    stored_account.cloud = "aws"
+                    stored_account.account_id = account_id
+                    stored_account.aws_external_id = external_id
+                    stored_account.aws_role_name = role_name
+
+                case _:
+                    raise ValueError(f"Unknown cloud {cloud_account.access}")
+
+            await session.commit()
+            await session.refresh(stored_account)
+            return stored_account.to_model()
 
     async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""

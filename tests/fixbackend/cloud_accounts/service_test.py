@@ -42,6 +42,10 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
     async def get(self, id: CloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
 
+    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+        self.accounts[id] = cloud_account
+        return cloud_account
+
     async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         return [account for account in self.accounts.values() if account.workspace_id == workspace_id]
 
@@ -144,8 +148,9 @@ async def test_create_aws_account() -> None:
     assert event.tenant_id == acc.workspace_id
 
     # account already exists
-    with pytest.raises(Exception):
-        await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    idempotent_account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+    assert idempotent_account == acc
 
     # wrong external id
     with pytest.raises(Exception):
