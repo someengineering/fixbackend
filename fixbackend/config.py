@@ -57,6 +57,9 @@ class Config(BaseSettings):
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
     env: Literal["local", "dev", "prd"]
+    customerio_baseurl: str
+    customerio_site_id: Optional[str]
+    customerio_api_key: Optional[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -72,9 +75,7 @@ class Config(BaseSettings):
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
-    parser.add_argument(
-        "--instance-id", help="Unique id of this instance in a cluster of fixbackend services", default="single"
-    )
+    parser.add_argument("--instance-id", default=os.environ.get("FIX_INSTANCE_ID", "single"))
     parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
     parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
     parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
@@ -120,6 +121,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
     parser.add_argument("--env", default=os.environ.get("ENV", "local"))
+    parser.add_argument(
+        "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
+    )
+    parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
+    parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
