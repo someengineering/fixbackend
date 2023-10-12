@@ -45,14 +45,14 @@ log = logging.getLogger(__name__)
 
 # alias names for better readability
 BenchmarkById = Dict[str, BenchmarkSummary]
-ChecksByBenchmarkId = Dict[str, List[str]]
+ChecksByBenchmarkId = Dict[str, List[Dict[str, str]]]  # benchmark_id -> [{id: check_id, severity: medium}, ...]
 ChecksByAccountId = Dict[str, Set[str]]
 SeverityByCheckId = Dict[str, str]
 T = TypeVar("T")
 V = TypeVar("V")
 
 ReportSeverityScore: Dict[str, int] = defaultdict(
-    lambda: 0, **{"info": 0, "low": 7, "medium": 13, "high": 27, "critical": 53}  # the sum is 100
+    lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # the sum is 100
 )
 ReportSeverityPriority: Dict[str, int] = defaultdict(
     lambda: 0, **{n: idx for idx, n in enumerate(["info", "low", "medium", "high", "critical"])}
@@ -172,11 +172,15 @@ class InventoryService(Service):
             top = list(islice(dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x]), num))
             return await self.client.issues(db, check_ids=top)
 
-        def account_score(failing_checks: Dict[str, int]) -> int:
-            # for the moment we ignore the count of failing checks and only look at the severity
-            return max(0, 100 - sum(ReportSeverityScore[severity] for severity in failing_checks.keys()))
+        def bench_account_score(failing_checks: Dict[str, int], benchmark_checks: Dict[str, int]) -> int:
+            # Compute the score of an account with respect to a benchmark
+            # Weight failing checks by severity and compute an overall percentage
+            missing = sum(ReportSeverityScore[severity] * count for severity, count in failing_checks.items())
+            total = sum(ReportSeverityScore[severity] * count for severity, count in benchmark_checks.items())
+            return int((max(0, total - missing) * 100) // total)
 
         def overall_score(accounts: Dict[str, AccountSummary]) -> int:
+            # The overall score is the average of all account scores
             total_score = sum(account.score for account in accounts.values())
             total_accounts = len(accounts)
             return total_score // total_accounts if total_accounts > 0 else 100
@@ -205,24 +209,30 @@ class InventoryService(Service):
             available_checks = 0
             for bid, bench in benchmarks.items():
                 benchmark_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                for check in checks.get(bid, []):
+                benchmark_severity_count: Dict[str, int] = defaultdict(int)
+                for check_info in checks.get(bid, []):
+                    check_id = check_info["id"]
+                    benchmark_severity_count[check_info["severity"]] += 1
                     available_checks += 1
-                    if severity := severity_by_check_id.get(check):
+                    if severity := severity_by_check_id.get(check_id):
                         severity_counter[severity] += 1
-                        for account_id in failed_accounts_by_check_id.get(check, []):
+                        for account_id in failed_accounts_by_check_id.get(check_id, []):
                             benchmark_counter[account_id][severity] += 1
                             account_counter[account_id][severity] += 1
-                            failed_checks_by_severity[severity].add(check)
+                            failed_checks_by_severity[severity].add(check_id)
                 for account_id, account in accounts.items():
                     if account.cloud in bench.clouds:
                         failing = benchmark_counter.get(account_id)
                         bench.account_summary[account_id] = BenchmarkAccountSummary(
-                            score=account_score(failing) if failing else 100, failed_checks=failing
+                            score=bench_account_score(failing or {}, benchmark_severity_count), failed_checks=failing
                         )
 
-            # compute a score for every account
+            # compute a score for every account by averaging the scores of all benchmark results
             for account_id, failing in account_counter.items():
-                accounts[account_id].score = account_score(failing)
+                scores = [
+                    ba.score for b in benchmarks.values() for aid, ba in b.account_summary.items() if aid == account_id
+                ]
+                accounts[account_id].score = sum(scores) // len(scores) if scores else 100
 
             # get issues for the top 5 issue_ids
             tops = await top_issues(failed_checks_by_severity, num=5)
