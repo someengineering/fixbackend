@@ -24,7 +24,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 from itertools import islice
-from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal
+from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
@@ -48,7 +48,8 @@ BenchmarkById = Dict[str, BenchmarkSummary]
 ChecksByBenchmarkId = Dict[str, List[str]]
 ChecksByAccountId = Dict[str, Set[str]]
 SeverityByCheckId = Dict[str, str]
-
+T = TypeVar("T")
+V = TypeVar("V")
 
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 7, "medium": 13, "high": 27, "critical": 53}  # the sum is 100
@@ -56,6 +57,15 @@ ReportSeverityScore: Dict[str, int] = defaultdict(
 ReportSeverityPriority: Dict[str, int] = defaultdict(
     lambda: 0, **{n: idx for idx, n in enumerate(["info", "low", "medium", "high", "critical"])}
 )
+
+
+def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterable[V]:
+    # Sort the dict using the given function and return unique values in the order of the sorted keys
+    visited = set()
+    for v in (v for _, values in sorted(d.items(), key=lambda x: fn(x[0]), reverse=True) for v in values):
+        if v not in visited:
+            visited.add(v)
+            yield v
 
 
 class InventoryService(Service):
@@ -97,14 +107,19 @@ class InventoryService(Service):
                 ": count(name) as count",
             ):
                 severity = elem["group"]["severity"]
-                accounts_by_severity[severity].add(elem["group"]["account_id"])
+                if isinstance(acc_id := elem["group"]["account_id"], str):
+                    accounts_by_severity[severity].add(acc_id)
                 resource_count_by_severity[severity] += elem["count"]
                 resource_count_by_kind[elem["group"]["kind"]] += elem["count"]
+            # reduce the count by kind dict to the top 3
+            reduced = dict(sorted(resource_count_by_kind.items(), key=lambda item: item[1], reverse=True)[:3])
+            # reduce the list of accounts to the top 3
+            top_accounts = list(islice(dict_values_by(accounts_by_severity, lambda x: ReportSeverityPriority[x]), 3))
             return VulnerabilitiesChanged(
                 since=duration,
-                accounts_by_severity=accounts_by_severity,
+                accounts_selection=top_accounts,
                 resource_count_by_severity=resource_count_by_severity,
-                resource_count_by_kind=resource_count_by_kind,
+                resource_count_by_kind_selection=reduced,
             )
 
         async def account_summary() -> Dict[str, AccountSummary]:
@@ -131,8 +146,8 @@ class InventoryService(Service):
             ):
                 group = entry["group"]
                 check_id = group["check_id"]
-                account_id = group["account_id"]
-                check_accounts[check_id].add(account_id)
+                if isinstance(account_id := group["account_id"], str):
+                    check_accounts[check_id].add(account_id)
                 check_severity[check_id] = group["severity"]
             return check_accounts, check_severity
 
@@ -154,8 +169,7 @@ class InventoryService(Service):
             return summaries, benchmark_checks
 
         async def top_issues(checks_by_severity: Dict[str, Set[str]], num: int) -> List[Json]:
-            list_gen = sorted(checks_by_severity.items(), key=lambda x: ReportSeverityPriority[x[0]], reverse=True)
-            top = list(islice((id for _, check_ids in list_gen for id in check_ids), num))
+            top = list(islice(dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x]), num))
             return await self.client.issues(db, check_ids=top)
 
         def account_score(failing_checks: Dict[str, int]) -> int:

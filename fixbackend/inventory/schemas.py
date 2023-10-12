@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta
-from typing import List, Dict, Set, Optional
+from typing import List, Dict, Optional
 
 from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
@@ -44,20 +44,22 @@ class BenchmarkSummary(BaseModel):
 
 
 class CheckSummary(BaseModel):
-    available_checks: int
-    failed_checks: int
-    failed_checks_by_severity: Dict[str, int]
+    available_checks: int = Field(description="The number of all available checks.")
+    failed_checks: int = Field(description="The number of failed checks.")
+    failed_checks_by_severity: Dict[str, int] = Field(description="The number of failed checks by severity.")
 
 
 class VulnerabilitiesChanged(BaseModel):
     since: timedelta = Field(description="The time since the last report.")
-    accounts_by_severity: Dict[str, Set[str]]
-    resource_count_by_severity: Dict[str, int]
-    resource_count_by_kind: Dict[str, int]
+    accounts_selection: List[str] = Field(description="A selection of accounts with highest impact.")
+    resource_count_by_severity: Dict[str, int] = Field(description="The number of resources by severity.")
+    resource_count_by_kind_selection: Dict[str, int] = Field(
+        default="A selection of resource kinds with highest impact."
+    )
 
 
 NoVulnerabilitiesChanged = VulnerabilitiesChanged(
-    since=timedelta(0), accounts_by_severity={}, resource_count_by_severity={}, resource_count_by_kind={}
+    since=timedelta(0), accounts_selection=[], resource_count_by_severity={}, resource_count_by_kind_selection={}
 )
 
 
