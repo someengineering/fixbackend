@@ -133,11 +133,13 @@ class DispatcherService(Service):
             return cast(Dict[bytes, bytes], result)
 
         def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[str, AccountCollectInProgress]:
-            return {k.decode("utf-8"): AccountCollectInProgress.from_json(v) for k, v in hash.items()}
+            return {k.decode(): AccountCollectInProgress.from_json(v.decode()) for k, v in hash.items()}
 
         async def mark_job_as_done(progress: AccountCollectInProgress) -> AccountCollectInProgress:
             progress = dataclasses.replace(progress, status="done")
-            self.readwrite_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())
+            result = self.readwrite_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())
+            if isinstance(result, Awaitable):
+                await result
             return progress
 
         def all_jobs_finished(collect_state: Dict[str, AccountCollectInProgress]) -> bool:
