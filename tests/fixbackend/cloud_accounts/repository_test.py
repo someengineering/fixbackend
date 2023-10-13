@@ -22,6 +22,7 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.models import User
+from attrs import evolve
 
 
 @pytest.mark.asyncio
@@ -53,6 +54,19 @@ async def test_create_cloud_account(
     accounts = await cloud_account_repository.list_by_workspace_id(workspace_id=workspace_id)
     assert len(accounts) == 1
     assert accounts[0] == account
+
+    # update
+    updated_account = evolve(
+        account,
+        access=AwsCloudAccess(
+            account_id="42",
+            role_name="bar",
+            external_id=ExternalId(uuid.uuid4()),
+        ),
+    )
+    updated = await cloud_account_repository.update(id=account.id, cloud_account=updated_account)
+    stored_account = await cloud_account_repository.get(id=account.id)
+    assert updated == stored_account == updated_account
 
     # delete
     await cloud_account_repository.delete(id=account.id)

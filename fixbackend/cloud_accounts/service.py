@@ -16,8 +16,9 @@
 import uuid
 from abc import ABC, abstractmethod
 from hmac import compare_digest
-from typing import Annotated
+from typing import Annotated, Optional
 
+from attrs import evolve
 from fastapi import Depends
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
@@ -25,11 +26,11 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryDependency
 from fixbackend.dependencies import FixDependency
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
-from fixbackend.domain_events.sender import DomainEventSender
 from fixbackend.domain_events.dependencies import DomainEventSenderDependency
 from fixbackend.domain_events.events import AwsAccountDiscovered
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
 class WrongExternalId(Exception):
@@ -76,24 +77,31 @@ class CloudAccountServiceImpl(CloudAccountService):
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
-        async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> bool:
+        async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> Optional[CloudAccount]:
             accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
-            return any(
-                account.access.account_id == account_id
-                for account in accounts
-                if isinstance(account.access, AwsCloudAccess)
+            maybe_account = next(
+                iter(
+                    [
+                        account
+                        for account in accounts
+                        if isinstance(account.access, AwsCloudAccess) and account.access.account_id == account_id
+                    ]
+                ),
+                None,
             )
-
-        if await account_already_exists(workspace_id, account_id):
-            raise ValueError("Cloud account already exists")
+            return maybe_account
 
         account = CloudAccount(
             id=CloudAccountId(uuid.uuid4()),
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id=account_id, external_id=external_id, role_name=role_name),
         )
+        if existing := await account_already_exists(workspace_id, account_id):
+            account = evolve(account, id=existing.id)
+            result = await self.cloud_account_repository.update(existing.id, account)
+        else:
+            result = await self.cloud_account_repository.create(account)
 
-        result = await self.cloud_account_repository.create(account)
         message = {
             "cloud_account_id": str(result.id),
             "workspace_id": str(result.workspace_id),
