@@ -61,6 +61,7 @@ from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
+domain_events_stream_name = "fixbackend::domain_events"
 
 
 # noinspection PyUnresolvedReferences
@@ -115,7 +116,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
 
-        domain_events_stream_name = "fixbackend::domain_events"
         domain_event_redis_publisher = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
@@ -167,9 +167,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+        domain_event_redis_publisher = deps.add(
+            SN.domain_event_redis_stream_publisher,
+            RedisStreamPublisher(
+                rw_redis,
+                domain_events_stream_name,
+                "dispatching",
+                keep_unprocessed_messages_for=timedelta(days=7),
+            ),
+        )
+        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
         deps.add(
             SN.dispatching,
-            DispatcherService(rw_redis, cloud_accounts, next_run_repo, metering_repo, collect_queue, db_access),
+            DispatcherService(
+                rw_redis, cloud_accounts, next_run_repo, metering_repo, collect_queue, db_access, domain_event_sender
+            ),
         )
 
         async with deps:

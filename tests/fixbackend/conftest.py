@@ -46,6 +46,8 @@ from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.events import Event
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -291,6 +293,19 @@ async def workspace_repository(
     return WorkspaceRepositoryImpl(session, graph_database_access_manager)
 
 
+class InMemoryDomainEventSender(DomainEventSender):
+    def __init__(self) -> None:
+        self.events: List[Event] = []
+
+    async def publish(self, event: Event) -> None:
+        self.events.append(event)
+
+
+@pytest.fixture
+async def domain_event_sender() -> InMemoryDomainEventSender:
+    return InMemoryDomainEventSender()
+
+
 @pytest.fixture
 async def dispatcher(
     arq_redis: ArqRedis,
@@ -299,6 +314,7 @@ async def dispatcher(
     metering_repository: MeteringRepository,
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
+    domain_event_sender: DomainEventSender,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -307,6 +323,7 @@ async def dispatcher(
         metering_repository,
         collect_queue,
         graph_database_access_manager,
+        domain_event_sender,
     )
 
 

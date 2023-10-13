@@ -19,11 +19,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 
 
+# deprecated, do not use
 class NextRun(Base):
     __tablename__ = "next_run"
 
@@ -31,29 +32,37 @@ class NextRun(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
 
 
+class NextTenantRun(Base):
+    __tablename__ = "next_tenant_run"
+
+    tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
+
+
 class NextRunRepository:
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
-    async def create(self, cid: CloudAccountId, next_run: datetime) -> None:
+    async def create(self, workspace_id: WorkspaceId, next_run: datetime) -> None:
         async with self.session_maker() as session:
-            session.add(NextRun(cloud_account_id=cid, at=next_run))
+            next_tenant_run = NextTenantRun(tenant_id=workspace_id, at=next_run)
+            session.add(next_tenant_run)
             await session.commit()
 
-    async def update_next_run_at(self, cid: CloudAccountId, next_run: datetime) -> None:
+    async def update_next_run_at(self, workspace_id: WorkspaceId, next_run: datetime) -> None:
         async with self.session_maker() as session:
-            if nxt := await session.get(NextRun, cid):
+            if nxt := await session.get(NextTenantRun, workspace_id):
                 nxt.at = next_run
                 await session.commit()
 
-    async def delete(self, cid: CloudAccountId) -> None:
+    async def delete(self, workspace_id: WorkspaceId) -> None:
         async with self.session_maker() as session:
-            results = await session.execute(select(NextRun).where(NextRun.cloud_account_id == cid))
+            results = await session.execute(select(NextTenantRun).where(NextTenantRun.tenant_id == workspace_id))
             if run := results.unique().scalar():
                 await session.delete(run)
                 await session.commit()
 
-    async def older_than(self, at: datetime) -> AsyncIterator[Tuple[CloudAccountId, datetime]]:
+    async def older_than(self, at: datetime) -> AsyncIterator[Tuple[WorkspaceId, datetime]]:
         async with self.session_maker() as session:
-            async for (entry,) in await session.stream(select(NextRun).where(NextRun.at < at)):
-                yield entry.cloud_account_id, entry.at
+            async for (entry,) in await session.stream(select(NextTenantRun).where(NextTenantRun.at < at)):
+                yield entry.tenant_id, entry.at
