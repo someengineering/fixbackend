@@ -16,7 +16,7 @@
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Optional, Literal, cast, Dict
+from typing import Any, Dict, Optional, cast
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
@@ -27,33 +27,16 @@ from redis.asyncio import Redis
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInformation, CollectQueue
+from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.events import TenantAccountsCollected
+from fixbackend.domain_events.sender import DomainEventSender
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.domain_events.events import TenantAccountsCollected
-from fixbackend.domain_events.sender import DomainEventSender
-from dataclasses import dataclass
-import dataclasses
-import json
 
 log = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class AccountCollectInProgress:
-    job_id: str
-    account_id: str
-    started_at: str
-    status: Literal["in_progress", "done"] = "in_progress"
-
-    def to_json_str(self) -> str:
-        return json.dumps(dataclasses.asdict(self))
-
-    @staticmethod
-    def from_json(value: str) -> "AccountCollectInProgress":
-        return AccountCollectInProgress(**json.loads(value))
 
 
 class DispatcherService(Service):
@@ -132,10 +115,10 @@ class DispatcherService(Service):
             return cast(Dict[bytes, bytes], result)
 
         def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[str, AccountCollectInProgress]:
-            return {k.decode(): AccountCollectInProgress.from_json(v.decode()) for k, v in hash.items()}
+            return {k.decode(): AccountCollectInProgress.from_json_bytes(v) for k, v in hash.items()}
 
         async def mark_job_as_done(progress: AccountCollectInProgress) -> AccountCollectInProgress:
-            progress = dataclasses.replace(progress, status="done")
+            progress = progress.done()
             await self.temp_store_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())  # type: ignore
             return progress
 
@@ -143,7 +126,7 @@ class DispatcherService(Service):
             return all(job.status == "done" for job in collect_state.values())
 
         async def send_domain_event(collect_state: Dict[str, AccountCollectInProgress]) -> None:
-            collected_accounts = [CloudAccountId(uuid.UUID(job.account_id)) for job in collect_state.values()]
+            collected_accounts = [CloudAccountId(job.account_id) for job in collect_state.values()]
             await self.domaim_event_sender.publish(TenantAccountsCollected(tenant_id, collected_accounts))
 
         # fetch the redis hash
@@ -223,7 +206,7 @@ class DispatcherService(Service):
     async def _add_collect_in_progress_account(
         self, workspace_id: WorkspaceId, job_id: str, account_id: CloudAccountId
     ) -> None:
-        value = AccountCollectInProgress(job_id, str(account_id), utc().isoformat()).to_json_str()
+        value = AccountCollectInProgress(job_id, account_id, utc()).to_json_str()
         await self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=job_id, value=value)  # type: ignore # noqa
         # cleanup after 4 hours just to be sure
         await self.temp_store_redis.expire(name=self._collect_progress_hash_key(workspace_id), time=timedelta(hours=4))

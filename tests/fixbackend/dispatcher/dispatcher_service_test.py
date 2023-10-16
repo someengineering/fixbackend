@@ -14,7 +14,7 @@
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextTenantRun
 from fixbackend.domain_events.events import TenantAccountsCollected
@@ -105,6 +106,13 @@ async def test_trigger_collect(
     assert next_run.at > utc()  # next run is in the future
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 3
+    in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+        dispatcher._collect_progress_hash_key(organization.id)
+    )  # type: ignore # noqa
+    assert len(in_progress_hash) == 1
+    progress = AccountCollectInProgress.from_json_bytes(list(in_progress_hash.values())[0])
+    assert progress.account_id == cloud_account_id
+    assert progress.status == "in_progress"
 
     # another run should not change anything
     await dispatcher.schedule_next_runs()
