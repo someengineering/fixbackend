@@ -99,6 +99,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             create_async_engine(
                 cfg.database_url,
                 pool_size=10,
+                pool_recycle=3600,
                 # connect_args=dict(ssl=client_context)
             ),
         )
