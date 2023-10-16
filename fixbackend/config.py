@@ -60,6 +60,7 @@ class Config(BaseSettings):
     customerio_baseurl: str
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
+    cors_origins: List[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -127,6 +128,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
     parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
+    parser.add_argument(
+        "--cors-origins", nargs="+", default=os.environ.get("CORS_ORIGINS", "http://127.0.0.1:8081/").split(",")
+    )
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
