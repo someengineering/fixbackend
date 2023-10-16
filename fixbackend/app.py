@@ -168,7 +168,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
-        domain_event_redis_publisher = deps.add(
+        fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 rw_redis,
@@ -177,7 +177,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
-        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
+        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventSenderImpl(fixbackend_events))
         deps.add(
             SN.dispatching,
             DispatcherService(
