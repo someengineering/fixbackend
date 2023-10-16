@@ -35,6 +35,7 @@ class ServiceNames:
     arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
     readwrite_redis = "readwrite_redis"
+    temp_store_redis = "temp_store_redis"
     collect_queue = "collect_queue"
     async_engine = "async_engine"
     session_maker = "session_maker"

@@ -78,6 +78,7 @@ def default_config() -> Config:
         github_oauth_client_secret="",
         redis_readwrite_url="redis://localhost:6379/0",
         redis_readonly_url="redis://localhost:6379/0",
+        redis_temp_store_url="redis://localhost:6379/1",
         redis_queue_url="redis://localhost:6379/5",
         cdn_endpoint="",
         cdn_bucket="",
@@ -326,6 +327,7 @@ async def dispatcher(
         collect_queue,
         graph_database_access_manager,
         domain_event_sender,
+        arq_redis,
     )
 
 

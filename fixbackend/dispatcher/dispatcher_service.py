@@ -66,6 +66,7 @@ class DispatcherService(Service):
         collect_queue: CollectQueue,
         access_manager: GraphDatabaseAccessManager,
         domain_event_sender: DomainEventSender,
+        temp_store_redis: Redis,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.next_run_repo = next_run_repo
@@ -91,7 +92,7 @@ class DispatcherService(Service):
             consider_failed_after=timedelta(minutes=5),
             batch_size=1,
         )
-        self.readwrite_redis = readwrite_redis
+        self.temp_store_redis = temp_store_redis
         self.domaim_event_sender = domain_event_sender
 
     async def start(self) -> Any:
@@ -123,11 +124,11 @@ class DispatcherService(Service):
     def _collect_progress_hash_key(self, workspace_id: WorkspaceId) -> str:
         return f"dispatching:collect_jobs_in_progress:{workspace_id}"
 
-    async def maybe_send_domain_event(self, tenant_id: WorkspaceId, completed_job_id: str) -> None:
+    async def check_job(self, tenant_id: WorkspaceId, completed_job_id: str) -> None:
         redis_set_key = self._collect_progress_hash_key(tenant_id)
 
         async def get_redis_hash() -> Dict[bytes, bytes]:
-            result = self.readwrite_redis.hgetall(redis_set_key)
+            result = self.temp_store_redis.hgetall(redis_set_key)
             if isinstance(result, Awaitable):
                 result = await result
             return cast(Dict[bytes, bytes], result)
@@ -137,7 +138,7 @@ class DispatcherService(Service):
 
         async def mark_job_as_done(progress: AccountCollectInProgress) -> AccountCollectInProgress:
             progress = dataclasses.replace(progress, status="done")
-            result = self.readwrite_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())
+            result = self.temp_store_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())
             if isinstance(result, Awaitable):
                 await result
             return progress
@@ -168,7 +169,7 @@ class DispatcherService(Service):
 
         # all jobs are finished, send domain event and delete the hash
         await send_domain_event(tenant_collect_state)
-        await self.readwrite_redis.delete(redis_set_key)
+        await self.temp_store_redis.delete(redis_set_key)
 
     async def collect_job_finished(self, message: Json) -> None:
         job_id = message["job_id"]
@@ -196,7 +197,7 @@ class DispatcherService(Service):
             for account_id, account_details in account_info.items()
         ]
         await self.metering_repo.add(records)
-        await self.maybe_send_domain_event(
+        await self.check_job(
             workspace_id,
             job_id,
         )
@@ -227,11 +228,11 @@ class DispatcherService(Service):
         self, workspace_id: WorkspaceId, job_id: str, account_id: CloudAccountId
     ) -> None:
         value = AccountCollectInProgress(job_id, str(account_id), utc().isoformat()).to_json_str()
-        result = self.readwrite_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=job_id, value=value)
+        result = self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=job_id, value=value)
         if isinstance(result, Awaitable):
             await result
         # cleanup after 24 hours just to be sure
-        result = self.readwrite_redis.expire(
+        result = self.temp_store_redis.expire(
             name=self._collect_progress_hash_key(workspace_id), time=timedelta(hours=24)
         )
         if isinstance(result, Awaitable):

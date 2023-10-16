@@ -153,6 +153,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
             SN.async_engine,
             create_async_engine(
@@ -180,7 +181,14 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(
             SN.dispatching,
             DispatcherService(
-                rw_redis, cloud_accounts, next_run_repo, metering_repo, collect_queue, db_access, domain_event_sender
+                rw_redis,
+                cloud_accounts,
+                next_run_repo,
+                metering_repo,
+                collect_queue,
+                db_access,
+                domain_event_sender,
+                temp_store_redis,
             ),
         )
 
