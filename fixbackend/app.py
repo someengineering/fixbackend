@@ -25,6 +25,7 @@ from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -48,6 +49,7 @@ from fixbackend.dependencies import FixDependencies
 from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -56,8 +58,6 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.router import workspaces_router
-from fixbackend.domain_events.consumers import CustomerIoEventConsumer
-
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -100,6 +100,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
             create_async_engine(
                 cfg.database_url,
                 pool_size=10,
+                pool_recycle=3600,
+                pool_pre_ping=True,
                 # connect_args=dict(ssl=client_context)
             ),
         )
@@ -159,6 +161,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
             create_async_engine(
                 cfg.database_url,
                 pool_size=10,
+                pool_recycle=3600,
+                pool_pre_ping=True,
                 # connect_args=dict(ssl=client_context)
             ),
         )
@@ -207,6 +211,14 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cfg.cors_origins,
+        allow_credentials=True,
+        allow_methods=["PUT", "GET", "HEAD", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["X-Fix-Csrf"],
+    )
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {

@@ -103,6 +103,7 @@ def default_config() -> Config:
         customerio_baseurl="",
         customerio_site_id=None,
         customerio_api_key=None,
+        cors_origins=["http://localhost:3000"],
     )
 
 
