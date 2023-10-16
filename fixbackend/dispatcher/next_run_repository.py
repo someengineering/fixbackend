@@ -19,17 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import WorkspaceId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
-
-
-# deprecated, do not use
-class NextRun(Base):
-    __tablename__ = "next_run"
-
-    cloud_account_id: Mapped[CloudAccountId] = mapped_column(GUID, primary_key=True)
-    at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
 
 
 class NextTenantRun(Base):

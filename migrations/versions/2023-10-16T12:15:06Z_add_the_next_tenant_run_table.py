@@ -1,19 +1,20 @@
 """add the next_tenant_run table
 
-Revision ID: cd9ef4e05fdd
+Revision ID: 337d9a21e53c
 Revises: 9b482c179740
-Create Date: 2023-10-13 11:23:36.653345+00:00
+Create Date: 2023-10-16 12:15:06.362132+00:00
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import mysql
 from fastapi_users_db_sqlalchemy.generics import GUID
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 # revision identifiers, used by Alembic.
-revision: str = "cd9ef4e05fdd"
+revision: str = "337d9a21e53c"
 down_revision: Union[str, None] = "9b482c179740"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,4 +29,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("tenant_id"),
     )
     op.create_index(op.f("ix_next_tenant_run_at"), "next_tenant_run", ["at"], unique=False)
+    op.drop_index("ix_next_run_at", table_name="next_run")
+    op.drop_table("next_run")
     # ### end Alembic commands ###
