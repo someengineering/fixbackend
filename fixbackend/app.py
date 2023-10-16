@@ -116,7 +116,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
         )
 
-        domain_event_redis_publisher = deps.add(
+        fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
@@ -125,7 +125,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
-        deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
+        deps.add(SN.domain_event_sender, DomainEventSenderImpl(fixbackend_events))
         deps.add(
             SN.customerio_consumer,
             CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domain_events_stream_name),
