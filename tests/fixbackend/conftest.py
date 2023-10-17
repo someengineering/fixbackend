@@ -170,7 +170,7 @@ async def boto_session(boto_answers: Dict[str, Any]) -> AsyncIterator[BotoSessio
             raise Exception(f"Please provide mocked answer for boto operation {operation_name} and arguments {kwarg}")
 
     with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
-        yield BotoSession()
+        yield BotoSession(region_name="us-east-1")
 
 
 @pytest.fixture

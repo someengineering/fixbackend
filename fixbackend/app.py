@@ -72,7 +72,7 @@ API_PREFIX = "/api"
 def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
-    boto_session = boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key)
+    boto_session = boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key, region_name="us-east-1")
     deps = FixDependencies()
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
