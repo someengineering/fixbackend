@@ -15,7 +15,6 @@ json_converter.register_unstructure_hook(UUID, lambda v: str(v))
 
 @frozen
 class AccountCollectInProgress:
-    job_id: str
     account_id: CloudAccountId
     started_at: datetime
     status: Literal["in_progress", "done"] = "in_progress"

@@ -98,6 +98,19 @@ async def test_receive_aws_account_discovered(
     assert progress.account_id == cloud_account_id
     assert progress.status == "in_progress"
 
+    # concurrent event does not create a new entry in the work queue
+    # signal to the dispatcher that the cloud account was discovered
+    await dispatcher.process_domain_event(
+        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+    )
+    assert len(await arq_redis.keys()) == 3
+    new_in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+        dispatcher._collect_progress_hash_key(organization.id)
+    )  # type: ignore # noqa
+    assert len(new_in_progress_hash) == 1
+    assert AccountCollectInProgress.from_json_bytes(list(new_in_progress_hash.values())[0]) == progress
+
 
 @pytest.mark.asyncio
 async def test_receive_collect_done_message(
@@ -105,23 +118,32 @@ async def test_receive_collect_done_message(
     metering_repository: MeteringRepository,
     organization: Workspace,
     domain_event_sender: InMemoryDomainEventPublisher,
+    arq_redis: Redis,
 ) -> None:
+    async def in_progress_hash_len() -> int:
+        in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+            dispatcher._collect_progress_hash_key(organization.id)
+        )  # type: ignore # noqa
+        return len(in_progress_hash)
+
     current_events_length = len(domain_event_sender.events)
     job_id = "j1"
+    account_id_1 = CloudAccountId(uuid.uuid4())
+    account_id_2 = CloudAccountId(uuid.uuid4())
     message = {
         "job_id": job_id,
         "task_id": "t1",
         "tenant_id": str(organization.id),
         "account_info": {
-            "account1": dict(
-                id="account1",
+            str(account_id_1): dict(
+                id=str(account_id_1),
                 name="test",
                 cloud="aws",
                 exported_at="2023-09-29T09:00:18Z",
                 summary={"instance": 23, "volume": 12},
             ),
-            "account2": dict(
-                id="account2",
+            str(account_id_2): dict(
+                id=str(account_id_2),
                 name="foo",
                 cloud="k8s",
                 exported_at="2023-09-29T09:00:18Z",
@@ -133,9 +155,12 @@ async def test_receive_collect_done_message(
         "duration": 18,
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
-    cloud_account_id = CloudAccountId(uuid.uuid4())
-    await dispatcher._add_collect_in_progress_account(organization.id, job_id, cloud_account_id)
+    await dispatcher._add_collect_in_progress_account(organization.id, account_id_1)
+    assert await in_progress_hash_len() == 1
+
     await dispatcher.process_collect_done_message(message, context)
+    assert await in_progress_hash_len() == 0
+
     result = [n async for n in metering_repository.list(organization.id)]
     assert len(result) == 2
     mr_1, mr_2 = result if result[0].account_name == "test" else list(reversed(result))
@@ -143,7 +168,7 @@ async def test_receive_collect_done_message(
     assert mr_1.job_id == "j1"
     assert mr_1.task_id == "t1"
     assert mr_1.cloud == "aws"
-    assert mr_1.account_id == "account1"
+    assert mr_1.account_id == str(account_id_1)
     assert mr_1.account_name == "test"
     assert mr_1.nr_of_resources_collected == 35
     assert mr_1.nr_of_error_messages == 2
@@ -153,7 +178,7 @@ async def test_receive_collect_done_message(
     assert mr_2.job_id == "j1"
     assert mr_2.task_id == "t1"
     assert mr_2.cloud == "k8s"
-    assert mr_2.account_id == "account2"
+    assert mr_2.account_id == str(account_id_2)
     assert mr_2.account_name == "foo"
     assert mr_2.nr_of_resources_collected == 25
     assert mr_2.nr_of_error_messages == 2
@@ -161,7 +186,7 @@ async def test_receive_collect_done_message(
     assert mr_2.duration == 18
 
     assert len(domain_event_sender.events) == current_events_length + 1
-    assert domain_event_sender.events[-1] == TenantAccountsCollected(organization.id, [cloud_account_id])
+    assert domain_event_sender.events[-1] == TenantAccountsCollected(organization.id, [account_id_1])
 
 
 @pytest.mark.asyncio

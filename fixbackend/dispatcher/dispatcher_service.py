@@ -16,7 +16,7 @@
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, cast, List
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
@@ -35,6 +35,8 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
+
+from uuid import UUID
 
 log = logging.getLogger(__name__)
 
@@ -112,26 +114,38 @@ class DispatcherService(Service):
     def _collect_progress_hash_key(self, workspace_id: WorkspaceId) -> str:
         return f"dispatching:collect_jobs_in_progress:{workspace_id}"
 
-    async def complete_collect_job(self, tenant_id: WorkspaceId, completed_job_id: str) -> None:
+    async def complete_collect_job(self, tenant_id: WorkspaceId, collected_accounts: List[CloudAccountId]) -> None:
         redis_set_key = self._collect_progress_hash_key(tenant_id)
 
         async def get_redis_hash() -> Dict[bytes, bytes]:
             result = await self.temp_store_redis.hgetall(redis_set_key)  # type: ignore
             return cast(Dict[bytes, bytes], result)
 
-        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[str, AccountCollectInProgress]:
-            return {k.decode(): AccountCollectInProgress.from_json_bytes(v) for k, v in hash.items()}
+        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[CloudAccountId, AccountCollectInProgress]:
+            return {
+                CloudAccountId(UUID(hex=k.decode())): AccountCollectInProgress.from_json_bytes(v)
+                for k, v in hash.items()
+            }
 
-        async def mark_job_as_done(progress: AccountCollectInProgress) -> AccountCollectInProgress:
-            progress = progress.done()
-            await self.temp_store_redis.hset(redis_set_key, completed_job_id, progress.to_json_str())  # type: ignore
-            return progress
+        async def mark_as_done(
+            collect_state: Dict[CloudAccountId, AccountCollectInProgress]
+        ) -> Dict[CloudAccountId, AccountCollectInProgress]:
+            completed = {}
+            for done_id in collected_accounts:
+                if done_id not in collect_state:
+                    log.error(f"Could not find collect job context for accound id {done_id}")
+                    continue
+                completed[done_id] = collect_state[done_id].done()
+            redis_mapping = {str(k): v.to_json_str() for k, v in completed.items()}
+            if redis_mapping:
+                await self.temp_store_redis.hset(redis_set_key, mapping=redis_mapping)  # type: ignore
+            return collect_state | completed
 
-        def all_jobs_finished(collect_state: Dict[str, AccountCollectInProgress]) -> bool:
+        def all_jobs_finished(collect_state: Dict[CloudAccountId, AccountCollectInProgress]) -> bool:
             return all(job.status == "done" for job in collect_state.values())
 
-        async def send_domain_event(collect_state: Dict[str, AccountCollectInProgress]) -> None:
-            collected_accounts = [CloudAccountId(job.account_id) for job in collect_state.values()]
+        async def send_domain_event(collect_state: Dict[CloudAccountId, AccountCollectInProgress]) -> None:
+            collected_accounts = list(collect_state.keys())
             await self.domaim_event_sender.publish(TenantAccountsCollected(tenant_id, collected_accounts))
 
         # fetch the redis hash
@@ -141,12 +155,8 @@ class DispatcherService(Service):
             return
         # parse it to dataclass
         tenant_collect_state = parse_collect_state(hash)
-        if not (progress := tenant_collect_state.get(completed_job_id)):
-            log.error(f"Could not find job context for job id {completed_job_id}")
-            return
         # mark the job as done
-        progress = await mark_job_as_done(progress)
-        tenant_collect_state[completed_job_id] = progress
+        tenant_collect_state = await mark_as_done(tenant_collect_state)
         # check if we can send the domain event
         if not all_jobs_finished(tenant_collect_state):
             return
@@ -159,7 +169,7 @@ class DispatcherService(Service):
         job_id = message["job_id"]
         task_id = message["task_id"]
         workspace_id = WorkspaceId(uuid.UUID(message["tenant_id"]))
-        account_info = message["account_info"]
+        account_info: Dict[str, Any] = message["account_info"]
         messages = message["messages"]
         started_at = parse_utc_str(message["started_at"])
         duration = message["duration"]
@@ -180,10 +190,11 @@ class DispatcherService(Service):
             )
             for account_id, account_details in account_info.items()
         ]
+        collected_accounts = [CloudAccountId(UUID(account_id)) for account_id in account_info.keys()]
         await self.metering_repo.add(records)
         await self.complete_collect_job(
             workspace_id,
-            job_id,
+            collected_accounts,
         )
 
     async def workspace_created(self, workspace_id: WorkspaceId) -> None:
@@ -210,15 +221,21 @@ class DispatcherService(Service):
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
-    async def _add_collect_in_progress_account(
-        self, workspace_id: WorkspaceId, job_id: str, account_id: CloudAccountId
-    ) -> None:
-        value = AccountCollectInProgress(job_id, account_id, utc()).to_json_str()
-        await self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=job_id, value=value)  # type: ignore # noqa
+    async def _add_collect_in_progress_account(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> None:
+        value = AccountCollectInProgress(account_id, utc()).to_json_str()
+        await self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=str(account_id), value=value)  # type: ignore # noqa
         # cleanup after 4 hours just to be sure
         await self.temp_store_redis.expire(name=self._collect_progress_hash_key(workspace_id), time=timedelta(hours=4))
 
+    async def account_collect_in_progress(self, workspace_id: WorkspaceId, cloud_account_id: CloudAccountId) -> bool:
+        ongoing_collect = await self.temp_store_redis.hget(self._collect_progress_hash_key(workspace_id), str(cloud_account_id))  # type: ignore # noqa
+        return ongoing_collect is not None
+
     async def trigger_collect(self, account: CloudAccount) -> None:
+        if await self.account_collect_in_progress(account.workspace_id, account.id):
+            log.info(f"Collect for tenant: {account.workspace_id} and account: {account.id} is already in progress.")
+            return
+
         def account_information() -> Optional[AccountInformation]:
             match account.access:
                 case AwsCloudAccess(account_id=account_id, role_name=role_name, external_id=external_id):
@@ -239,21 +256,13 @@ class DispatcherService(Service):
             log.info(
                 f"Trigger collect for tenant: {account.workspace_id} and account: {account.id} with job_id: {job_id}"
             )
-            await self._add_collect_in_progress_account(account.workspace_id, job_id, account.id)
+            await self._add_collect_in_progress_account(account.workspace_id, account.id)
             await self.collect_queue.enqueue(db, ai, job_id=job_id)
 
     async def schedule_next_runs(self) -> None:
         now = utc()
 
-        async def job_still_running(workspace_id: WorkspaceId) -> bool:
-            hash_length: int = await self.temp_store_redis.hlen(self._collect_progress_hash_key(workspace_id))  # type: ignore # noqa
-            return hash_length > 0
-
         async for workspace_id, at in self.next_run_repo.older_than(now):
-            if await job_still_running(workspace_id):
-                log.error(f"Job for tenant: {workspace_id} is still running. Will not schedule next run.")
-                continue
-
             if accounts := await self.cloud_account_repo.list_by_workspace_id(workspace_id):
                 for account in accounts:
                     await self.trigger_collect(account)
