@@ -73,8 +73,10 @@ class AwsMarketplaceHandler(Service):
             await self.listener.stop()
 
     async def subscribed(self, user: User, token: str) -> Optional[SubscriptionMethod]:
+        log.info(f"AWS Marketplace subscription for user {user.email} with token {token}")
         # Get the related data from AWS. Will throw in case of an error.
         customer_data = self.marketplace_client.resolve_customer(RegistrationToken=token)
+        log.debug(f"AWS Marketplace user {user.email} got customer data: {customer_data}")
         product_code = customer_data["ProductCode"]
         customer_identifier = customer_data["CustomerIdentifier"]
         customer_aws_account_id = customer_data["CustomerAWSAccountId"]
@@ -86,6 +88,7 @@ class AwsMarketplaceHandler(Service):
 
         # only create a new subscription if there is no existing one
         if existing := await self.aws_marketplace_repo.aws_marketplace_subscription(user.id, customer_identifier):
+            log.debug(f"AWS Marketplace user {user.email}: return existing subscription")
             return existing
         else:
             subscription = AwsMarketplaceSubscription(
@@ -102,6 +105,7 @@ class AwsMarketplaceHandler(Service):
     async def handle_message(self, message: Json) -> None:
         # See: https://docs.aws.amazon.com/marketplace/latest/userguide/saas-notification.html
         action = message["action"]
+        log.info(f"AWS Marketplace. Received message: {message}")
         # customer_identifier = message["customer-identifier"]
         # free_trial = message.get("isFreeTrialTermPresent", False)
         match action:
