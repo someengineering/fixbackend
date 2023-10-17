@@ -127,7 +127,7 @@ def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any
         cookie_name="fix.auth",
         cookie_secure=True,
         cookie_httponly=True,
-        cookie_samesite="strict",
+        cookie_samesite="lax",
         cookie_max_age=config.session_ttl,
     )
     return AuthenticationBackend(
