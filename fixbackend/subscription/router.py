@@ -29,6 +29,8 @@ from fixbackend.auth.depedencies import OptionalAuthenticatedUser, Authenticated
 from fixbackend.dependencies import FixDependencies, ServiceNames as SN
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 
+AddUrlName = "aws-marketplace-subscription-add"
+
 
 def subscription_router(deps: FixDependencies) -> APIRouter:
     router = APIRouter()
@@ -47,13 +49,14 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
             # load the app and show a message
             return RedirectResponse("/?message=aws-marketplace-subscribed")
         else:
-            response = RedirectResponse("/auth/login?returnUrl=/subscriptions/aws/marketplace/add")
+            add_url = router.url_path_for(AddUrlName)
+            response = RedirectResponse(f"/auth/login?returnUrl={add_url}")
             response.set_cookie("fix-aws-marketplace-token", x_amzn_marketplace_token, secure=True, httponly=True)
             return response
 
-    @router.get("/subscriptions/aws/marketplace/add", response_model=None)
+    @router.get("/subscriptions/aws/marketplace/add", response_model=None, name=AddUrlName)
     async def aws_marketplace_fulfillment_after_login(
-        user: AuthenticatedUser, fix_aws_marketplace_token: str = Cookie(None)
+        user: AuthenticatedUser, fix_aws_marketplace_token: str = Cookie(None, alias="fix-aws-marketplace-token")
     ) -> Response:
         if fix_aws_marketplace_token is not None:
             await market_place_handler().subscribed(user, fix_aws_marketplace_token)
