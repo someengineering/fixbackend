@@ -47,13 +47,13 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
             # load the app and show a message
             return RedirectResponse("/?message=aws-marketplace-subscribed")
         else:
-            response = RedirectResponse("/auth/login?returnUrl=/subscriptions/aws/marketplace/add")
+            response = RedirectResponse("/auth/login?returnUrl=/api/subscriptions/aws/marketplace/add")
             response.set_cookie("fix-aws-marketplace-token", x_amzn_marketplace_token, secure=True, httponly=True)
             return response
 
     @router.get("/subscriptions/aws/marketplace/add", response_model=None)
     async def aws_marketplace_fulfillment_after_login(
-        user: AuthenticatedUser, fix_aws_marketplace_token: str = Cookie(None)
+        user: AuthenticatedUser, fix_aws_marketplace_token: str = Cookie(None, alias="fix-aws-marketplace-token")
     ) -> Response:
         if fix_aws_marketplace_token is not None:
             await market_place_handler().subscribed(user, fix_aws_marketplace_token)
