@@ -16,7 +16,7 @@
 from typing import Optional, Tuple
 import uuid
 import pytest
-from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
+from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.events import AwsAccountDiscovered
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
@@ -34,11 +34,10 @@ class RedisStreamPublisherMock(RedisStreamPublisher):
 @pytest.mark.asyncio
 async def test_publish_event() -> None:
     stream_publisher = RedisStreamPublisherMock()
-    sender = DomainEventSenderImpl(stream_publisher)
+    sender = DomainEventPublisherImpl(stream_publisher)
     event = AwsAccountDiscovered(
         cloud_account_id=CloudAccountId(uuid.uuid4()),
         tenant_id=WorkspaceId(uuid.uuid4()),
-        cloud_id="aws",
         aws_account_id="123456789012",
     )
     await sender.publish(event)

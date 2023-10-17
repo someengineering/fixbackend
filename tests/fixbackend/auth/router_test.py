@@ -20,9 +20,9 @@ from httpx import AsyncClient
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
-from fixbackend.domain_events.sender import DomainEventSender
-from fixbackend.domain_events.dependencies import get_domain_event_sender
-from fixbackend.domain_events.events import Event, UserRegistered
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.dependencies import get_domain_event_publisher
+from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
 
 
 class InMemoryVerifier(UserVerifier):
@@ -33,7 +33,7 @@ class InMemoryVerifier(UserVerifier):
         return self.verification_requests.append((user, token))
 
 
-class InMemoryDomainSender(DomainEventSender):
+class InMemoryDomainSender(DomainEventPublisher):
     def __init__(self) -> None:
         self.events: List[Event] = []
 
@@ -46,7 +46,7 @@ async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> 
     verifier = InMemoryVerifier()
     domain_event_sender = InMemoryDomainSender()
     fast_api.dependency_overrides[get_user_verifier] = lambda: verifier
-    fast_api.dependency_overrides[get_domain_event_sender] = lambda: domain_event_sender
+    fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
 
     registration_json = {
         "email": "user@example.com",
@@ -92,9 +92,13 @@ async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> 
     assert workspace_json.get("name") == user.email
 
     # domain event is sent
-    assert len(domain_event_sender.events) == 1
-    event = domain_event_sender.events[0]
+    assert len(domain_event_sender.events) == 2
+    event = domain_event_sender.events[1]
     assert isinstance(event, UserRegistered)
     assert event.user_id == user.id
     assert event.email == user.email
     assert str(event.tenant_id) == workspace_json["id"]
+
+    event1 = domain_event_sender.events[0]
+    assert isinstance(event1, WorkspaceCreated)
+    assert str(event1.workspace_id) == workspace_json["id"]

@@ -30,6 +30,9 @@ from fixbackend.dependencies import FixDependency
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, UserId
 from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.events import WorkspaceCreated
+from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 
 
 class WorkspaceRepository(ABC):
@@ -85,9 +88,15 @@ class WorkspaceRepository(ABC):
 
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
-    def __init__(self, session: AsyncSession, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        graph_db_access_manager: GraphDatabaseAccessManager,
+        domain_event_sender: DomainEventPublisher,
+    ) -> None:
         self.session = session
         self.graph_db_access_manager = graph_db_access_manager
+        self.domain_event_sender = domain_event_sender
 
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         workspace_id = WorkspaceId(uuid.uuid4())
@@ -97,6 +106,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         self.session.add(organization)
         # create a database access object for this organization in the same transaction
         await self.graph_db_access_manager.create_database_access(workspace_id, session=self.session)
+        await self.domain_event_sender.publish(WorkspaceCreated(workspace_id))
 
         await self.session.commit()
         await self.session.refresh(organization)
@@ -203,8 +213,10 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         await self.session.commit()
 
 
-async def get_workspace_repository(session: AsyncSessionDependency, fix: FixDependency) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(session, fix.graph_database_access)
+async def get_workspace_repository(
+    session: AsyncSessionDependency, fix: FixDependency, domain_event_sender: DomainEventPublisherDependency
+) -> WorkspaceRepository:
+    return WorkspaceRepositoryImpl(session, fix.graph_database_access, domain_event_sender)
 
 
 WorkspaceRepositoryDependency = Annotated[WorkspaceRepository, Depends(get_workspace_repository)]

@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from fixbackend.domain_events.events import Event
 
 
-class DomainEventSender(ABC):
+class DomainEventPublisher(ABC):
     @abstractmethod
     async def publish(self, event: Event) -> None:
         pass

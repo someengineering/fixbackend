@@ -15,7 +15,6 @@ from typing import Annotated
 
 from arq import ArqRedis
 from fastapi.params import Depends
-from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.service import Dependencies
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -26,8 +25,8 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.certificates.cert_store import CertificateStore
-from fixbackend.domain_events.sender import DomainEventSender
-from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 
 
 class ServiceNames:
@@ -46,7 +45,6 @@ class ServiceNames:
     inventory = "inventory"
     inventory_client = "inventory_client"
     dispatching = "dispatching"
-    cloudaccount_publisher = "cloudaccount_publisher"
     certificate_store = "certificate_store"
     domain_event_redis_stream_publisher = "domain_event_redis_stream_publisher"
     domain_event_sender = "domain_event_sender"
@@ -91,16 +89,12 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
     @property
-    def cloudaccount_publisher(self) -> RedisStreamPublisher:
-        return self.service(ServiceNames.cloudaccount_publisher, RedisStreamPublisher)
-
-    @property
     def certificate_store(self) -> CertificateStore:
         return self.service(ServiceNames.certificate_store, CertificateStore)
 
     @property
-    def domain_event_sender(self) -> DomainEventSender:
-        return self.service(ServiceNames.domain_event_sender, DomainEventSenderImpl)
+    def domain_event_sender(self) -> DomainEventPublisher:
+        return self.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

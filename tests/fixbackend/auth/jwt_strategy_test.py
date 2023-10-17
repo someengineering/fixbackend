@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.config import Config
 from fixbackend.auth.user_verifier import UserVerifier
-from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import Event
 
 
@@ -47,7 +47,7 @@ class UserVerifierMock(UserVerifier):
         return None
 
 
-class DomainEventSenderMock(DomainEventSender):
+class DomainEventSenderMock(DomainEventPublisher):
     async def publish(self, event: Event) -> None:
         pass
 

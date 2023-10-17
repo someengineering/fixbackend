@@ -27,83 +27,67 @@ from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
-from fixbackend.dispatcher.next_run_repository import NextRunRepository, NextTenantRun
-from fixbackend.domain_events.events import TenantAccountsCollected
+from fixbackend.dispatcher.next_run_repository import NextTenantRun
+from fixbackend.domain_events.events import TenantAccountsCollected, WorkspaceCreated, AwsAccountDiscovered
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
-from tests.fixbackend.conftest import InMemoryDomainEventSender
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
 @pytest.mark.asyncio
-async def test_receive_cloud_account_created(
+async def test_receive_workspace_created(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
     organization: Workspace,
-    arq_redis: Redis,
 ) -> None:
     # create a cloud account
     cloud_account_id = CloudAccountId(uuid.uuid1())
+    aws_account_id = "123"
     await cloud_account_repository.create(
-        CloudAccount(cloud_account_id, organization.id, AwsCloudAccess("123", organization.external_id, "test"))
+        CloudAccount(
+            cloud_account_id, organization.id, AwsCloudAccess(aws_account_id, organization.external_id, "test")
+        )
     )
-    # signal to the dispatcher that the cloud account was created
-    await dispatcher.process_cloud_account_changed_message(
-        {"cloud_account_id": str(cloud_account_id)},
-        MessageContext("test", "cloud_account_created", "test", utc(), utc()),
+    # signal to the dispatcher that the new workspace was created
+    await dispatcher.process_domain_event(
+        WorkspaceCreated(organization.id).to_json(),
+        MessageContext("test", WorkspaceCreated.kind, "test", utc(), utc()),
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextTenantRun, organization.id)
     assert next_run is not None
     assert next_run.at > utc()  # next run is in the future
-    # check that three new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx, arq:collect_in_progress:xxx) # noqa
-    redis_keys = await arq_redis.keys()
-    assert len(redis_keys) == 3
 
 
 @pytest.mark.asyncio
-async def test_receive_cloud_account_deleted(
-    dispatcher: DispatcherService,
-    session: AsyncSession,
-    next_run_repository: NextRunRepository,
-    organization: Workspace,
-) -> None:
-    # create cloud
-    cloud_account_id = CloudAccountId(uuid.uuid1())
-    # create a next run entry
-    await next_run_repository.create(organization.id, utc())
-    # signal to the dispatcher that the cloud account was created
-    await dispatcher.process_cloud_account_changed_message(
-        {"cloud_account_id": str(cloud_account_id)},
-        MessageContext("test", "cloud_account_deleted", "test", utc(), utc()),
-    )
-    # check that nothing was deleted in the next_tenant_run table
-    next_run = await session.get(NextTenantRun, organization.id)
-    assert next_run is not None
-
-
-@pytest.mark.asyncio
-async def test_trigger_collect(
+async def test_receive_aws_account_discovered(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
-    next_run_repository: NextRunRepository,
     organization: Workspace,
     arq_redis: Redis,
 ) -> None:
     # create a cloud account and next_run entry
     cloud_account_id = CloudAccountId(uuid.uuid1())
-    account = CloudAccount(cloud_account_id, organization.id, AwsCloudAccess("123", organization.external_id, "test"))
-    await cloud_account_repository.create(account)
-    # Create a next run entry scheduled in the past - it should be picked up for collect
-    await next_run_repository.create(organization.id, utc() - timedelta(hours=1))
+    aws_account_id = "123"
 
-    # schedule runs: make sure a collect is triggered and the next_run is updated
-    await dispatcher.schedule_next_runs()
+    account = CloudAccount(
+        cloud_account_id, organization.id, AwsCloudAccess(aws_account_id, organization.external_id, "test")
+    )
+    await cloud_account_repository.create(account)
+
+    # signal to the dispatcher that the cloud account was discovered
+    await dispatcher.process_domain_event(
+        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+    )
+
+    # check that no new entry was created in the next_run table
     next_run = await session.get(NextTenantRun, organization.id)
-    assert next_run is not None
-    assert next_run.at > utc()  # next run is in the future
+    assert next_run is None
+
     # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
     assert len(await arq_redis.keys()) == 3
     in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
@@ -114,21 +98,15 @@ async def test_trigger_collect(
     assert progress.account_id == cloud_account_id
     assert progress.status == "in_progress"
 
-    # another run should not change anything
-    await dispatcher.schedule_next_runs()
-    again = await session.get(NextTenantRun, organization.id)
-    assert again is not None
-    assert again.at == next_run.at
-    assert len(await arq_redis.keys()) == 3
-
 
 @pytest.mark.asyncio
 async def test_receive_collect_done_message(
     dispatcher: DispatcherService,
     metering_repository: MeteringRepository,
     organization: Workspace,
-    domain_event_sender: InMemoryDomainEventSender,
+    domain_event_sender: InMemoryDomainEventPublisher,
 ) -> None:
+    current_events_length = len(domain_event_sender.events)
     job_id = "j1"
     message = {
         "job_id": job_id,
@@ -182,8 +160,8 @@ async def test_receive_collect_done_message(
     assert mr_2.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
     assert mr_2.duration == 18
 
-    assert len(domain_event_sender.events) == 1
-    assert domain_event_sender.events[0] == TenantAccountsCollected(organization.id, [cloud_account_id])
+    assert len(domain_event_sender.events) == current_events_length + 1
+    assert domain_event_sender.events[-1] == TenantAccountsCollected(organization.id, [cloud_account_id])
 
 
 @pytest.mark.asyncio

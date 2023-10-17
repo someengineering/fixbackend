@@ -46,7 +46,7 @@ from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import Event
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
@@ -290,14 +290,7 @@ async def metering_repository(async_session_maker: AsyncSessionMaker) -> Meterin
     return MeteringRepository(async_session_maker)
 
 
-@pytest.fixture
-async def workspace_repository(
-    session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
-) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(session, graph_database_access_manager)
-
-
-class InMemoryDomainEventSender(DomainEventSender):
+class InMemoryDomainEventPublisher(DomainEventPublisher):
     def __init__(self) -> None:
         self.events: List[Event] = []
 
@@ -306,8 +299,17 @@ class InMemoryDomainEventSender(DomainEventSender):
 
 
 @pytest.fixture
-async def domain_event_sender() -> InMemoryDomainEventSender:
-    return InMemoryDomainEventSender()
+async def domain_event_sender() -> InMemoryDomainEventPublisher:
+    return InMemoryDomainEventPublisher()
+
+
+@pytest.fixture
+async def workspace_repository(
+    session: AsyncSession,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    domain_event_sender: DomainEventPublisher,
+) -> WorkspaceRepository:
+    return WorkspaceRepositoryImpl(session, graph_database_access_manager, domain_event_sender)
 
 
 @pytest.fixture
@@ -318,7 +320,7 @@ async def dispatcher(
     metering_repository: MeteringRepository,
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
-    domain_event_sender: DomainEventSender,
+    domain_event_sender: DomainEventPublisher,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -329,6 +331,7 @@ async def dispatcher(
         graph_database_access_manager,
         domain_event_sender,
         arq_redis,
+        "foobar",
     )
 
 
