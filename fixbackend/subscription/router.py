@@ -22,7 +22,7 @@
 from functools import partial
 from typing import Callable
 
-from fastapi import APIRouter, Form, Cookie, Response
+from fastapi import APIRouter, Form, Cookie, Response, Request
 from starlette.responses import RedirectResponse
 
 from fixbackend.auth.depedencies import OptionalAuthenticatedUser, AuthenticatedUser
@@ -41,7 +41,9 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
     # Attention: Changing this route will break the AWS Marketplace integration!
     @router.post("/cloud/callbacks/aws/marketplace")
     async def aws_marketplace_fulfillment(
-        maybe_user: OptionalAuthenticatedUser, x_amzn_marketplace_token: str = Form(alias="x-amzn-marketplace-token")
+        request: Request,
+        maybe_user: OptionalAuthenticatedUser,
+        x_amzn_marketplace_token: str = Form(alias="x-amzn-marketplace-token"),
     ) -> Response:
         if user := maybe_user:
             # add marketplace subscription
@@ -49,7 +51,7 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
             # load the app and show a message
             return RedirectResponse("/?message=aws-marketplace-subscribed")
         else:
-            add_url = router.url_path_for(AddUrlName)
+            add_url = request.scope["router"].url_path_for(AddUrlName)
             response = RedirectResponse(f"/auth/login?returnUrl={add_url}")
             response.set_cookie("fix-aws-marketplace-token", x_amzn_marketplace_token, secure=True, httponly=True)
             return response
