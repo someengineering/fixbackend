@@ -45,6 +45,7 @@ class SQSRawListener(Service):
 
     def __init__(
         self,
+        session: boto3.Session,
         queue_url: str,
         message_processor: Callable[[Json], Awaitable[Any]],
         *,
@@ -62,7 +63,7 @@ class SQSRawListener(Service):
         :param wait_for_new_messages_to_arrive: The time to wait for new messages to arrive.
         :param backoff: The backoff strategy to use when processing messages.
         """
-        self.sqs = boto3.client("sqs")
+        self.sqs = session.client("sqs")
         self.queue_url = queue_url
         self.message_processor = message_processor
         self.consider_failed_after = consider_failed_after.total_seconds() if consider_failed_after else 30
@@ -111,11 +112,12 @@ class SQSListener(SQSRawListener):
 
     def __init__(
         self,
+        session: boto3.Session,
         queue_url: str,
         message_processor: Callable[[Json, MessageContext], Awaitable[Any]],
         **kwargs: Any,
     ) -> None:
-        super().__init__(queue_url, self.__context_handler(message_processor), **kwargs)
+        super().__init__(session, queue_url, self.__context_handler(message_processor), **kwargs)
 
     @staticmethod
     def __context_handler(fn: Callable[[Json, MessageContext], Awaitable[Any]]) -> Callable[[Json], Awaitable[Any]]:
@@ -134,9 +136,9 @@ class SQSListener(SQSRawListener):
 
 
 class SQSPublisher(Service):
-    def __init__(self, publisher_name: str, queue_url: str) -> None:
+    def __init__(self, session: boto3.Session, publisher_name: str, queue_url: str) -> None:
         self.publisher_name = publisher_name
-        self.sqs = boto3.client("sqs")
+        self.sqs = session.client("sqs")
         self.queue_url = queue_url
 
     async def publish(self, kind: str, message: Json) -> None:

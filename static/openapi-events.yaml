@@ -49,7 +49,7 @@ components:
         tenant_id:
           type: string
           description: Id of the defaut workspace.
-    
+
     AwsAccountDiscovered:
       description: "This event emitted when a new aws account has been discovered."
       type: object

@@ -16,13 +16,15 @@ import asyncio
 import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
-from typing import AsyncIterator, Iterator, List
+from typing import AsyncIterator, Iterator, List, Any, Dict
+from unittest.mock import patch
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from boto3 import Session as BotoSession
 from fastapi import FastAPI
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
@@ -30,9 +32,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from fixbackend.app import fast_api_app
-from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.auth.db import get_user_repository
 from fixbackend.auth.models import User
+from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
 from fixbackend.db import get_async_session
@@ -43,9 +45,11 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-from fixbackend.types import AsyncSessionMaker
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -150,6 +154,23 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     await session.close()
     await transaction.close()
     await connection.close()
+
+
+@pytest.fixture
+async def boto_answers() -> Dict[str, Any]:
+    return {}
+
+
+@pytest.fixture
+async def boto_session(boto_answers: Dict[str, Any]) -> AsyncIterator[BotoSession]:
+    def mock_make_api_call(client: Any, operation_name: str, kwarg: Any) -> Any:
+        if result := boto_answers.get(operation_name):
+            return result
+        else:
+            raise Exception(f"Please provide mocked answer for boto operation {operation_name} and arguments {kwarg}")
+
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
+        yield BotoSession(region_name="us-east-1")
 
 
 @pytest.fixture
@@ -283,15 +304,29 @@ async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> Cl
 
 
 @pytest.fixture
+async def subscription_repository(async_session_maker: AsyncSessionMaker) -> SubscriptionRepository:
+    return SubscriptionRepository(async_session_maker)
+
+
+@pytest.fixture
 async def metering_repository(async_session_maker: AsyncSessionMaker) -> MeteringRepository:
     return MeteringRepository(async_session_maker)
 
 
 @pytest.fixture
 async def workspace_repository(
-    session: AsyncSession, graph_database_access_manager: GraphDatabaseAccessManager
+    async_session_maker: AsyncSessionMaker, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(session, graph_database_access_manager)
+    return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager)
+
+
+@pytest.fixture
+async def aws_marketplace_handler(
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
+    boto_session: BotoSession,
+) -> AwsMarketplaceHandler:
+    return AwsMarketplaceHandler(subscription_repository, workspace_repository, boto_session, None)
 
 
 @pytest.fixture
@@ -315,10 +350,18 @@ async def dispatcher(
 
 @pytest.fixture
 async def fix_deps(
-    db_engine: AsyncEngine, graph_database_access_manager: GraphDatabaseAccessManager
+    db_engine: AsyncEngine,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
 ) -> FixDependencies:
     return FixDependencies(
-        **{ServiceNames.async_engine: db_engine, ServiceNames.graph_db_access: graph_database_access_manager}
+        **{
+            ServiceNames.async_engine: db_engine,
+            ServiceNames.graph_db_access: graph_database_access_manager,
+            ServiceNames.session_maker: async_session_maker,
+            ServiceNames.workspace_repo: workspace_repository,
+        }
     )
 
 

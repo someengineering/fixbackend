@@ -19,6 +19,7 @@ from datetime import timedelta
 from ssl import Purpose, create_default_context
 from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
 
+import boto3
 import httpx
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -57,6 +58,10 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.router import subscription_router
+from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
 
 log = logging.getLogger(__name__)
@@ -67,6 +72,7 @@ API_PREFIX = "/api"
 def fast_api_app(cfg: Config) -> FastAPI:
     google = google_client(cfg)
     github = github_client(cfg)
+    boto_session = boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key, region_name="us-east-1")
     deps = FixDependencies()
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
@@ -109,12 +115,20 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
-        deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+        graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
         deps.add(SN.inventory, InventoryService(inventory_client))
         deps.add(
             SN.cloudaccount_publisher,
             RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
+        )
+        workspace_repo = deps.add(SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access))
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        deps.add(
+            SN.aws_marketplace_handler,
+            AwsMarketplaceHandler(
+                subscription_repo, workspace_repo, boto_session, cfg.args.aws_marketplace_metering_sqs_url
+            ),
         )
 
         domain_events_stream_name = "fixbackend::domain_events"
@@ -268,8 +282,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
-        app.include_router(api_router)
+        api_router.include_router(subscription_router(deps))
 
+        app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
 
         if cfg.static_assets:
