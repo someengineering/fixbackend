@@ -11,8 +11,12 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import datetime
 
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import func, text, DefaultClause
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 
 class Base(DeclarativeBase):
@@ -21,3 +25,16 @@ class Base(DeclarativeBase):
 
     All model classes should inherit from this class.
     """
+
+
+class CreatedUpdatedMixin:
+    """
+    Mixin to always have created_at and updated_at columns in a model.
+    """
+
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        server_default=func.now(),
+        server_onupdate=DefaultClause(text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")),
+    )

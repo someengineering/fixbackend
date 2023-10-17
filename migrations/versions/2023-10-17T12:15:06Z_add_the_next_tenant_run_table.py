@@ -15,7 +15,7 @@ from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "337d9a21e53c"
-down_revision: Union[str, None] = "9b482c179740"
+down_revision: Union[str, None] = "6e6db9c38194"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

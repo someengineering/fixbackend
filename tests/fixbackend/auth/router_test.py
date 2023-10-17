@@ -24,6 +24,8 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
 
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher
+
 
 class InMemoryVerifier(UserVerifier):
     def __init__(self) -> None:
@@ -42,9 +44,10 @@ class InMemoryDomainSender(DomainEventPublisher):
 
 
 @pytest.mark.asyncio
-async def test_registration_flow(api_client: AsyncClient, fast_api: FastAPI) -> None:
+async def test_registration_flow(
+    api_client: AsyncClient, fast_api: FastAPI, domain_event_sender: InMemoryDomainEventPublisher
+) -> None:
     verifier = InMemoryVerifier()
-    domain_event_sender = InMemoryDomainSender()
     fast_api.dependency_overrides[get_user_verifier] = lambda: verifier
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
 

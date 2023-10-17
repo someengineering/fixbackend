@@ -11,7 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated
+from typing import Annotated, cast
 
 from arq import ArqRedis
 from fastapi.params import Depends
@@ -19,14 +19,12 @@ from fixcloudutils.service import Dependencies
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from fixbackend.collect.collect_queue import RedisCollectQueue
-from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.inventory.inventory_client import InventoryClient
-from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.types import AsyncSessionMaker
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.types import AsyncSessionMaker
 
 
 class ServiceNames:
@@ -49,6 +47,9 @@ class ServiceNames:
     domain_event_redis_stream_publisher = "domain_event_redis_stream_publisher"
     domain_event_sender = "domain_event_sender"
     customerio_consumer = "customerio_consumer"
+    aws_marketplace_handler = "aws_marketplace_handler"
+    workspace_repo = "workspace_repo"
+    subscription_repo = "subscription_repo"
 
 
 class FixDependencies(Dependencies):
@@ -57,24 +58,16 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.arq_redis, ArqRedis)
 
     @property
-    def collect_queue(self) -> RedisCollectQueue:
-        return self.service(ServiceNames.collect_queue, RedisCollectQueue)
-
-    @property
     def async_engine(self) -> AsyncEngine:
         return self.service(ServiceNames.async_engine, AsyncEngine)
 
     @property
     def session_maker(self) -> AsyncSessionMaker:
-        return self.service(ServiceNames.async_engine, AsyncSessionMaker)  # type: ignore
+        return cast(AsyncSessionMaker, self.lookup[ServiceNames.session_maker])
 
     @property
     def inventory(self) -> InventoryService:
         return self.service(ServiceNames.inventory, InventoryService)
-
-    @property
-    def inventory_client(self) -> InventoryClient:
-        return self.service(ServiceNames.inventory, InventoryClient)
 
     @property
     def readonly_redis(self) -> Redis:

@@ -119,6 +119,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID", ""))
     parser.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
     parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "us-east-1"))
+    parser.add_argument(
+        "--aws-marketplace-metering-sqs-url", default=os.environ.get("AWS_MARKETPLACE_METERING_SQS_URL")
+    )
     parser.add_argument("--ca-cert", type=Path, default=os.environ.get("CA_CERT"))
     parser.add_argument("--host-cert", type=Path, default=os.environ.get("HOST_CERT"))
     parser.add_argument("--host-key", type=Path, default=os.environ.get("HOST_KEY"))

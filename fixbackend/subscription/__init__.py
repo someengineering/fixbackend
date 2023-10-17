@@ -19,25 +19,3 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated, Optional
-from uuid import UUID
-
-from fastapi import Depends
-from fastapi_users import FastAPIUsers
-
-from fixbackend.auth.auth_backend import get_auth_backend
-from fixbackend.auth.models import User
-from fixbackend.auth.user_manager import get_user_manager
-from fixbackend.config import get_config
-
-
-# todo: use dependency injection
-fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
-
-# the value below is a dependency itself
-get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
-maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
-
-
-AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
-OptionalAuthenticatedUser = Annotated[Optional[User], Depends(maybe_current_active_verified_user)]
