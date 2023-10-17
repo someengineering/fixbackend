@@ -29,6 +29,8 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, UserId
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.events import WorkspaceCreated
 
 
 class WorkspaceRepository(ABC):
@@ -84,9 +86,15 @@ class WorkspaceRepository(ABC):
 
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
-    def __init__(self, session_maker: AsyncSessionMaker, graph_db_access_manager: GraphDatabaseAccessManager) -> None:
+    def __init__(
+        self,
+        session_maker: AsyncSessionMaker,
+        graph_db_access_manager: GraphDatabaseAccessManager,
+        domain_event_sender: DomainEventPublisher,
+    ) -> None:
         self.session_maker = session_maker
         self.graph_db_access_manager = graph_db_access_manager
+        self.domain_event_sender = domain_event_sender
 
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
@@ -97,6 +105,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
+            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id))
 
             await session.commit()
             await session.refresh(organization)

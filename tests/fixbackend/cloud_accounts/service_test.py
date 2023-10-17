@@ -27,7 +27,7 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
-from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import Event, AwsAccountDiscovered
 
 
@@ -95,7 +95,7 @@ class RedisPubSubPublisherMock(RedisPubSubPublisher):
         self.last_message = (kind, message, channel)
 
 
-class DomainEventSenderMock(DomainEventSender):
+class DomainEventSenderMock(DomainEventPublisher):
     def __init__(self) -> None:
         self.events: List[Event] = []
 
@@ -107,12 +107,9 @@ class DomainEventSenderMock(DomainEventSender):
 async def test_create_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
-    stream_publisher = RedisStreamPublisherMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(
-        organization_repository, repository, stream_publisher, pubsub_publisher, domain_sender
-    )
+    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
 
     # happy case
     acc = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -130,10 +127,6 @@ async def test_create_aws_account() -> None:
         "workspace_id": str(account.workspace_id),
         "aws_account_id": account_id,
     }
-
-    assert stream_publisher.last_message is not None
-    assert stream_publisher.last_message[0] == "cloud_account_created"
-    assert stream_publisher.last_message[1] == message
 
     assert pubsub_publisher.last_message is not None
     assert pubsub_publisher.last_message[0] == "cloud_account_created"
@@ -165,12 +158,9 @@ async def test_create_aws_account() -> None:
 async def test_delete_aws_account() -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
-    stream_publisher = RedisStreamPublisherMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(
-        organization_repository, repository, stream_publisher, pubsub_publisher, domain_sender
-    )
+    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
@@ -183,7 +173,3 @@ async def test_delete_aws_account() -> None:
     # success
     await service.delete_cloud_account(account.id, test_workspace_id)
     assert len(repository.accounts) == 0
-
-    assert stream_publisher.last_message is not None
-    assert stream_publisher.last_message[0] == "cloud_account_deleted"
-    assert stream_publisher.last_message[1] == {"id": str(account.id)}

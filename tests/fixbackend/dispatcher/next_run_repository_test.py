@@ -19,12 +19,12 @@ import pytest
 from fixcloudutils.util import utc
 
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import WorkspaceId
 
 
 @pytest.mark.asyncio
 async def test_create(next_run_repository: NextRunRepository) -> None:
-    cid = CloudAccountId(uuid.uuid1())
+    cid = WorkspaceId(uuid.uuid1())
     now = utc()
     now_minus_1 = now - timedelta(minutes=1)
     await next_run_repository.create(cid, now_minus_1)

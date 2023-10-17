@@ -24,6 +24,11 @@ services:
     network_mode: service:app
     container_name: "fixbackend-redis-${USER}"
 
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    network_mode: service:app
+    container_name: "fixbackend-redisinsight-${USER}"
+
   db:
     image: mysql:8
     network_mode: service:app

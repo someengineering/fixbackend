@@ -28,7 +28,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
@@ -51,7 +51,7 @@ from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
-from fixbackend.domain_events.sender_impl import DomainEventSenderImpl
+from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -63,9 +63,11 @@ from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
+from fixbackend.errors import Unauthorized
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
+domain_events_stream_name = "fixbackend:domain_events"
 
 
 # noinspection PyUnresolvedReferences
@@ -118,21 +120,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
         deps.add(SN.inventory, InventoryService(inventory_client))
-        deps.add(
-            SN.cloudaccount_publisher,
-            RedisStreamPublisher(readwrite_redis, "fixbackend::cloudaccount", f"fixbackend-{cfg.instance_id}"),
-        )
-        workspace_repo = deps.add(SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access))
-        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
-        deps.add(
-            SN.aws_marketplace_handler,
-            AwsMarketplaceHandler(
-                subscription_repo, workspace_repo, boto_session, cfg.args.aws_marketplace_metering_sqs_url
-            ),
-        )
-
-        domain_events_stream_name = "fixbackend::domain_events"
-        domain_event_redis_publisher = deps.add(
+        fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
@@ -141,7 +129,17 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
         )
-        deps.add(SN.domain_event_sender, DomainEventSenderImpl(domain_event_redis_publisher))
+        domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+        workspace_repo = deps.add(
+            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher)
+        )
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        deps.add(
+            SN.aws_marketplace_handler,
+            AwsMarketplaceHandler(
+                subscription_repo, workspace_repo, boto_session, cfg.args.aws_marketplace_metering_sqs_url
+            ),
+        )
         deps.add(
             SN.customerio_consumer,
             CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domain_events_stream_name),
@@ -169,6 +167,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
             SN.async_engine,
             create_async_engine(
@@ -185,9 +184,29 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+        fixbackend_events = deps.add(
+            SN.domain_event_redis_stream_publisher,
+            RedisStreamPublisher(
+                rw_redis,
+                domain_events_stream_name,
+                "dispatching",
+                keep_unprocessed_messages_for=timedelta(days=7),
+            ),
+        )
+        domain_event_sender = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         deps.add(
             SN.dispatching,
-            DispatcherService(rw_redis, cloud_accounts, next_run_repo, metering_repo, collect_queue, db_access),
+            DispatcherService(
+                rw_redis,
+                cloud_accounts,
+                next_run_repo,
+                metering_repo,
+                collect_queue,
+                db_access,
+                domain_event_sender,
+                temp_store_redis,
+                domain_events_stream_name,
+            ),
         )
 
         async with deps:
@@ -213,6 +232,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
         allow_methods=["PUT", "GET", "HEAD", "POST", "DELETE", "OPTIONS"],
         allow_headers=["X-Fix-Csrf"],
     )
+
+    @app.exception_handler(Unauthorized)
+    async def unauthorized_handler(request: Request, exception: Unauthorized) -> Response:
+        return JSONResponse(status_code=403, content={"message": str(exception)})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {

@@ -50,6 +50,8 @@ from fixbackend.subscription.subscription_repository import SubscriptionReposito
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.events import Event
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -80,6 +82,7 @@ def default_config() -> Config:
         github_oauth_client_secret="",
         redis_readwrite_url="redis://localhost:6379/0",
         redis_readonly_url="redis://localhost:6379/0",
+        redis_temp_store_url="redis://localhost:6379/1",
         redis_queue_url="redis://localhost:6379/5",
         cdn_endpoint="",
         cdn_bucket="",
@@ -313,11 +316,26 @@ async def metering_repository(async_session_maker: AsyncSessionMaker) -> Meterin
     return MeteringRepository(async_session_maker)
 
 
+class InMemoryDomainEventPublisher(DomainEventPublisher):
+    def __init__(self) -> None:
+        self.events: List[Event] = []
+
+    async def publish(self, event: Event) -> None:
+        self.events.append(event)
+
+
+@pytest.fixture
+async def domain_event_sender() -> InMemoryDomainEventPublisher:
+    return InMemoryDomainEventPublisher()
+
+
 @pytest.fixture
 async def workspace_repository(
-    async_session_maker: AsyncSessionMaker, graph_database_access_manager: GraphDatabaseAccessManager
+    async_session_maker: AsyncSessionMaker,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    domain_event_sender: DomainEventPublisher,
 ) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager)
+    return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager, domain_event_sender)
 
 
 @pytest.fixture
@@ -337,6 +355,7 @@ async def dispatcher(
     metering_repository: MeteringRepository,
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
+    domain_event_sender: DomainEventPublisher,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -345,6 +364,9 @@ async def dispatcher(
         metering_repository,
         collect_queue,
         graph_database_access_manager,
+        domain_event_sender,
+        arq_redis,
+        "foobar",
     )
 
 

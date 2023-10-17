@@ -11,23 +11,15 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU Affero General Public License for more details.
-#
-#  You should have received a copy of the GNU Affero General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 
 from fixbackend.domain_events.events import Event
-from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixcloudutils.service import Service
 
 
-class DomainEventSenderImpl(DomainEventSender):
+class DomainEventPublisherImpl(DomainEventPublisher, Service):
     def __init__(self, publisher: RedisStreamPublisher) -> None:
         self.publisher = publisher
 

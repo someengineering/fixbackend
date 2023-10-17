@@ -37,6 +37,7 @@ class Config(BaseSettings):
     redis_readwrite_url: str
     redis_readonly_url: str
     redis_queue_url: str
+    redis_temp_store_url: str
     cdn_endpoint: str
     cdn_bucket: str
     fixui_sha: str
@@ -92,6 +93,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument(
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
+    )
+    parser.add_argument(
+        "--redis-temp-store-url", default=os.environ.get("REDIS_TEMP_STORE_URL", "redis://localhost:6379/1")
     )
     parser.add_argument("--redis-queue-url", default=os.environ.get("REDIS_QUEUE_URL", "redis://localhost:6379/5"))
     parser.add_argument("--redis-password", default=os.environ.get("REDIS_PASSWORD"))

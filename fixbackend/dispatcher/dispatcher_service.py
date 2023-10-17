@@ -12,25 +12,31 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 import logging
 import uuid
-from datetime import timedelta, datetime
-from typing import Any, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional, cast, List
 
 from fixcloudutils.asyncio.periodic import Periodic
-from fixcloudutils.redis.event_stream import RedisStreamListener, Json, MessageContext
+from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
-from fixcloudutils.util import utc, parse_utc_str
+from fixcloudutils.util import parse_utc_str, utc
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.collect.collect_queue import CollectQueue, AccountInformation, AwsAccountInformation
+from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInformation, CollectQueue
+from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.events import TenantAccountsCollected, WorkspaceCreated, AwsAccountDiscovered
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
+
+from uuid import UUID
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +50,9 @@ class DispatcherService(Service):
         metering_repo: MeteringRepository,
         collect_queue: CollectQueue,
         access_manager: GraphDatabaseAccessManager,
+        domain_event_sender: DomainEventPublisher,
+        temp_store_redis: Redis,
+        domain_events_stream_name: str,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.next_run_repo = next_run_repo
@@ -51,12 +60,12 @@ class DispatcherService(Service):
         self.collect_queue = collect_queue
         self.access_manager = access_manager
         self.periodic = Periodic("schedule_next_runs", self.schedule_next_runs, timedelta(minutes=1))
-        self.cloudaccount_listener = RedisStreamListener(
+        self.domain_event_listener = RedisStreamListener(
             readwrite_redis,
-            "fixbackend::cloudaccount",
+            domain_events_stream_name,
             group="dispatching",
             listener="dispatching",
-            message_processor=self.process_cloud_account_changed_message,
+            message_processor=self.process_domain_event,
             consider_failed_after=timedelta(minutes=5),
             batch_size=1,
         )
@@ -69,25 +78,31 @@ class DispatcherService(Service):
             consider_failed_after=timedelta(minutes=5),
             batch_size=1,
         )
+        self.temp_store_redis = temp_store_redis
+        self.domain_event_sender = domain_event_sender
 
     async def start(self) -> Any:
         await self.collect_result_listener.start()
-        await self.cloudaccount_listener.start()
+        await self.domain_event_listener.start()
         await self.periodic.start()
 
     async def stop(self) -> None:
         await self.periodic.stop()
-        await self.cloudaccount_listener.stop()
+        await self.domain_event_listener.stop()
         await self.collect_result_listener.stop()
 
-    async def process_cloud_account_changed_message(self, message: Json, context: MessageContext) -> None:
+    async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         match context.kind:
-            case "cloud_account_created":
-                await self.cloud_account_created(CloudAccountId(message["cloud_account_id"]))
-            case "cloud_account_deleted":
-                await self.cloud_account_deleted(CloudAccountId(message["cloud_account_id"]))
+            case WorkspaceCreated.kind:
+                wc_event = WorkspaceCreated.from_json(message)
+                await self.workspace_created(wc_event.workspace_id)
+
+            case AwsAccountDiscovered.kind:
+                awd_event = AwsAccountDiscovered.from_json(message)
+                await self.cloud_account_created(awd_event.cloud_account_id)
+
             case _:
-                log.error(f"Don't know how to handle messages of kind {context.kind}")
+                pass  # ignore other domain events
 
     async def process_collect_done_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
@@ -96,18 +111,72 @@ class DispatcherService(Service):
             case _:
                 log.info(f"Collect messages: will ignore messages of kine {context.kind}")
 
+    def _collect_progress_hash_key(self, workspace_id: WorkspaceId) -> str:
+        return f"dispatching:collect_jobs_in_progress:{workspace_id}"
+
+    async def complete_collect_job(self, tenant_id: WorkspaceId, collected_accounts: List[CloudAccountId]) -> None:
+        redis_set_key = self._collect_progress_hash_key(tenant_id)
+
+        async def get_redis_hash() -> Dict[bytes, bytes]:
+            result = await self.temp_store_redis.hgetall(redis_set_key)  # type: ignore
+            return cast(Dict[bytes, bytes], result)
+
+        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[CloudAccountId, AccountCollectInProgress]:
+            return {
+                CloudAccountId(UUID(hex=k.decode())): AccountCollectInProgress.from_json_bytes(v)
+                for k, v in hash.items()
+            }
+
+        async def mark_as_done(
+            collect_state: Dict[CloudAccountId, AccountCollectInProgress]
+        ) -> Dict[CloudAccountId, AccountCollectInProgress]:
+            completed = {}
+            for done_id in collected_accounts:
+                if done_id not in collect_state:
+                    log.error(f"Could not find collect job context for accound id {done_id}")
+                    continue
+                completed[done_id] = collect_state[done_id].done()
+            redis_mapping = {str(k): v.to_json_str() for k, v in completed.items()}
+            if redis_mapping:
+                await self.temp_store_redis.hset(redis_set_key, mapping=redis_mapping)  # type: ignore
+            return collect_state | completed
+
+        def all_jobs_finished(collect_state: Dict[CloudAccountId, AccountCollectInProgress]) -> bool:
+            return all(job.status == "done" for job in collect_state.values())
+
+        async def send_domain_event(collect_state: Dict[CloudAccountId, AccountCollectInProgress]) -> None:
+            collected_accounts = list(collect_state.keys())
+            await self.domain_event_sender.publish(TenantAccountsCollected(tenant_id, collected_accounts))
+
+        # fetch the redis hash
+        hash = await get_redis_hash()
+        if not hash:
+            log.error(f"Could not find any job context for tenant id {tenant_id}")
+            return
+        # parse it to dataclass
+        tenant_collect_state = parse_collect_state(hash)
+        # mark the job as done
+        tenant_collect_state = await mark_as_done(tenant_collect_state)
+        # check if we can send the domain event
+        if not all_jobs_finished(tenant_collect_state):
+            return
+
+        # all jobs are finished, send domain event and delete the hash
+        await send_domain_event(tenant_collect_state)
+        await self.temp_store_redis.delete(redis_set_key)
+
     async def collect_job_finished(self, message: Json) -> None:
         job_id = message["job_id"]
         task_id = message["task_id"]
-        workspace_id = message["tenant_id"]
-        account_info = message["account_info"]
+        workspace_id = WorkspaceId(uuid.UUID(message["tenant_id"]))
+        account_info: Dict[str, Any] = message["account_info"]
         messages = message["messages"]
         started_at = parse_utc_str(message["started_at"])
         duration = message["duration"]
         records = [
             MeteringRecord(
                 id=uuid.uuid4(),
-                workspace_id=WorkspaceId(uuid.UUID(workspace_id)),
+                workspace_id=workspace_id,
                 cloud=account_details["cloud"],
                 account_id=account_id,
                 account_name=account_details["name"],
@@ -121,20 +190,23 @@ class DispatcherService(Service):
             )
             for account_id, account_details in account_info.items()
         ]
+        collected_accounts = [CloudAccountId(UUID(account_id)) for account_id in account_info.keys()]
         await self.metering_repo.add(records)
+        await self.complete_collect_job(
+            workspace_id,
+            collected_accounts,
+        )
 
-    async def cloud_account_created(self, cid: CloudAccountId) -> None:
-        if account := await self.cloud_account_repo.get(cid):
+    async def workspace_created(self, workspace_id: WorkspaceId) -> None:
+        # store an entry in the next_run table
+        next_run_at = await self.compute_next_run(workspace_id)
+        await self.next_run_repo.create(workspace_id, next_run_at)
+
+    async def cloud_account_created(self, cloud_account_id: CloudAccountId) -> None:
+        if account := await self.cloud_account_repo.get(cloud_account_id):
             await self.trigger_collect(account)
-            # store an entry in the next_run table
-            next_run_at = await self.compute_next_run(account.workspace_id)
-            await self.next_run_repo.create(cid, next_run_at)
         else:
             log.error("Received a message, that a cloud account is created, but it does not exist in the database")
-
-    async def cloud_account_deleted(self, cid: CloudAccountId) -> None:
-        # delete the entry from the scheduler table
-        await self.next_run_repo.delete(cid)
 
     async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
         now = utc()
@@ -149,7 +221,21 @@ class DispatcherService(Service):
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
+    async def _add_collect_in_progress_account(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> None:
+        value = AccountCollectInProgress(account_id, utc()).to_json_str()
+        await self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=str(account_id), value=value)  # type: ignore # noqa
+        # cleanup after 4 hours just to be sure
+        await self.temp_store_redis.expire(name=self._collect_progress_hash_key(workspace_id), time=timedelta(hours=4))
+
+    async def account_collect_in_progress(self, workspace_id: WorkspaceId, cloud_account_id: CloudAccountId) -> bool:
+        ongoing_collect = await self.temp_store_redis.hget(self._collect_progress_hash_key(workspace_id), str(cloud_account_id))  # type: ignore # noqa
+        return ongoing_collect is not None
+
     async def trigger_collect(self, account: CloudAccount) -> None:
+        if await self.account_collect_in_progress(account.workspace_id, account.id):
+            log.info(f"Collect for tenant: {account.workspace_id} and account: {account.id} is already in progress.")
+            return
+
         def account_information() -> Optional[AccountInformation]:
             match account.access:
                 case AwsCloudAccess(account_id=account_id, role_name=role_name, external_id=external_id):
@@ -170,15 +256,18 @@ class DispatcherService(Service):
             log.info(
                 f"Trigger collect for tenant: {account.workspace_id} and account: {account.id} with job_id: {job_id}"
             )
+            await self._add_collect_in_progress_account(account.workspace_id, account.id)
             await self.collect_queue.enqueue(db, ai, job_id=job_id)
 
     async def schedule_next_runs(self) -> None:
         now = utc()
-        async for cid, at in self.next_run_repo.older_than(now):
-            if account := await self.cloud_account_repo.get(cid):
-                await self.trigger_collect(account)
-                next_run_at = await self.compute_next_run(account.workspace_id, at)
-                await self.next_run_repo.update_next_run_at(cid, next_run_at)
+
+        async for workspace_id, at in self.next_run_repo.older_than(now):
+            if accounts := await self.cloud_account_repo.list_by_workspace_id(workspace_id):
+                for account in accounts:
+                    await self.trigger_collect(account)
+                next_run_at = await self.compute_next_run(workspace_id, at)
+                await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
             else:
                 log.error("Received a message, that a cloud account is created, but it does not exist in the database")
                 continue

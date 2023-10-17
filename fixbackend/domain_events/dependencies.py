@@ -26,12 +26,12 @@ from typing import Annotated
 from fastapi import Depends
 
 from fixbackend.dependencies import FixDependency
-from fixbackend.domain_events.sender import DomainEventSender
+from fixbackend.domain_events.publisher import DomainEventPublisher
 
 
-def get_domain_event_sender(fix: FixDependency) -> DomainEventSender:
+def get_domain_event_publisher(fix: FixDependency) -> DomainEventPublisher:
     return fix.domain_event_sender
 
 
-# convenient way to depend on the domain sender and override in tests
-DomainEventSenderDependency = Annotated[DomainEventSender, Depends(get_domain_event_sender)]
+# convenient way to depend on the domain event publisher and override in tests
+DomainEventPublisherDependency = Annotated[DomainEventPublisher, Depends(get_domain_event_publisher)]
