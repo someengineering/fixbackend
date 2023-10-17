@@ -79,7 +79,7 @@ class DispatcherService(Service):
             batch_size=1,
         )
         self.temp_store_redis = temp_store_redis
-        self.domaim_event_sender = domain_event_sender
+        self.domain_event_sender = domain_event_sender
 
     async def start(self) -> Any:
         await self.collect_result_listener.start()
@@ -146,7 +146,7 @@ class DispatcherService(Service):
 
         async def send_domain_event(collect_state: Dict[CloudAccountId, AccountCollectInProgress]) -> None:
             collected_accounts = list(collect_state.keys())
-            await self.domaim_event_sender.publish(TenantAccountsCollected(tenant_id, collected_accounts))
+            await self.domain_event_sender.publish(TenantAccountsCollected(tenant_id, collected_accounts))
 
         # fetch the redis hash
         hash = await get_redis_hash()
