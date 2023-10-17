@@ -19,25 +19,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated, Optional
-from uuid import UUID
+from typing import Union, Optional
 
-from fastapi import Depends
-from fastapi_users import FastAPIUsers
+from attr import frozen
 
-from fixbackend.auth.auth_backend import get_auth_backend
-from fixbackend.auth.models import User
-from fixbackend.auth.user_manager import get_user_manager
-from fixbackend.config import get_config
+from fixbackend.ids import PaymentMethodId, WorkspaceId, UserId
 
 
-# todo: use dependency injection
-fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
+@frozen
+class AwsMarketplaceSubscription:
+    id: PaymentMethodId
+    user_id: Optional[UserId]
+    workspace_id: Optional[WorkspaceId]
+    customer_identifier: str
+    customer_aws_account_id: str
+    product_code: str
+    active: bool
 
-# the value below is a dependency itself
-get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
-maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
 
-
-AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
-OptionalAuthenticatedUser = Annotated[Optional[User], Depends(maybe_current_active_verified_user)]
+# Multiple payment methods are possible, but for now we only support AWS Marketplace
+SubscriptionMethod = Union[AwsMarketplaceSubscription]

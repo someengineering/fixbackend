@@ -19,25 +19,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated, Optional
-from uuid import UUID
+from typing import Dict, Any
 
-from fastapi import Depends
-from fastapi_users import FastAPIUsers
-
-from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.models import User
-from fixbackend.auth.user_manager import get_user_manager
-from fixbackend.config import get_config
+from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 
 
-# todo: use dependency injection
-fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
-
-# the value below is a dependency itself
-get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
-maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
-
-
-AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
-OptionalAuthenticatedUser = Annotated[Optional[User], Depends(maybe_current_active_verified_user)]
+async def test_handle_subscription(
+    aws_marketplace_handler: AwsMarketplaceHandler, user: User, boto_answers: Dict[str, Any]
+) -> None:
+    boto_answers["ResolveCustomer"] = {"CustomerAWSAccountId": "1", "CustomerIdentifier": "2", "ProductCode": "3"}
+    result = await aws_marketplace_handler.subscribed(user, "123")
+    assert result is not None
+    assert result.customer_aws_account_id == "1"
+    assert result.customer_identifier == "2"
+    assert result.product_code == "3"
+    assert result.user_id == user.id
+    assert result.workspace_id is None  # user does not have any workspaces yet
+    # subscribe again: will not create a new subscription
+    result2 = await aws_marketplace_handler.subscribed(user, "123")
+    assert result == result2
