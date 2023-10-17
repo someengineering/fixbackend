@@ -135,3 +135,18 @@ def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any
         transport=cookie_transport,
         get_strategy=get_jwt_strategy,
     )
+
+
+def get_aws_marketplace_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
+    cookie_transport = CookieTransport(
+        cookie_name="fix.auth",
+        cookie_secure=True,
+        cookie_httponly=True,
+        cookie_samesite="none",
+        cookie_max_age=config.session_ttl,
+    )
+    return AuthenticationBackend(
+        name="jwt",
+        transport=cookie_transport,
+        get_strategy=get_jwt_strategy,
+    )

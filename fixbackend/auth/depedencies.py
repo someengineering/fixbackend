@@ -25,18 +25,24 @@ from uuid import UUID
 from fastapi import Depends
 from fastapi_users import FastAPIUsers
 
-from fixbackend.auth.auth_backend import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend, get_aws_marketplace_auth_backend
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
+from fastapi_users.authentication import Authenticator
 
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
+aws_marketplace_authenticator = Authenticator([get_aws_marketplace_auth_backend(get_config())], get_user_manager)
 
 # the value below is a dependency itself
 get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
-maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
+
+# Not CSRF-safe! Use only for aws marketplace callbacks
+maybe_current_active_verified_user = aws_marketplace_authenticator.current_user(
+    active=True, verified=True, optional=True
+)
 
 
 AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
