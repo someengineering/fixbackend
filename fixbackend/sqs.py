@@ -28,6 +28,7 @@ from functools import partial
 from typing import Callable, Awaitable, Any, Optional
 
 import boto3
+from botocore.exceptions import ClientError
 from fixcloudutils.asyncio import stop_running_task
 from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.redis.event_stream import Backoff, NoBackoff, MessageContext
@@ -66,10 +67,10 @@ class SQSRawListener(Service):
         self.sqs = session.client("sqs")
         self.queue_url = queue_url
         self.message_processor = message_processor
-        self.consider_failed_after = consider_failed_after.total_seconds() if consider_failed_after else 30
+        self.consider_failed_after = int(consider_failed_after.total_seconds()) if consider_failed_after else 30
         self.max_nr_of_messages_in_one_batch = max_nr_of_messages_in_one_batch or 10
         self.wait_for_new_messages_to_arrive = (
-            wait_for_new_messages_to_arrive.total_seconds() if wait_for_new_messages_to_arrive else 1
+            int(wait_for_new_messages_to_arrive.total_seconds()) if wait_for_new_messages_to_arrive else 1
         )
         self.backoff = backoff or NoBackoff
         self.__should_run = True
@@ -85,24 +86,28 @@ class SQSRawListener(Service):
 
     async def _listen(self) -> None:
         while self.__should_run:
-            log.debug("Polling SQS for messages")
-            response = await run_async(
-                self.sqs.receive_message,
-                QueueUrl=self.queue_url,
-                AttributeNames=["All"],
-                MaxNumberOfMessages=self.max_nr_of_messages_in_one_batch,
-                VisibilityTimeout=self.consider_failed_after,
-                WaitTimeSeconds=self.wait_for_new_messages_to_arrive,
-            )
-            started = utc()
-            for message in response.get("Messages", []):
-                if (utc() - started).total_seconds() >= self.consider_failed_after:
-                    # do not process messages that are overdue
-                    break
-                receipt_handle = message["ReceiptHandle"]
-                await self.backoff.with_backoff(partial(self.message_processor, message))
-                # Delete the message from the queue
-                await run_async(self.sqs.delete_message, QueueUrl=self.queue_url, ReceiptHandle=receipt_handle)
+            try:
+                log.debug("Polling SQS for messages")
+                response = await run_async(
+                    self.sqs.receive_message,
+                    QueueUrl=self.queue_url,
+                    AttributeNames=["All"],
+                    MaxNumberOfMessages=self.max_nr_of_messages_in_one_batch,
+                    VisibilityTimeout=self.consider_failed_after,
+                    WaitTimeSeconds=self.wait_for_new_messages_to_arrive,
+                )
+                started = utc()
+                for message in response.get("Messages", []):
+                    if (utc() - started).total_seconds() >= self.consider_failed_after:
+                        # do not process messages that are overdue
+                        break
+                    receipt_handle = message["ReceiptHandle"]
+                    await self.backoff.with_backoff(partial(self.message_processor, message))
+                    # Delete the message from the queue
+                    await run_async(self.sqs.delete_message, QueueUrl=self.queue_url, ReceiptHandle=receipt_handle)
+            except ClientError as ex:
+                log.error(f"Error while polling SQS: {ex}")
+                await asyncio.sleep(10)
 
 
 class SQSListener(SQSRawListener):
