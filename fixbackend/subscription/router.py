@@ -45,7 +45,8 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
     ) -> Response:
         # Cross-Origin Post Request: we will not receive our auth cookie here.
         # Store the token in a cookie and redirect to the marketplace add page.
-        response = RedirectResponse(request.scope["router"].url_path_for(AddUrlName))
+        # Use a 303 status code here to force a GET request instead of a POST request.
+        response = RedirectResponse(request.scope["router"].url_path_for(AddUrlName), status_code=303)
         response.set_cookie(MarketplaceTokenCookie, x_amzn_marketplace_token, secure=True, httponly=True)
         return response
 
