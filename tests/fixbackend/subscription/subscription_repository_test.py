@@ -31,20 +31,34 @@ from fixbackend.subscription.subscription_repository import (
 )
 
 
-async def test_create_entry(subscription_repository: SubscriptionRepository, session: AsyncSession) -> None:
+async def test_crud_entry(subscription_repository: SubscriptionRepository, session: AsyncSession) -> None:
     id = PaymentMethodId(uuid4())
     user_id = UserId(uuid4())
+    cid = "some-customer-id"
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
         workspace_id=WorkspaceId(uuid4()),
-        customer_identifier="123",
+        customer_identifier=cid,
         customer_aws_account_id="123",
         product_code="123",
         active=True,
     )
+    # create entity
     await subscription_repository.create(entity)
-    assert await subscription_repository.aws_marketplace_subscription(user_id, entity.customer_identifier) is not None
-    assert await subscription_repository.aws_marketplace_subscription(user_id, "124") is None
-    result = await session.get(SubscriptionEntity, id)
-    assert result is not None
+    # make sure the value is stored in the database
+    assert await session.get(SubscriptionEntity, id) is not None
+    # load existing entity
+    assert await subscription_repository.aws_marketplace_subscription(user_id, cid) is not None
+    # try to load non-existing entity
+    assert await subscription_repository.aws_marketplace_subscription(user_id, "n/a") is None
+    # mark entity as inactive
+    assert await subscription_repository.mark_aws_marketplace_subscriptions(cid, False) == 1
+    assert (await session.get(SubscriptionEntity, id)).active is False
+    # mark entity as active
+    assert await subscription_repository.mark_aws_marketplace_subscriptions(cid, True) == 1
+    assert (await session.get(SubscriptionEntity, id)).active is True
+    # delete entity
+    assert await subscription_repository.delete_aws_marketplace_subscriptions(cid) == 1
+    # make sure the value is gone
+    assert await session.get(SubscriptionEntity, id) is None
