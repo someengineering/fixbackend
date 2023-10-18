@@ -25,10 +25,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
+from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
-from fixbackend.domain_events.events import TenantAccountsCollected, WorkspaceCreated, AwsAccountDiscovered
+from fixbackend.domain_events.events import (
+    TenantAccountsCollected,
+    WorkspaceCreated,
+    AwsAccountDiscovered,
+    CloudAccountCollectInfo,
+)
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
@@ -94,9 +99,9 @@ async def test_receive_aws_account_discovered(
         dispatcher._collect_progress_hash_key(organization.id)
     )  # type: ignore # noqa
     assert len(in_progress_hash) == 1
-    progress = AccountCollectInProgress.from_json_bytes(list(in_progress_hash.values())[0])
+    progress = AccountCollectProgress.from_json_bytes(list(in_progress_hash.values())[0])
     assert progress.account_id == cloud_account_id
-    assert progress.status == "in_progress"
+    assert progress.is_done() is False
 
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
@@ -109,7 +114,7 @@ async def test_receive_aws_account_discovered(
         dispatcher._collect_progress_hash_key(organization.id)
     )  # type: ignore # noqa
     assert len(new_in_progress_hash) == 1
-    assert AccountCollectInProgress.from_json_bytes(list(new_in_progress_hash.values())[0]) == progress
+    assert AccountCollectProgress.from_json_bytes(list(new_in_progress_hash.values())[0]) == progress
 
 
 @pytest.mark.asyncio
@@ -186,7 +191,9 @@ async def test_receive_collect_done_message(
     assert mr_2.duration == 18
 
     assert len(domain_event_sender.events) == current_events_length + 1
-    assert domain_event_sender.events[-1] == TenantAccountsCollected(organization.id, [account_id_1])
+    assert domain_event_sender.events[-1] == TenantAccountsCollected(
+        organization.id, {account_id_1: CloudAccountCollectInfo(mr_1.nr_of_resources_collected, mr_1.duration)}, None
+    )
 
 
 @pytest.mark.asyncio

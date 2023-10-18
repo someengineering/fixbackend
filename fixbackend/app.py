@@ -50,6 +50,7 @@ from fixbackend.dependencies import FixDependencies
 from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.events.router import websocket_router
@@ -67,7 +68,6 @@ from fixbackend.errors import Unauthorized
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
-domain_events_stream_name = "fixbackend:domain_events"
 
 
 # noinspection PyUnresolvedReferences
@@ -124,7 +124,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
                 "fixbackend",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
@@ -142,7 +142,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(
             SN.customerio_consumer,
-            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domain_events_stream_name),
+            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, DomainEventsStreamName),
         )
 
         deps.add(SN.certificate_store, CertificateStore(cfg))
@@ -188,7 +188,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 rw_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
                 "dispatching",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
@@ -205,7 +205,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 db_access,
                 domain_event_sender,
                 temp_store_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
             ),
         )
 
