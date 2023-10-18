@@ -54,10 +54,10 @@ async def test_crud_entry(subscription_repository: SubscriptionRepository, sessi
     assert await subscription_repository.aws_marketplace_subscription(user_id, "n/a") is None
     # mark entity as inactive
     assert await subscription_repository.mark_aws_marketplace_subscriptions(cid, False) == 1
-    assert (await session.get(SubscriptionEntity, id)).active is False
+    assert (await session.get(SubscriptionEntity, id)).active is False  # type: ignore
     # mark entity as active
     assert await subscription_repository.mark_aws_marketplace_subscriptions(cid, True) == 1
-    assert (await session.get(SubscriptionEntity, id)).active is True
+    assert (await session.get(SubscriptionEntity, id)).active is True  # type: ignore
     # delete entity
     assert await subscription_repository.delete_aws_marketplace_subscriptions(cid) == 1
     # make sure the value is gone
