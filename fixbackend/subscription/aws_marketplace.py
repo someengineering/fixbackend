@@ -106,20 +106,25 @@ class AwsMarketplaceHandler(Service):
         # See: https://docs.aws.amazon.com/marketplace/latest/userguide/saas-notification.html
         action = message["action"]
         log.info(f"AWS Marketplace. Received message: {message}")
-        # customer_identifier = message["customer-identifier"]
+        customer_identifier = message["customer-identifier"]
+        # product_code = message["product-code"]
         # free_trial = message.get("isFreeTrialTermPresent", False)
         match action:
             case "subscribe-success":
                 # allow sending metering records
-                pass
-            case "subscribe-fail":
-                # wait for subscribe-success
-                pass
+                count = await self.aws_marketplace_repo.mark_aws_marketplace_subscriptions(customer_identifier, True)
+                log.info(
+                    f"AWS Marketplace. subscribe-success for customer {customer_identifier}. "
+                    f"Updated {count} subscriptions."
+                )
             case "unsubscribe-pending":
                 # TODO: send metering records!
                 pass
-            case "unsubscribe-success":
-                # the user has unsubscribed
-                pass
+            case "subscribe-fail" | "unsubscribe-success":
+                # delete subscriptions from the database
+                count = await self.aws_marketplace_repo.delete_aws_marketplace_subscriptions(customer_identifier)
+                log.info(
+                    f"AWS Marketplace. {action} for customer {customer_identifier}. Deleted {count} subscriptions."
+                )
             case _:
                 raise ValueError(f"Unknown action: {action}")

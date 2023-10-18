@@ -25,7 +25,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import String, Boolean, select, Index
+from sqlalchemy import String, Boolean, select, Index, update, delete
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
@@ -86,6 +86,22 @@ class SubscriptionRepository:
                 return result.to_model()
             else:
                 return None
+
+    async def mark_aws_marketplace_subscriptions(self, customer_identifier: str, active: bool) -> int:
+        async with self.session_maker() as session:
+            result = await session.execute(
+                update(SubscriptionEntity)
+                .where(SubscriptionEntity.aws_customer_identifier == customer_identifier)
+                .values(active=active)
+            )
+            return result.rowcount  # noqa
+
+    async def delete_aws_marketplace_subscriptions(self, customer_identifier: str) -> int:
+        async with self.session_maker() as session:
+            result = await session.execute(
+                delete(SubscriptionEntity).where(SubscriptionEntity.aws_customer_identifier == customer_identifier)
+            )
+            return result.rowcount  # noqa
 
     async def create(self, subscription: AwsMarketplaceSubscription) -> AwsMarketplaceSubscription:
         async with self.session_maker() as session:
