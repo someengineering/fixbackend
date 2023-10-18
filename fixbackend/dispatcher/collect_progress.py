@@ -21,7 +21,8 @@ class CollectionDone:
 
 @frozen
 class AccountCollectProgress:
-    account_id: CloudAccountId
+    cloud_account_id: CloudAccountId
+    account_id: str  # could be anything, aws, azure, gcp, etc
     started_at: datetime
     collection_done: Optional[CollectionDone] = None
 
@@ -39,5 +40,5 @@ class AccountCollectProgress:
         return json_converter.dumps(self)
 
     @staticmethod
-    def from_json_bytes(value: bytes) -> "AccountCollectProgress":
+    def from_json_bytes(value: bytes | str) -> "AccountCollectProgress":
         return json_converter.loads(value, AccountCollectProgress)

@@ -50,6 +50,7 @@ class ServiceNames:
     aws_marketplace_handler = "aws_marketplace_handler"
     workspace_repo = "workspace_repo"
     subscription_repo = "subscription_repo"
+    cloud_account_service = "cloud_account_service"
 
 
 class FixDependencies(Dependencies):

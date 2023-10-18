@@ -60,6 +60,7 @@ async def test_json_store(async_session_maker: AsyncSessionMaker, db_engine: Asy
                 return i + 1
             case _:
                 raise ValueError(f"Unexpected value {value}")
+        return None
 
     # concurrency test of atomic_update
     nr_increments = 42

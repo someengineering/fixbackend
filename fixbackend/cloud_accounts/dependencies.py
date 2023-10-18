@@ -12,44 +12,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, Union, Optional
+from typing import Annotated
 
-from attrs import frozen
+from fastapi import Depends
 
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-
-
-@frozen
-class AwsCloudAccess:
-    account_id: str
-    external_id: ExternalId
-    role_name: str
+from fixbackend.cloud_accounts.service import CloudAccountService
+from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.dependencies import FixDependency, ServiceNames
 
 
-@frozen
-class GcpCloudAccess:
-    project_id: str
+def get_cloud_account_service(
+    fix_dependency: FixDependency,
+) -> CloudAccountService:
+    return fix_dependency.service(ServiceNames.cloud_account_service, CloudAccountServiceImpl)
 
 
-CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
-
-
-@frozen
-class CloudAccount:
-    id: CloudAccountId
-    workspace_id: WorkspaceId
-    access: CloudAccess
-
-
-@frozen
-class LastScanAccountInfo:
-    aws_account_id: str
-    duration_seconds: int
-    resources_scanned: int
-
-
-@frozen
-class LastScanInfo:
-    accounts: Dict[CloudAccountId, LastScanAccountInfo]
-    next_scan: Optional[datetime]
+CloudAccountServiceDependency = Annotated[CloudAccountService, Depends(get_cloud_account_service)]

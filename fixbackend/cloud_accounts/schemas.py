@@ -13,7 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pydantic import BaseModel, Field
-
+from typing import List, Optional
+from datetime import datetime
 from fixbackend.ids import WorkspaceId, ExternalId
 
 
@@ -35,3 +36,15 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
             ]
         }
     }
+
+
+class ScannedAccount(BaseModel):
+    aws_account_id: str = Field(description="AWS account ID")
+    resource_scanned: int = Field(description="Number of resources scanned")
+    duration: int = Field(description="Duration of the scan in seconds")
+
+
+class LastScanInfo(BaseModel):
+    workspace_id: WorkspaceId = Field(description="Id of the workspace where the scan was performed")
+    accounts: List[ScannedAccount] = Field(description="List of accounts scanned")
+    next_scan: Optional[datetime] = Field(description="Next scheduled scan")

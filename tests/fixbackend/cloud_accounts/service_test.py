@@ -14,21 +14,26 @@
 
 
 import uuid
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
-
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
-from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from fixcloudutils.types import Json
+from fixcloudutils.types import Json, JsonElement
+from redis.asyncio import Redis
+
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.domain_events.events import AwsAccountDiscovered, Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import Event, AwsAccountDiscovered
+from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.keyvalue.json_kv import JsonStore
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
+from datetime import datetime
+from fixcloudutils.redis.event_stream import MessageContext
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -103,13 +108,38 @@ class DomainEventSenderMock(DomainEventPublisher):
         return self.events.append(event)
 
 
+class JsonStoreMock(JsonStore):
+    def __init__(self) -> None:
+        self.data: Dict[str, JsonElement] = {}
+
+    async def get(self, key: str) -> Optional[JsonElement]:
+        return self.data.get(key)
+
+    async def set(self, key: str, value: JsonElement) -> None:
+        self.data[key] = value
+
+    async def delete(self, key: str) -> None:
+        del self.data[key]
+
+    async def atomic_update(self, key: str, compute: Callable[[str, JsonElement], JsonElement]) -> JsonElement:
+        """
+        Compute a new value for the key using the compute function. The compute function will be run in a retry loop
+        until it succeeds. It must be side-effect free.
+        """
+        self.data[key] = compute(key, self.data.get(key, None))
+        return self.data[key]
+
+
 @pytest.mark.asyncio
-async def test_create_aws_account() -> None:
+async def test_create_aws_account(arq_redis: Redis) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
+    json_store = JsonStoreMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, json_store, arq_redis
+    )
 
     # happy case
     acc = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -155,12 +185,15 @@ async def test_create_aws_account() -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_aws_account() -> None:
+async def test_delete_aws_account(arq_redis: Redis) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
+    json_store = JsonStoreMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, json_store, arq_redis
+    )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
@@ -173,3 +206,33 @@ async def test_delete_aws_account() -> None:
     # success
     await service.delete_cloud_account(account.id, test_workspace_id)
     assert len(repository.accounts) == 0
+
+
+@pytest.mark.asyncio
+async def test_store_last_run_info(arq_redis: Redis) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    json_store = JsonStoreMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, json_store, arq_redis
+    )
+
+    cloud_account_id = CloudAccountId(uuid.uuid4())
+    now = datetime.utcnow()
+    event = TenantAccountsCollected(
+        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10)}, now
+    )
+    await service.process_domain_event(
+        event.to_json(),
+        MessageContext(id="test", kind=TenantAccountsCollected.kind, publisher="test", sent_at=now, received_at=now),
+    )
+
+    last_scan = await service.last_scan(test_workspace_id)
+    assert last_scan is not None
+    assert last_scan.next_scan == now
+    account = last_scan.accounts[cloud_account_id]
+    assert account.aws_account_id == account_id
+    assert account.duration_seconds == 10
+    assert account.resources_scanned == 100

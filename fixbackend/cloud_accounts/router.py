@@ -16,8 +16,8 @@ import logging
 
 from fastapi import APIRouter
 
-from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters
-from fixbackend.cloud_accounts.service import CloudAccountServiceDependency
+from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters, LastScanInfo, ScannedAccount
+from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.ids import CloudAccountId
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -34,6 +34,31 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> None:
         await service.delete_cloud_account(cloud_account_id, workspace.id)
+
+    @router.get("/{workspace_id}/cloud_accounts/last_scan")
+    async def last_scan(
+        workspace: UserWorkspaceDependency,
+        service: CloudAccountServiceDependency,
+    ) -> LastScanInfo:
+        last_scan = await service.last_scan(workspace.id)
+        if last_scan is None:
+            return LastScanInfo(
+                workspace_id=workspace.id,
+                accounts=[],
+                next_scan=None,
+            )
+        return LastScanInfo(
+            workspace_id=workspace.id,
+            accounts=[
+                ScannedAccount(
+                    aws_account_id=account.aws_account_id,
+                    resource_scanned=account.resources_scanned,
+                    duration=account.duration_seconds,
+                )
+                for account in last_scan.accounts.values()
+            ],
+            next_scan=last_scan.next_scan,
+        )
 
     return router
 

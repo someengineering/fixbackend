@@ -95,6 +95,7 @@ class AwsAccountDeleted(Event):
 
 @frozen
 class CloudAccountCollectInfo:
+    aws_account_id: str
     scanned_resources: int
     duration_seconds: int
 
