@@ -332,7 +332,9 @@ def setup_process() -> FastAPI:
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
     """
-    setup_logger("fixbackend")
+    current_config = config.get_config()
+    level = logging.DEBUG if current_config.args.debug else logging.INFO
+    setup_logger("fixbackend", level=level)
 
     # Replace all special uvicorn handlers
     for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
@@ -340,4 +342,4 @@ def setup_process() -> FastAPI:
         lg.handlers.clear()  # remove handlers
         lg.propagate = True  # propagate to root, so the handlers there are used
 
-    return fast_api_app(config.get_config())
+    return fast_api_app(current_config)

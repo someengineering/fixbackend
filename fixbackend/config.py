@@ -77,6 +77,7 @@ class Config(BaseSettings):
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
+    parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--instance-id", default=os.environ.get("FIX_INSTANCE_ID", "single"))
     parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
     parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
