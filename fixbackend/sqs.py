@@ -53,6 +53,7 @@ class SQSRawListener(Service):
         consider_failed_after: Optional[timedelta] = None,
         max_nr_of_messages_in_one_batch: Optional[int] = None,
         wait_for_new_messages_to_arrive: Optional[timedelta] = None,
+        do_not_retry_message_more_than: int = 5,
         backoff: Optional[Backoff] = Backoff(0.1, 10, 10),
     ) -> None:
         """
@@ -72,6 +73,7 @@ class SQSRawListener(Service):
         self.wait_for_new_messages_to_arrive = (
             int(wait_for_new_messages_to_arrive.total_seconds()) if wait_for_new_messages_to_arrive else 1
         )
+        self.do_not_retry_message_more_than = do_not_retry_message_more_than
         self.backoff = backoff or NoBackoff
         self.__should_run = True
         self.__listen_task: Optional[Task[Any]] = None
@@ -102,12 +104,17 @@ class SQSRawListener(Service):
                         # do not process messages that are overdue
                         break
                     receipt_handle = message["ReceiptHandle"]
-                    await self.backoff.with_backoff(partial(self.message_processor, message))
+                    attributes = message.get("Attributes", {})
+                    receive_count = int(attributes.get("ApproximateReceiveCount", "0"))
+                    if receive_count <= self.do_not_retry_message_more_than:
+                        await self.backoff.with_backoff(partial(self.message_processor, message))
                     # Delete the message from the queue
                     await run_async(self.sqs.delete_message, QueueUrl=self.queue_url, ReceiptHandle=receipt_handle)
             except ClientError as ex:
                 log.error(f"Error while polling SQS: {ex}")
                 await asyncio.sleep(10)
+            except Exception as ex:
+                log.exception(f"Error handling message: {ex}")
 
 
 class SQSListener(SQSRawListener):
