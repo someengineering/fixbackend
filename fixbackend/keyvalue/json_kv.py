@@ -13,13 +13,15 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from abc import ABC, abstractmethod
-from typing import Annotated, Optional
+from typing import Annotated, Callable, Optional
 
 from fastapi import Depends
 from fixcloudutils.types import JsonElement
-from sqlalchemy import JSON, String, delete
+from sqlalchemy import JSON, Integer, String, delete
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.exc import IntegrityError
 
 from fixbackend.base_model import Base
 from fixbackend.db import AsyncSessionMakerDependency
@@ -39,12 +41,23 @@ class JsonStore(ABC):
     async def delete(self, key: str) -> None:
         pass
 
+    @abstractmethod
+    async def atomic_update(self, key: str, compute: Callable[[str, JsonElement], JsonElement]) -> JsonElement:
+        """
+        Compute a new value for the key using the compute function. The compute function will be run in a retry loop
+        until it succeeds. It must be side-effect free.
+        """
+        pass
+
 
 class JsonEntry(Base):
     __tablename__ = "key_value_json"
 
     key: Mapped[str] = mapped_column(String(length=64), primary_key=True)
     value: Mapped[JsonElement] = mapped_column(JSON, nullable=False)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __mapper_args__ = {"version_id_col": version_id}
 
 
 class JsonStoreImpl(JsonStore):
@@ -63,11 +76,36 @@ class JsonStoreImpl(JsonStore):
             insert_statement = insert(JsonEntry).values(key=key, value=value)
             upsert_statement = insert_statement.on_duplicate_key_update(value=insert_statement.inserted.value)
             await session.execute(upsert_statement)
+            await session.commit()
 
     async def delete(self, key: str) -> None:
         async with self.session_maker() as session:
             statement = delete(JsonEntry).where(JsonEntry.key == key)
             await session.execute(statement)
+            await session.commit()
+
+    async def atomic_update(self, key: str, update_fn: Callable[[str, JsonElement], JsonElement]) -> JsonElement:
+        async def do_updade() -> JsonElement:
+            async with self.session_maker() as session:
+                entry = await session.get(JsonEntry, key)
+                if entry is None:
+                    value = update_fn(key, None)
+                    session.add(JsonEntry(key=key, value=value))
+                    await session.commit()
+                    return value
+                else:
+                    value = update_fn(key, entry.value)
+                    entry.value = value
+                    await session.commit()
+                    return value
+
+        while True:
+            try:
+                return await do_updade()
+            except StaleDataError:  # in case of concurrent update
+                pass
+            except IntegrityError:  # in case of concurrent insert
+                pass
 
 
 def get_json_store(session_maker: AsyncSessionMakerDependency) -> JsonStore:
