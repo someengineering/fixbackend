@@ -33,7 +33,6 @@ from fixbackend.domain_events.events import AwsAccountDeleted, AwsAccountDiscove
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import Unauthorized
 from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
-from fixbackend.keyvalue.json_kv import JsonStore
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 
@@ -44,7 +43,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         cloud_account_repository: CloudAccountRepository,
         pubsub_publisher: RedisPubSubPublisher,
         domain_event_publisher: DomainEventPublisher,
-        kv_store: JsonStore,
+        last_scan_repo: LastScanRepository,
         readwrite_redis: Redis,
     ) -> None:
         self.workspace_repository = workspace_repository
@@ -52,7 +51,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
 
-        self.last_scan_repo = LastScanRepository(kv_store)
+        self.last_scan_repo = last_scan_repo
         self.domain_event_listener = RedisStreamListener(
             readwrite_redis,
             DomainEventsStreamName,

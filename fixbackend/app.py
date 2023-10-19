@@ -61,13 +61,13 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
-from fixbackend.keyvalue.json_kv import JsonStoreImpl
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
+from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -157,7 +157,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 CloudAccountRepositoryImpl(session_maker),
                 cloud_accounts_redis_publisher,
                 domain_event_publisher,
-                JsonStoreImpl(session_maker),
+                LastScanRepository(session_maker),
                 arq_redis,
             ),
         )
