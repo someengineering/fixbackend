@@ -42,11 +42,7 @@ def cloud_accounts_router() -> APIRouter:
     ) -> LastScanInfo:
         last_scan = await service.last_scan(workspace.id)
         if last_scan is None:
-            return LastScanInfo(
-                workspace_id=workspace.id,
-                accounts=[],
-                next_scan=None,
-            )
+            return LastScanInfo.empty(workspace.id)
         return LastScanInfo(
             workspace_id=workspace.id,
             accounts=[

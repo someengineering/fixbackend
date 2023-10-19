@@ -49,3 +49,7 @@ class LastScanInfo(BaseModel):
     workspace_id: WorkspaceId = Field(description="Id of the workspace where the scan was performed")
     accounts: List[ScannedAccount] = Field(description="List of accounts scanned")
     next_scan: Optional[datetime] = Field(description="Next scheduled scan")
+
+    @staticmethod
+    def empty(workspace_id: WorkspaceId) -> "LastScanInfo":
+        return LastScanInfo(workspace_id=workspace_id, accounts=[], next_scan=None)
