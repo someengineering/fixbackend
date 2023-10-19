@@ -52,6 +52,7 @@ from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import Event
+from redis.asyncio import Redis
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -219,6 +220,16 @@ async def arq_redis() -> AsyncIterator[ArqRedis]:
 
 
 @pytest.fixture
+async def redis() -> AsyncIterator[Redis]:
+    redis = Redis.from_url("redis://localhost:6379/6", decode_responses=True)
+    keys = await redis.keys()
+    if keys:
+        await redis.delete(*keys)
+    yield redis
+    await redis.close()
+
+
+@pytest.fixture
 async def collect_queue(arq_redis: ArqRedis) -> RedisCollectQueue:
     return RedisCollectQueue(arq_redis)
 
@@ -356,6 +367,7 @@ async def dispatcher(
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
+    redis: Redis,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -365,7 +377,7 @@ async def dispatcher(
         collect_queue,
         graph_database_access_manager,
         domain_event_sender,
-        arq_redis,
+        redis,
         "foobar",
     )
 

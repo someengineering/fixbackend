@@ -74,6 +74,7 @@ async def test_receive_aws_account_discovered(
     cloud_account_repository: CloudAccountRepository,
     organization: Workspace,
     arq_redis: Redis,
+    redis: Redis,
 ) -> None:
     # create a cloud account and next_run entry
     cloud_account_id = FixCloudAccountId(uuid.uuid1())
@@ -95,12 +96,13 @@ async def test_receive_aws_account_discovered(
     assert next_run is None
 
     # check that 4 new entries are created in the redis: two job queues, one progress hash, one jobs mapping
-    assert len(await arq_redis.keys()) == 4
-    in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+    assert len(await arq_redis.keys()) == 2
+    assert len(await redis.keys()) == 2
+    in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher._collect_progress_hash_key(organization.id)
     )  # type: ignore # noqa
     assert len(in_progress_hash) == 1
-    progress = AccountCollectProgress.from_json_bytes(list(in_progress_hash.values())[0])
+    progress = AccountCollectProgress.from_json_str(list(in_progress_hash.values())[0])
     assert progress.cloud_account_id == cloud_account_id
     assert progress.account_id == aws_account_id
     assert progress.is_done() is False
@@ -111,12 +113,13 @@ async def test_receive_aws_account_discovered(
         AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
         MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
     )
-    assert len(await arq_redis.keys()) == 4
-    new_in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+    assert len(await arq_redis.keys()) == 2
+    assert len(await redis.keys()) == 2
+    new_in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher._collect_progress_hash_key(organization.id)
     )  # type: ignore # noqa
     assert len(new_in_progress_hash) == 1
-    assert AccountCollectProgress.from_json_bytes(list(new_in_progress_hash.values())[0]) == progress
+    assert AccountCollectProgress.from_json_str(list(new_in_progress_hash.values())[0]) == progress
 
 
 @pytest.mark.asyncio
@@ -126,15 +129,16 @@ async def test_receive_collect_done_message(
     organization: Workspace,
     domain_event_sender: InMemoryDomainEventPublisher,
     arq_redis: Redis,
+    redis: Redis,
 ) -> None:
     async def in_progress_hash_len() -> int:
-        in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
             dispatcher._collect_progress_hash_key(organization.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
     async def jobs_mapping_hash_len() -> int:
-        in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
             dispatcher._jobs_hash_key(organization.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)

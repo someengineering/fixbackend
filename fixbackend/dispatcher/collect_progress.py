@@ -40,5 +40,5 @@ class AccountCollectProgress:
         return json_converter.dumps(self)
 
     @staticmethod
-    def from_json_bytes(value: bytes | str) -> "AccountCollectProgress":
+    def from_json_str(value: bytes | str) -> "AccountCollectProgress":
         return json_converter.loads(value, AccountCollectProgress)

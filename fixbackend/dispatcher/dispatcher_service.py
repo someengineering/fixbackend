@@ -126,15 +126,12 @@ class DispatcherService(Service):
     ) -> None:
         redis_set_key = self._collect_progress_hash_key(tenant_id)
 
-        async def get_redis_hash() -> Dict[bytes, bytes]:
+        async def get_redis_hash() -> Dict[str, str]:
             result = await self.temp_store_redis.hgetall(redis_set_key)  # type: ignore
-            return cast(Dict[bytes, bytes], result)
+            return cast(Dict[str, str], result)
 
-        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[FixCloudAccountId, AccountCollectProgress]:
-            return {
-                FixCloudAccountId(UUID(hex=k.decode())): AccountCollectProgress.from_json_bytes(v)
-                for k, v in hash.items()
-            }
+        def parse_collect_state(hash: Dict[str, str]) -> Dict[FixCloudAccountId, AccountCollectProgress]:
+            return {FixCloudAccountId(UUID(k)): AccountCollectProgress.from_json_str(v) for k, v in hash.items()}
 
         async def mark_as_done(
             collect_state: Dict[FixCloudAccountId, AccountCollectProgress]
@@ -211,22 +208,21 @@ class DispatcherService(Service):
             for account_id, account_details in account_info.items()
         ]
         # lookup the cloud account id from the job_id
-        cloud_account_id_bytes: Optional[bytes] = await self.temp_store_redis.hget(
+        cloud_account_id: Optional[str] = await self.temp_store_redis.hget(
             self._jobs_hash_key(workspace_id), job_id
         )  # type: ignore
-        if cloud_account_id_bytes is None:
+        if cloud_account_id is None:
             log.error(f"Could not find cloud account id for job id {job_id}")
             return
-        cloud_account_id = cloud_account_id_bytes.decode()
 
-        account_progress_bytes: Optional[bytes] = await self.temp_store_redis.hget(
+        account_progress_str: Optional[str] = await self.temp_store_redis.hget(
             self._collect_progress_hash_key(workspace_id), cloud_account_id
         )  # type: ignore
-        if account_progress_bytes is None:
+        if account_progress_str is None:
             log.error(f"Could not find collect job context for cloud account id {cloud_account_id}")
             return
 
-        account_progress = AccountCollectProgress.from_json_bytes(account_progress_bytes)
+        account_progress = AccountCollectProgress.from_json_str(account_progress_str)
         record = next((r for r in records if r.account_id == account_progress.account_id), None)
         if record is None:
             log.error(f"Could not find metering record for cloud account id {cloud_account_id}")
