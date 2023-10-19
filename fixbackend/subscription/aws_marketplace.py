@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import logging
 from datetime import timedelta
 from typing import Optional
@@ -104,11 +105,12 @@ class AwsMarketplaceHandler(Service):
 
     async def handle_message(self, message: Json) -> None:
         # See: https://docs.aws.amazon.com/marketplace/latest/userguide/saas-notification.html
-        action = message["action"]
         log.info(f"AWS Marketplace. Received message: {message}")
-        customer_identifier = message["customer-identifier"]
-        # product_code = message["product-code"]
-        # free_trial = message.get("isFreeTrialTermPresent", False)
+        body = json.loads(message["Body"])
+        action = body["action"]
+        customer_identifier = body["customer-identifier"]
+        # product_code = body["product-code"]
+        # free_trial = body.get("isFreeTrialTermPresent", False)
         match action:
             case "subscribe-success":
                 # allow sending metering records
