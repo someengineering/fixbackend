@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Dict, Any, Annotated
+from typing import Annotated
 
 from fastapi import WebSocket, Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubListener
+from fixcloudutils.types import Json
+from fixcloudutils.util import utc_str
 from redis.asyncio import Redis
 
 from fixbackend.dependencies import FixDependency
@@ -14,9 +16,9 @@ class WebsocketEventHandler:
         self.readonly_redis = readonly_redis
 
     async def handle_websocket(self, workspace_id: WorkspaceId, websocket: WebSocket) -> None:
-        async def redis_message_handler(id: str, at: datetime, publisher: str, kind: str, data: Dict[str, Any]) -> None:
+        async def redis_message_handler(id: str, at: datetime, publisher: str, kind: str, data: Json) -> None:
             await websocket.send_json(
-                {"type": "event", "id": id, "at": at, "publisher": publisher, "kind": kind, "data": data}
+                {"type": "event", "id": id, "at": utc_str(at), "publisher": publisher, "kind": kind, "data": data}
             )
 
         async def ignore_incoming_messages(websocket: WebSocket) -> None:
