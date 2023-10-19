@@ -11,26 +11,20 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import datetime
-from typing import Optional
-from uuid import UUID
 
-from attrs import frozen
+from typing import Annotated
 
-from fixbackend.ids import WorkspaceId, CloudAccountId
+from fastapi import Depends
+
+from fixbackend.cloud_accounts.service import CloudAccountService
+from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.dependencies import FixDependency, ServiceNames
 
 
-@frozen
-class MeteringRecord:
-    id: UUID
-    workspace_id: WorkspaceId
-    cloud: str
-    account_id: CloudAccountId
-    account_name: Optional[str]
-    timestamp: datetime
-    job_id: str
-    task_id: str
-    nr_of_resources_collected: int
-    nr_of_error_messages: int
-    started_at: datetime
-    duration: int
+def get_cloud_account_service(
+    fix_dependency: FixDependency,
+) -> CloudAccountService:
+    return fix_dependency.service(ServiceNames.cloud_account_service, CloudAccountServiceImpl)
+
+
+CloudAccountServiceDependency = Annotated[CloudAccountService, Depends(get_cloud_account_service)]

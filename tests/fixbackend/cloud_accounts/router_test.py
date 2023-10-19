@@ -14,40 +14,46 @@
 
 
 import uuid
-from typing import AsyncIterator, List
+from datetime import datetime
+from typing import AsyncIterator, Dict, List
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.workspaces.dependencies import get_user_workspace
-from fixbackend.workspaces.models import Workspace
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
-from fixbackend.cloud_accounts.service import CloudAccountService, get_cloud_account_service
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanAccountInfo, LastScanInfo
+from fixbackend.cloud_accounts.service import CloudAccountService
+from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
+from fixbackend.workspaces.dependencies import get_user_workspace
+from fixbackend.workspaces.models import Workspace
 
 
 class InMemoryCloudAccountService(CloudAccountService):
     def __init__(self) -> None:
         self.accounts: List[CloudAccount] = []
+        self.last_scan_dict: Dict[WorkspaceId, LastScanInfo] = {}
 
     async def create_aws_account(
-        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         account = CloudAccount(
-            id=CloudAccountId(uuid.uuid4()),
+            id=FixCloudAccountId(uuid.uuid4()),
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
         )
         self.accounts.append(account)
         return account
 
-    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
         self.accounts = [account for account in self.accounts if account.id != cloud_account_id]
+
+    async def last_scan(self, workspace_id: WorkspaceId) -> LastScanInfo | None:
+        return self.last_scan_dict.get(workspace_id, None)
 
 
 cloud_account_service = InMemoryCloudAccountService()
@@ -56,7 +62,7 @@ workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
 workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [])
 role_name = "FooBarRole"
-account_id = "123456789012"
+account_id = CloudAccountId("123456789012")
 
 
 @pytest.fixture
@@ -95,7 +101,7 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_delete_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = []
-    cloud_account_id = CloudAccountId(uuid.uuid4())
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts.append(
         CloudAccount(
             id=cloud_account_id,
@@ -106,3 +112,31 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
     assert len(cloud_account_service.accounts) == 0
+
+
+@pytest.mark.asyncio
+async def test_last_scan(client: AsyncClient) -> None:
+    next_scan = datetime.utcnow()
+    started_at = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            FixCloudAccountId(uuid.uuid4()): LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=started_at,
+            )
+        },
+        next_scan=next_scan,
+    )
+
+    response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts/last_scan")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["workspace_id"] == str(workspace_id)
+    assert len(data["accounts"]) == 1
+    assert data["accounts"][0]["account_id"] == "123456789012"
+    assert data["accounts"][0]["duration"] == 10
+    assert data["accounts"][0]["resource_scanned"] == 100
+    assert data["accounts"][0]["started_at"] == started_at.isoformat()
+    assert data["next_scan"] == next_scan.isoformat()

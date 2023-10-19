@@ -32,6 +32,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from httpx import AsyncClient
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
@@ -44,14 +45,17 @@ from fixbackend.auth.router import auth_router, users_router
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
+from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies
 from fixbackend.dependencies import ServiceNames as SN
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
+from fixbackend.errors import Unauthorized
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -63,11 +67,10 @@ from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
-from fixbackend.errors import Unauthorized
+from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
-domain_events_stream_name = "fixbackend:domain_events"
 
 
 # noinspection PyUnresolvedReferences
@@ -124,7 +127,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 readwrite_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
                 "fixbackend",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
@@ -142,7 +145,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(
             SN.customerio_consumer,
-            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, domain_events_stream_name),
+            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, DomainEventsStreamName),
+        )
+        cloud_accounts_redis_publisher = RedisPubSubPublisher(
+            redis=readwrite_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
+        )
+        deps.add(
+            SN.cloud_account_service,
+            CloudAccountServiceImpl(
+                workspace_repo,
+                CloudAccountRepositoryImpl(session_maker),
+                cloud_accounts_redis_publisher,
+                domain_event_publisher,
+                LastScanRepository(session_maker),
+                arq_redis,
+            ),
         )
 
         deps.add(SN.certificate_store, CertificateStore(cfg))
@@ -188,7 +205,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
                 rw_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
                 "dispatching",
                 keep_unprocessed_messages_for=timedelta(days=7),
             ),
@@ -205,7 +222,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 db_access,
                 domain_event_sender,
                 temp_store_redis,
-                domain_events_stream_name,
+                DomainEventsStreamName,
             ),
         )
 

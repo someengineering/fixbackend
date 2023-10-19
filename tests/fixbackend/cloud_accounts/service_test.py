@@ -17,45 +17,50 @@ import uuid
 from typing import Dict, List, Optional, Tuple
 
 import pytest
-
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
-from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.cloud_accounts.service import CloudAccountServiceImpl
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
-from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
+from redis.asyncio import Redis
+
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanInfo
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.domain_events.events import AwsAccountDiscovered, Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import Event, AwsAccountDiscovered
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
+from datetime import datetime
+from fixcloudutils.redis.event_stream import MessageContext
+from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
     def __init__(self) -> None:
-        self.accounts: Dict[CloudAccountId, CloudAccount] = {}
+        self.accounts: Dict[FixCloudAccountId, CloudAccount] = {}
 
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         self.accounts[cloud_account.id] = cloud_account
         return cloud_account
 
-    async def get(self, id: CloudAccountId) -> CloudAccount | None:
+    async def get(self, id: FixCloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
 
-    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
         self.accounts[id] = cloud_account
         return cloud_account
 
     async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         return [account for account in self.accounts.values() if account.workspace_id == workspace_id]
 
-    async def delete(self, id: CloudAccountId) -> None:
+    async def delete(self, id: FixCloudAccountId) -> None:
         self.accounts.pop(id)
 
 
 test_workspace_id = WorkspaceId(uuid.uuid4())
 
-account_id = "foobar"
+account_id = CloudAccountId("foobar")
 role_name = "FooBarRole"
 external_id = ExternalId(uuid.uuid4())
 
@@ -103,13 +108,27 @@ class DomainEventSenderMock(DomainEventPublisher):
         return self.events.append(event)
 
 
+class LastScanRepositoryMock(LastScanRepository):
+    def __init__(self) -> None:
+        self.data: Dict[WorkspaceId, LastScanInfo] = {}
+
+    async def set_last_scan(self, workspace_id: WorkspaceId, last_scan_statistics: LastScanInfo) -> None:
+        self.data[workspace_id] = last_scan_statistics
+
+    async def get_last_scan(self, workspace_id: WorkspaceId) -> LastScanInfo | None:
+        return self.data.get(workspace_id)
+
+
 @pytest.mark.asyncio
-async def test_create_aws_account() -> None:
+async def test_create_aws_account(arq_redis: Redis) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
 
     # happy case
     acc = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -155,12 +174,15 @@ async def test_create_aws_account() -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_aws_account() -> None:
+async def test_delete_aws_account(arq_redis: Redis) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    service = CloudAccountServiceImpl(organization_repository, repository, pubsub_publisher, domain_sender)
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
     assert len(repository.accounts) == 1
@@ -173,3 +195,34 @@ async def test_delete_aws_account() -> None:
     # success
     await service.delete_cloud_account(account.id, test_workspace_id)
     assert len(repository.accounts) == 0
+
+
+@pytest.mark.asyncio
+async def test_store_last_run_info(arq_redis: Redis) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
+
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    now = datetime.utcnow()
+    event = TenantAccountsCollected(
+        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now)}, now
+    )
+    await service.process_domain_event(
+        event.to_json(),
+        MessageContext(id="test", kind=TenantAccountsCollected.kind, publisher="test", sent_at=now, received_at=now),
+    )
+
+    last_scan = await service.last_scan(test_workspace_id)
+    assert last_scan is not None
+    assert last_scan.next_scan == now
+    account = last_scan.accounts[cloud_account_id]
+    assert account.account_id == account_id
+    assert account.duration_seconds == 10
+    assert account.resources_scanned == 100
+    assert account.started_at == now

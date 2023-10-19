@@ -19,6 +19,7 @@ from arq import ArqRedis
 from attrs import define
 from cattr import unstructure
 from fixcloudutils.types import Json
+from fixbackend.ids import CloudAccountId
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 
@@ -43,7 +44,7 @@ class AccountInformation(ABC):
 @define
 class AwsAccountInformation(AccountInformation):
     kind: ClassVar[str] = "aws_account_information"
-    aws_account_id: str
+    aws_account_id: CloudAccountId
     aws_account_name: Optional[str]
     aws_role_arn: str
     external_id: str

@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
 from fixbackend.db import AsyncSessionMakerDependency
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
 from abc import ABC, abstractmethod
 
@@ -29,11 +29,11 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:
+    async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
         raise NotImplementedError
 
     @abstractmethod
@@ -41,7 +41,7 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def delete(self, id: CloudAccountId) -> None:
+    async def delete(self, id: FixCloudAccountId) -> None:
         raise NotImplementedError
 
 
@@ -68,13 +68,13 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             await session.refresh(orm_cloud_account)
             return orm_cloud_account.to_model()
 
-    async def get(self, id: CloudAccountId) -> Optional[CloudAccount]:
+    async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
         """Get a single cloud account by id."""
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_model() if cloud_account else None
 
-    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
         async with self.session_maker() as session:
             stored_account = await session.get(orm.CloudAccount, id)
             if stored_account is None:
@@ -103,7 +103,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]
 
-    async def delete(self, id: CloudAccountId) -> None:
+    async def delete(self, id: FixCloudAccountId) -> None:
         """Delete a cloud account."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.id == id)

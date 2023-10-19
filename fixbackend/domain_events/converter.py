@@ -24,8 +24,11 @@
 from cattrs import Converter
 
 from uuid import UUID
+from datetime import datetime
 
 converter = Converter()
 
 converter.register_unstructure_hook(UUID, lambda id: str(id))
 converter.register_structure_hook(UUID, lambda ojb, typ: UUID(ojb))
+converter.register_unstructure_hook(datetime, lambda v: v.isoformat())
+converter.register_structure_hook(datetime, lambda v, _: datetime.fromisoformat(v))

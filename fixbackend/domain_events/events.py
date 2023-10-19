@@ -21,11 +21,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import ClassVar, List
+from typing import ClassVar, Dict, Optional
 from attrs import frozen
 from abc import ABC, abstractmethod
-from fixbackend.ids import UserId, WorkspaceId, CloudAccountId
+from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId
 from fixcloudutils.types import Json
+from datetime import datetime
 
 from fixbackend.domain_events.converter import converter
 
@@ -64,9 +65,9 @@ class UserRegistered(Event):
 class AwsAccountDiscovered(Event):
     kind: ClassVar[str] = "aws_account_discovered"
 
-    cloud_account_id: CloudAccountId
+    cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: str
+    aws_account_id: CloudAccountId
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
@@ -80,9 +81,9 @@ class AwsAccountDiscovered(Event):
 class AwsAccountDeleted(Event):
     kind: ClassVar[str] = "aws_account_deleted"
 
-    cloud_account_id: CloudAccountId
+    cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: str
+    aws_account_id: CloudAccountId
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
@@ -93,11 +94,20 @@ class AwsAccountDeleted(Event):
 
 
 @frozen
+class CloudAccountCollectInfo:
+    account_id: CloudAccountId
+    scanned_resources: int
+    duration_seconds: int
+    started_at: datetime
+
+
+@frozen
 class TenantAccountsCollected(Event):
     kind: ClassVar[str] = "tenant_accounts_collected"
 
     tenant_id: WorkspaceId
-    cloud_account_ids: List[CloudAccountId]
+    cloud_accounts: Dict[FixCloudAccountId, CloudAccountCollectInfo]
+    next_run: Optional[datetime]
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
