@@ -18,7 +18,7 @@ from typing import Optional
 
 from fixbackend.cloud_accounts.models import CloudAccount, LastScanInfo
 
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 
 
 class WrongExternalId(Exception):
@@ -28,13 +28,13 @@ class WrongExternalId(Exception):
 class CloudAccountService(ABC):
     @abstractmethod
     async def create_aws_account(
-        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         """Create a cloud account."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
         """Delete a cloud account."""
         raise NotImplementedError
 

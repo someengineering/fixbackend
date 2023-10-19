@@ -24,7 +24,7 @@ from fixbackend.collect.collect_queue import (
     AwsAccountInformation,
 )
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, CloudAccountId
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ async def test_redis_collect_queue(
     # assert no keys in redis
     assert set(await arq_redis.keys()) == set()
     # enqueue new job
-    aws_account = AwsAccountInformation("123", "test", "arn", "1234")
+    aws_account = AwsAccountInformation(CloudAccountId("123"), "test", "arn", "1234")
     await collect_queue.enqueue(graph_db_access, aws_account, job_id="test")
     assert set(await arq_redis.keys()) == {b"arq:queue", b"arq:job:test"}
     # enqueue again will fail
@@ -71,7 +71,7 @@ async def test_redis_collect_queue(
 
 async def test_aws_account_info_json() -> None:
     aws_account_info = AwsAccountInformation(
-        aws_account_id="123456789012",
+        aws_account_id=CloudAccountId("123456789012"),
         aws_account_name="test",
         aws_role_arn="arn:aws:iam::123456789012:role/test",
         external_id="test",

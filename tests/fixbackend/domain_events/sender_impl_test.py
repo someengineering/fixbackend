@@ -20,7 +20,7 @@ from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.events import AwsAccountDiscovered
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
 
 
 class RedisStreamPublisherMock(RedisStreamPublisher):
@@ -36,9 +36,9 @@ async def test_publish_event() -> None:
     stream_publisher = RedisStreamPublisherMock()
     sender = DomainEventPublisherImpl(stream_publisher)
     event = AwsAccountDiscovered(
-        cloud_account_id=CloudAccountId(uuid.uuid4()),
+        cloud_account_id=FixCloudAccountId(uuid.uuid4()),
         tenant_id=WorkspaceId(uuid.uuid4()),
-        aws_account_id="123456789012",
+        aws_account_id=CloudAccountId("123456789012"),
     )
     await sender.publish(event)
 

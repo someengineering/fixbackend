@@ -27,7 +27,7 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.domain_events.events import AwsAccountDiscovered, Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 from fixbackend.keyvalue.json_kv import JsonStore
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -38,29 +38,29 @@ from fixcloudutils.redis.event_stream import MessageContext
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
     def __init__(self) -> None:
-        self.accounts: Dict[CloudAccountId, CloudAccount] = {}
+        self.accounts: Dict[FixCloudAccountId, CloudAccount] = {}
 
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         self.accounts[cloud_account.id] = cloud_account
         return cloud_account
 
-    async def get(self, id: CloudAccountId) -> CloudAccount | None:
+    async def get(self, id: FixCloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
 
-    async def update(self, id: CloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
         self.accounts[id] = cloud_account
         return cloud_account
 
     async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         return [account for account in self.accounts.values() if account.workspace_id == workspace_id]
 
-    async def delete(self, id: CloudAccountId) -> None:
+    async def delete(self, id: FixCloudAccountId) -> None:
         self.accounts.pop(id)
 
 
 test_workspace_id = WorkspaceId(uuid.uuid4())
 
-account_id = "foobar"
+account_id = CloudAccountId("foobar")
 role_name = "FooBarRole"
 external_id = ExternalId(uuid.uuid4())
 
@@ -219,7 +219,7 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
         organization_repository, repository, pubsub_publisher, domain_sender, json_store, arq_redis
     )
 
-    cloud_account_id = CloudAccountId(uuid.uuid4())
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
     now = datetime.utcnow()
     event = TenantAccountsCollected(
         test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10)}, now
@@ -233,6 +233,6 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
     assert last_scan is not None
     assert last_scan.next_scan == now
     account = last_scan.accounts[cloud_account_id]
-    assert account.aws_account_id == account_id
+    assert account.account_id == account_id
     assert account.duration_seconds == 10
     assert account.resources_scanned == 100

@@ -37,7 +37,7 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 from uuid import UUID
@@ -122,7 +122,7 @@ class DispatcherService(Service):
         return f"dispatching:collect_jobs_in_progress:{workspace_id}:jobs"
 
     async def complete_collect_job(
-        self, tenant_id: WorkspaceId, cloud_account_id: CloudAccountId, record: MeteringRecord
+        self, tenant_id: WorkspaceId, cloud_account_id: FixCloudAccountId, record: MeteringRecord
     ) -> None:
         redis_set_key = self._collect_progress_hash_key(tenant_id)
 
@@ -130,14 +130,15 @@ class DispatcherService(Service):
             result = await self.temp_store_redis.hgetall(redis_set_key)  # type: ignore
             return cast(Dict[bytes, bytes], result)
 
-        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[CloudAccountId, AccountCollectProgress]:
+        def parse_collect_state(hash: Dict[bytes, bytes]) -> Dict[FixCloudAccountId, AccountCollectProgress]:
             return {
-                CloudAccountId(UUID(hex=k.decode())): AccountCollectProgress.from_json_bytes(v) for k, v in hash.items()
+                FixCloudAccountId(UUID(hex=k.decode())): AccountCollectProgress.from_json_bytes(v)
+                for k, v in hash.items()
             }
 
         async def mark_as_done(
-            collect_state: Dict[CloudAccountId, AccountCollectProgress]
-        ) -> Dict[CloudAccountId, AccountCollectProgress]:
+            collect_state: Dict[FixCloudAccountId, AccountCollectProgress]
+        ) -> Dict[FixCloudAccountId, AccountCollectProgress]:
             if cloud_account_id not in collect_state:
                 raise Exception(f"Could not find collect job context for accound id {cloud_account_id}")
             collect_progress_done = collect_state[cloud_account_id].done(
@@ -148,10 +149,10 @@ class DispatcherService(Service):
             )  # type: ignore
             return collect_state | {cloud_account_id: collect_progress_done}
 
-        def all_jobs_finished(collect_state: Dict[CloudAccountId, AccountCollectProgress]) -> bool:
+        def all_jobs_finished(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> bool:
             return all(job.is_done() for job in collect_state.values())
 
-        async def send_domain_event(collect_state: Dict[CloudAccountId, AccountCollectProgress]) -> None:
+        async def send_domain_event(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> None:
             collected_accounts = {
                 k: CloudAccountCollectInfo(
                     v.account_id, v.collection_done.scanned_resources, v.collection_done.duration_seconds
@@ -194,7 +195,7 @@ class DispatcherService(Service):
                 id=uuid.uuid4(),
                 workspace_id=workspace_id,
                 cloud=account_details["cloud"],
-                account_id=account_id,
+                account_id=CloudAccountId(account_id),
                 account_name=account_details["name"],
                 timestamp=utc(),
                 job_id=job_id,
@@ -236,7 +237,7 @@ class DispatcherService(Service):
         next_run_at = await self.compute_next_run(workspace_id)
         await self.next_run_repo.create(workspace_id, next_run_at)
 
-    async def cloud_account_created(self, cloud_account_id: CloudAccountId) -> None:
+    async def cloud_account_created(self, cloud_account_id: FixCloudAccountId) -> None:
         if account := await self.cloud_account_repo.get(cloud_account_id):
             await self.trigger_collect(account)
         else:
@@ -258,7 +259,7 @@ class DispatcherService(Service):
     async def _add_collect_in_progress_account(
         self,
         workspace_id: WorkspaceId,
-        cloud_account_id: CloudAccountId,
+        cloud_account_id: FixCloudAccountId,
         account_information: AccountInformation,
         job_id: UUID,
     ) -> None:
@@ -277,7 +278,7 @@ class DispatcherService(Service):
         await self.temp_store_redis.expire(name=self._collect_progress_hash_key(workspace_id), time=timedelta(hours=4))
         await self.temp_store_redis.expire(name=self._jobs_hash_key(workspace_id), time=timedelta(hours=4))
 
-    async def account_collect_in_progress(self, workspace_id: WorkspaceId, cloud_account_id: CloudAccountId) -> bool:
+    async def account_collect_in_progress(self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId) -> bool:
         ongoing_collect = await self.temp_store_redis.hget(self._collect_progress_hash_key(workspace_id), str(cloud_account_id))  # type: ignore # noqa
         return ongoing_collect is not None
 

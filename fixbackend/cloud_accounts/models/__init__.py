@@ -17,19 +17,19 @@ from typing import Dict, Union, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 
 
 @frozen
 class AwsCloudAccess:
-    account_id: str
+    account_id: CloudAccountId
     external_id: ExternalId
     role_name: str
 
 
 @frozen
 class GcpCloudAccess:
-    project_id: str
+    project_id: CloudAccountId
 
 
 CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
@@ -37,19 +37,19 @@ CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
 
 @frozen
 class CloudAccount:
-    id: CloudAccountId
+    id: FixCloudAccountId
     workspace_id: WorkspaceId
     access: CloudAccess
 
 
 @frozen
 class LastScanAccountInfo:
-    aws_account_id: str
+    account_id: CloudAccountId
     duration_seconds: int
     resources_scanned: int
 
 
 @frozen
 class LastScanInfo:
-    accounts: Dict[CloudAccountId, LastScanAccountInfo]
+    accounts: Dict[FixCloudAccountId, LastScanAccountInfo]
     next_scan: Optional[datetime]

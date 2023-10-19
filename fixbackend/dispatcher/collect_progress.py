@@ -3,7 +3,7 @@ from typing import Optional
 
 from cattrs.preconf.json import make_converter
 from attrs import evolve
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import FixCloudAccountId, CloudAccountId
 from uuid import UUID
 from datetime import datetime
 
@@ -21,8 +21,8 @@ class CollectionDone:
 
 @frozen
 class AccountCollectProgress:
-    cloud_account_id: CloudAccountId
-    account_id: str  # could be anything, aws, azure, gcp, etc
+    cloud_account_id: FixCloudAccountId
+    account_id: CloudAccountId
     started_at: datetime
     collection_done: Optional[CollectionDone] = None
 

@@ -34,7 +34,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDiscovered,
     CloudAccountCollectInfo,
 )
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
@@ -49,8 +49,8 @@ async def test_receive_workspace_created(
     organization: Workspace,
 ) -> None:
     # create a cloud account
-    cloud_account_id = CloudAccountId(uuid.uuid1())
-    aws_account_id = "123"
+    cloud_account_id = FixCloudAccountId(uuid.uuid1())
+    aws_account_id = CloudAccountId("123")
     await cloud_account_repository.create(
         CloudAccount(
             cloud_account_id, organization.id, AwsCloudAccess(aws_account_id, organization.external_id, "test")
@@ -76,8 +76,8 @@ async def test_receive_aws_account_discovered(
     arq_redis: Redis,
 ) -> None:
     # create a cloud account and next_run entry
-    cloud_account_id = CloudAccountId(uuid.uuid1())
-    aws_account_id = "123"
+    cloud_account_id = FixCloudAccountId(uuid.uuid1())
+    aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
         cloud_account_id, organization.id, AwsCloudAccess(aws_account_id, organization.external_id, "test")
@@ -141,9 +141,9 @@ async def test_receive_collect_done_message(
 
     current_events_length = len(domain_event_sender.events)
     job_id = uuid.uuid4()
-    cloud_account_id_1 = CloudAccountId(uuid.uuid4())
-    aws_account_id = "123"
-    k8s_account_id = "456"
+    cloud_account_id_1 = FixCloudAccountId(uuid.uuid4())
+    aws_account_id = CloudAccountId("123")
+    k8s_account_id = CloudAccountId("456")
     message = {
         "job_id": str(job_id),
         "task_id": "t1",

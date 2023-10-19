@@ -4,6 +4,7 @@ from uuid import UUID
 WorkspaceId = NewType("WorkspaceId", UUID)
 InvitationId = NewType("InvitationId", UUID)
 UserId = NewType("UserId", UUID)
-CloudAccountId = NewType("CloudAccountId", UUID)
+FixCloudAccountId = NewType("FixCloudAccountId", UUID)  # fix-internal cloud account id
+CloudAccountId = NewType("CloudAccountId", str)  # cloud account id, e.g. AWS account id, GCP project id, etc.
 ExternalId = NewType("ExternalId", UUID)
 PaymentMethodId = NewType("PaymentMethodId", UUID)

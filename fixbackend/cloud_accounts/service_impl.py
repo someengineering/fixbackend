@@ -32,7 +32,7 @@ from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import AwsAccountDeleted, AwsAccountDiscovered, TenantAccountsCollected
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import Unauthorized
-from fixbackend.ids import CloudAccountId, ExternalId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 from fixbackend.keyvalue.json_kv import JsonStore
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -78,7 +78,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     LastScanInfo(
                         {
                             account_id: LastScanAccountInfo(
-                                account.aws_account_id, account.duration_seconds, account.scanned_resources
+                                account.account_id, account.duration_seconds, account.scanned_resources
                             )
                             for account_id, account in event.cloud_accounts.items()
                         },
@@ -90,7 +90,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 pass  # ignore other domain events
 
     async def create_aws_account(
-        self, workspace_id: WorkspaceId, account_id: str, role_name: str, external_id: ExternalId
+        self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId
     ) -> CloudAccount:
         """Create a cloud account."""
 
@@ -115,7 +115,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             return maybe_account
 
         account = CloudAccount(
-            id=CloudAccountId(uuid.uuid4()),
+            id=FixCloudAccountId(uuid.uuid4()),
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id=account_id, external_id=external_id, role_name=role_name),
         )
@@ -138,7 +138,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         )
         return result
 
-    async def delete_cloud_account(self, cloud_account_id: CloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             return None  # account already deleted, do nothing

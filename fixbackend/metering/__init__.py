@@ -17,7 +17,7 @@ from uuid import UUID
 
 from attrs import frozen
 
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, CloudAccountId
 
 
 @frozen
@@ -25,7 +25,7 @@ class MeteringRecord:
     id: UUID
     workspace_id: WorkspaceId
     cloud: str
-    account_id: str
+    account_id: CloudAccountId
     account_name: Optional[str]
     timestamp: datetime
     job_id: str
