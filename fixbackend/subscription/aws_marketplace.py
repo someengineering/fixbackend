@@ -21,21 +21,26 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
-from datetime import timedelta
+from asyncio import Semaphore, TaskGroup
+from datetime import timedelta, datetime
 from typing import Optional
 from uuid import uuid4
 
 import boto3
+from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
-from fixbackend.ids import PaymentMethodId
+from fixbackend.ids import SubscriptionId
+from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
-from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod
+from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
 )
+from fixbackend.utils import start_of_next_month
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
@@ -46,11 +51,13 @@ class AwsMarketplaceHandler(Service):
         self,
         subscription_repo: SubscriptionRepository,
         workspace_repo: WorkspaceRepository,
+        metering_repo: MeteringRepository,
         session: boto3.Session,
         sqs_queue_url: Optional[str],
     ) -> None:
-        self.aws_marketplace_repo = subscription_repo
+        self.subscription_repo = subscription_repo
         self.workspace_repo = workspace_repo
+        self.metering_repo = metering_repo
         self.listener = (
             SQSRawListener(
                 session,
@@ -88,20 +95,95 @@ class AwsMarketplaceHandler(Service):
         workspace_id = workspaces[0].id if len(workspaces) == 1 else None
 
         # only create a new subscription if there is no existing one
-        if existing := await self.aws_marketplace_repo.aws_marketplace_subscription(user.id, customer_identifier):
+        if existing := await self.subscription_repo.aws_marketplace_subscription(user.id, customer_identifier):
             log.debug(f"AWS Marketplace user {user.email}: return existing subscription")
             return existing
         else:
             subscription = AwsMarketplaceSubscription(
-                id=PaymentMethodId(uuid4()),
+                id=SubscriptionId(uuid4()),
                 user_id=user.id,
                 workspace_id=workspace_id,
                 customer_identifier=customer_identifier,
                 customer_aws_account_id=customer_aws_account_id,
                 product_code=product_code,
                 active=True,
+                last_charge_timestamp=utc(),
+                next_charge_timestamp=start_of_next_month(hour=9),
             )
-            return await self.aws_marketplace_repo.create(subscription)
+            return await self.subscription_repo.create(subscription)
+
+    async def create_billing_entry(
+        self, subscription: AwsMarketplaceSubscription, now: Optional[datetime] = None
+    ) -> Optional[BillingEntry]:
+        if not subscription.active:
+            log.info(f"AWS Marketplace: subscription {subscription.id} is not active")
+            return None
+        try:
+            billing_time = now or utc()
+            last_charged = subscription.last_charge_timestamp or billing_time
+            customer = subscription.customer_identifier
+            delta = billing_time - last_charged
+            # Default should be a single month. For shorter or longer periods, we use a fraction/factor of the month
+            is_full_month = 25 < delta.days < 40
+            month_factor = 1 if is_full_month else delta.days / 28
+            if ws_id := subscription.workspace_id:
+                # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
+                summaries = [
+                    summary
+                    async for summary in self.metering_repo.collect_summary(
+                        ws_id, start=last_charged, end=billing_time, min_resources_collected=100, min_nr_of_collects=3
+                    )
+                ]
+                # We only count the number of accounts, no matter how many runs we had
+                usage = int(len(summaries) * month_factor)
+                log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
+                billing_entry = await self.subscription_repo.add_billing_entry(
+                    subscription.id,
+                    subscription.workspace_id,
+                    "FoundationalSecurity",
+                    usage,
+                    last_charged,
+                    billing_time,
+                    start_of_next_month(billing_time, hour=9),
+                )
+                return billing_entry
+            else:
+                log.info(f"AWS Marketplace: customer {customer} has no workspace")
+                return None
+        except Exception:
+            log.error("Could not create a billing entry", exc_info=True)
+            raise
+
+    async def report_usage(self, subscription: AwsMarketplaceSubscription, entry: BillingEntry) -> None:
+        await run_async(
+            self.marketplace_client.meter_usage,
+            ProductCode=subscription.product_code,
+            Timestamp=utc_str(entry.period_end),
+            CustomerIdentifier=subscription.customer_identifier,
+            Dimension=entry.tier,
+            Quantity=entry.nr_of_accounts_charged,
+        )
+        await self.subscription_repo.mark_billing_entry_reported(entry.id)
+
+    async def report_unreported_usages(self, raise_exception: bool = False) -> None:
+        async def send(be: BillingEntry, ms: AwsMarketplaceSubscription) -> None:
+            try:
+                await self.report_usage(ms, be)
+            except Exception:
+                log.error(f"Could not report usage for billing entry {be.id}", exc_info=True)
+                if raise_exception:
+                    raise
+
+        max_parallel = Semaphore(64)  # up to 64 parallel tasks
+        async with TaskGroup() as group:
+            async for entry, subscription in self.subscription_repo.unreported_billing_entries():
+                async with max_parallel:
+                    await group.create_task(send(entry, subscription))
+
+    async def subscription_canceled(self, customer_id: str) -> None:
+        async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
+            if billing := await self.create_billing_entry(subscription):
+                await self.report_usage(subscription, billing)
 
     async def handle_message(self, message: Json) -> None:
         # See: https://docs.aws.amazon.com/marketplace/latest/userguide/saas-notification.html
@@ -114,19 +196,19 @@ class AwsMarketplaceHandler(Service):
         match action:
             case "subscribe-success":
                 # allow sending metering records
-                count = await self.aws_marketplace_repo.mark_aws_marketplace_subscriptions(customer_identifier, True)
+                count = await self.subscription_repo.mark_aws_marketplace_subscriptions(customer_identifier, True)
                 log.info(
                     f"AWS Marketplace. subscribe-success for customer {customer_identifier}. "
                     f"Updated {count} subscriptions."
                 )
             case "unsubscribe-pending":
-                # TODO: send metering records!
-                pass
+                log.info(f"AWS Marketplace: subscription canceled for customer {customer_identifier}. Report usage.")
+                await self.subscription_canceled(customer_identifier)
             case "subscribe-fail" | "unsubscribe-success":
-                # delete subscriptions from the database
-                count = await self.aws_marketplace_repo.delete_aws_marketplace_subscriptions(customer_identifier)
+                count = await self.subscription_repo.mark_aws_marketplace_subscriptions(customer_identifier, False)
                 log.info(
-                    f"AWS Marketplace. {action} for customer {customer_identifier}. Deleted {count} subscriptions."
+                    f"AWS Marketplace. subscribe-success for customer {customer_identifier}. "
+                    f"Updated {count} subscriptions."
                 )
             case _:
                 raise ValueError(f"Unknown action: {action}")

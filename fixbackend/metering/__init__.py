@@ -34,3 +34,10 @@ class MeteringRecord:
     nr_of_error_messages: int
     started_at: datetime
     duration: int
+
+
+@frozen
+class MeteringSummary:
+    account_id: str
+    account_name: str
+    count: int

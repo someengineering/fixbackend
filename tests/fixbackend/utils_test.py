@@ -19,38 +19,22 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import datetime
-from typing import Union, Optional
-
-from attr import frozen
-
-from fixbackend.ids import SubscriptionId, WorkspaceId, UserId, BillingId
-
-
-@frozen
-class AwsMarketplaceSubscription:
-    id: SubscriptionId
-    user_id: Optional[UserId]
-    workspace_id: Optional[WorkspaceId]
-    customer_identifier: str
-    customer_aws_account_id: str
-    product_code: str
-    active: bool
-    last_charge_timestamp: Optional[datetime]
-    next_charge_timestamp: Optional[datetime]
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import datetime, timezone
 
 
-@frozen
-class BillingEntry:
-    id: BillingId
-    workspace_id: WorkspaceId
-    subscription_id: SubscriptionId
-    tier: str
-    nr_of_accounts_charged: int
-    period_start: datetime
-    period_end: datetime
-    reported: bool
+from fixbackend.utils import start_of_next_month
 
 
-# Multiple payment methods are possible, but for now we only support AWS Marketplace
-SubscriptionMethod = Union[AwsMarketplaceSubscription]
+def test_start_of_next_month() -> None:
+    utc = timezone.utc
+    assert start_of_next_month(datetime(2023, 1, 23), hour=12) == datetime(2023, 2, 1, 12, tzinfo=utc)
+    assert start_of_next_month(datetime(2023, 2, 1)) == datetime(2023, 3, 1, tzinfo=utc)
+    assert start_of_next_month(datetime(2023, 12, 24)) == datetime(2024, 1, 1, tzinfo=utc)

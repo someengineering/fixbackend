@@ -21,40 +21,46 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from __future__ import annotations
 
-from typing import Optional
-from uuid import UUID
+from datetime import datetime
+from typing import Optional, Tuple, AsyncIterator
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import String, Boolean, select, Index, update, delete
+from sqlalchemy import String, Boolean, select, Index, update, delete, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
-from fixbackend.ids import WorkspaceId, UserId, PaymentMethodId
-from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.ids import WorkspaceId, UserId, SubscriptionId, BillingId
+from fixbackend.sqlalechemy_extensions import UTCDateTime
+from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.utils import uid
 
 
 class SubscriptionEntity(CreatedUpdatedMixin, Base):
     __tablename__ = "subscriptions"
     __table_args__ = (Index("idx_aws_customer_user", "aws_customer_identifier", "user_id"),)
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
+    id: Mapped[SubscriptionId] = mapped_column(GUID, primary_key=True)
     user_id: Mapped[Optional[UserId]] = mapped_column(GUID, nullable=True, index=True)
     workspace_id: Mapped[Optional[WorkspaceId]] = mapped_column(GUID, nullable=True, index=True)
     aws_customer_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     aws_customer_account_id: Mapped[str] = mapped_column(String(128), nullable=True, default="")
     aws_product_code: Mapped[str] = mapped_column(String(128), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
+    next_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
 
     def to_model(self) -> AwsMarketplaceSubscription:
         return AwsMarketplaceSubscription(
-            id=PaymentMethodId(self.id),
+            id=self.id,
             user_id=self.user_id,
             workspace_id=self.workspace_id,
             customer_identifier=self.aws_customer_identifier,
             customer_aws_account_id=self.aws_customer_account_id,
             product_code=self.aws_product_code,
             active=self.active,
+            last_charge_timestamp=self.last_charge_timestamp,
+            next_charge_timestamp=self.next_charge_timestamp,
         )
 
     @staticmethod
@@ -67,6 +73,45 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
             aws_customer_account_id=subscription.customer_aws_account_id,
             aws_product_code=subscription.product_code,
             active=subscription.active,
+            last_charge_timestamp=subscription.last_charge_timestamp,
+            next_charge_timestamp=subscription.next_charge_timestamp,
+        )
+
+
+class BillingEntity(CreatedUpdatedMixin, Base):
+    __tablename__ = "billing"
+    id: Mapped[BillingId] = mapped_column(GUID, primary_key=True)
+    workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, index=True)
+    subscription_id: Mapped[SubscriptionId] = mapped_column(GUID, nullable=False, index=True)
+    tier: Mapped[str] = mapped_column(String(64), nullable=False)
+    nr_of_accounts_charged: Mapped[int] = mapped_column(Integer, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=None)
+    period_end: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=None)
+    reported: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    def to_model(self) -> BillingEntry:
+        return BillingEntry(
+            id=self.id,
+            workspace_id=self.workspace_id,
+            subscription_id=self.subscription_id,
+            tier=self.tier,
+            nr_of_accounts_charged=self.nr_of_accounts_charged,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            reported=self.reported,
+        )
+
+    @staticmethod
+    def from_model(entry: BillingEntry) -> BillingEntity:
+        return BillingEntity(
+            id=entry.id,
+            workspace_id=entry.workspace_id,
+            subscription_id=entry.subscription_id,
+            tier=entry.tier,
+            nr_of_accounts_charged=entry.nr_of_accounts_charged,
+            period_start=entry.period_start,
+            period_end=entry.period_end,
+            reported=entry.reported,
         )
 
 
@@ -96,6 +141,76 @@ class SubscriptionRepository:
             )
             return result.rowcount  # noqa
 
+    async def subscriptions(
+        self,
+        *,
+        user_id: Optional[UserId] = None,
+        aws_customer_identifier: Optional[str] = None,
+        workspace_id: Optional[WorkspaceId] = None,
+        active: Optional[bool] = None,
+        next_charge_timestamp_younger_than: Optional[datetime] = None,
+    ) -> AsyncIterator[AwsMarketplaceSubscription]:
+        query = select(SubscriptionEntity)
+        if user_id:
+            query = query.where(SubscriptionEntity.user_id == user_id)
+        if aws_customer_identifier:
+            query = query.where(SubscriptionEntity.aws_customer_identifier == aws_customer_identifier)
+        if workspace_id:
+            query = query.where(SubscriptionEntity.workspace_id == workspace_id)
+        if active is not None:
+            query = query.where(SubscriptionEntity.active == active)
+        if next_charge_timestamp_younger_than:
+            query = query.where(SubscriptionEntity.next_charge_timestamp >= next_charge_timestamp_younger_than)
+        async with self.session_maker() as session:
+            async for (subscription,) in await session.stream(query):
+                yield subscription.to_model()
+
+    async def unreported_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
+        async with self.session_maker() as session:
+            query = (
+                select(BillingEntity, SubscriptionEntity)
+                .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
+                .where(BillingEntity.reported == False)  # noqa
+            )
+            async for billing_entity, subscription_entity in await session.stream(query):
+                yield billing_entity.to_model(), subscription_entity.to_model()
+
+    async def add_billing_entry(
+        self,
+        sid: SubscriptionId,
+        workspace_id: WorkspaceId,
+        tier: str,
+        nr_of_accounts_charged: int,
+        last_charge_timestamp: datetime,
+        now: datetime,
+        next_charge_timestamp: datetime,
+    ) -> BillingEntry:
+        async with self.session_maker() as session:
+            # add billing entry
+            billing_entity = BillingEntity(
+                id=uid(),
+                workspace_id=workspace_id,
+                subscription_id=sid,
+                tier=tier,
+                nr_of_accounts_charged=nr_of_accounts_charged,
+                period_start=last_charge_timestamp,
+                period_end=now,
+                reported=False,
+            )
+            result = billing_entity.to_model()
+            session.add(billing_entity)
+            # update the billing timestamps
+            await session.execute(
+                update(SubscriptionEntity)
+                .where(SubscriptionEntity.id == sid)
+                .values(
+                    last_charge_timestamp=now,
+                    next_charge_timestamp=next_charge_timestamp,
+                )
+            )
+            await session.commit()
+            return result
+
     async def delete_aws_marketplace_subscriptions(self, customer_identifier: str) -> int:
         async with self.session_maker() as session:
             result = await session.execute(
@@ -108,3 +223,8 @@ class SubscriptionRepository:
             session.add(SubscriptionEntity.from_model(subscription))
             await session.commit()
             return subscription
+
+    async def mark_billing_entry_reported(self, bid: BillingId) -> None:
+        async with self.session_maker() as session:
+            await session.execute(update(BillingEntity).where(BillingEntity.id == bid).values(reported=True))
+            await session.commit()
