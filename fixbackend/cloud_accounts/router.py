@@ -54,6 +54,7 @@ def cloud_accounts_router() -> APIRouter:
                     account_id=account.account_id,
                     resource_scanned=account.resources_scanned,
                     duration=account.duration_seconds,
+                    started_at=account.started_at,
                 )
                 for account in last_scan.accounts.values()
             ],

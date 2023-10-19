@@ -78,7 +78,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     LastScanInfo(
                         {
                             account_id: LastScanAccountInfo(
-                                account.account_id, account.duration_seconds, account.scanned_resources
+                                account.account_id,
+                                account.duration_seconds,
+                                account.scanned_resources,
+                                account.started_at,
                             )
                             for account_id, account in event.cloud_accounts.items()
                         },

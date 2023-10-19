@@ -117,12 +117,14 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_last_scan(client: AsyncClient) -> None:
     next_scan = datetime.utcnow()
+    started_at = datetime.utcnow()
     cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
         accounts={
             FixCloudAccountId(uuid.uuid4()): LastScanAccountInfo(
                 account_id=CloudAccountId("123456789012"),
                 duration_seconds=10,
                 resources_scanned=100,
+                started_at=started_at,
             )
         },
         next_scan=next_scan,
@@ -136,4 +138,5 @@ async def test_last_scan(client: AsyncClient) -> None:
     assert data["accounts"][0]["account_id"] == "123456789012"
     assert data["accounts"][0]["duration"] == 10
     assert data["accounts"][0]["resource_scanned"] == 100
+    assert data["accounts"][0]["started_at"] == started_at.isoformat()
     assert data["next_scan"] == next_scan.isoformat()

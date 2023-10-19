@@ -169,6 +169,7 @@ async def test_receive_collect_done_message(
         "duration": 18,
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
+    now = utc()
     await dispatcher._add_collect_in_progress_account(
         organization.id,
         cloud_account_id_1,
@@ -176,6 +177,7 @@ async def test_receive_collect_done_message(
             aws_account_id=aws_account_id, aws_account_name="test", aws_role_arn="arn", external_id="ext_id"
         ),
         job_id,
+        now,
     )
     assert await in_progress_hash_len() == 1
     assert await jobs_mapping_hash_len() == 1
@@ -211,7 +213,14 @@ async def test_receive_collect_done_message(
     assert len(domain_event_sender.events) == current_events_length + 1
     assert domain_event_sender.events[-1] == TenantAccountsCollected(
         organization.id,
-        {cloud_account_id_1: CloudAccountCollectInfo(mr_1.account_id, mr_1.nr_of_resources_collected, mr_1.duration)},
+        {
+            cloud_account_id_1: CloudAccountCollectInfo(
+                mr_1.account_id,
+                mr_1.nr_of_resources_collected,
+                mr_1.duration,
+                now,
+            )
+        },
         None,
     )
 

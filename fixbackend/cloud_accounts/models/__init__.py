@@ -47,6 +47,7 @@ class LastScanAccountInfo:
     account_id: CloudAccountId
     duration_seconds: int
     resources_scanned: int
+    started_at: datetime
 
 
 @frozen

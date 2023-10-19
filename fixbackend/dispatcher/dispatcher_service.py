@@ -155,7 +155,10 @@ class DispatcherService(Service):
         async def send_domain_event(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> None:
             collected_accounts = {
                 k: CloudAccountCollectInfo(
-                    v.account_id, v.collection_done.scanned_resources, v.collection_done.duration_seconds
+                    v.account_id,
+                    v.collection_done.scanned_resources,
+                    v.collection_done.duration_seconds,
+                    v.started_at,
                 )
                 for k, v in collect_state.items()
                 if v.collection_done
@@ -262,13 +265,14 @@ class DispatcherService(Service):
         cloud_account_id: FixCloudAccountId,
         account_information: AccountInformation,
         job_id: UUID,
+        now: datetime,
     ) -> None:
         if isinstance(account_information, AwsAccountInformation):
             account_id = account_information.aws_account_id
         else:
             raise NotImplementedError("Unsupported account information type")
         value = AccountCollectProgress(
-            cloud_account_id=cloud_account_id, account_id=account_id, started_at=utc()
+            cloud_account_id=cloud_account_id, account_id=account_id, started_at=now
         ).to_json_str()
         # store account_collect_progress
         await self.temp_store_redis.hset(name=self._collect_progress_hash_key(workspace_id), key=str(cloud_account_id), value=value)  # type: ignore # noqa
@@ -307,7 +311,7 @@ class DispatcherService(Service):
             log.info(
                 f"Trigger collect for tenant: {account.workspace_id} and account: {account.id} with job_id: {job_id}"
             )
-            await self._add_collect_in_progress_account(account.workspace_id, account.id, ai, job_id)
+            await self._add_collect_in_progress_account(account.workspace_id, account.id, ai, job_id, utc())
             await self.collect_queue.enqueue(db, ai, job_id=str(job_id))
 
     async def schedule_next_runs(self) -> None:

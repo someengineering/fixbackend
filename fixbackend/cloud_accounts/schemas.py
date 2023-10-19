@@ -42,6 +42,7 @@ class ScannedAccount(BaseModel):
     account_id: CloudAccountId = Field(description="Cloud account ID")
     resource_scanned: int = Field(description="Number of resources scanned")
     duration: int = Field(description="Duration of the scan in seconds")
+    started_at: datetime = Field(description="Time when the scan started")
 
 
 class LastScanInfo(BaseModel):

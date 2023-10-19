@@ -98,6 +98,7 @@ class CloudAccountCollectInfo:
     account_id: CloudAccountId
     scanned_resources: int
     duration_seconds: int
+    started_at: datetime
 
 
 @frozen

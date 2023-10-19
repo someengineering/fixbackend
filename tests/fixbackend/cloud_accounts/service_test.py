@@ -222,7 +222,7 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     now = datetime.utcnow()
     event = TenantAccountsCollected(
-        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10)}, now
+        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now)}, now
     )
     await service.process_domain_event(
         event.to_json(),
@@ -236,3 +236,4 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
     assert account.account_id == account_id
     assert account.duration_seconds == 10
     assert account.resources_scanned == 100
+    assert account.started_at == now
