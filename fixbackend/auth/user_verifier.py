@@ -51,9 +51,12 @@ class EMailUserVerifier(UserVerifier):
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         destination = user.email
         assert request
-
+        # redirect is defined by the UI - use / as safe fallback
+        redirect_url = request.query_params.get("redirectUrl", "/")
         verification_link = request.base_url
-        verification_link = verification_link.replace(path="/verify-email", query=f"token={token}")
+        verification_link = verification_link.replace(
+            path="/auth/verify-email", query=f"token={token}&redirectUrl={redirect_url}"
+        )
 
         def send_email(destination: str, token: str) -> None:
             body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
