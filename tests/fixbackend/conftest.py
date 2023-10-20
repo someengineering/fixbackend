@@ -29,6 +29,7 @@ from boto3 import Session as BotoSession
 from fastapi import FastAPI
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
@@ -56,9 +57,6 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid, start_of_next_month
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import Event
-from redis.asyncio import Redis
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database

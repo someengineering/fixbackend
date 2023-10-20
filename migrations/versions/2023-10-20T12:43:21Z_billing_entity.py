@@ -2,7 +2,7 @@
 
 Revision ID: d9be24f944dc
 Revises: 337d9a21e53c
-Create Date: 2023-10-19 12:43:21.899358+00:00
+Create Date: 2023-10-20 12:43:21.899358+00:00
 
 """
 from typing import Sequence, Union
@@ -16,7 +16,7 @@ from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "d9be24f944dc"
-down_revision: Union[str, None] = "337d9a21e53c"
+down_revision: Union[str, None] = "4df8ea080f3e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

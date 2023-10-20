@@ -137,7 +137,7 @@ async def test_receive_collect_done_message(
 
     async def jobs_mapping_hash_len() -> int:
         in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher._jobs_hash_key(organization.id)
+            dispatcher._jobs_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
