@@ -30,7 +30,6 @@ from fixbackend.cloud_accounts.models import (
     CloudAccount,
     LastScanAccountInfo,
     LastScanInfo,
-    CloudAccess,
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId

@@ -127,6 +127,7 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         id=cloud_account_id,
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
+        name="foo",
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
