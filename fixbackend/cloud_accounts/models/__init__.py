@@ -11,23 +11,25 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Union
+
+from datetime import datetime
+from typing import Dict, Union, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import WorkspaceId, CloudAccountId, ExternalId
+from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 
 
 @frozen
 class AwsCloudAccess:
-    account_id: str
+    account_id: CloudAccountId
     external_id: ExternalId
     role_name: str
 
 
 @frozen
 class GcpCloudAccess:
-    project_id: str
+    project_id: CloudAccountId
 
 
 CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
@@ -35,6 +37,20 @@ CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
 
 @frozen
 class CloudAccount:
-    id: CloudAccountId
+    id: FixCloudAccountId
     workspace_id: WorkspaceId
     access: CloudAccess
+
+
+@frozen
+class LastScanAccountInfo:
+    account_id: CloudAccountId
+    duration_seconds: int
+    resources_scanned: int
+    started_at: datetime
+
+
+@frozen
+class LastScanInfo:
+    accounts: Dict[FixCloudAccountId, LastScanAccountInfo]
+    next_scan: Optional[datetime]

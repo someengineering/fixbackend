@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, CloudAccountId
 from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.metering.metering_repository import MeteringRepository
 
@@ -30,7 +30,7 @@ def create_metering_record(workspace_id: WorkspaceId, account_id: str) -> Meteri
         job_id="123e4567-e89b-12d3-a456-426614174000",
         task_id="123e4567-e89b-12d3-a456-426614174000",
         cloud="aws",
-        account_id=account_id,
+        account_id=CloudAccountId(account_id),
         account_name="test",
         nr_of_resources_collected=424242,
         nr_of_error_messages=1,

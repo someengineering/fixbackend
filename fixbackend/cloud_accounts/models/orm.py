@@ -20,16 +20,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
-from fixbackend.ids import WorkspaceId, CloudAccountId, ExternalId
+from fixbackend.ids import WorkspaceId, FixCloudAccountId, ExternalId, CloudAccountId
 
 
 class CloudAccount(Base):
     __tablename__ = "cloud_account"
 
-    id: Mapped[CloudAccountId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    id: Mapped[FixCloudAccountId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
     cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
-    account_id: Mapped[str] = mapped_column(String(length=12), nullable=False)
+    account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
     aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)

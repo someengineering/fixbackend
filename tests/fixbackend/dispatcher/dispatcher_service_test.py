@@ -25,14 +25,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.dispatcher.collect_progress import AccountCollectInProgress
+from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
-from fixbackend.domain_events.events import TenantAccountsCollected, WorkspaceCreated, AwsAccountDiscovered
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.domain_events.events import (
+    TenantAccountsCollected,
+    WorkspaceCreated,
+    AwsAccountDiscovered,
+    CloudAccountCollectInfo,
+)
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
+from fixbackend.collect.collect_queue import AwsAccountInformation
 
 
 @pytest.mark.asyncio
@@ -43,8 +49,8 @@ async def test_receive_workspace_created(
     workspace: Workspace,
 ) -> None:
     # create a cloud account
-    cloud_account_id = CloudAccountId(uuid.uuid1())
-    aws_account_id = "123"
+    cloud_account_id = FixCloudAccountId(uuid.uuid1())
+    aws_account_id = CloudAccountId("123")
     await cloud_account_repository.create(
         CloudAccount(cloud_account_id, workspace.id, AwsCloudAccess(aws_account_id, workspace.external_id, "test"))
     )
@@ -66,10 +72,11 @@ async def test_receive_aws_account_discovered(
     cloud_account_repository: CloudAccountRepository,
     workspace: Workspace,
     arq_redis: Redis,
+    redis: Redis,
 ) -> None:
     # create a cloud account and next_run entry
-    cloud_account_id = CloudAccountId(uuid.uuid1())
-    aws_account_id = "123"
+    cloud_account_id = FixCloudAccountId(uuid.uuid1())
+    aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
         cloud_account_id, workspace.id, AwsCloudAccess(aws_account_id, workspace.external_id, "test")
@@ -86,15 +93,17 @@ async def test_receive_aws_account_discovered(
     next_run = await session.get(NextTenantRun, workspace.id)
     assert next_run is None
 
-    # check that two new entries are created in the work queue: (e.g.: arq:queue, arq:job:xxx)
-    assert len(await arq_redis.keys()) == 3
-    in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+    # check that 4 new entries are created in the redis: two job queues, one progress hash, one jobs mapping
+    assert len(await arq_redis.keys()) == 2
+    assert len(await redis.keys()) == 2
+    in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(in_progress_hash) == 1
-    progress = AccountCollectInProgress.from_json_bytes(list(in_progress_hash.values())[0])
-    assert progress.account_id == cloud_account_id
-    assert progress.status == "in_progress"
+    progress = AccountCollectProgress.from_json_str(list(in_progress_hash.values())[0])
+    assert progress.cloud_account_id == cloud_account_id
+    assert progress.account_id == aws_account_id
+    assert progress.is_done() is False
 
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
@@ -102,12 +111,13 @@ async def test_receive_aws_account_discovered(
         AwsAccountDiscovered(cloud_account_id, workspace.id, aws_account_id).to_json(),
         MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
     )
-    assert len(await arq_redis.keys()) == 3
-    new_in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+    assert len(await arq_redis.keys()) == 2
+    assert len(await redis.keys()) == 2
+    new_in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(new_in_progress_hash) == 1
-    assert AccountCollectInProgress.from_json_bytes(list(new_in_progress_hash.values())[0]) == progress
+    assert AccountCollectProgress.from_json_str(list(new_in_progress_hash.values())[0]) == progress
 
 
 @pytest.mark.asyncio
@@ -117,31 +127,39 @@ async def test_receive_collect_done_message(
     workspace: Workspace,
     domain_event_sender: InMemoryDomainEventPublisher,
     arq_redis: Redis,
+    redis: Redis,
 ) -> None:
     async def in_progress_hash_len() -> int:
-        in_progress_hash: Dict[bytes, bytes] = await arq_redis.hgetall(
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
             dispatcher._collect_progress_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
+    async def jobs_mapping_hash_len() -> int:
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
+            dispatcher._jobs_hash_key(organization.id)
+        )  # type: ignore # noqa
+        return len(in_progress_hash)
+
     current_events_length = len(domain_event_sender.events)
-    job_id = "j1"
-    account_id_1 = CloudAccountId(uuid.uuid4())
-    account_id_2 = CloudAccountId(uuid.uuid4())
+    job_id = uuid.uuid4()
+    cloud_account_id_1 = FixCloudAccountId(uuid.uuid4())
+    aws_account_id = CloudAccountId("123")
+    k8s_account_id = CloudAccountId("456")
     message = {
-        "job_id": job_id,
+        "job_id": str(job_id),
         "task_id": "t1",
         "tenant_id": str(workspace.id),
         "account_info": {
-            str(account_id_1): dict(
-                id=str(account_id_1),
+            aws_account_id: dict(
+                id=aws_account_id,
                 name="test",
                 cloud="aws",
                 exported_at="2023-09-29T09:00:18Z",
                 summary={"instance": 23, "volume": 12},
             ),
-            str(account_id_2): dict(
-                id=str(account_id_2),
+            k8s_account_id: dict(
+                id=k8s_account_id,
                 name="foo",
                 cloud="k8s",
                 exported_at="2023-09-29T09:00:18Z",
@@ -153,30 +171,41 @@ async def test_receive_collect_done_message(
         "duration": 18,
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
-    await dispatcher._add_collect_in_progress_account(workspace.id, account_id_1)
+    now = utc()
+    await dispatcher._add_collect_in_progress_account(
+        workspace.id,
+        cloud_account_id_1,
+        AwsAccountInformation(
+            aws_account_id=aws_account_id, aws_account_name="test", aws_role_arn="arn", external_id="ext_id"
+        ),
+        job_id,
+        now,
+    )
     assert await in_progress_hash_len() == 1
+    assert await jobs_mapping_hash_len() == 1
 
     await dispatcher.process_collect_done_message(message, context)
     assert await in_progress_hash_len() == 0
+    assert await jobs_mapping_hash_len() == 0
 
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 2
     mr_1, mr_2 = result if result[0].account_name == "test" else list(reversed(result))
     assert mr_1.workspace_id == workspace.id
-    assert mr_1.job_id == "j1"
+    assert mr_1.job_id == str(job_id)
     assert mr_1.task_id == "t1"
     assert mr_1.cloud == "aws"
-    assert mr_1.account_id == str(account_id_1)
+    assert mr_1.account_id == aws_account_id
     assert mr_1.account_name == "test"
     assert mr_1.nr_of_resources_collected == 35
     assert mr_1.nr_of_error_messages == 2
     assert mr_1.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
     assert mr_1.duration == 18
     assert mr_2.workspace_id == workspace.id
-    assert mr_2.job_id == "j1"
+    assert mr_2.job_id == str(job_id)
     assert mr_2.task_id == "t1"
     assert mr_2.cloud == "k8s"
-    assert mr_2.account_id == str(account_id_2)
+    assert mr_2.account_id == k8s_account_id
     assert mr_2.account_name == "foo"
     assert mr_2.nr_of_resources_collected == 25
     assert mr_2.nr_of_error_messages == 2
@@ -184,7 +213,18 @@ async def test_receive_collect_done_message(
     assert mr_2.duration == 18
 
     assert len(domain_event_sender.events) == current_events_length + 1
-    assert domain_event_sender.events[-1] == TenantAccountsCollected(workspace.id, [account_id_1])
+    assert domain_event_sender.events[-1] == TenantAccountsCollected(
+        workspace.id,
+        {
+            cloud_account_id_1: CloudAccountCollectInfo(
+                mr_1.account_id,
+                mr_1.nr_of_resources_collected,
+                mr_1.duration,
+                now,
+            )
+        },
+        None,
+    )
 
 
 @pytest.mark.asyncio

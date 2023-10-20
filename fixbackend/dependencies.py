@@ -51,6 +51,7 @@ class ServiceNames:
     workspace_repo = "workspace_repo"
     subscription_repo = "subscription_repo"
     billing = "billing"
+    cloud_account_service = "cloud_account_service"
 
 
 class FixDependencies(Dependencies):
