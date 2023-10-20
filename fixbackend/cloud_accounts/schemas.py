@@ -15,7 +15,8 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
-from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId
+from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId
+from fixbackend.cloud_accounts.models import CloudAccount
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
@@ -36,6 +37,26 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
             ]
         }
     }
+
+
+class CloudAccountRead(BaseModel):
+    id: FixCloudAccountId = Field(description="Fix cloud account ID")
+    cloud: str = Field(description="Cloud provider")
+    account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
+    name: Optional[str] = Field(description="Name of the cloud account", max_length=64)
+
+    @staticmethod
+    def from_model(model: CloudAccount) -> "CloudAccountRead":
+        return CloudAccountRead(
+            id=model.id,
+            cloud=model.access.cloud,
+            account_id=model.access.account_id(),
+            name=model.name,
+        )
+
+
+class AwsCloudAccountUpdate(BaseModel):
+    name: str = Field(description="Name of the cloud account", max_length=64)
 
 
 class ScannedAccount(BaseModel):

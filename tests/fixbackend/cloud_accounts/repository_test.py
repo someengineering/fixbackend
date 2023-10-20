@@ -36,10 +36,11 @@ async def test_create_cloud_account(
         id=FixCloudAccountId(uuid.uuid4()),
         workspace_id=workspace_id,
         access=AwsCloudAccess(
-            account_id=CloudAccountId("123456789012"),
+            aws_account_id=CloudAccountId("123456789012"),
             role_name="foo",
             external_id=ExternalId(uuid.uuid4()),
         ),
+        name="foo",
     )
 
     # create
@@ -59,7 +60,7 @@ async def test_create_cloud_account(
     updated_account = evolve(
         account,
         access=AwsCloudAccess(
-            account_id=CloudAccountId("42"),
+            aws_account_id=CloudAccountId("42"),
             role_name="bar",
             external_id=ExternalId(uuid.uuid4()),
         ),

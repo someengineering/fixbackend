@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-class Unauthorized(Exception):
+class AccessDenied(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message

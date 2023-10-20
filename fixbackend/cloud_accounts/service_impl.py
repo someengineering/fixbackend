@@ -16,7 +16,7 @@
 import uuid
 from datetime import timedelta
 from hmac import compare_digest
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from attrs import evolve
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
@@ -25,13 +25,18 @@ from fixcloudutils.service import Service
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanAccountInfo, LastScanInfo
+from fixbackend.cloud_accounts.models import (
+    AwsCloudAccess,
+    CloudAccount,
+    LastScanAccountInfo,
+    LastScanInfo,
+)
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import AwsAccountDeleted, AwsAccountDiscovered, TenantAccountsCollected
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import Unauthorized
+from fixbackend.errors import AccessDenied
 from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -109,7 +114,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     [
                         account
                         for account in accounts
-                        if isinstance(account.access, AwsCloudAccess) and account.access.account_id == account_id
+                        if isinstance(account.access, AwsCloudAccess) and account.access.aws_account_id == account_id
                     ]
                 ),
                 None,
@@ -119,7 +124,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
             workspace_id=workspace_id,
-            access=AwsCloudAccess(account_id=account_id, external_id=external_id, role_name=role_name),
+            access=AwsCloudAccess(aws_account_id=account_id, external_id=external_id, role_name=role_name),
+            name=None,
         )
         if existing := await account_already_exists(workspace_id, account_id):
             account = evolve(account, id=existing.id)
@@ -145,7 +151,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if account is None:
             return None  # account already deleted, do nothing
         if account.workspace_id != workspace_id:
-            raise Unauthorized("Deletion of cloud accounts is only allowed by the owning organization.")
+            raise AccessDenied("Deletion of cloud accounts is only allowed by the owning organization.")
 
         await self.cloud_account_repository.delete(cloud_account_id)
         match account.access:
@@ -156,3 +162,36 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
     async def last_scan(self, workspace_id: WorkspaceId) -> Optional[LastScanInfo]:
         return await self.last_scan_repo.get_last_scan(workspace_id)
+
+    async def get_cloud_account(
+        self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> Optional[CloudAccount]:
+        account = await self.cloud_account_repository.get(cloud_account_id)
+
+        if account is None:
+            return None
+
+        if account.workspace_id != workspace_id:
+            raise AccessDenied("This account does not belong to this workspace.")
+
+        return account
+
+    async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+        return await self.cloud_account_repository.list_by_workspace_id(workspace_id)
+
+    async def update_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+        name: str,
+    ) -> CloudAccount:
+        old_account = await self.cloud_account_repository.get(cloud_account_id)
+        if old_account is None:
+            raise ValueError(f"Cloud account {cloud_account_id} not found")
+
+        if old_account.workspace_id != workspace_id:
+            raise AccessDenied("This account does not belong to this workspace.")
+
+        new_account = evolve(old_account, name=name)
+
+        return await self.cloud_account_repository.update(cloud_account_id, new_account)

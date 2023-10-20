@@ -57,9 +57,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                     id=cloud_account.id,
                     tenant_id=cloud_account.workspace_id,
                     cloud="aws",
-                    account_id=cloud_account.access.account_id,
+                    account_id=cloud_account.access.aws_account_id,
                     aws_role_name=cloud_account.access.role_name,
                     aws_external_id=cloud_account.access.external_id,
+                    name=cloud_account.name,
                 )
             else:
                 raise ValueError(f"Unknown cloud {cloud_account.access}")
@@ -79,6 +80,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             stored_account = await session.get(orm.CloudAccount, id)
             if stored_account is None:
                 raise ValueError(f"Cloud account {id} not found")
+
+            stored_account.name = cloud_account.name
 
             match cloud_account.access:
                 case AwsCloudAccess(account_id, external_id, role_name):

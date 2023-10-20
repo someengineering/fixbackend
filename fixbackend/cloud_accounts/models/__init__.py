@@ -12,33 +12,51 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, Union, Optional
+from typing import ClassVar, Dict, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
+from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
 
 
 @frozen
-class AwsCloudAccess:
-    account_id: CloudAccountId
+class CloudAccess(ABC):
+    cloud: ClassVar[str]
+
+    @abstractmethod
+    def account_id(self) -> CloudAccountId:
+        raise NotImplementedError
+
+
+@frozen
+class AwsCloudAccess(CloudAccess):
+    cloud: ClassVar[str] = "aws"
+
+    aws_account_id: CloudAccountId
     external_id: ExternalId
     role_name: str
 
+    def account_id(self) -> CloudAccountId:
+        return self.aws_account_id
+
 
 @frozen
-class GcpCloudAccess:
+class GcpCloudAccess(CloudAccess):
+    cloud: ClassVar[str] = "gcp"
+
     project_id: CloudAccountId
 
-
-CloudAccess = Union[AwsCloudAccess, GcpCloudAccess]
+    def account_id(self) -> CloudAccountId:
+        return self.project_id
 
 
 @frozen
 class CloudAccount:
     id: FixCloudAccountId
     workspace_id: WorkspaceId
+    name: Optional[str]
     access: CloudAccess
 
 
