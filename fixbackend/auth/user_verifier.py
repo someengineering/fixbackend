@@ -51,7 +51,7 @@ class EMailUserVerifier(UserVerifier):
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         destination = user.email
         assert request
-        # redirect
+        # redirect is defined by the UI - use / as safe fallback
         redirect_url = request.query_params.get("redirectUrl", "/")
         verification_link = request.base_url
         verification_link = verification_link.replace(
