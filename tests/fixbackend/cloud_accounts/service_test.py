@@ -137,7 +137,7 @@ async def test_create_aws_account(arq_redis: Redis) -> None:
     assert account is not None
     assert account.workspace_id == test_workspace_id
     assert isinstance(account.access, AwsCloudAccess)
-    assert account.access.account_id == account_id
+    assert account.access.aws_account_id == account_id
     assert account.access.role_name == role_name
     assert account.access.external_id == external_id
 
@@ -226,3 +226,90 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
     assert account.duration_seconds == 10
     assert account.resources_scanned == 100
     assert account.started_at == now
+
+
+@pytest.mark.asyncio
+async def test_get_cloud_account(arq_redis: Redis) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
+
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    # success
+    cloud_account = await service.get_cloud_account(account.id, test_workspace_id)
+    assert cloud_account is not None
+    assert cloud_account.id == account.id
+    assert cloud_account.access.cloud == "aws"
+    assert cloud_account.access.account_id() == account_id
+
+    # wrong tenant id
+    with pytest.raises(Exception):
+        await service.get_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
+
+    # wrong account id
+    non_existing = await service.get_cloud_account(FixCloudAccountId(uuid.uuid4()), test_workspace_id)
+    assert non_existing is None
+
+
+@pytest.mark.asyncio
+async def test_list_cloud_accounts(arq_redis: Redis) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
+
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    # success
+    cloud_accounts = await service.list_accounts(test_workspace_id)
+    assert len(cloud_accounts) == 1
+    assert cloud_accounts[0].id == account.id
+    assert cloud_accounts[0].access.cloud == "aws"
+    assert cloud_accounts[0].access.account_id() == account_id
+    assert cloud_accounts[0].name is None
+
+    # wrong tenant id
+    non_existing_tenant = await service.list_accounts(WorkspaceId(uuid.uuid4()))
+    assert len(non_existing_tenant) == 0
+
+
+@pytest.mark.asyncio
+async def test_update_cloud_account(arq_redis: Redis) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    service = CloudAccountServiceImpl(
+        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+    )
+
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    # success
+    updated = await service.update_cloud_account(test_workspace_id, account.id, "foo")
+    assert updated.name == "foo"
+    assert updated.id == account.id
+    assert updated.access == account.access
+    assert updated.workspace_id == account.workspace_id
+
+    # wrong tenant id
+    with pytest.raises(Exception):
+        await service.update_cloud_account(WorkspaceId(uuid.uuid4()), account.id, "foo")
+
+    # wrong account id
+    with pytest.raises(Exception):
+        await service.update_cloud_account(test_workspace_id, FixCloudAccountId(uuid.uuid4()), "foo")

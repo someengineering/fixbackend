@@ -14,7 +14,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 
 from fixbackend.cloud_accounts.models import CloudAccount, LastScanInfo
 
@@ -41,4 +41,26 @@ class CloudAccountService(ABC):
     @abstractmethod
     async def last_scan(self, workspace_id: WorkspaceId) -> Optional[LastScanInfo]:
         """Get the last scan statistics for workspace."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_cloud_account(
+        self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> Optional[CloudAccount]:
+        """Get a cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+        """List all cloud accounts"""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+        name: str,
+    ) -> CloudAccount:
+        """Update a cloud account."""
         raise NotImplementedError

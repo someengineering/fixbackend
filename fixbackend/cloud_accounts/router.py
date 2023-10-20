@@ -14,9 +14,17 @@
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from fixbackend.cloud_accounts.schemas import AwsCloudFormationLambdaCallbackParameters, LastScanInfo, ScannedAccount
+from typing import List
+
+from fixbackend.cloud_accounts.schemas import (
+    AwsCloudFormationLambdaCallbackParameters,
+    LastScanInfo,
+    ScannedAccount,
+    CloudAccountRead,
+    AwsCloudAccountUpdate,
+)
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.ids import FixCloudAccountId
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -26,6 +34,35 @@ log = logging.getLogger(__name__)
 
 def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
+
+    @router.get("/{workspace_id}/cloud_account/{cloud_account_id}")
+    async def get_cloud_account(
+        workspace: UserWorkspaceDependency,
+        cloud_account_id: FixCloudAccountId,
+        service: CloudAccountServiceDependency,
+    ) -> CloudAccountRead:
+        cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
+        if cloud_account is None:
+            raise HTTPException(status_code=404, detail="Cloud account not found")
+
+        return CloudAccountRead.from_model(cloud_account)
+
+    @router.get("/{workspace_id}/cloud_accounts")
+    async def list_cloud_accounts(
+        workspace: UserWorkspaceDependency, service: CloudAccountServiceDependency
+    ) -> List[CloudAccountRead]:
+        cloud_accounts = await service.list_accounts(workspace.id)
+        return [CloudAccountRead.from_model(cloud_account) for cloud_account in cloud_accounts]
+
+    @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}")
+    async def update_cloud_account(
+        workspace: UserWorkspaceDependency,
+        cloud_account_id: FixCloudAccountId,
+        service: CloudAccountServiceDependency,
+        update: AwsCloudAccountUpdate,
+    ) -> CloudAccountRead:
+        updated = await service.update_cloud_account(workspace.id, cloud_account_id, update.name)
+        return CloudAccountRead.from_model(updated)
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def delete_cloud_account(
