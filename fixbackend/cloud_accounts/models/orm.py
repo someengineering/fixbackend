@@ -14,6 +14,8 @@
 
 import uuid
 
+from typing import Optional
+
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -32,6 +34,7 @@ class CloudAccount(Base):
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
     aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
     def to_model(self) -> models.CloudAccount:
@@ -39,9 +42,9 @@ class CloudAccount(Base):
             match self.cloud:
                 case "aws":
                     return models.AwsCloudAccess(
-                        account_id=self.account_id, external_id=self.aws_external_id, role_name=self.aws_role_name
+                        aws_account_id=self.account_id, external_id=self.aws_external_id, role_name=self.aws_role_name
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
 
-        return models.CloudAccount(id=self.id, workspace_id=self.tenant_id, access=access())
+        return models.CloudAccount(id=self.id, workspace_id=self.tenant_id, access=access(), name=self.name)

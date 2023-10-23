@@ -289,11 +289,11 @@ class DispatcherService(Service):
 
         def account_information() -> Optional[AccountInformation]:
             match account.access:
-                case AwsCloudAccess(account_id=account_id, role_name=role_name, external_id=external_id):
+                case AwsCloudAccess(aws_account_id=aws_account_id, role_name=role_name, external_id=external_id):
                     return AwsAccountInformation(
-                        aws_account_id=account_id,
+                        aws_account_id=aws_account_id,
                         aws_account_name=None,
-                        aws_role_arn=f"arn:aws:iam::{account_id}:role/{role_name}",
+                        aws_role_arn=f"arn:aws:iam::{aws_account_id}:role/{role_name}",
                         external_id=str(external_id),
                     )
                 case _:

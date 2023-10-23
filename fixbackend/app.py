@@ -55,7 +55,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.errors import Unauthorized
+from fixbackend.errors import AccessDenied
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -308,8 +308,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         allow_headers=["X-Fix-Csrf"],
     )
 
-    @app.exception_handler(Unauthorized)
-    async def unauthorized_handler(request: Request, exception: Unauthorized) -> Response:
+    @app.exception_handler(AccessDenied)
+    async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
 
     class EndpointFilter(logging.Filter):

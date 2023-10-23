@@ -52,7 +52,12 @@ async def test_receive_workspace_created(
     cloud_account_id = FixCloudAccountId(uuid.uuid1())
     aws_account_id = CloudAccountId("123")
     await cloud_account_repository.create(
-        CloudAccount(cloud_account_id, workspace.id, AwsCloudAccess(aws_account_id, workspace.external_id, "test"))
+        CloudAccount(
+            cloud_account_id,
+            workspace.id,
+            "foo",
+            AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
+        )
     )
     # signal to the dispatcher that the new workspace was created
     await dispatcher.process_domain_event(
@@ -79,7 +84,7 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id, workspace.id, AwsCloudAccess(aws_account_id, workspace.external_id, "test")
+        cloud_account_id, workspace.id, "foo", AwsCloudAccess(aws_account_id, workspace.external_id, "test")
     )
     await cloud_account_repository.create(account)
 
