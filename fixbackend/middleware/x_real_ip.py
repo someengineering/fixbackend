@@ -26,7 +26,8 @@ class RealIpMiddleware:
             if b"x-real-ip" in headers:
                 # Determine the client address from the last trusted IP in the X-Real-Ip header.
                 host = headers[b"x-real-ip"].decode()
-                port = 42
+                # we lost the port information, so we set it to 0
+                port = 0
                 scope["client"] = (host, port)  # type: ignore[arg-type]
 
         return await self.app(scope, receive, send)

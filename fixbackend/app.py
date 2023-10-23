@@ -280,10 +280,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             body = response.content
             return body
 
-    @app.get("/echo")
-    async def echo(request: Request) -> Response:
-        return Response(status_code=200, content=str(request.headers) + f"\nyour ip: {request.client}")
-
     @app.get("/health")
     async def health() -> Response:
         return Response(status_code=200)
