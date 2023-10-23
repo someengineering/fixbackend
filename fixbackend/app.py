@@ -93,7 +93,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_application(app: FastAPI) -> AsyncIterator[None]:
-        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
+        http_client = deps.add(SN.http_client, AsyncClient(verify=client_context or True))
         arq_redis = deps.add(
             SN.arq_redis,
             await create_pool(
