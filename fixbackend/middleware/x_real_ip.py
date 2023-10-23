@@ -28,6 +28,6 @@ class RealIpMiddleware:
                 host = headers[b"x-real-ip"].decode()
                 # we lost the port information, so we set it to 0
                 port = 0
-                scope["client"] = (host, port)  # type: ignore[arg-type]
+                scope["client"] = (host, port)
 
         return await self.app(scope, receive, send)
