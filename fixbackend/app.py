@@ -68,6 +68,7 @@ from fixbackend.subscription.subscription_repository import SubscriptionReposito
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
+from fixbackend.middleware.x_real_ip import RealIpMiddleware
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -241,6 +242,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
+
+    app.add_middleware(RealIpMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
