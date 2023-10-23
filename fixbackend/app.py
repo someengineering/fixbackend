@@ -279,7 +279,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @app.get("/echo")
     async def echo(request: Request) -> Response:
-        return Response(status_code=200, content=str(request))
+        return Response(status_code=200, content=str(request.headers))
 
     @app.get("/health")
     async def health() -> Response:
