@@ -37,7 +37,9 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+    async def list_by_workspace_id(
+        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+    ) -> List[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
@@ -102,10 +104,16 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             await session.refresh(stored_account)
             return stored_account.to_model()
 
-    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+    async def list_by_workspace_id(
+        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+    ) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
+            if enabled is not None:
+                statement = statement.where(orm.CloudAccount.enabled == enabled)
+            if configured is not None:
+                statement = statement.where(orm.CloudAccount.is_configured == configured)
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]

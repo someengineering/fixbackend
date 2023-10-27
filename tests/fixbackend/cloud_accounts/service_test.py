@@ -55,8 +55,15 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
         self.accounts[id] = cloud_account
         return cloud_account
 
-    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
-        return [account for account in self.accounts.values() if account.workspace_id == workspace_id]
+    async def list_by_workspace_id(
+        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+    ) -> List[CloudAccount]:
+        accounts = [account for account in self.accounts.values() if account.workspace_id == workspace_id]
+        if enabled is not None:
+            accounts = [account for account in accounts if account.enabled == enabled]
+        if configured is not None:
+            accounts = [account for account in accounts if account.is_configured == configured]
+        return accounts
 
     async def delete(self, id: FixCloudAccountId) -> None:
         self.accounts.pop(id)

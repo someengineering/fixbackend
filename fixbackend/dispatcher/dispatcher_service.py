@@ -314,7 +314,9 @@ class DispatcherService(Service):
         now = utc()
 
         async for workspace_id, at in self.next_run_repo.older_than(now):
-            if accounts := await self.cloud_account_repo.list_by_workspace_id(workspace_id):
+            if accounts := await self.cloud_account_repo.list_by_workspace_id(
+                workspace_id, enabled=True, configured=True
+            ):
                 for account in accounts:
                     await self.trigger_collect(account)
                 next_run_at = await self.compute_next_run(workspace_id, at)
