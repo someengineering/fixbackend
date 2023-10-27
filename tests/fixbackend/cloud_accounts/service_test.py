@@ -25,7 +25,7 @@ from redis.asyncio import Redis
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanInfo
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
-from fixbackend.domain_events.events import AwsAccountDiscovered, Event
+from fixbackend.domain_events.events import AwsAccountDiscovered, Event, AwsAccountConfigured
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId
 from fixbackend.workspaces.models import Workspace
@@ -34,6 +34,9 @@ from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccoun
 from datetime import datetime
 from fixcloudutils.redis.event_stream import MessageContext
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
+from fixbackend.config import Config
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+import asyncio
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -119,15 +122,34 @@ class LastScanRepositoryMock(LastScanRepository):
         return self.data.get(workspace_id)
 
 
+class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
+    def __init__(self) -> None:
+        self.can_assume = True
+
+    async def can_assume_role(self, account_id: str, role_name: str) -> bool:
+        return self.can_assume
+
+
 @pytest.mark.asyncio
-async def test_create_aws_account(arq_redis: Redis) -> None:
+async def test_create_aws_account(
+    arq_redis: Redis,
+    default_config: Config,
+) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     # happy case
@@ -174,14 +196,22 @@ async def test_create_aws_account(arq_redis: Redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_aws_account(arq_redis: Redis) -> None:
+async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -198,14 +228,22 @@ async def test_delete_aws_account(arq_redis: Redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_store_last_run_info(arq_redis: Redis) -> None:
+async def test_store_last_run_info(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
@@ -229,14 +267,22 @@ async def test_store_last_run_info(arq_redis: Redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_cloud_account(arq_redis: Redis) -> None:
+async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -259,14 +305,22 @@ async def test_get_cloud_account(arq_redis: Redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_cloud_accounts(arq_redis: Redis) -> None:
+async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -286,14 +340,22 @@ async def test_list_cloud_accounts(arq_redis: Redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_cloud_account(arq_redis: Redis) -> None:
+async def test_update_cloud_account(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
     last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
-        organization_repository, repository, pubsub_publisher, domain_sender, last_scan_repo, arq_redis
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -313,3 +375,70 @@ async def test_update_cloud_account(arq_redis: Redis) -> None:
     # wrong account id
     with pytest.raises(Exception):
         await service.update_cloud_account(test_workspace_id, FixCloudAccountId(uuid.uuid4()), "foo")
+
+
+@pytest.mark.asyncio
+async def test_handle_account_discovered(arq_redis: Redis, default_config: Config) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
+    service = CloudAccountServiceImpl(
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
+        account_setup_sleep_seconds=0.05,
+    )
+
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    assert len(domain_sender.events) == 1
+    event = domain_sender.events[0]
+    assert isinstance(event, AwsAccountDiscovered)
+
+    # happy case, boto3 can assume role
+    await service.process_cloud_account_discovered(
+        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
+    )
+
+    assert len(domain_sender.events) == 2
+    event = domain_sender.events[1]
+    assert isinstance(event, AwsAccountConfigured)
+    assert event.cloud_account_id == account.id
+    assert event.aws_account_id == account_id
+    assert event.tenant_id == account.workspace_id
+
+    # boto3 cannot assume right away
+    account_id1 = CloudAccountId("foobar1")
+    role_name1 = "FooBarRole1"
+    account1 = await service.create_aws_account(test_workspace_id, account_id1, role_name1, external_id)
+    assert len(repository.accounts) == 2
+    event = domain_sender.events[2]
+
+    account_setup_helper.can_assume = False
+    task = asyncio.create_task(
+        service.process_cloud_account_discovered(
+            event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
+        )
+    )
+    await asyncio.sleep(0.1)
+    # no event should be published before the account is configured
+    assert len(domain_sender.events) == 3
+
+    # now boto3 can assume role and event should be published
+    account_setup_helper.can_assume = True
+    await task
+    assert len(domain_sender.events) == 4
+    event = domain_sender.events[3]
+    assert isinstance(event, AwsAccountConfigured)
+    assert event.cloud_account_id == account1.id
+    assert event.aws_account_id == account_id1
+    assert event.tenant_id == account1.workspace_id

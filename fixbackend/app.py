@@ -160,6 +160,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 domain_event_publisher,
                 LastScanRepository(session_maker),
                 arq_redis,
+                cfg,
+                boto_session,
             ),
         )
 

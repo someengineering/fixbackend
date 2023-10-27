@@ -31,7 +31,7 @@ from fixbackend.dispatcher.next_run_repository import NextTenantRun
 from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     WorkspaceCreated,
-    AwsAccountDiscovered,
+    AwsAccountConfigured,
     CloudAccountCollectInfo,
 )
 from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
@@ -90,8 +90,8 @@ async def test_receive_aws_account_discovered(
 
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
-        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+        AwsAccountConfigured(cloud_account_id, organization.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
 
     # check that no new entry was created in the next_run table
@@ -113,8 +113,8 @@ async def test_receive_aws_account_discovered(
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
-        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+        AwsAccountConfigured(cloud_account_id, organization.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2

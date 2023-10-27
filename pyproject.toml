@@ -19,7 +19,8 @@ jinja2 = "^3.1.2"
 boto3 = "^1.28.45"
 async-lru = "^2.0.4"
 arq = "^0.25.0"
-fixcloudutils = { extras = ["redis", "arango"], version = "^1.5.0" }
+# todo: remove once fixcloudutils pr is merged
+fixcloudutils = { extras = ["redis", "arango"], git = "https://github.com/someengineering/fixcloudutils.git", rev = "3ff926988841b934217d0464f864c195f6494e5c" }
 prometheus-fastapi-instrumentator = ">=6.1.0"
 websockets = "^11.0.3"
 cryptography = "^41.0.4"
