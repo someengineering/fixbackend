@@ -116,6 +116,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     ),
                 )
 
+            case AwsAccountConfigured.kind:
+                configured_event = AwsAccountConfigured.from_json(message)
+                account = await self.cloud_account_repository.get(configured_event.cloud_account_id)
+                if account is None:
+                    log.warning(f"Account {configured_event.cloud_account_id} not found, cannot mark as configured")
+                    return None
+                await self.cloud_account_repository.update(account.id, evolve(account, is_configured=True))
+
             case _:
                 pass  # ignore other domain events
 
@@ -185,6 +193,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             workspace_id=workspace_id,
             access=AwsCloudAccess(aws_account_id=account_id, external_id=external_id, role_name=role_name),
             name=None,
+            is_configured=False,
+            enabled=True,
         )
         if existing := await account_already_exists(workspace_id, account_id):
             account = evolve(account, id=existing.id)

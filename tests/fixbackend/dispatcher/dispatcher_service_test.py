@@ -57,6 +57,8 @@ async def test_receive_workspace_created(
             organization.id,
             "foo",
             AwsCloudAccess(aws_account_id, organization.external_id, "test"),
+            is_configured=False,
+            enabled=True,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -84,7 +86,12 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id, organization.id, "foo", AwsCloudAccess(aws_account_id, organization.external_id, "test")
+        cloud_account_id,
+        organization.id,
+        "foo",
+        AwsCloudAccess(aws_account_id, organization.external_id, "test"),
+        is_configured=False,
+        enabled=True,
     )
     await cloud_account_repository.create(account)
 

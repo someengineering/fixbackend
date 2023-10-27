@@ -58,6 +58,8 @@ class CloudAccount:
     workspace_id: WorkspaceId
     name: Optional[str]
     access: CloudAccess
+    is_configured: bool
+    enabled: bool
 
 
 @frozen

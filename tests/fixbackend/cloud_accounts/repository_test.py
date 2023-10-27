@@ -41,6 +41,8 @@ async def test_create_cloud_account(
             external_id=ExternalId(uuid.uuid4()),
         ),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     # create

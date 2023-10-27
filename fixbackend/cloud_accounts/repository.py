@@ -61,6 +61,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                     aws_role_name=cloud_account.access.role_name,
                     aws_external_id=cloud_account.access.external_id,
                     name=cloud_account.name,
+                    is_configured=cloud_account.is_configured,
+                    enabled=cloud_account.enabled,
                 )
             else:
                 raise ValueError(f"Unknown cloud {cloud_account.access}")
@@ -82,6 +84,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 raise ValueError(f"Cloud account {id} not found")
 
             stored_account.name = cloud_account.name
+            stored_account.is_configured = cloud_account.is_configured
+            stored_account.enabled = cloud_account.enabled
 
             match cloud_account.access:
                 case AwsCloudAccess(account_id, external_id, role_name):

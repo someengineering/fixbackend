@@ -47,6 +47,8 @@ class InMemoryCloudAccountService(CloudAccountService):
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
             name=None,
+            is_configured=False,
+            enabled=True,
         )
         self.accounts[account.id] = account
         return account
@@ -128,6 +130,8 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -171,6 +175,8 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -191,6 +197,8 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
@@ -212,6 +220,8 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     payload = {
