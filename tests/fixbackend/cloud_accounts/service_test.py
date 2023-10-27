@@ -37,6 +37,7 @@ from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.config import Config
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 import asyncio
+from fixbackend.errors import ResourceNotFound, AccessDenied
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -299,12 +300,12 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
     assert cloud_account.access.account_id() == account_id
 
     # wrong tenant id
-    with pytest.raises(Exception):
+    with pytest.raises(AccessDenied):
         await service.get_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
 
     # wrong account id
-    non_existing = await service.get_cloud_account(FixCloudAccountId(uuid.uuid4()), test_workspace_id)
-    assert non_existing is None
+    with pytest.raises(ResourceNotFound):
+        await service.get_cloud_account(FixCloudAccountId(uuid.uuid4()), test_workspace_id)
 
 
 @pytest.mark.asyncio
@@ -343,7 +344,7 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
 
 
 @pytest.mark.asyncio
-async def test_update_cloud_account(arq_redis: Redis, default_config: Config) -> None:
+async def test_update_cloud_account_name(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
@@ -365,19 +366,19 @@ async def test_update_cloud_account(arq_redis: Redis, default_config: Config) ->
     assert len(repository.accounts) == 1
 
     # success
-    updated = await service.update_cloud_account(test_workspace_id, account.id, "foo")
+    updated = await service.update_cloud_account_name(test_workspace_id, account.id, "foo")
     assert updated.name == "foo"
     assert updated.id == account.id
     assert updated.access == account.access
     assert updated.workspace_id == account.workspace_id
 
     # wrong tenant id
-    with pytest.raises(Exception):
-        await service.update_cloud_account(WorkspaceId(uuid.uuid4()), account.id, "foo")
+    with pytest.raises(AccessDenied):
+        await service.update_cloud_account_name(WorkspaceId(uuid.uuid4()), account.id, "foo")
 
     # wrong account id
-    with pytest.raises(Exception):
-        await service.update_cloud_account(test_workspace_id, FixCloudAccountId(uuid.uuid4()), "foo")
+    with pytest.raises(ResourceNotFound):
+        await service.update_cloud_account_name(test_workspace_id, FixCloudAccountId(uuid.uuid4()), "foo")
 
 
 @pytest.mark.asyncio
@@ -488,3 +489,49 @@ async def test_handle_account_configured(arq_redis: Redis, default_config: Confi
     assert after_configured.name == account.name
     assert after_configured.id == account.id
     assert after_configured.enabled == account.enabled
+
+
+@pytest.mark.asyncio
+async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Config) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
+    service = CloudAccountServiceImpl(
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
+    )
+
+    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
+    assert len(repository.accounts) == 1
+
+    # success
+    updated = await service.enable_cloud_account(
+        test_workspace_id,
+        account.id,
+    )
+    assert updated.enabled is True
+    assert repository.accounts[account.id].enabled is True
+
+    updated = await service.disable_cloud_account(
+        test_workspace_id,
+        account.id,
+    )
+    assert updated.enabled is False
+    assert repository.accounts[account.id].enabled is False
+
+    # wrong tenant id
+    with pytest.raises(Exception):
+        await service.update_cloud_account_name(WorkspaceId(uuid.uuid4()), account.id, "foo")
+
+    # wrong account id
+    with pytest.raises(Exception):
+        await service.update_cloud_account_name(test_workspace_id, FixCloudAccountId(uuid.uuid4()), "foo")

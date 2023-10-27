@@ -14,7 +14,7 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from typing import List
 
@@ -42,9 +42,6 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
         cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
-        if cloud_account is None:
-            raise HTTPException(status_code=404, detail="Cloud account not found")
-
         return CloudAccountRead.from_model(cloud_account)
 
     @router.get("/{workspace_id}/cloud_accounts")
@@ -61,7 +58,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         update: AwsCloudAccountUpdate,
     ) -> CloudAccountRead:
-        updated = await service.update_cloud_account(workspace.id, cloud_account_id, update.name)
+        updated = await service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
         return CloudAccountRead.from_model(updated)
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -71,6 +68,24 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> None:
         await service.delete_cloud_account(cloud_account_id, workspace.id)
+
+    @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/enable")
+    async def enable_cloud_account(
+        workspace: UserWorkspaceDependency,
+        cloud_account_id: FixCloudAccountId,
+        service: CloudAccountServiceDependency,
+    ) -> CloudAccountRead:
+        updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
+        return CloudAccountRead.from_model(updated)
+
+    @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/disable")
+    async def disable_cloud_account(
+        workspace: UserWorkspaceDependency,
+        cloud_account_id: FixCloudAccountId,
+        service: CloudAccountServiceDependency,
+    ) -> CloudAccountRead:
+        updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
+        return CloudAccountRead.from_model(updated)
 
     @router.get("/{workspace_id}/cloud_accounts/last_scan")
     async def last_scan(

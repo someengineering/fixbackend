@@ -44,6 +44,8 @@ class CloudAccountRead(BaseModel):
     cloud: str = Field(description="Cloud provider")
     account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
     name: Optional[str] = Field(description="Name of the cloud account", max_length=64)
+    enabled: bool = Field(description="Whether the cloud account is enabled for collection")
+    is_configured: bool = Field(description="Is account correctly configured")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -52,6 +54,8 @@ class CloudAccountRead(BaseModel):
             cloud=model.access.cloud,
             account_id=model.access.account_id(),
             name=model.name,
+            enabled=model.enabled,
+            is_configured=model.is_configured,
         )
 
 
