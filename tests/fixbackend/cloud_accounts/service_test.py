@@ -14,7 +14,7 @@
 
 
 import uuid
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 
 import pytest
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
@@ -50,9 +50,9 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
     async def get(self, id: FixCloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
 
-    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
-        self.accounts[id] = cloud_account
-        return cloud_account
+    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
+        self.accounts[id] = update_fn(self.accounts[id])
+        return self.accounts[id]
 
     async def list_by_workspace_id(
         self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
@@ -453,47 +453,14 @@ async def test_handle_account_discovered(arq_redis: Redis, default_config: Confi
     assert event.aws_account_id == account_id1
     assert event.tenant_id == account1.workspace_id
 
-
-@pytest.mark.asyncio
-async def test_handle_account_configured(arq_redis: Redis, default_config: Config) -> None:
-    repository = CloudAccountRepositoryMock()
-    organization_repository = OrganizationServiceMock()
-    pubsub_publisher = RedisPubSubPublisherMock()
-    domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
-    account_setup_helper = AwsAccountSetupHelperMock()
-    service = CloudAccountServiceImpl(
-        organization_repository,
-        repository,
-        pubsub_publisher,
-        domain_sender,
-        last_scan_repo,
-        arq_redis,
-        default_config,
-        account_setup_helper,
-    )
-
-    account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
-    assert account.is_configured is False
-
-    event = AwsAccountConfigured(
-        cloud_account_id=account.id,
-        tenant_id=account.workspace_id,
-        aws_account_id=account_id,
-    )
-    # happy case, boto3 can assume role
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
-
-    after_configured = await service.get_cloud_account(account.id, test_workspace_id)
-    assert after_configured is not None
-    assert after_configured.is_configured is True
-    assert after_configured.access == account.access
-    assert after_configured.workspace_id == account.workspace_id
-    assert after_configured.name == account.name
-    assert after_configured.id == account.id
-    assert after_configured.enabled == account.enabled
+    after_discovered = await service.get_cloud_account(account.id, test_workspace_id)
+    assert after_discovered is not None
+    assert after_discovered.is_configured is True
+    assert after_discovered.access == account.access
+    assert after_discovered.workspace_id == account.workspace_id
+    assert after_discovered.name == account.name
+    assert after_discovered.id == account.id
+    assert after_discovered.enabled == account.enabled
 
 
 @pytest.mark.asyncio

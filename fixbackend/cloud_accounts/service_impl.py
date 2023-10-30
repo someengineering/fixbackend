@@ -103,22 +103,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     ),
                 )
 
-            case AwsAccountConfigured.kind:
-                configured_event = AwsAccountConfigured.from_json(message)
-                account = await self.cloud_account_repository.get(configured_event.cloud_account_id)
-                if account is None:
-                    log.warning(f"Account {configured_event.cloud_account_id} not found, cannot mark as configured")
-                    return None
-                await self.cloud_account_repository.update(account.id, evolve(account, is_configured=True))
-
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
-                await self.check_account_trust_setup(discovered_event.cloud_account_id)
+                await self.try_configure_account(discovered_event.cloud_account_id)
 
             case _:
                 pass  # ignore other domain events
 
-    async def check_account_trust_setup(self, cloud_account_id: FixCloudAccountId) -> None:
+    async def try_configure_account(self, cloud_account_id: FixCloudAccountId) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             log.warning(f"Account {cloud_account_id} not found, cannot setup account")
@@ -128,6 +120,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
         if await self.account_setup_helper.can_assume_role(account.access.aws_account_id, account.access.role_name):
+            await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
             await self.domain_events.publish(
                 AwsAccountConfigured(
                     cloud_account_id=cloud_account_id,
@@ -173,7 +166,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         )
         if existing := await account_already_exists(workspace_id, account_id):
             account = evolve(account, id=existing.id)
-            result = await self.cloud_account_repository.update(existing.id, account)
+            result = await self.cloud_account_repository.update(existing.id, lambda _: account)
         else:
             result = await self.cloud_account_repository.create(account)
 
@@ -227,30 +220,25 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         cloud_account_id: FixCloudAccountId,
         name: str,
     ) -> CloudAccount:
-        old_account = await self.get_cloud_account(cloud_account_id, workspace_id)
-
-        new_account = evolve(old_account, name=name)
-
-        return await self.cloud_account_repository.update(cloud_account_id, new_account)
+        # make sure access is possible
+        await self.get_cloud_account(cloud_account_id, workspace_id)
+        return await self.cloud_account_repository.update(cloud_account_id, lambda acc: evolve(acc, name=name))
 
     async def enable_cloud_account(
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
     ) -> CloudAccount:
-        old_account = await self.get_cloud_account(cloud_account_id, workspace_id)
-
-        new_account = evolve(old_account, enabled=True)
-
-        return await self.cloud_account_repository.update(cloud_account_id, new_account)
+        # make sure access is possible
+        await self.get_cloud_account(cloud_account_id, workspace_id)
+        result = await self.cloud_account_repository.update(cloud_account_id, lambda acc: evolve(acc, enabled=True))
+        return result
 
     async def disable_cloud_account(
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
     ) -> CloudAccount:
-        old_account = await self.get_cloud_account(cloud_account_id, workspace_id)
-
-        new_account = evolve(old_account, enabled=False)
-
-        return await self.cloud_account_repository.update(cloud_account_id, new_account)
+        # make sure access is possible
+        await self.get_cloud_account(cloud_account_id, workspace_id)
+        return await self.cloud_account_repository.update(cloud_account_id, lambda acc: evolve(acc, enabled=False))

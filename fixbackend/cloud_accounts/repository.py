@@ -11,16 +11,17 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated, List, Optional
+from abc import ABC, abstractmethod
+from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
 
-from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, orm
 from fixbackend.db import AsyncSessionMakerDependency
+from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
-from abc import ABC, abstractmethod
 
 
 class CloudAccountRepository(ABC):
@@ -33,7 +34,7 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         raise NotImplementedError
 
     @abstractmethod
@@ -79,11 +80,13 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_model() if cloud_account else None
 
-    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         async with self.session_maker() as session:
             stored_account = await session.get(orm.CloudAccount, id)
             if stored_account is None:
-                raise ValueError(f"Cloud account {id} not found")
+                raise ResourceNotFound(f"Cloud account {id} not found")
+
+            cloud_account = update_fn(stored_account.to_model())
 
             stored_account.name = cloud_account.name
             stored_account.is_configured = cloud_account.is_configured

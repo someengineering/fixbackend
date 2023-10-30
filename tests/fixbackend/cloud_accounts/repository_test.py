@@ -58,18 +58,20 @@ async def test_create_cloud_account(
     assert len(accounts) == 1
     assert accounts[0] == account
 
-    # update
-    updated_account = evolve(
-        account,
-        access=AwsCloudAccess(
-            aws_account_id=CloudAccountId("42"),
-            role_name="bar",
-            external_id=ExternalId(uuid.uuid4()),
-        ),
+    new_cloud_access = AwsCloudAccess(
+        aws_account_id=CloudAccountId("42"),
+        role_name="bar",
+        external_id=ExternalId(uuid.uuid4()),
     )
-    updated = await cloud_account_repository.update(id=account.id, cloud_account=updated_account)
+
+    # update
+    def update_account(account: CloudAccount) -> CloudAccount:
+        return evolve(account, access=new_cloud_access)
+
+    updated = await cloud_account_repository.update(id=account.id, update_fn=update_account)
     stored_account = await cloud_account_repository.get(id=account.id)
-    assert updated == stored_account == updated_account
+    assert updated == stored_account
+    assert updated.access == new_cloud_access
 
     # delete
     await cloud_account_repository.delete(id=account.id)
