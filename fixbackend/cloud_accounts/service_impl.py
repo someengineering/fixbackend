@@ -73,7 +73,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             base_delay=5,
             # 30 retries * 30s = roughly 15 minutes
             maximum_delay=30,
-            retries=30,
+            retries=15,
             log_failed_attempts=False,
         )
 
