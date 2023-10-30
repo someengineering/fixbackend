@@ -13,9 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import asyncio
 import uuid
-from datetime import timedelta, datetime
+from datetime import timedelta
 from hmac import compare_digest
 from logging import getLogger
 from typing import Any, List, Optional
@@ -58,7 +57,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         readwrite_redis: Redis,
         config: Config,
         account_setup_helper: AwsAccountSetupHelper,
-        account_setup_sleep_seconds: float = 30,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
@@ -69,26 +67,15 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.domain_event_listener = RedisStreamListener(
             readwrite_redis,
             DomainEventsStreamName,
-            group="fixbackent-cloudaccountservice-domain",
+            group="fixbackend-cloudaccountservice-domain",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
             consider_failed_after=timedelta(minutes=5),
-            batch_size=1,
+            batch_size=config.cloud_account_service_event_parallelism,
+            parallelism=config.cloud_account_service_event_parallelism,
         )
         self.instance_id = config.instance_id
-        self.cloud_account_setup_timeout = timedelta(minutes=15)
-        self.cloud_account_setup_listener = RedisStreamListener(
-            readwrite_redis,
-            DomainEventsStreamName,
-            group="fixbackent-cloudaccountservice-accountsetup",
-            listener=config.instance_id,
-            message_processor=self.process_domain_event,
-            consider_failed_after=self.cloud_account_setup_timeout,  # try setup an account for 15 minutes and give up
-            batch_size=1,
-            parallelism=1000,
-        )
         self.account_setup_helper = account_setup_helper
-        self.account_setup_sleep_seconds = account_setup_sleep_seconds
 
     async def start(self) -> Any:
         return await self.domain_event_listener.start()
@@ -124,44 +111,32 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     return None
                 await self.cloud_account_repository.update(account.id, evolve(account, is_configured=True))
 
+            case AwsAccountDiscovered.kind:
+                discovered_event = AwsAccountDiscovered.from_json(message)
+                await self.check_account_trust_setup(discovered_event.cloud_account_id)
+
             case _:
                 pass  # ignore other domain events
 
-    async def process_cloud_account_discovered(self, message: Json, context: MessageContext) -> None:
-        match context.kind:
-            case AwsAccountDiscovered.kind:
-                event = AwsAccountDiscovered.from_json(message)
-                await self.wait_for_account_setup(event.cloud_account_id)
-
-            case _:
-                pass
-
-    async def wait_for_account_setup(self, cloud_account_id: FixCloudAccountId) -> None:
+    async def check_account_trust_setup(self, cloud_account_id: FixCloudAccountId) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             log.warning(f"Account {cloud_account_id} not found, cannot setup account")
             return None
 
-        started = datetime.utcnow()
-
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
-        while datetime.utcnow() - started < self.cloud_account_setup_timeout:
-            if await self.account_setup_helper.can_assume_role(account.access.aws_account_id, account.access.role_name):
-                await self.domain_events.publish(
-                    AwsAccountConfigured(
-                        cloud_account_id=cloud_account_id,
-                        tenant_id=account.workspace_id,
-                        aws_account_id=account.access.aws_account_id,
-                    )
+        if await self.account_setup_helper.can_assume_role(account.access.aws_account_id, account.access.role_name):
+            await self.domain_events.publish(
+                AwsAccountConfigured(
+                    cloud_account_id=cloud_account_id,
+                    tenant_id=account.workspace_id,
+                    aws_account_id=account.access.aws_account_id,
                 )
-                return None
-            else:
-                log.info(f"Account {cloud_account_id} not setup yet, waiting")
-                await asyncio.sleep(self.account_setup_sleep_seconds)
-
-        raise TimeoutError(f"Account {cloud_account_id} not setup after {self.cloud_account_setup_timeout}, giving up")
+            )
+        else:
+            raise RuntimeError("Cannot assume role yet, waiting")
 
     async def create_aws_account(
         self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId

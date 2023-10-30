@@ -36,7 +36,6 @@ from fixcloudutils.redis.event_stream import MessageContext
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.config import Config
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
-import asyncio
 from fixbackend.errors import ResourceNotFound, AccessDenied
 
 
@@ -405,7 +404,6 @@ async def test_handle_account_discovered(arq_redis: Redis, default_config: Confi
         arq_redis,
         default_config,
         account_setup_helper,
-        account_setup_sleep_seconds=0.05,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
@@ -416,7 +414,7 @@ async def test_handle_account_discovered(arq_redis: Redis, default_config: Confi
     assert isinstance(event, AwsAccountDiscovered)
 
     # happy case, boto3 can assume role
-    await service.process_cloud_account_discovered(
+    await service.process_domain_event(
         event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
     )
 
@@ -435,18 +433,19 @@ async def test_handle_account_discovered(arq_redis: Redis, default_config: Confi
     event = domain_sender.events[2]
 
     account_setup_helper.can_assume = False
-    task = asyncio.create_task(
-        service.process_cloud_account_discovered(
+
+    with pytest.raises(Exception):
+        await service.process_domain_event(
             event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
         )
-    )
-    await asyncio.sleep(0.1)
     # no event should be published before the account is configured
     assert len(domain_sender.events) == 3
 
     # now boto3 can assume role and event should be published
     account_setup_helper.can_assume = True
-    await task
+    await service.process_domain_event(
+        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
+    )
     assert len(domain_sender.events) == 4
     event = domain_sender.events[3]
     assert isinstance(event, AwsAccountConfigured)
@@ -472,7 +471,6 @@ async def test_handle_account_configured(arq_redis: Redis, default_config: Confi
         arq_redis,
         default_config,
         account_setup_helper,
-        account_setup_sleep_seconds=0.05,
     )
 
     account = await service.create_aws_account(test_workspace_id, account_id, role_name, external_id)
