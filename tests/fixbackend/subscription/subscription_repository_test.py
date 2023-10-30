@@ -19,11 +19,12 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import timezone, datetime
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.ids import PaymentMethodId, UserId, WorkspaceId
+from fixbackend.ids import SubscriptionId, UserId, WorkspaceId
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
@@ -32,9 +33,10 @@ from fixbackend.subscription.subscription_repository import (
 
 
 async def test_crud_entry(subscription_repository: SubscriptionRepository, session: AsyncSession) -> None:
-    id = PaymentMethodId(uuid4())
+    id = SubscriptionId(uuid4())
     user_id = UserId(uuid4())
     cid = "some-customer-id"
+    now = datetime(2021, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
@@ -43,6 +45,8 @@ async def test_crud_entry(subscription_repository: SubscriptionRepository, sessi
         customer_aws_account_id="123",
         product_code="123",
         active=True,
+        last_charge_timestamp=now,
+        next_charge_timestamp=now,
     )
     # create entity
     await subscription_repository.create(entity)

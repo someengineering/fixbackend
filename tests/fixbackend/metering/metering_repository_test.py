@@ -17,33 +17,43 @@ from datetime import datetime, timezone
 import pytest
 
 from fixbackend.ids import WorkspaceId, CloudAccountId
-from fixbackend.metering import MeteringRecord
+from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.metering.metering_repository import MeteringRepository
 
 
-@pytest.fixture
-def metering_record() -> MeteringRecord:
+def create_metering_record(workspace_id: WorkspaceId, account_id: str) -> MeteringRecord:
     ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     return MeteringRecord(
         id=uuid.uuid1(),
-        workspace_id=WorkspaceId(uuid.uuid1()),
+        workspace_id=workspace_id,
         timestamp=ts,
         job_id="123e4567-e89b-12d3-a456-426614174000",
         task_id="123e4567-e89b-12d3-a456-426614174000",
         cloud="aws",
-        account_id=CloudAccountId("123456789012"),
+        account_id=CloudAccountId(account_id),
         account_name="test",
-        nr_of_resources_collected=1,
+        nr_of_resources_collected=424242,
         nr_of_error_messages=1,
         started_at=ts,
         duration=1,
     )
 
 
+@pytest.fixture
+def metering_record() -> MeteringRecord:
+    return create_metering_record(WorkspaceId(uuid.uuid1()), "123456789012")
+
+
 @pytest.mark.asyncio
 async def test_create_load(metering_repository: MeteringRepository, metering_record: MeteringRecord) -> None:
     # make sure there are no entries for the tenant
-    assert [e async for e in metering_repository.list(metering_record.workspace_id)] == []
+    ws_id = metering_record.workspace_id
+    assert [e async for e in metering_repository.list(ws_id)] == []
     # create the entry
     await metering_repository.add([metering_record])
-    assert [e async for e in metering_repository.list(metering_record.workspace_id)] == [metering_record]
+    assert [e async for e in metering_repository.list(ws_id)] == [metering_record]
+    # collect summary
+    assert [e async for e in metering_repository.collect_summary(ws_id)] == [MeteringSummary("123456789012", "test", 1)]
+
+    more = metering_record.nr_of_resources_collected + 1
+    assert [e async for e in metering_repository.collect_summary(ws_id, min_resources_collected=more)] == []

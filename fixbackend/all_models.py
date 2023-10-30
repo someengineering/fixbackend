@@ -25,5 +25,5 @@ from fixbackend.cloud_accounts.models.orm import CloudAccount  # noqa
 from fixbackend.dispatcher.next_run_repository import NextTenantRun  # noqa
 from fixbackend.metering.metering_repository import MeteringRecordEntity  # noqa
 from fixbackend.keyvalue.json_kv import JsonEntry  # noqa
-from fixbackend.subscription.subscription_repository import SubscriptionEntity  # noqa
+from fixbackend.subscription.subscription_repository import SubscriptionEntity, BillingEntity  # noqa
 from fixbackend.cloud_accounts.last_scan_repository import Entry  # noqa

@@ -16,7 +16,8 @@ import asyncio
 import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
-from typing import AsyncIterator, Iterator, List, Any, Dict
+from datetime import datetime, timezone
+from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple
 from unittest.mock import patch
 
 import pytest
@@ -28,6 +29,7 @@ from boto3 import Session as BotoSession
 from fastapi import FastAPI
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
@@ -41,18 +43,21 @@ from fixbackend.db import get_async_session
 from fixbackend.dependencies import FixDependencies, ServiceNames, fix_dependencies
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.events import Event
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.billing import BillingService
+from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.utils import uid, start_of_next_month
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import Event
-from redis.asyncio import Redis
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -93,7 +98,7 @@ def default_config() -> Config:
         available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
-        args=Namespace(dispatcher=False),
+        args=Namespace(dispatcher=False, mode="app"),
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_region="",
@@ -166,8 +171,16 @@ async def boto_answers() -> Dict[str, Any]:
 
 
 @pytest.fixture
-async def boto_session(boto_answers: Dict[str, Any]) -> AsyncIterator[BotoSession]:
+async def boto_requests() -> List[Tuple[str, Any]]:
+    return []
+
+
+@pytest.fixture
+async def boto_session(
+    boto_answers: Dict[str, Any], boto_requests: List[Tuple[str, Any]]
+) -> AsyncIterator[BotoSession]:
     def mock_make_api_call(client: Any, operation_name: str, kwarg: Any) -> Any:
+        boto_requests.append((operation_name, kwarg))
         if result := boto_answers.get(operation_name):
             return result
         else:
@@ -204,8 +217,27 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def organization(workspace_repository: WorkspaceRepository, user: User) -> Workspace:
+async def workspace(workspace_repository: WorkspaceRepository, user: User) -> Workspace:
     return await workspace_repository.create_workspace("foo", "foo", user)
+
+
+@pytest.fixture
+async def subscription(
+    subscription_repository: SubscriptionRepository, user: User, workspace: Workspace
+) -> AwsMarketplaceSubscription:
+    return await subscription_repository.create(
+        AwsMarketplaceSubscription(
+            id=SubscriptionId(uid()),
+            user_id=user.id,
+            workspace_id=workspace.id,
+            customer_identifier="123",
+            customer_aws_account_id="123456789",
+            product_code="foo",
+            active=True,
+            last_charge_timestamp=datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+            next_charge_timestamp=start_of_next_month(hour=9),
+        )
+    )
 
 
 @pytest.fixture
@@ -352,10 +384,11 @@ async def workspace_repository(
 @pytest.fixture
 async def aws_marketplace_handler(
     subscription_repository: SubscriptionRepository,
+    metering_repository: MeteringRepository,
     workspace_repository: WorkspaceRepository,
     boto_session: BotoSession,
 ) -> AwsMarketplaceHandler:
-    return AwsMarketplaceHandler(subscription_repository, workspace_repository, boto_session, None)
+    return AwsMarketplaceHandler(subscription_repository, workspace_repository, metering_repository, boto_session, None)
 
 
 @pytest.fixture
@@ -413,3 +446,10 @@ async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_con
 async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: F811
     async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture
+async def billing_service(
+    aws_marketplace_handler: AwsMarketplaceHandler, subscription_repository: SubscriptionRepository
+) -> BillingService:
+    return BillingService(aws_marketplace_handler, subscription_repository)

@@ -46,7 +46,7 @@ async def test_receive_workspace_created(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
-    organization: Workspace,
+    workspace: Workspace,
 ) -> None:
     # create a cloud account
     cloud_account_id = FixCloudAccountId(uuid.uuid1())
@@ -54,18 +54,18 @@ async def test_receive_workspace_created(
     await cloud_account_repository.create(
         CloudAccount(
             cloud_account_id,
-            organization.id,
+            workspace.id,
             "foo",
-            AwsCloudAccess(aws_account_id, organization.external_id, "test"),
+            AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
         )
     )
     # signal to the dispatcher that the new workspace was created
     await dispatcher.process_domain_event(
-        WorkspaceCreated(organization.id).to_json(),
+        WorkspaceCreated(workspace.id).to_json(),
         MessageContext("test", WorkspaceCreated.kind, "test", utc(), utc()),
     )
     # check that a new entry was created in the next_run table
-    next_run = await session.get(NextTenantRun, organization.id)
+    next_run = await session.get(NextTenantRun, workspace.id)
     assert next_run is not None
     assert next_run.at > utc()  # next run is in the future
 
@@ -75,7 +75,7 @@ async def test_receive_aws_account_discovered(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
-    organization: Workspace,
+    workspace: Workspace,
     arq_redis: Redis,
     redis: Redis,
 ) -> None:
@@ -84,25 +84,25 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id, organization.id, "foo", AwsCloudAccess(aws_account_id, organization.external_id, "test")
+        cloud_account_id, workspace.id, "foo", AwsCloudAccess(aws_account_id, workspace.external_id, "test")
     )
     await cloud_account_repository.create(account)
 
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
+        AwsAccountDiscovered(cloud_account_id, workspace.id, aws_account_id).to_json(),
         MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
     )
 
     # check that no new entry was created in the next_run table
-    next_run = await session.get(NextTenantRun, organization.id)
+    next_run = await session.get(NextTenantRun, workspace.id)
     assert next_run is None
 
     # check that 4 new entries are created in the redis: two job queues, one progress hash, one jobs mapping
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2
     in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-        dispatcher._collect_progress_hash_key(organization.id)
+        dispatcher._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(in_progress_hash) == 1
     progress = AccountCollectProgress.from_json_str(list(in_progress_hash.values())[0])
@@ -113,13 +113,13 @@ async def test_receive_aws_account_discovered(
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
+        AwsAccountDiscovered(cloud_account_id, workspace.id, aws_account_id).to_json(),
         MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
     )
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2
     new_in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-        dispatcher._collect_progress_hash_key(organization.id)
+        dispatcher._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(new_in_progress_hash) == 1
     assert AccountCollectProgress.from_json_str(list(new_in_progress_hash.values())[0]) == progress
@@ -129,20 +129,20 @@ async def test_receive_aws_account_discovered(
 async def test_receive_collect_done_message(
     dispatcher: DispatcherService,
     metering_repository: MeteringRepository,
-    organization: Workspace,
+    workspace: Workspace,
     domain_event_sender: InMemoryDomainEventPublisher,
     arq_redis: Redis,
     redis: Redis,
 ) -> None:
     async def in_progress_hash_len() -> int:
         in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher._collect_progress_hash_key(organization.id)
+            dispatcher._collect_progress_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
     async def jobs_mapping_hash_len() -> int:
         in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher._jobs_hash_key(organization.id)
+            dispatcher._jobs_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
@@ -154,7 +154,7 @@ async def test_receive_collect_done_message(
     message = {
         "job_id": str(job_id),
         "task_id": "t1",
-        "tenant_id": str(organization.id),
+        "tenant_id": str(workspace.id),
         "account_info": {
             aws_account_id: dict(
                 id=aws_account_id,
@@ -178,7 +178,7 @@ async def test_receive_collect_done_message(
     context = MessageContext("test", "collect-done", "test", utc(), utc())
     now = utc()
     await dispatcher._add_collect_in_progress_account(
-        organization.id,
+        workspace.id,
         cloud_account_id_1,
         AwsAccountInformation(
             aws_account_id=aws_account_id, aws_account_name="test", aws_role_arn="arn", external_id="ext_id"
@@ -193,10 +193,10 @@ async def test_receive_collect_done_message(
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
 
-    result = [n async for n in metering_repository.list(organization.id)]
+    result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 2
     mr_1, mr_2 = result if result[0].account_name == "test" else list(reversed(result))
-    assert mr_1.workspace_id == organization.id
+    assert mr_1.workspace_id == workspace.id
     assert mr_1.job_id == str(job_id)
     assert mr_1.task_id == "t1"
     assert mr_1.cloud == "aws"
@@ -206,7 +206,7 @@ async def test_receive_collect_done_message(
     assert mr_1.nr_of_error_messages == 2
     assert mr_1.started_at == datetime(2023, 9, 29, 9, 0, tzinfo=timezone.utc)
     assert mr_1.duration == 18
-    assert mr_2.workspace_id == organization.id
+    assert mr_2.workspace_id == workspace.id
     assert mr_2.job_id == str(job_id)
     assert mr_2.task_id == "t1"
     assert mr_2.cloud == "k8s"
@@ -219,7 +219,7 @@ async def test_receive_collect_done_message(
 
     assert len(domain_event_sender.events) == current_events_length + 1
     assert domain_event_sender.events[-1] == TenantAccountsCollected(
-        organization.id,
+        workspace.id,
         {
             cloud_account_id_1: CloudAccountCollectInfo(
                 mr_1.account_id,

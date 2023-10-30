@@ -63,6 +63,7 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -92,7 +93,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
 
     @asynccontextmanager
-    async def setup_teardown_application(app: FastAPI) -> AsyncIterator[None]:
+    async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
         http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
         arq_redis = deps.add(
             SN.arq_redis,
@@ -119,7 +120,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
-        deps.add(SN.metering_repo, MeteringRepository(session_maker))
+        metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
@@ -141,7 +142,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(
-                subscription_repo, workspace_repo, boto_session, cfg.args.aws_marketplace_metering_sqs_url
+                subscription_repo,
+                workspace_repo,
+                metering_repo,
+                boto_session,
+                cfg.args.aws_marketplace_metering_sqs_url,
             ),
         )
         deps.add(
@@ -233,13 +238,66 @@ def fast_api_app(cfg: Config) -> FastAPI:
         await arq_redis.close()
         log.info("Application services stopped.")
 
-    app = FastAPI(
-        title="Fix Backend",
-        summary="Backend for the FIX project",
-        description="Backend for the FIX project",
-        lifespan=setup_teardown_dispatcher if cfg.args.dispatcher else setup_teardown_application,
-    )
+    @asynccontextmanager
+    async def setup_teardown_billing(_: FastAPI) -> AsyncIterator[None]:
+        engine = deps.add(
+            SN.async_engine,
+            create_async_engine(
+                cfg.database_url,
+                pool_size=10,
+                pool_recycle=3600,
+                pool_pre_ping=True,
+                # connect_args=dict(ssl=client_context)
+            ),
+        )
+        session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
+        graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+        readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        fixbackend_events = deps.add(
+            SN.domain_event_redis_stream_publisher,
+            RedisStreamPublisher(
+                readwrite_redis,
+                DomainEventsStreamName,
+                "fixbackend",
+                keep_unprocessed_messages_for=timedelta(days=7),
+            ),
+        )
+        domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+        metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
+        workspace_repo = deps.add(
+            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher)
+        )
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        aws_marketplace = deps.add(
+            SN.aws_marketplace_handler,
+            AwsMarketplaceHandler(
+                subscription_repo,
+                workspace_repo,
+                metering_repo,
+                boto_session,
+                cfg.args.aws_marketplace_metering_sqs_url,
+            ),
+        )
+        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo))
 
+        async with deps:
+            log.info("Application services started.")
+            yield None
+        log.info("Application services stopped.")
+
+    match cfg.args.mode:
+        case "dispatcher":
+            lifespan = setup_teardown_dispatcher
+        case "billing":
+            lifespan = setup_teardown_billing
+        case _:
+            # TODO: remove this option once rolled out
+            if cfg.args.dispatcher:
+                lifespan = setup_teardown_dispatcher
+            else:
+                lifespan = setup_teardown_application
+
+    app = FastAPI(title="Fix Backend", summary="Backend for the FIX project", lifespan=lifespan)
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
 
@@ -302,7 +360,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     Instrumentator().instrument(app).expose(app)
 
-    if not cfg.args.dispatcher:
+    if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
 

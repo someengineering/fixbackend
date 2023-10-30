@@ -7,4 +7,5 @@ UserId = NewType("UserId", UUID)
 FixCloudAccountId = NewType("FixCloudAccountId", UUID)  # fix-internal cloud account id
 CloudAccountId = NewType("CloudAccountId", str)  # cloud account id, e.g. AWS account id, GCP project id, etc.
 ExternalId = NewType("ExternalId", UUID)
-PaymentMethodId = NewType("PaymentMethodId", UUID)
+SubscriptionId = NewType("SubscriptionId", UUID)
+BillingId = NewType("BillingId", UUID)

@@ -139,6 +139,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--cors-origins", nargs="+", default=os.environ.get("CORS_ORIGINS", "http://127.0.0.1:8081/").split(",")
     )
+    parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

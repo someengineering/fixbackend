@@ -19,38 +19,36 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import datetime
-from typing import Union, Optional
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import os
+import signal
+import uuid
+from datetime import datetime, timezone
+from typing import Optional
+from uuid import UUID
 
-from attr import frozen
-
-from fixbackend.ids import SubscriptionId, WorkspaceId, UserId, BillingId
-
-
-@frozen
-class AwsMarketplaceSubscription:
-    id: SubscriptionId
-    user_id: Optional[UserId]
-    workspace_id: Optional[WorkspaceId]
-    customer_identifier: str
-    customer_aws_account_id: str
-    product_code: str
-    active: bool
-    last_charge_timestamp: Optional[datetime]
-    next_charge_timestamp: Optional[datetime]
+from fixcloudutils.util import utc
 
 
-@frozen
-class BillingEntry:
-    id: BillingId
-    workspace_id: WorkspaceId
-    subscription_id: SubscriptionId
-    tier: str
-    nr_of_accounts_charged: int
-    period_start: datetime
-    period_end: datetime
-    reported: bool
+def uid() -> UUID:
+    return uuid.uuid4()
 
 
-# Multiple payment methods are possible, but for now we only support AWS Marketplace
-SubscriptionMethod = Union[AwsMarketplaceSubscription]
+def kill_running_process() -> None:
+    os.kill(os.getpid(), signal.SIGINT)
+
+
+def start_of_next_month(current_time: Optional[datetime] = None, hour: int = 0) -> datetime:
+    now = current_time or utc()
+    return (
+        datetime(now.year + 1, 1, 1, hour=hour, tzinfo=timezone.utc)
+        if now.month == 12
+        else datetime(now.year, now.month + 1, 1, hour=hour, tzinfo=timezone.utc)
+    )
