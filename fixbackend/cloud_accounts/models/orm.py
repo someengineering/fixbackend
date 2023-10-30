@@ -17,7 +17,7 @@ import uuid
 from typing import Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import ForeignKey, String, UniqueConstraint, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
@@ -35,6 +35,8 @@ class CloudAccount(Base):
     aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
     aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    is_configured: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
     def to_model(self) -> models.CloudAccount:
@@ -47,4 +49,11 @@ class CloudAccount(Base):
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
 
-        return models.CloudAccount(id=self.id, workspace_id=self.tenant_id, access=access(), name=self.name)
+        return models.CloudAccount(
+            id=self.id,
+            workspace_id=self.tenant_id,
+            access=access(),
+            name=self.name,
+            is_configured=self.is_configured,
+            enabled=self.enabled,
+        )
