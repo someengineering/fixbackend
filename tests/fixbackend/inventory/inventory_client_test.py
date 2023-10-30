@@ -29,7 +29,7 @@ db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database",
 
 
 async def test_execute_single(inventory_client: InventoryClient) -> None:
-    assert [a async for a in inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]  # type: ignore # noqa
+    assert [a async for a in inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
 
 
 async def test_report_benchmarks(inventory_client: InventoryClient) -> None:
