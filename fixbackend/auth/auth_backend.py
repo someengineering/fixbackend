@@ -74,7 +74,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
         available_keys = {self.kid(key): key for key in self.public_keys}
 
         if not (key_id in available_keys):
-            raise ValueError("Token signed with unknown key")
+            raise ValueError("Token signed with an unknown key")
 
         public_key = available_keys[key_id]
 

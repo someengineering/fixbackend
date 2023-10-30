@@ -12,14 +12,22 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import boto3
 
-class ResourceNotFound(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+from fixcloudutils.asyncio.async_extensions import run_async
 
 
-class AccessDenied(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+class AwsAccountSetupHelper:
+    def __init__(self, session: boto3.Session) -> None:
+        self.sts_client = session.client("sts")
+
+    async def can_assume_role(self, account_id: str, role_name: str) -> bool:
+        try:
+            await run_async(
+                self.sts_client.assume_role,
+                RoleArn=f"arn:aws:iam::{account_id}:role/{role_name}",
+                RoleSessionName="FixBackend",
+            )
+            return True
+        except Exception:
+            return False

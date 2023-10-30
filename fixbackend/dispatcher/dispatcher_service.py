@@ -32,7 +32,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     WorkspaceCreated,
-    AwsAccountDiscovered,
+    AwsAccountConfigured,
     CloudAccountCollectInfo,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -101,8 +101,8 @@ class DispatcherService(Service):
                 wc_event = WorkspaceCreated.from_json(message)
                 await self.workspace_created(wc_event.workspace_id)
 
-            case AwsAccountDiscovered.kind:
-                awd_event = AwsAccountDiscovered.from_json(message)
+            case AwsAccountConfigured.kind:
+                awd_event = AwsAccountConfigured.from_json(message)
                 await self.cloud_account_created(awd_event.cloud_account_id)
 
             case _:
@@ -314,7 +314,9 @@ class DispatcherService(Service):
         now = utc()
 
         async for workspace_id, at in self.next_run_repo.older_than(now):
-            if accounts := await self.cloud_account_repo.list_by_workspace_id(workspace_id):
+            if accounts := await self.cloud_account_repo.list_by_workspace_id(
+                workspace_id, enabled=True, configured=True
+            ):
                 for account in accounts:
                     await self.trigger_collect(account)
                 next_run_at = await self.compute_next_run(workspace_id, at)

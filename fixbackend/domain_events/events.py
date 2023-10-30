@@ -63,6 +63,10 @@ class UserRegistered(Event):
 
 @frozen
 class AwsAccountDiscovered(Event):
+    """
+    This event is emitted when the cloud account callback is hit, and .
+    """
+
     kind: ClassVar[str] = "aws_account_discovered"
 
     cloud_account_id: FixCloudAccountId
@@ -75,6 +79,26 @@ class AwsAccountDiscovered(Event):
     @staticmethod
     def from_json(json: Json) -> "AwsAccountDiscovered":
         return converter.structure(json, AwsAccountDiscovered)
+
+
+@frozen
+class AwsAccountConfigured(Event):
+    """
+    This event is emitted when AWS account is ready to be collected.
+    """
+
+    kind: ClassVar[str] = "aws_account_configured"
+
+    cloud_account_id: FixCloudAccountId
+    tenant_id: WorkspaceId
+    aws_account_id: CloudAccountId
+
+    def to_json(self) -> Json:
+        return converter.unstructure(self)  # type: ignore
+
+    @staticmethod
+    def from_json(json: Json) -> "AwsAccountConfigured":
+        return converter.structure(json, AwsAccountConfigured)
 
 
 @frozen
