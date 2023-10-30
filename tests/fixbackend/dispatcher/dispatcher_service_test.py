@@ -97,8 +97,8 @@ async def test_receive_aws_account_discovered(
 
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, organization.id, aws_account_id).to_json(),
-        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+        AwsAccountConfigured(cloud_account_id, workspace.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
 
     # check that no new entry was created in the next_run table

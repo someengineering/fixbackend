@@ -1,7 +1,7 @@
 """add configured flag to cloud account
 
 Revision ID: e5a452318fa7
-Revises: 69f29fc94a5c
+Revises: d9be24f944dc
 Create Date: 2023-10-27 12:46:40.781041+00:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "e5a452318fa7"
-down_revision: Union[str, None] = "69f29fc94a5c"
+down_revision: Union[str, None] = "d9be24f944dc"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
