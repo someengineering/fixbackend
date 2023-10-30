@@ -89,7 +89,7 @@ class InventoryService(Service):
         if only_failing:
             report += " --only-failing"
 
-        return self.client.execute_single(db, report + " | dump")
+        return self.client.execute_single(db, report + " | dump")  # type: ignore
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def issues_since(
@@ -106,6 +106,7 @@ class InventoryService(Service):
                 f"kind as kind"
                 ": count(name) as count",
             ):
+                assert isinstance(elem, dict), f"Expected Json object but got {elem}"
                 severity = elem["group"]["severity"]
                 if isinstance(acc_id := elem["group"]["account_id"], str):
                     accounts_by_severity[severity].add(acc_id)
