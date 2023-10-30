@@ -49,7 +49,13 @@ def cloud_accounts_router() -> APIRouter:
         workspace: UserWorkspaceDependency, service: CloudAccountServiceDependency
     ) -> List[CloudAccountRead]:
         cloud_accounts = await service.list_accounts(workspace.id)
-        return [CloudAccountRead.from_model(cloud_account) for cloud_account in cloud_accounts]
+        last_scan = await service.last_scan(workspace.id)
+        accounts = last_scan.accounts if last_scan else {}
+        next_scan = last_scan.next_scan if last_scan else None
+        return [
+            CloudAccountRead.from_model(cloud_account, accounts.get(cloud_account.id), next_scan)
+            for cloud_account in cloud_accounts
+        ]
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def update_cloud_account(

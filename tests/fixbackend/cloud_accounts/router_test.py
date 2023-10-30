@@ -211,6 +211,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_list_cloud_accounts(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
+    cloud_account_service.last_scan_dict = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
@@ -219,6 +220,18 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         name="foo",
         is_configured=False,
         enabled=True,
+    )
+    next_scan = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            cloud_account_id: LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=datetime.utcnow(),
+            )
+        },
+        next_scan=next_scan,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
@@ -229,6 +242,10 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     assert data[0]["cloud"] == "aws"
     assert data[0]["account_id"] == "123456789012"
     assert data[0]["name"] == "foo"
+    assert data[0]["is_configured"] is False
+    assert data[0]["enabled"] is True
+    assert data[0]["resources"] == 100
+    assert data[0]["next_scan"] == next_scan.isoformat()
 
 
 @pytest.mark.asyncio
