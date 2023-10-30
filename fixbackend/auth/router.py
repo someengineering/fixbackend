@@ -12,19 +12,21 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, Any, List
+from typing import Annotated, Any, Dict, List
+from uuid import UUID
 
-from fastapi import APIRouter, Request
-from fastapi_users.authentication import AuthenticationBackend
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
-from fixbackend.auth.depedencies import fastapi_users
 from fixbackend.auth.auth_backend import get_auth_backend
+from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
+from fixbackend.auth.models import User
 from fixbackend.auth.oauth import get_oauth_router
-from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate, OAuthProviderAuthUrl
+from fixbackend.auth.schemas import OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
 from fixbackend.config import Config
 
 
@@ -102,6 +104,15 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
+
+    @router.post("/refresh-session", tags=["auth"])
+    async def refresh_session(
+        user: AuthenticatedUser, strategy: Annotated[Strategy[User, UUID], Depends(auth_backend.get_strategy)]
+    ) -> Response:
+        """
+        Refreshes the session cookie.
+        """
+        return await auth_backend.login(strategy, user)
 
     return router
 
