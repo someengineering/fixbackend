@@ -66,3 +66,20 @@ components:
         aws_account_id:
           type: string
           description: Id of the aws account.
+
+    AwsAccountConfigured:
+      description: "This event emitted when a new aws account has been configured."
+      type: object
+      properties:
+        cloud_account_id:
+          type: string
+          description: Id of the cloud account.
+        tenant_id:
+          type: string
+          description: Id of the workspace.
+        cloud:
+          type: string
+          description: Name of the cloud.
+        aws_account_id:
+          type: string
+          description: Id of the aws account.

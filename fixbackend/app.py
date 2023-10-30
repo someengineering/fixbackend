@@ -55,7 +55,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.errors import AccessDenied
+from fixbackend.errors import AccessDenied, ResourceNotFound
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -70,6 +70,7 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -165,6 +166,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 domain_event_publisher,
                 LastScanRepository(session_maker),
                 arq_redis,
+                cfg,
+                AwsAccountSetupHelper(boto_session),
             ),
         )
 
@@ -314,6 +317,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @app.exception_handler(AccessDenied)
     async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
+
+    @app.exception_handler(ResourceNotFound)
+    async def resource_not_found_handler(request: Request, exception: ResourceNotFound) -> Response:
+        return JSONResponse(status_code=404, content={"message": str(exception)})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {

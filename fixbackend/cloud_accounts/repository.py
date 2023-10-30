@@ -11,16 +11,17 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Annotated, List, Optional
+from abc import ABC, abstractmethod
+from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
 
-from fixbackend.cloud_accounts.models import orm, CloudAccount, AwsCloudAccess
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, orm
 from fixbackend.db import AsyncSessionMakerDependency
+from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
-from abc import ABC, abstractmethod
 
 
 class CloudAccountRepository(ABC):
@@ -33,11 +34,13 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         raise NotImplementedError
 
     @abstractmethod
-    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+    async def list_by_workspace_id(
+        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+    ) -> List[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
@@ -61,6 +64,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                     aws_role_name=cloud_account.access.role_name,
                     aws_external_id=cloud_account.access.external_id,
                     name=cloud_account.name,
+                    is_configured=cloud_account.is_configured,
+                    enabled=cloud_account.enabled,
                 )
             else:
                 raise ValueError(f"Unknown cloud {cloud_account.access}")
@@ -75,13 +80,17 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_model() if cloud_account else None
 
-    async def update(self, id: FixCloudAccountId, cloud_account: CloudAccount) -> CloudAccount:
+    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         async with self.session_maker() as session:
             stored_account = await session.get(orm.CloudAccount, id)
             if stored_account is None:
-                raise ValueError(f"Cloud account {id} not found")
+                raise ResourceNotFound(f"Cloud account {id} not found")
+
+            cloud_account = update_fn(stored_account.to_model())
 
             stored_account.name = cloud_account.name
+            stored_account.is_configured = cloud_account.is_configured
+            stored_account.enabled = cloud_account.enabled
 
             match cloud_account.access:
                 case AwsCloudAccess(account_id, external_id, role_name):
@@ -98,10 +107,16 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             await session.refresh(stored_account)
             return stored_account.to_model()
 
-    async def list_by_workspace_id(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
+    async def list_by_workspace_id(
+        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+    ) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
+            if enabled is not None:
+                statement = statement.where(orm.CloudAccount.enabled == enabled)
+            if configured is not None:
+                statement = statement.where(orm.CloudAccount.is_configured == configured)
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]

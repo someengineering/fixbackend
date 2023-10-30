@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId
-from fixbackend.cloud_accounts.models import CloudAccount
+from fixbackend.cloud_accounts.models import CloudAccount, LastScanAccountInfo
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
@@ -40,18 +40,28 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
 
 
 class CloudAccountRead(BaseModel):
-    id: FixCloudAccountId = Field(description="Fix cloud account ID")
+    id: FixCloudAccountId = Field(description="Fix internal cloud account ID, users should not typically see this")
     cloud: str = Field(description="Cloud provider")
     account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
     name: Optional[str] = Field(description="Name of the cloud account", max_length=64)
+    enabled: bool = Field(description="Whether the cloud account is enabled for collection")
+    is_configured: bool = Field(description="Is account correctly configured")
+    resources: Optional[int] = Field(description="Number of resources in the account")
+    next_scan: Optional[datetime] = Field(description="Next scheduled scan")
 
     @staticmethod
-    def from_model(model: CloudAccount) -> "CloudAccountRead":
+    def from_model(
+        model: CloudAccount, last_scan_info: Optional[LastScanAccountInfo] = None, next_scan: Optional[datetime] = None
+    ) -> "CloudAccountRead":
         return CloudAccountRead(
             id=model.id,
             cloud=model.access.cloud,
             account_id=model.access.account_id(),
             name=model.name,
+            enabled=model.enabled,
+            is_configured=model.is_configured,
+            resources=last_scan_info.resources_scanned if last_scan_info else None,
+            next_scan=next_scan,
         )
 
 

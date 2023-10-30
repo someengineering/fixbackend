@@ -31,7 +31,7 @@ from fixbackend.dispatcher.next_run_repository import NextTenantRun
 from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     WorkspaceCreated,
-    AwsAccountDiscovered,
+    AwsAccountConfigured,
     CloudAccountCollectInfo,
 )
 from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
@@ -57,6 +57,8 @@ async def test_receive_workspace_created(
             workspace.id,
             "foo",
             AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
+            is_configured=False,
+            enabled=True,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -84,14 +86,19 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id, workspace.id, "foo", AwsCloudAccess(aws_account_id, workspace.external_id, "test")
+        cloud_account_id,
+        workspace.id,
+        "foo",
+        AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
+        is_configured=False,
+        enabled=True,
     )
     await cloud_account_repository.create(account)
 
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, workspace.id, aws_account_id).to_json(),
-        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+        AwsAccountConfigured(cloud_account_id, workspace.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
 
     # check that no new entry was created in the next_run table
@@ -113,8 +120,8 @@ async def test_receive_aws_account_discovered(
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_domain_event(
-        AwsAccountDiscovered(cloud_account_id, workspace.id, aws_account_id).to_json(),
-        MessageContext("test", AwsAccountDiscovered.kind, "test", utc(), utc()),
+        AwsAccountConfigured(cloud_account_id, workspace.id, aws_account_id).to_json(),
+        MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2

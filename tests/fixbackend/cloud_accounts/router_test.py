@@ -15,7 +15,7 @@
 
 import uuid
 from datetime import datetime
-from typing import AsyncIterator, Dict, Optional, List
+from typing import AsyncIterator, Dict, List
 
 import pytest
 from httpx import AsyncClient
@@ -47,6 +47,8 @@ class InMemoryCloudAccountService(CloudAccountService):
             workspace_id=workspace_id,
             access=AwsCloudAccess(account_id, external_id, role_name),
             name=None,
+            is_configured=False,
+            enabled=True,
         )
         self.accounts[account.id] = account
         return account
@@ -57,15 +59,13 @@ class InMemoryCloudAccountService(CloudAccountService):
     async def last_scan(self, workspace_id: WorkspaceId) -> LastScanInfo | None:
         return self.last_scan_dict.get(workspace_id, None)
 
-    async def get_cloud_account(
-        self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
-    ) -> Optional[CloudAccount]:
-        return self.accounts.get(cloud_account_id)
+    async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
+        return self.accounts[cloud_account_id]
 
     async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         return [acc for acc in self.accounts.values() if acc.workspace_id == workspace_id]
 
-    async def update_cloud_account(
+    async def update_cloud_account_name(
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
@@ -73,6 +73,26 @@ class InMemoryCloudAccountService(CloudAccountService):
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         account = evolve(account, name=name)
+        self.accounts[cloud_account_id] = account
+        return account
+
+    async def enable_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+    ) -> CloudAccount:
+        account = self.accounts[cloud_account_id]
+        account = evolve(account, enabled=True)
+        self.accounts[cloud_account_id] = account
+        return account
+
+    async def disable_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+    ) -> CloudAccount:
+        account = self.accounts[cloud_account_id]
+        account = evolve(account, enabled=False)
         self.accounts[cloud_account_id] = account
         return account
 
@@ -128,6 +148,8 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -171,6 +193,8 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -180,17 +204,34 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["cloud"] == "aws"
     assert data["account_id"] == "123456789012"
     assert data["name"] == "foo"
+    assert data["is_configured"] is False
+    assert data["enabled"] is True
 
 
 @pytest.mark.asyncio
 async def test_list_cloud_accounts(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
+    cloud_account_service.last_scan_dict = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
+    )
+    next_scan = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            cloud_account_id: LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=datetime.utcnow(),
+            )
+        },
+        next_scan=next_scan,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
@@ -201,6 +242,10 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     assert data[0]["cloud"] == "aws"
     assert data[0]["account_id"] == "123456789012"
     assert data[0]["name"] == "foo"
+    assert data[0]["is_configured"] is False
+    assert data[0]["enabled"] is True
+    assert data[0]["resources"] == 100
+    assert data[0]["next_scan"] == next_scan.isoformat()
 
 
 @pytest.mark.asyncio
@@ -212,6 +257,8 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         access=AwsCloudAccess(account_id, external_id, role_name),
         name="foo",
+        is_configured=False,
+        enabled=True,
     )
 
     payload = {
@@ -224,3 +271,37 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     assert data["cloud"] == "aws"
     assert data["account_id"] == "123456789012"
     assert data["name"] == "bar"
+
+
+@pytest.mark.asyncio
+async def test_enable_disable_account(client: AsyncClient) -> None:
+    cloud_account_service.accounts = {}
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    cloud_account_service.accounts[cloud_account_id] = CloudAccount(
+        id=cloud_account_id,
+        workspace_id=workspace_id,
+        access=AwsCloudAccess(account_id, external_id, role_name),
+        name="foo",
+        is_configured=False,
+        enabled=True,
+    )
+
+    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == str(cloud_account_id)
+    assert data["cloud"] == "aws"
+    assert data["account_id"] == "123456789012"
+    assert data["name"] == "foo"
+    assert data["enabled"] is False
+    assert data["is_configured"] is False
+
+    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/enable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == str(cloud_account_id)
+    assert data["cloud"] == "aws"
+    assert data["account_id"] == "123456789012"
+    assert data["name"] == "foo"
+    assert data["enabled"] is True
+    assert data["is_configured"] is False

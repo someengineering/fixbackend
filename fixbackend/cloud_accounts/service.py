@@ -44,9 +44,7 @@ class CloudAccountService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_cloud_account(
-        self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
-    ) -> Optional[CloudAccount]:
+    async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         """Get a cloud account."""
         raise NotImplementedError
 
@@ -56,11 +54,29 @@ class CloudAccountService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_cloud_account(
+    async def update_cloud_account_name(
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
         name: str,
     ) -> CloudAccount:
         """Update a cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def enable_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+    ) -> CloudAccount:
+        """Enable a cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def disable_cloud_account(
+        self,
+        workspace_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+    ) -> CloudAccount:
+        """Disable a cloud account."""
         raise NotImplementedError
