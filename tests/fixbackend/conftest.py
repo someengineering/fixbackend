@@ -51,6 +51,7 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
@@ -445,3 +446,10 @@ async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_con
 async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: F811
     async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture
+async def billing_service(
+    aws_marketplace_handler: AwsMarketplaceHandler, subscription_repository: SubscriptionRepository
+) -> BillingService:
+    return BillingService(aws_marketplace_handler, subscription_repository)
