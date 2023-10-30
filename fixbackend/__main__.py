@@ -29,7 +29,6 @@ def main() -> None:
         "fixbackend.app:setup_process",
         host="0.0.0.0",
         log_level="info",
-        forwarded_allow_ips="*",
         ws_ping_interval=1,
         ws_ping_timeout=5,
         ssl_ca_certs=args.ca_cert,

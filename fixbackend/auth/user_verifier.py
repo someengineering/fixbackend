@@ -24,6 +24,18 @@ from fixbackend.config import Config, ConfigDependency
 
 
 class UserVerifier(ABC):
+    def plaintext_email_content(self, request: Request, token: str) -> str:
+        # redirect is defined by the UI - use / as safe fallback
+        redirect_url = request.query_params.get("redirectUrl", "/")
+        verification_link = request.base_url
+        verification_link = verification_link.replace(
+            path="/auth/verify-email", query=f"token={token}&redirectUrl={redirect_url}"
+        )
+
+        body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
+
+        return body_text
+
     @abstractmethod
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         pass
@@ -32,11 +44,10 @@ class UserVerifier(ABC):
 class ConsoleUserVerifier(UserVerifier):
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         assert request
-        verification_link = request.url_for("verify:verify")
-        print(
-            f"Verification requested for user {user.id}. Do a POST request to {verification_link} with "
-            f'the following payload: {{"token": "{token}" }}'
-        )
+
+        email_body = self.plaintext_email_content(request, token)
+
+        print(email_body)
 
 
 class EMailUserVerifier(UserVerifier):
@@ -51,15 +62,9 @@ class EMailUserVerifier(UserVerifier):
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         destination = user.email
         assert request
-        # redirect is defined by the UI - use / as safe fallback
-        redirect_url = request.query_params.get("redirectUrl", "/")
-        verification_link = request.base_url
-        verification_link = verification_link.replace(
-            path="/auth/verify-email", query=f"token={token}&redirectUrl={redirect_url}"
-        )
 
         def send_email(destination: str, token: str) -> None:
-            body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
+            body_text = self.plaintext_email_content(request, token)
 
             self.client.send_email(
                 Destination={
