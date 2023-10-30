@@ -23,7 +23,7 @@ import json
 from typing import Optional, Dict, AsyncIterator, List, cast, Union
 
 from fixcloudutils.service import Service
-from fixcloudutils.types import Json
+from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -48,7 +48,7 @@ class InventoryClient(Service):
 
     async def execute_single(
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
-    ) -> AsyncIterator[Json]:
+    ) -> AsyncIterator[JsonElement]:
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         response = await self.client.post(
             self.inventory_url + "/cli/execute", content=command, params=env, headers=headers

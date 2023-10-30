@@ -38,6 +38,7 @@ flake8 = ">=6.1.0"
 coverage = {extras = ["toml"], version = "^7.3.1"}
 pytest-cov = "^4.1.0"
 httpx-ws = { git = "https://github.com/frankie567/httpx-ws.git", rev = "f9f2555603f40053f84adf6890e6cda245294b18" }
+urllib3 = "<2" # poetry bug
 
 # all type sheds
 types-PyMySQL = "*"
