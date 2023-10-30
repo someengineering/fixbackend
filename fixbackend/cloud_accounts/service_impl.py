@@ -19,6 +19,8 @@ from hmac import compare_digest
 from logging import getLogger
 from typing import Any, List, Optional
 
+from collections import defaultdict
+
 from attrs import evolve
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
@@ -42,6 +44,7 @@ from fixbackend.errors import AccessDenied, ResourceNotFound
 from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff
 
 log = getLogger(__name__)
 
@@ -64,15 +67,26 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.domain_events = domain_event_publisher
 
         self.last_scan_repo = last_scan_repo
+
+        backoff_config = defaultdict(lambda: DefaultBackoff)
+        backoff_config[AwsAccountDiscovered.kind] = Backoff(
+            base_delay=5,
+            # 30 retries * 30s = roughly 15 minutes
+            maximum_delay=30,
+            retries=30,
+            log_failed_attempts=False,
+        )
+
         self.domain_event_listener = RedisStreamListener(
             readwrite_redis,
             DomainEventsStreamName,
             group="fixbackend-cloudaccountservice-domain",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(minutes=5),
+            consider_failed_after=timedelta(minutes=15),
             batch_size=config.cloud_account_service_event_parallelism,
             parallelism=config.cloud_account_service_event_parallelism,
+            backoff=backoff_config,
         )
         self.instance_id = config.instance_id
         self.account_setup_helper = account_setup_helper

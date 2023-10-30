@@ -40,7 +40,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
 
 
 class CloudAccountRead(BaseModel):
-    id: FixCloudAccountId = Field(description="Fix cloud account ID")
+    id: FixCloudAccountId = Field(description="Fix internal cloud account ID, users should not typically see this")
     cloud: str = Field(description="Cloud provider")
     account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
     name: Optional[str] = Field(description="Name of the cloud account", max_length=64)
