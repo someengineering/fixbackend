@@ -71,7 +71,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         backoff_config = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
-            # 30 retries * 30s = roughly 15 minutes
+            # 15 retries * 30s = roughly 7 minutes
             maximum_delay=30,
             retries=15,
             log_failed_attempts=False,
