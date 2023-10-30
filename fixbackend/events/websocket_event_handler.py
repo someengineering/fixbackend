@@ -9,6 +9,9 @@ from redis.asyncio import Redis
 
 from fixbackend.dependencies import FixDependency
 from fixbackend.ids import WorkspaceId
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 class WebsocketEventHandler:
@@ -32,8 +35,8 @@ class WebsocketEventHandler:
         ):
             try:
                 await ignore_incoming_messages(websocket)
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.warn(f"websocket connection closed with exception {ex}")
 
 
 def get_websocket_event_handler(fix: FixDependency) -> WebsocketEventHandler:
