@@ -62,7 +62,10 @@ async def test_create_billing_entry(
     subscription_repository: SubscriptionRepository,
 ) -> None:
     now = datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
-    boto_answers["MeterUsage"] = {"MeteringRecordId": "123", "ResponseMetadata": {"RetryAttempts": 0}}
+    boto_answers["BatchMeterUsage"] = {
+        "Results": [{"MeteringRecordId": "123", "Status": "Success"}],
+        "UnprocessedRecords": [],
+    }
     # factories to create metering records
     mr1 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc1")
     mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2")
@@ -81,12 +84,10 @@ async def test_create_billing_entry(
     assert len(boto_requests) == 0
     await aws_marketplace_handler.report_unreported_usages()
     assert len(boto_requests) == 1
-    boto_requests[0][1].pop("Timestamp")
+    boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
-        "CustomerIdentifier": "123",
-        "Dimension": "FoundationalSecurity",
         "ProductCode": "foo",
-        "Quantity": 2,
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "FoundationalSecurity", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0

@@ -23,7 +23,7 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Optional
+from typing import Optional, cast
 from uuid import uuid4
 
 import boto3
@@ -136,6 +136,9 @@ class AwsMarketplaceHandler(Service):
                 ]
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
+                if usage == 0:
+                    log.info(f"AWS Marketplace: customer {customer} has no usage")
+                    return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
@@ -156,14 +159,20 @@ class AwsMarketplaceHandler(Service):
 
     async def report_usage(self, subscription: AwsMarketplaceSubscription, entry: BillingEntry) -> None:
         await run_async(
-            self.marketplace_client.meter_usage,
+            self.marketplace_client.batch_meter_usage,
             ProductCode=subscription.product_code,
-            Timestamp=utc_str(entry.period_end),
-            CustomerIdentifier=subscription.customer_identifier,
-            Dimension=entry.tier,
-            Quantity=entry.nr_of_accounts_charged,
+            UsageRecords=[
+                dict(
+                    CustomerIdentifier=subscription.customer_identifier,
+                    Dimension=entry.tier,
+                    Quantity=entry.nr_of_accounts_charged,
+                    Timestamp=utc_str(entry.period_end),
+                )
+            ],
         )
-        await self.subscription_repo.mark_billing_entry_reported(entry.id)
+        result = cast(Json, await self.subscription_repo.mark_billing_entry_reported(entry.id))
+        if len(result.get("UnprocessedRecords", [])) > 0:
+            raise ValueError(f"Could not report usage for billing entry {entry.id}: {result}")
 
     async def report_unreported_usages(self, raise_exception: bool = False) -> None:
         async def send(be: BillingEntry, ms: AwsMarketplaceSubscription) -> None:
