@@ -136,6 +136,9 @@ class AwsMarketplaceHandler(Service):
                 ]
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
+                if usage == 0:
+                    log.info(f"AWS Marketplace: customer {customer} has no usage")
+                    return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
@@ -160,8 +163,8 @@ class AwsMarketplaceHandler(Service):
             ProductCode=subscription.product_code,
             Timestamp=utc_str(entry.period_end),
             CustomerIdentifier=subscription.customer_identifier,
-            Dimension=entry.tier,
-            Quantity=entry.nr_of_accounts_charged,
+            UsageDimension=entry.tier,
+            UsageQuantity=entry.nr_of_accounts_charged,
         )
         await self.subscription_repo.mark_billing_entry_reported(entry.id)
 

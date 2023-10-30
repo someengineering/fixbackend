@@ -84,9 +84,9 @@ async def test_create_billing_entry(
     boto_requests[0][1].pop("Timestamp")
     assert boto_requests[0][1] == {
         "CustomerIdentifier": "123",
-        "Dimension": "FoundationalSecurity",
+        "UsageDimension": "FoundationalSecurity",
         "ProductCode": "foo",
-        "Quantity": 2,
+        "UsageQuantity": 2,
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
