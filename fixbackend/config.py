@@ -140,6 +140,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--cors-origins", nargs="+", default=os.environ.get("CORS_ORIGINS", "http://127.0.0.1:8081/").split(",")
     )
+    parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
     parser.add_argument(
         "--cloud-account-service-event-parallelism",
         type=int,

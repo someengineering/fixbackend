@@ -18,12 +18,12 @@ from typing import AsyncIterator, Optional, List
 from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import select, INT, String
+from sqlalchemy import select, INT, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.ids import WorkspaceId, CloudAccountId
-from fixbackend.metering import MeteringRecord
+from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 
@@ -89,6 +89,34 @@ class MeteringRepository:
             for record in records:
                 session.add(MeteringRecordEntity.from_model(record))
             await session.commit()
+
+    async def collect_summary(
+        self,
+        workspace_id: WorkspaceId,
+        *,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        min_resources_collected: int = 0,
+        min_nr_of_collects: int = 0,
+    ) -> AsyncIterator[MeteringSummary]:
+        query = (
+            select(
+                MeteringRecordEntity.account_id, MeteringRecordEntity.account_name, func.count().label("num_records")
+            )
+            .where(
+                (MeteringRecordEntity.tenant_id == workspace_id)
+                & (MeteringRecordEntity.nr_of_resources_collected >= min_resources_collected)
+            )
+            .group_by(MeteringRecordEntity.account_id, MeteringRecordEntity.account_name)
+        )
+        if start is not None:
+            query = query.where(MeteringRecordEntity.timestamp >= start)
+        if end is not None:
+            query = query.where(MeteringRecordEntity.timestamp <= end)
+        async with self.session_maker() as session:
+            async for (account_id, account_name, count) in await session.stream(query):
+                if count >= min_nr_of_collects:
+                    yield MeteringSummary(account_id=account_id, account_name=account_name, count=count)
 
     async def list(
         self,
