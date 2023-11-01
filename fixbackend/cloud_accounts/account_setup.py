@@ -16,6 +16,7 @@ import boto3
 
 import logging
 from fixcloudutils.asyncio.async_extensions import run_async
+from ids import ExternalId
 
 
 log = logging.getLogger(__name__)
@@ -25,12 +26,13 @@ class AwsAccountSetupHelper:
     def __init__(self, session: boto3.Session) -> None:
         self.sts_client = session.client("sts")
 
-    async def can_assume_role(self, account_id: str, role_name: str) -> bool:
+    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> bool:
         try:
             result = await run_async(
                 self.sts_client.assume_role,
                 RoleArn=f"arn:aws:iam::{account_id}:role/{role_name}",
-                RoleSessionName="FixBackend",
+                RoleSessionName="fix-account-preflight-check",
+                ExternalId=str(external_id),
             )
             if not result.get("Credentials", {}).get("AccessKeyId"):
                 return False

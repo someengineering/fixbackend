@@ -133,7 +133,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
-        if await self.account_setup_helper.can_assume_role(account.access.aws_account_id, account.access.role_name):
+        if await self.account_setup_helper.can_assume_role(
+            account.access.aws_account_id, account.access.role_name, account.access.external_id
+        ):
             await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
             await self.domain_events.publish(
                 AwsAccountConfigured(
