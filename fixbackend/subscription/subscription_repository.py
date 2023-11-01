@@ -148,7 +148,8 @@ class SubscriptionRepository:
         aws_customer_identifier: Optional[str] = None,
         workspace_id: Optional[WorkspaceId] = None,
         active: Optional[bool] = None,
-        next_charge_timestamp_younger_than: Optional[datetime] = None,
+        next_charge_timestamp_before: Optional[datetime] = None,
+        next_charge_timestamp_after: Optional[datetime] = None,
     ) -> AsyncIterator[AwsMarketplaceSubscription]:
         query = select(SubscriptionEntity)
         if user_id:
@@ -159,8 +160,10 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.workspace_id == workspace_id)
         if active is not None:
             query = query.where(SubscriptionEntity.active == active)
-        if next_charge_timestamp_younger_than:
-            query = query.where(SubscriptionEntity.next_charge_timestamp >= next_charge_timestamp_younger_than)
+        if next_charge_timestamp_before:
+            query = query.where(SubscriptionEntity.next_charge_timestamp <= next_charge_timestamp_before)
+        if next_charge_timestamp_after:
+            query = query.where(SubscriptionEntity.next_charge_timestamp > next_charge_timestamp_after)
         async with self.session_maker() as session:
             async for (subscription,) in await session.stream(query):
                 yield subscription.to_model()
@@ -210,6 +213,19 @@ class SubscriptionRepository:
             )
             await session.commit()
             return result
+
+    async def update_charge_timestamp(self, sid: SubscriptionId, now: datetime, next_charge_timestamp: datetime) -> int:
+        async with self.session_maker() as session:
+            result = await session.execute(
+                update(SubscriptionEntity)
+                .where(SubscriptionEntity.id == sid)
+                .values(
+                    last_charge_timestamp=now,
+                    next_charge_timestamp=next_charge_timestamp,
+                )
+            )
+            await session.commit()
+            return result.rowcount  # noqa
 
     async def delete_aws_marketplace_subscriptions(self, customer_identifier: str) -> int:
         async with self.session_maker() as session:
