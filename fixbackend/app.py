@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from ssl import Purpose, create_default_context
-from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
+from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast, Callable, Awaitable
 
 import boto3
 import httpx
@@ -71,6 +71,7 @@ from fixbackend.workspaces.router import workspaces_router
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.auth.auth_backend import cookie_transport
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -394,6 +395,17 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
+
+        cookie = cookie_transport(cfg.session_ttl)
+
+        @app.middleware("http")
+        async def refresh_session(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            response = await call_next(request)
+            if refresh_session_token := request.scope.get("refreshed_session"):
+                # refresh the session token on every request
+                cookie._set_login_cookie(response, refresh_session_token)
+
+            return response
 
         if cfg.static_assets:
             app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")

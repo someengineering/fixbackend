@@ -21,15 +21,17 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Annotated, Optional
 from uuid import UUID
+from datetime import datetime, timedelta
 
-from fastapi import Depends
+from fastapi import Depends, Cookie
 from fastapi_users import FastAPIUsers
+from starlette.requests import HTTPConnection, Request
 
-from fixbackend.auth.auth_backend import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend, get_session_strategy, cookie_name, FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
-
+from fastapi_users.authentication.strategy.base import Strategy
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
@@ -39,5 +41,23 @@ get_current_active_verified_user = fastapi_users.current_user(active=True, verif
 maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
 
 
-AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
+async def user_with_session_refresh(
+    connection: HTTPConnection,  # could be either a websocket or an http request
+    user: Annotated[User, Depends(get_current_active_verified_user)],
+    strategy: Annotated[FixJWTStrategy, Depends(get_session_strategy)],
+    fix_auth: Annotated[Optional[str], Cookie(alias=cookie_name)],
+) -> User:
+    # if this is called for websocket - skip the rest
+    if not isinstance(connection, Request):
+        return user
+    # in all possible cases if we get the authenticated user, the jwt cookie must be valid.
+    if fix_auth and (token := strategy.decode_token(fix_auth)):
+        if token.get("exp", 0) < (datetime.utcnow() + timedelta(hours=1)).timestamp():
+            # if the token is expired, we need to refresh it
+            connection.scope["refreshed_session"] = await strategy.write_token(user)
+
+    return user
+
+
+AuthenticatedUser = Annotated[User, Depends(user_with_session_refresh)]
 OptionalAuthenticatedUser = Annotated[Optional[User], Depends(maybe_current_active_verified_user)]
