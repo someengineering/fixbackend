@@ -74,7 +74,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             # 15 retries * 30s = roughly 7 minutes
             maximum_delay=30,
             retries=15,
-            log_failed_attempts=False,
+            log_failed_attempts=True,
         )
 
         self.domain_event_listener = RedisStreamListener(
