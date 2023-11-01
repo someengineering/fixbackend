@@ -133,6 +133,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
+        log.info(f"Trying to configure account {cloud_account_id}")
         if await self.account_setup_helper.can_assume_role(
             account.access.aws_account_id, account.access.role_name, account.access.external_id
         ):
