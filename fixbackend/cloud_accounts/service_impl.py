@@ -134,19 +134,21 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
         log.info(f"Trying to configure account {cloud_account_id}")
-        if await self.account_setup_helper.can_assume_role(
+
+        if not await self.account_setup_helper.can_assume_role(
             account.access.aws_account_id, account.access.role_name, account.access.external_id
         ):
-            await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
-            await self.domain_events.publish(
-                AwsAccountConfigured(
-                    cloud_account_id=cloud_account_id,
-                    tenant_id=account.workspace_id,
-                    aws_account_id=account.access.aws_account_id,
-                )
-            )
-        else:
             raise RuntimeError("Cannot assume role yet, waiting")
+
+        await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
+        log.info(f"Account {cloud_account_id} configured")
+        await self.domain_events.publish(
+            AwsAccountConfigured(
+                cloud_account_id=cloud_account_id,
+                tenant_id=account.workspace_id,
+                aws_account_id=account.access.aws_account_id,
+            )
+        )
 
     async def create_aws_account(
         self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId
