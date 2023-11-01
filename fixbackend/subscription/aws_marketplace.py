@@ -23,7 +23,7 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Optional, cast
+from typing import Optional
 from uuid import uuid4
 
 import boto3
@@ -143,7 +143,7 @@ class AwsMarketplaceHandler(Service):
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
-                    "FoundationalSecurity",
+                    "FoundationalSecurityAccount",  # TODO: lookup the correct tier
                     usage,
                     last_charged,
                     billing_time,
@@ -158,7 +158,7 @@ class AwsMarketplaceHandler(Service):
             raise
 
     async def report_usage(self, subscription: AwsMarketplaceSubscription, entry: BillingEntry) -> None:
-        await run_async(
+        result = await run_async(
             self.marketplace_client.batch_meter_usage,
             ProductCode=subscription.product_code,
             UsageRecords=[
@@ -170,7 +170,7 @@ class AwsMarketplaceHandler(Service):
                 )
             ],
         )
-        result = cast(Json, await self.subscription_repo.mark_billing_entry_reported(entry.id))
+        await self.subscription_repo.mark_billing_entry_reported(entry.id)
         if len(result.get("UnprocessedRecords", [])) > 0:
             raise ValueError(f"Could not report usage for billing entry {entry.id}: {result}")
 
