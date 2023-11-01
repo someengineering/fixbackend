@@ -23,6 +23,7 @@ import logging
 from typing import List, Optional, Annotated
 
 from fastapi import APIRouter, Query, Request, Depends
+from fastapi.params import Form
 from fastapi.responses import StreamingResponse
 
 from fixbackend.dependencies import FixDependencies, FixDependency
@@ -68,5 +69,15 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.get("/{workspace_id}/inventory/report-summary")
     async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
+
+    @router.post("/{workspace_id}/inventory/search/list")
+    async def search_list(
+        workspace_id: WorkspaceId,
+        graph_db: CurrentGraphDbDependency,
+        request: Request,
+        query: str = Form(),
+    ) -> StreamingResponse:
+        search_result = await fix.inventory.search_list(graph_db, query)
+        return streaming_response(request.headers.get("accept", "application/json"), search_result)
 
     return router

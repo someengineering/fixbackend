@@ -103,3 +103,14 @@ async def test_dict_values_by() -> None:
     # make sure the result is unique
     inv = {1: [1, 2, 3, 11, 12, 13], 2: [1, 2, 3, 11, 12, 13, 21, 22, 23], 0: [1, 2, 3]}
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
+
+
+async def test_search_list(inventory_service: InventoryService) -> None:
+    result = [e async for e in await inventory_service.search_list(db, "is(account) and name==foo")]
+    assert result == [
+        [
+            {"name": "name", "kind": "string", "display": "Name"},
+            {"name": "some_int", "kind": "int32", "display": "Some Int"},
+        ],
+        {"name": "a", "some_int": 1},
+    ]
