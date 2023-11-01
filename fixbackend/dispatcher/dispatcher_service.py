@@ -317,7 +317,9 @@ class DispatcherService(Service):
 
         async for workspace_id, at in self.next_run_repo.older_than(now):
             accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, enabled=True, configured=True)
+            log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
             for account in accounts:
                 await self.trigger_collect(account)
             next_run_at = await self.compute_next_run(workspace_id, at)
+            log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")
             await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
