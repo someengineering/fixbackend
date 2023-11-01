@@ -16,7 +16,7 @@ import boto3
 
 import logging
 from fixcloudutils.asyncio.async_extensions import run_async
-from ids import ExternalId
+from fixbackend.ids import ExternalId
 
 
 log = logging.getLogger(__name__)

@@ -133,7 +133,7 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
     def __init__(self) -> None:
         self.can_assume = True
 
-    async def can_assume_role(self, account_id: str, role_name: str) -> bool:
+    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> bool:
         return self.can_assume
 
 
