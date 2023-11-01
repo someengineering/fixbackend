@@ -14,7 +14,11 @@
 
 import boto3
 
+import logging
 from fixcloudutils.asyncio.async_extensions import run_async
+
+
+log = logging.getLogger(__name__)
 
 
 class AwsAccountSetupHelper:
@@ -23,11 +27,14 @@ class AwsAccountSetupHelper:
 
     async def can_assume_role(self, account_id: str, role_name: str) -> bool:
         try:
-            await run_async(
+            result = await run_async(
                 self.sts_client.assume_role,
                 RoleArn=f"arn:aws:iam::{account_id}:role/{role_name}",
                 RoleSessionName="FixBackend",
             )
+            if not result.get("Credentials", {}).get("AccessKeyId"):
+                return False
             return True
-        except Exception:
+        except Exception as ex:
+            log.warn(f"Failed to assume role: {ex}")
             return False
