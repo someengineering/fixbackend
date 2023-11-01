@@ -31,19 +31,18 @@ from fixbackend.auth.auth_backend import get_auth_backend, get_session_strategy,
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
-from fastapi_users.authentication.strategy.base import Strategy
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
 
 # the value below is a dependency itself
-get_current_active_verified_user = fastapi_users.current_user(active=True, verified=True)
+get_current_active_user = fastapi_users.current_user(active=True, verified=True)
 maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
 
 
-async def user_with_session_refresh(
+async def get_current_active_verified_user(
     connection: HTTPConnection,  # could be either a websocket or an http request
-    user: Annotated[User, Depends(get_current_active_verified_user)],
+    user: Annotated[User, Depends(get_current_active_user)],
     strategy: Annotated[FixJWTStrategy, Depends(get_session_strategy)],
     fix_auth: Annotated[Optional[str], Cookie(alias=cookie_name)],
 ) -> User:
@@ -52,12 +51,12 @@ async def user_with_session_refresh(
         return user
     # in all possible cases if we get the authenticated user, the jwt cookie must be valid.
     if fix_auth and (token := strategy.decode_token(fix_auth)):
+        # if the token is to be expired in 1 hour, we need to refresh it
         if token.get("exp", 0) < (datetime.utcnow() + timedelta(hours=1)).timestamp():
-            # if the token is expired, we need to refresh it
             connection.scope["refreshed_session"] = await strategy.write_token(user)
 
     return user
 
 
-AuthenticatedUser = Annotated[User, Depends(user_with_session_refresh)]
+AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]
 OptionalAuthenticatedUser = Annotated[Optional[User], Depends(maybe_current_active_verified_user)]

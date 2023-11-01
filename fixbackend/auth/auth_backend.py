@@ -77,7 +77,9 @@ class FixJWTStrategy(Strategy[User, UUID]):
         public_key = available_keys[key_id]
 
         try:
-            data = jwt.decode(jwt=token, key=public_key, algorithms=[self.algorithm], audience=self.token_audience)
+            data: Dict[str, Any] = jwt.decode(
+                jwt=token, key=public_key, algorithms=[self.algorithm], audience=self.token_audience
+            )
             return data
         except jwt.PyJWTError:
             return None
