@@ -12,10 +12,9 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, Any, Dict, List
-from uuid import UUID
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.github import GitHubOAuth2
@@ -104,15 +103,6 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
-
-    @router.post("/refresh-session", tags=["auth"])
-    async def refresh_session(
-        user: AuthenticatedUser, strategy: Annotated[Strategy[User, UUID], Depends(auth_backend.get_strategy)]
-    ) -> Response:
-        """
-        Refreshes the session cookie.
-        """
-        return await auth_backend.login(strategy, user)
 
     return router
 
