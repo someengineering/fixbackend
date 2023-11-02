@@ -14,30 +14,31 @@
 
 import hashlib
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import jwt
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import (
-    ec,
-    ed448,
-    ed25519,
-    rsa,
-)
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 from fastapi_users import exceptions
-from fastapi_users.authentication import AuthenticationBackend, JWTStrategy
+from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroyNotSupportedError
 from fastapi_users.manager import BaseUserManager
 
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
-from fixbackend.dependencies import FixDependency
+from fixbackend.certificates.cert_store import CertKeyPair
 from fixbackend.config import ConfigDependency
+from fixbackend.dependencies import FixDependency
+import os
 
 # copied from jwt package
-AllowedPrivateKeys = rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey | ed25519.Ed25519PrivateKey | ed448.Ed448PrivateKey
-AllowedPublicKeys = rsa.RSAPublicKey | ec.EllipticCurvePublicKey | ed25519.Ed25519PublicKey | ed448.Ed448PublicKey
+AllowedPrivateKeys = Union[
+    rsa.RSAPrivateKey, ec.EllipticCurvePrivateKey, ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey
+]
+AllowedPublicKeys = Union[rsa.RSAPublicKey, ec.EllipticCurvePublicKey, ed25519.Ed25519PublicKey, ed448.Ed448PublicKey]
 
 
 class FixJWTStrategy(Strategy[User, UUID]):
@@ -60,10 +61,8 @@ class FixJWTStrategy(Strategy[User, UUID]):
             key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.PKCS1)
         ).hexdigest()[0:8]
 
-    async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UUID]) -> Optional[User]:
-        if token is None:
-            return None
-
+    def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
+        # try to decode the token without verifying the signature to get the key id
         unverified = jwt.api_jwt.decode_complete(token, options={"verify_signature": False})
         header = unverified["header"]
         key_id = header.get("kid")
@@ -74,16 +73,28 @@ class FixJWTStrategy(Strategy[User, UUID]):
         available_keys = {self.kid(key): key for key in self.public_keys}
 
         if not (key_id in available_keys):
-            raise ValueError("Token signed with an unknown key")
+            return None
 
         public_key = available_keys[key_id]
 
         try:
-            data = jwt.decode(jwt=token, key=public_key, algorithms=[self.algorithm], audience=self.token_audience)
-            user_id = data.get("sub")
-            if user_id is None:
-                return None
+            data: Dict[str, Any] = jwt.decode(
+                jwt=token, key=public_key, algorithms=[self.algorithm], audience=self.token_audience
+            )
+            return data
         except jwt.PyJWTError:
+            return None
+
+    async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UUID]) -> Optional[User]:
+        if token is None:
+            return None
+
+        data = self.decode_token(token)
+        if data is None:
+            return None
+
+        user_id = data.get("sub")
+        if user_id is None:
             return None
 
         try:
@@ -110,28 +121,52 @@ class FixJWTStrategy(Strategy[User, UUID]):
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-async def get_jwt_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
-    if config.env == "local":
-        return JWTStrategy(secret=config.secret, lifetime_seconds=None)
+# cache it for the duration of the process
+@lru_cache(maxsize=1)
+def get_ephemeral_key_pair() -> List[CertKeyPair]:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "fixbackend jwt ephemeral signing key")]))
+        .issuer_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "fixbackend running locally")]))
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    return [CertKeyPair(cert=cert, private_key=key)]
+
+
+async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
+    # only to make it easier to run locally
+    if os.environ.get("LOCAL_DEV_ENV") is not None:
+        cert_key_pairs = get_ephemeral_key_pair()
     else:
         cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
-        return FixJWTStrategy(
-            public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
-            private_key=cert_key_pairs[0].private_key,
-            lifetime_seconds=config.session_ttl,
-        )
+    return FixJWTStrategy(
+        public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
+        private_key=cert_key_pairs[0].private_key,
+        lifetime_seconds=config.session_ttl,
+    )
 
 
-def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
-    cookie_transport = CookieTransport(
-        cookie_name="fix.auth",
+session_cookie_name = "session_token"
+
+
+def cookie_transport(session_ttl: int) -> CookieTransport:
+    return CookieTransport(
+        cookie_name=session_cookie_name,
         cookie_secure=True,
         cookie_httponly=True,
         cookie_samesite="lax",
-        cookie_max_age=config.session_ttl,
+        cookie_max_age=session_ttl,
     )
+
+
+def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
     return AuthenticationBackend(
         name="jwt",
-        transport=cookie_transport,
-        get_strategy=get_jwt_strategy,
+        transport=cookie_transport(config.session_ttl),
+        get_strategy=get_session_strategy,
     )

@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence, List, Literal, Tuple
+from typing import Annotated, Optional, Sequence, List, Tuple
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -57,7 +57,6 @@ class Config(BaseSettings):
     signing_key_1: Optional[Path]
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
-    env: Literal["local", "dev", "prd"]
     customerio_baseurl: str
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
@@ -105,7 +104,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", "edge"))
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
-    parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", 3600)))
+    one_week = 3600 * 24 * 7
+    parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", one_week)))
     parser.add_argument(
         "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
     )
@@ -130,7 +130,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
-    parser.add_argument("--env", default=os.environ.get("ENV", "local"))
     parser.add_argument(
         "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
     )

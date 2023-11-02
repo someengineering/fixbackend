@@ -24,7 +24,7 @@ from typing import Annotated, Union, Literal
 
 from fastapi import Depends, HTTPException, Path
 
-from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.auth.depedencies import OptionalAuthenticatedUser
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
@@ -35,9 +35,12 @@ WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized"]
 
 async def get_optional_user_workspace(
     workspace_id: Annotated[WorkspaceId, Path()],
-    user: AuthenticatedUser,
+    user: OptionalAuthenticatedUser,
     workspace_repository: WorkspaceRepositoryDependency,
 ) -> Workspace | WorkspaceError:
+    if user is None:
+        return "Unauthorized"
+
     workspace = await workspace_repository.get_workspace(workspace_id)
     if workspace is None:
         return "WorkspaceNotFound"

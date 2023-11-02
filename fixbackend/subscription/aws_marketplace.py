@@ -23,7 +23,7 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Optional
+from typing import Optional, Tuple, List
 from uuid import uuid4
 
 import boto3
@@ -120,6 +120,7 @@ class AwsMarketplaceHandler(Service):
             return None
         try:
             billing_time = now or utc()
+            start_month = start_of_next_month(billing_time, hour=9)
             last_charged = subscription.last_charge_timestamp or billing_time
             customer = subscription.customer_identifier
             delta = billing_time - last_charged
@@ -138,6 +139,8 @@ class AwsMarketplaceHandler(Service):
                 usage = int(len(summaries) * month_factor)
                 if usage == 0:
                     log.info(f"AWS Marketplace: customer {customer} has no usage")
+                    # move the charge timestamp tp
+                    await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, start_month)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 billing_entry = await self.subscription_repo.add_billing_entry(
@@ -147,7 +150,7 @@ class AwsMarketplaceHandler(Service):
                     usage,
                     last_charged,
                     billing_time,
-                    start_of_next_month(billing_time, hour=9),
+                    start_month,
                 )
                 return billing_entry
             else:
@@ -157,10 +160,12 @@ class AwsMarketplaceHandler(Service):
             log.error("Could not create a billing entry", exc_info=True)
             raise
 
-    async def report_usage(self, subscription: AwsMarketplaceSubscription, entry: BillingEntry) -> None:
+    async def report_usage(
+        self, product_code: str, entries: List[Tuple[AwsMarketplaceSubscription, BillingEntry]]
+    ) -> None:
         result = await run_async(
             self.marketplace_client.batch_meter_usage,
-            ProductCode=subscription.product_code,
+            ProductCode=product_code,
             UsageRecords=[
                 dict(
                     CustomerIdentifier=subscription.customer_identifier,
@@ -168,16 +173,17 @@ class AwsMarketplaceHandler(Service):
                     Quantity=entry.nr_of_accounts_charged,
                     Timestamp=utc_str(entry.period_end),
                 )
+                for subscription, entry in entries
             ],
         )
-        await self.subscription_repo.mark_billing_entry_reported(entry.id)
         if len(result.get("UnprocessedRecords", [])) > 0:
-            raise ValueError(f"Could not report usage for billing entry {entry.id}: {result}")
+            raise ValueError(f"Could not report usage for billing entries {result}")
 
     async def report_unreported_usages(self, raise_exception: bool = False) -> None:
         async def send(be: BillingEntry, ms: AwsMarketplaceSubscription) -> None:
             try:
-                await self.report_usage(ms, be)
+                await self.report_usage(ms.product_code, [(ms, be)])
+                await self.subscription_repo.mark_billing_entry_reported(entry.id)
             except Exception:
                 log.error(f"Could not report usage for billing entry {be.id}", exc_info=True)
                 if raise_exception:
@@ -192,7 +198,7 @@ class AwsMarketplaceHandler(Service):
     async def subscription_canceled(self, customer_id: str) -> None:
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
             if billing := await self.create_billing_entry(subscription):
-                await self.report_usage(subscription, billing)
+                await self.report_usage(subscription.product_code, [(subscription, billing)])
 
     async def handle_message(self, message: Json) -> None:
         # See: https://docs.aws.amazon.com/marketplace/latest/userguide/saas-notification.html
