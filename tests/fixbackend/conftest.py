@@ -278,25 +278,28 @@ async def benchmark_json() -> List[Json]:
 
 @pytest.fixture
 async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[InventoryClient]:
+    def nd_json_response(content: List[Json]) -> Response:
+        response = ""
+        for a in content:
+            response += json.dumps(a) + "\n"
+        return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+
     async def app(request: Request) -> Response:
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/cli/execute" and content.endswith("jq --no-rewrite .group"):
+            return nd_json_response(
+                [{"id": "123", "name": "foo", "cloud": "aws"},  # fmt: skip
+                 {"id": "234", "name": "bla", "cloud": "gcp"}]  # fmt: skip
+            )
         elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
-            result_list = [
-                {"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},
-                {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}},
-            ]
-            response = ""
-            for a in result_list:
-                response += json.dumps(a) + "\n"
-            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
-
+            return nd_json_response(
+                [{"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},  # fmt: skip
+                 {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}}],  # fmt: skip
+            )
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
-            response = ""
-            for a in benchmark_json:
-                response += json.dumps(a) + "\n"
-            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+            return nd_json_response(benchmark_json)
         elif request.url.path == "/report/checks":
             info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
             return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
@@ -309,23 +312,15 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
                 200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
             )
         elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
-            result_list = [
-                {"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
-                {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}  # fmt: skip
-            ]
-            response = ""
-            for a in result_list:
-                response += json.dumps(a) + "\n"
-            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+            return nd_json_response(
+                [{"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
+                 {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}]  # fmt: skip
+            )
         elif request.url.path == "/graph/resoto/search/aggregate":
-            aggregated = [
-                {"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
-                {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}  # fmt: skip
-            ]
-            response = ""
-            for a in aggregated:
-                response += json.dumps(a) + "\n"
-            return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+            return nd_json_response(
+                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
+                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}]  # fmt: skip
+            )
         else:
             raise Exception(f"Unexpected request: {request.url.path} with content {content}")
 

@@ -28,7 +28,7 @@ from fastapi.responses import StreamingResponse
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
-from fixbackend.inventory.schemas import ReportSummary
+from fixbackend.inventory.schemas import ReportSummary, SearchStartData
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -68,5 +68,9 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.get("/{workspace_id}/inventory/report-summary")
     async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
+
+    @router.get("/{workspace_id}/inventory/search/start")
+    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
+        return await fix.inventory.search_start_data(graph_db)
 
     return router

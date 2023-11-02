@@ -29,7 +29,13 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
-from fixbackend.inventory.schemas import ReportSummary, NoVulnerabilitiesChanged, BenchmarkAccountSummary, CheckSummary
+from fixbackend.inventory.schemas import (
+    ReportSummary,
+    NoVulnerabilitiesChanged,
+    BenchmarkAccountSummary,
+    CheckSummary,
+    SearchCloudResource,
+)
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -103,3 +109,14 @@ async def test_dict_values_by() -> None:
     # make sure the result is unique
     inv = {1: [1, 2, 3, 11, 12, 13], 2: [1, 2, 3, 11, 12, 13, 21, 22, 23], 0: [1, 2, 3]}
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
+
+
+async def test_search_start_data(inventory_service: InventoryService) -> None:
+    result = [
+        SearchCloudResource(id="123", name="foo", cloud="aws"),
+        SearchCloudResource(id="234", name="bla", cloud="gcp"),
+    ]
+    start_data = await inventory_service.search_start_data(db)
+    assert start_data.accounts == result
+    assert start_data.regions == result
+    assert start_data.kinds == result
