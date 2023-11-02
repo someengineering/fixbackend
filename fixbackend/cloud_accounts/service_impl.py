@@ -43,7 +43,7 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
 from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResults
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff
 
 log = getLogger(__name__)
@@ -74,7 +74,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             # 15 retries * 30s = roughly 7 minutes
             maximum_delay=30,
             retries=15,
-            log_failed_attempts=True,
         )
 
         self.domain_event_listener = RedisStreamListener(
@@ -133,12 +132,17 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
-        log.info(f"Trying to configure account {cloud_account_id}")
+        log.info(f"Waiting for account {cloud_account_id} to be configured")
 
-        if not await self.account_setup_helper.can_assume_role(
+        assume_role_result = await self.account_setup_helper.can_assume_role(
             account.access.aws_account_id, account.access.role_name, account.access.external_id
-        ):
-            raise RuntimeError("Cannot assume role yet, waiting")
+        )
+
+        match assume_role_result:
+            case AssumeRoleResults.Failure(reason):
+                msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
+                log.info(msg)
+                raise RuntimeError(msg)
 
         await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
         log.info(f"Account {cloud_account_id} configured")

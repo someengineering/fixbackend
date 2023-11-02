@@ -35,7 +35,7 @@ from datetime import datetime
 from fixcloudutils.redis.event_stream import MessageContext
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.config import Config
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResult, AssumeRoleResults
 from fixbackend.errors import ResourceNotFound, AccessDenied
 
 
@@ -133,8 +133,10 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
     def __init__(self) -> None:
         self.can_assume = True
 
-    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> bool:
-        return self.can_assume
+    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> AssumeRoleResult:
+        if self.can_assume:
+            return AssumeRoleResults.Success()
+        return AssumeRoleResults.Failure("Cannot assume role")
 
 
 @pytest.mark.asyncio

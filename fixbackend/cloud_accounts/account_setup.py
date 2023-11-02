@@ -14,19 +14,35 @@
 
 import boto3
 
+from abc import ABC
 import logging
 from fixcloudutils.asyncio.async_extensions import run_async
 from fixbackend.ids import ExternalId
-
+from attrs import frozen
 
 log = logging.getLogger(__name__)
+
+
+@frozen
+class AssumeRoleResult(ABC):
+    pass
+
+
+class AssumeRoleResults:
+    @frozen
+    class Success(AssumeRoleResult):
+        pass
+
+    @frozen
+    class Failure(AssumeRoleResult):
+        reason: str
 
 
 class AwsAccountSetupHelper:
     def __init__(self, session: boto3.Session) -> None:
         self.sts_client = session.client("sts")
 
-    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> bool:
+    async def can_assume_role(self, account_id: str, role_name: str, external_id: ExternalId) -> AssumeRoleResult:
         try:
             result = await run_async(
                 self.sts_client.assume_role,
@@ -35,8 +51,7 @@ class AwsAccountSetupHelper:
                 ExternalId=str(external_id),
             )
             if not result.get("Credentials", {}).get("AccessKeyId"):
-                return False
-            return True
+                return AssumeRoleResults.Failure("Failed to assume role, no access key id in the response")
+            return AssumeRoleResults.Success()
         except Exception as ex:
-            log.warn(f"Failed to assume role: {ex}")
-            return False
+            return AssumeRoleResults.Failure(str(ex))
