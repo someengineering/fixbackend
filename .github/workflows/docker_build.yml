@@ -96,6 +96,8 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           provenance: false # Temporary workaround for https://github.com/docker/buildx/issues/1533
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Authenticate with GitHub CLI
         # if: github.event_name != 'pull_request'
