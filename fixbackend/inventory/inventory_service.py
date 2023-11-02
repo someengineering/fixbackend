@@ -91,10 +91,10 @@ class InventoryService(Service):
 
         return self.client.execute_single(db, report + " | dump")  # type: ignore
 
-    async def search_list(self, db: GraphDatabaseAccess, query: str) -> AsyncIterator[JsonElement]:
+    async def search_table(self, db: GraphDatabaseAccess, query: str) -> AsyncIterator[JsonElement]:
         if not query.startswith("search"):
             query = "search " + query
-        return self.client.execute_single(db, query + " | list --table")
+        return self.client.execute_single(db, query + " | list --json-table")
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def issues_since(

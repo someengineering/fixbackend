@@ -69,14 +69,14 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
-    @router.post("/{workspace_id}/inventory/search/list")
+    @router.post("/{workspace_id}/inventory/search/table")
     async def search_list(
         workspace_id: WorkspaceId,
         graph_db: CurrentGraphDbDependency,
         request: Request,
         query: str = Form(),
     ) -> StreamingResponse:
-        search_result = await fix.inventory.search_list(graph_db, query)
+        search_result = await fix.inventory.search_table(graph_db, query)
         return streaming_response(request.headers.get("accept", "application/json"), search_result)
 
     return router

@@ -106,11 +106,13 @@ async def test_dict_values_by() -> None:
 
 
 async def test_search_list(inventory_service: InventoryService) -> None:
-    result = [e async for e in await inventory_service.search_list(db, "is(account) and name==foo")]
+    result = [e async for e in await inventory_service.search_table(db, "is(account) and name==foo")]
     assert result == [
-        [
-            {"name": "name", "kind": "string", "display": "Name"},
-            {"name": "some_int", "kind": "int32", "display": "Some Int"},
-        ],
-        {"name": "a", "some_int": 1},
+        {
+            "columns": [
+                {"name": "name", "kind": "string", "display": "Name"},
+                {"name": "some_int", "kind": "int32", "display": "Some Int"},
+            ]
+        },
+        {"id": "123", "row": {"name": "a", "some_int": 1}},
     ]
