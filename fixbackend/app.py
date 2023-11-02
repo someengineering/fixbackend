@@ -26,7 +26,6 @@ from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -308,14 +307,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.add_middleware(RealIpMiddleware)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cfg.cors_origins,
-        allow_credentials=True,
-        allow_methods=["PUT", "GET", "HEAD", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["X-Fix-Csrf"],
-    )
-
     @app.exception_handler(AccessDenied)
     async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
@@ -375,21 +366,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         # organizations path is deprecated, use /workspaces instead
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
-        api_router.include_router(workspaces_router(), prefix="/organizations", include_in_schema=False)  # deprecated
-
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
-        api_router.include_router(
-            cloud_accounts_router(), prefix="/organizations", include_in_schema=False
-        )  # deprecated
-
         api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
-        api_router.include_router(
-            inventory_router(deps), prefix="/organizations", include_in_schema=False
-        )  # deprecated
-
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
-        api_router.include_router(websocket_router(cfg), prefix="/organizations", include_in_schema=False)  # deprecated
-
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router(deps))

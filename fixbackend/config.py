@@ -60,7 +60,6 @@ class Config(BaseSettings):
     customerio_baseurl: str
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
-    cors_origins: List[str]
     cloud_account_service_event_parallelism: int
 
     def frontend_cdn_origin(self) -> str:
@@ -136,9 +135,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
     parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
-    parser.add_argument(
-        "--cors-origins", nargs="+", default=os.environ.get("CORS_ORIGINS", "http://127.0.0.1:8081/").split(",")
-    )
     parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
     parser.add_argument(
         "--cloud-account-service-event-parallelism",
