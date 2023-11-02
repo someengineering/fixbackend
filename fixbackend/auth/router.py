@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Request
 from fastapi_users.authentication import AuthenticationBackend
@@ -21,10 +21,10 @@ from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
-from fixbackend.auth.depedencies import fastapi_users
 from fixbackend.auth.auth_backend import get_auth_backend
+from fixbackend.auth.depedencies import fastapi_users
 from fixbackend.auth.oauth import get_oauth_router
-from fixbackend.auth.schemas import UserRead, UserCreate, UserUpdate, OAuthProviderAuthUrl
+from fixbackend.auth.schemas import OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
 from fixbackend.config import Config
 
 

@@ -20,6 +20,7 @@ from httpx import AsyncClient
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
+from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
@@ -86,11 +87,11 @@ async def test_registration_flow(
     # verified can login
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 204
-    auth_cookie = response.cookies.get("fix.auth")
+    auth_cookie = response.cookies.get(session_cookie_name)
     assert auth_cookie is not None
 
     # organization is created by default
-    response = await api_client.get("/api/workspaces/", cookies={"fix.auth": auth_cookie})
+    response = await api_client.get("/api/workspaces/", cookies={session_cookie_name: auth_cookie})
     workspace_json = response.json()[0]
     assert workspace_json.get("name") == user.email
 
