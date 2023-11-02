@@ -58,10 +58,13 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid, start_of_next_month
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+import os
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
+
+os.environ["LOCAL_DEV_ENV"] = "true"
 
 
 @pytest.fixture(scope="session")
@@ -109,7 +112,6 @@ def default_config() -> Config:
         signing_key_1=None,
         signing_cert_2=None,
         signing_key_2=None,
-        env="local",
         customerio_baseurl="",
         customerio_site_id=None,
         customerio_api_key=None,
