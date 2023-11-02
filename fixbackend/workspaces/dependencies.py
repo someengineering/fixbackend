@@ -38,12 +38,12 @@ async def get_optional_user_workspace(
     user: OptionalAuthenticatedUser,
     workspace_repository: WorkspaceRepositoryDependency,
 ) -> Workspace | WorkspaceError:
+    if user is None:
+        return "Unauthorized"
+
     workspace = await workspace_repository.get_workspace(workspace_id)
     if workspace is None:
         return "WorkspaceNotFound"
-
-    if user is None:
-        return "Unauthorized"
 
     if user.id not in workspace.all_users():
         return "Unauthorized"
