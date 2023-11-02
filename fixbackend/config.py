@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence, List, Literal, Tuple
+from typing import Annotated, Optional, Sequence, List, Tuple
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -57,7 +57,6 @@ class Config(BaseSettings):
     signing_key_1: Optional[Path]
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
-    env: Literal["local", "dev", "prd"]
     customerio_baseurl: str
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
@@ -132,7 +131,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
-    parser.add_argument("--env", default=os.environ.get("FIX_ENV", "prd"))
     parser.add_argument(
         "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
     )

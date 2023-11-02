@@ -32,6 +32,7 @@ from fixbackend.auth.transport import CookieTransport
 from fixbackend.certificates.cert_store import CertKeyPair
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency
+import os
 
 # copied from jwt package
 AllowedPrivateKeys = Union[
@@ -138,7 +139,8 @@ def get_ephemeral_key_pair() -> List[CertKeyPair]:
 
 
 async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
-    if config.env == "local":
+    # only to make it easier to run locally
+    if os.environ.get("LOCAL_DEV_ENV") is not None:
         cert_key_pairs = get_ephemeral_key_pair()
     else:
         cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
