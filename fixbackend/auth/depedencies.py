@@ -39,6 +39,8 @@ fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get
 get_current_active_user = fastapi_users.current_user(active=True, verified=True)
 maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
 
+refreshed_session_scope = "refreshed_session"
+
 
 async def get_current_active_verified_user(
     connection: HTTPConnection,  # could be either a websocket or an http request
@@ -53,7 +55,7 @@ async def get_current_active_verified_user(
     if fix_auth and (token := strategy.decode_token(fix_auth)):
         # if the token is to be expired in 1 hour, we need to refresh it
         if token.get("exp", 0) < (datetime.utcnow() + timedelta(hours=1)).timestamp():
-            connection.scope["refreshed_session"] = await strategy.write_token(user)
+            connection.scope[refreshed_session_scope] = await strategy.write_token(user)
 
     return user
 
