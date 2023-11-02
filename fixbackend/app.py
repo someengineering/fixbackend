@@ -414,7 +414,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         logout_cookie = cookie_transport(1)
 
         @app.exception_handler(401)
-        async def not_unauthorized_handler(request: Request, exception: HTTPException) -> Response:
+        async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
             response = await http_exception_handler(request, exception)
             logout_cookie._set_logout_cookie(response)
             return response
