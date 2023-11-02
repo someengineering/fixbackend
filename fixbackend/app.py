@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from ssl import Purpose, create_default_context
-from typing import Any, AsyncIterator, ClassVar, Optional, Set, Tuple, cast
+from typing import Any, AsyncIterator, Awaitable, Callable, ClassVar, Optional, Set, Tuple, cast
 
 import boto3
 import httpx
@@ -26,7 +26,6 @@ from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -40,9 +39,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.auth.auth_backend import cookie_transport
+from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
 from fixbackend.certificates.cert_store import CertificateStore
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
@@ -62,15 +65,13 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
-from fixbackend.middleware.x_real_ip import RealIpMiddleware
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -306,14 +307,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.add_middleware(RealIpMiddleware)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cfg.cors_origins,
-        allow_credentials=True,
-        allow_methods=["PUT", "GET", "HEAD", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["X-Fix-Csrf"],
-    )
-
     @app.exception_handler(AccessDenied)
     async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
@@ -373,27 +366,26 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         # organizations path is deprecated, use /workspaces instead
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
-        api_router.include_router(workspaces_router(), prefix="/organizations", include_in_schema=False)  # deprecated
-
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
-        api_router.include_router(
-            cloud_accounts_router(), prefix="/organizations", include_in_schema=False
-        )  # deprecated
-
         api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
-        api_router.include_router(
-            inventory_router(deps), prefix="/organizations", include_in_schema=False
-        )  # deprecated
-
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
-        api_router.include_router(websocket_router(cfg), prefix="/organizations", include_in_schema=False)  # deprecated
-
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router(deps))
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
+
+        cookie = cookie_transport(cfg.session_ttl)
+
+        @app.middleware("http")
+        async def refresh_session(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            response = await call_next(request)
+            if refresh_session_token := request.scope.get(refreshed_session_scope):
+                # refresh the session token on every request
+                cookie._set_login_cookie(response, refresh_session_token)
+
+            return response
 
         if cfg.static_assets:
             app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
@@ -408,6 +400,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
             if request.url.path.startswith(API_PREFIX):
                 return await http_exception_handler(request, exception)
             return await root(request)
+
+        # ttl does not matter here since this cookie is only used for logout
+        logout_cookie = cookie_transport(1)
+
+        @app.exception_handler(401)
+        async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
+            response = await http_exception_handler(request, exception)
+            logout_cookie._set_logout_cookie(response)
+            return response
 
     return app
 
