@@ -151,12 +151,12 @@ async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> 
     )
 
 
-cookie_name = "fix.auth"
+session_cookie_name = "session_token"
 
 
 def cookie_transport(session_ttl: int) -> CookieTransport:
     return CookieTransport(
-        cookie_name=cookie_name,
+        cookie_name=session_cookie_name,
         cookie_secure=True,
         cookie_httponly=True,
         cookie_samesite="lax",
