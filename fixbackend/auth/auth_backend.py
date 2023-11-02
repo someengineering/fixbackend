@@ -122,16 +122,19 @@ async def get_jwt_strategy(config: ConfigDependency, fix: FixDependency) -> Stra
         )
 
 
-def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
-    cookie_transport = CookieTransport(
+def cookie_transport(session_ttl: int) -> CookieTransport:
+    return CookieTransport(
         cookie_name="fix.auth",
         cookie_secure=True,
         cookie_httponly=True,
         cookie_samesite="lax",
-        cookie_max_age=config.session_ttl,
+        cookie_max_age=session_ttl,
     )
+
+
+def get_auth_backend(config: ConfigDependency) -> AuthenticationBackend[Any, Any]:
     return AuthenticationBackend(
         name="jwt",
-        transport=cookie_transport,
+        transport=cookie_transport(config.session_ttl),
         get_strategy=get_jwt_strategy,
     )

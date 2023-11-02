@@ -42,6 +42,7 @@ from starlette.exceptions import HTTPException
 from fixbackend import config, dependencies
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
+from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
@@ -408,6 +409,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
             if request.url.path.startswith(API_PREFIX):
                 return await http_exception_handler(request, exception)
             return await root(request)
+
+        # ttl does not matter here since this cookie is only used for logout
+        logout_cookie = cookie_transport(1)
+
+        @app.exception_handler(401)
+        async def not_unauthorized_handler(request: Request, exception: HTTPException) -> Response:
+            response = await http_exception_handler(request, exception)
+            logout_cookie._set_logout_cookie(response)
+            return response
 
     return app
 
