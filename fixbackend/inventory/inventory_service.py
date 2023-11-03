@@ -101,10 +101,14 @@ class InventoryService(Service):
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
             cmd = (
                 f"search {search_filter} | "
-                f"aggregate {id_prop} as id {name_prop} as name, /ancestors.cloud.reported.name as cloud: "
+                f"aggregate {id_prop} as id, {name_prop} as name, /ancestors.cloud.reported.name as cloud: "
                 f"sum(1) as count | jq --no-rewrite .group"
             )
-            return [SearchCloudResource.model_validate(n) async for n in self.client.execute_single(db, f"{cmd}")]
+            return [
+                SearchCloudResource.model_validate(n)
+                async for n in self.client.execute_single(db, f"{cmd}")
+                if isinstance(n, dict) and n.get("cloud") is not None
+            ]
 
         (accounts, regions, kinds) = await asyncio.gather(
             cloud_resource("is(account)", "id", "name"),
@@ -200,7 +204,7 @@ class InventoryService(Service):
             # Weight failing checks by severity and compute an overall percentage
             missing = sum(ReportSeverityScore[severity] * count for severity, count in failing_checks.items())
             total = sum(ReportSeverityScore[severity] * count for severity, count in benchmark_checks.items())
-            return int((max(0, total - missing) * 100) // total)
+            return int((max(0, total - missing) * 100) // total) if total > 0 else 100
 
         def overall_score(accounts: Dict[str, AccountSummary]) -> int:
             # The overall score is the average of all account scores
