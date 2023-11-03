@@ -39,6 +39,8 @@ from fixbackend.inventory.schemas import (
     NoVulnerabilitiesChanged,
     BenchmarkAccountSummary,
     CheckSummary,
+    SearchStartData,
+    SearchCloudResource,
 )
 
 log = logging.getLogger(__name__)
@@ -51,12 +53,11 @@ SeverityByCheckId = Dict[str, str]
 T = TypeVar("T")
 V = TypeVar("V")
 
+ReportSeverityList = ["info", "low", "medium", "high", "critical"]
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
 )
-ReportSeverityPriority: Dict[str, int] = defaultdict(
-    lambda: 0, **{n: idx for idx, n in enumerate(["info", "low", "medium", "high", "critical"])}
-)
+ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
 
 
 def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterable[V]:
@@ -95,6 +96,22 @@ class InventoryService(Service):
         if not query.startswith("search"):
             query = "search " + query
         return self.client.execute_single(db, query + " | list --json-table")
+
+    async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
+        async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
+            cmd = (
+                f"search {search_filter} | "
+                f"aggregate {id_prop} as id {name_prop} as name, /ancestors.cloud.reported.name as cloud: "
+                f"sum(1) as count | jq --no-rewrite .group"
+            )
+            return [SearchCloudResource.model_validate(n) async for n in self.client.execute_single(db, f"{cmd}")]
+
+        (accounts, regions, kinds) = await asyncio.gather(
+            cloud_resource("is(account)", "id", "name"),
+            cloud_resource("is(region)", "id", "name"),
+            cloud_resource("all", "kind", "kind"),
+        )
+        return SearchStartData(accounts=accounts, regions=regions, kinds=kinds, severity=ReportSeverityList)
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def issues_since(
