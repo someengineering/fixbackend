@@ -107,7 +107,7 @@ class InventoryService(Service):
             return [
                 SearchCloudResource.model_validate(n)
                 async for n in self.client.execute_single(db, f"{cmd}")
-                if n.get("cloud") is not None
+                if isinstance(n, dict) and n.get("cloud") is not None
             ]
 
         (accounts, regions, kinds) = await asyncio.gather(
