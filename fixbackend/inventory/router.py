@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.schemas import ReportSummary, SearchStartData
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -50,6 +51,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/{workspace_id}/inventory/report/{benchmark_name}")
     async def report(
+        workspace_id: WorkspaceId,
         benchmark_name: str,
         graph_db: CurrentGraphDbDependency,
         request: Request,
@@ -64,11 +66,12 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return streaming_response(request.headers.get("accept", "application/json"), result)
 
     @router.get("/{workspace_id}/inventory/report-summary")
-    async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
+    async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
     @router.post("/{workspace_id}/inventory/search/table")
     async def search_list(
+        workspace_id: WorkspaceId,
         graph_db: CurrentGraphDbDependency,
         request: Request,
         query: str = Form(),
@@ -77,7 +80,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return streaming_response(request.headers.get("accept", "application/json"), search_result)
 
     @router.get("/{workspace_id}/inventory/search/start")
-    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
+    async def search_start(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> SearchStartData:
         return await fix.inventory.search_start_data(graph_db)
 
     return router
