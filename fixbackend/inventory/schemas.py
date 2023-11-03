@@ -71,3 +71,16 @@ class ReportSummary(BaseModel):
     changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
     changed_compliant: VulnerabilitiesChanged = Field(description="Accounts and resources became compliant.")
     top_checks: List[Json] = Field(description="The most relevant report check definitions.")
+
+
+class SearchCloudResource(BaseModel):
+    id: str
+    name: str
+    cloud: str
+
+
+class SearchStartData(BaseModel):
+    accounts: List[SearchCloudResource] = Field(description="The available accounts.")
+    regions: List[SearchCloudResource] = Field(description="The available regions.")
+    kinds: List[SearchCloudResource] = Field(description="The available resource kinds.")
+    severity: List[str] = Field(description="Severity values.")
