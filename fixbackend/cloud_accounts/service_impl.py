@@ -43,7 +43,7 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
 from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResults
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff
 
 log = getLogger(__name__)
@@ -74,7 +74,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             # 15 retries * 30s = roughly 7 minutes
             maximum_delay=30,
             retries=15,
-            log_failed_attempts=False,
         )
 
         self.domain_event_listener = RedisStreamListener(
@@ -133,17 +132,27 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
-        if await self.account_setup_helper.can_assume_role(account.access.aws_account_id, account.access.role_name):
-            await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
-            await self.domain_events.publish(
-                AwsAccountConfigured(
-                    cloud_account_id=cloud_account_id,
-                    tenant_id=account.workspace_id,
-                    aws_account_id=account.access.aws_account_id,
-                )
+        log.info(f"Waiting for account {cloud_account_id} to be configured")
+
+        assume_role_result = await self.account_setup_helper.can_assume_role(
+            account.access.aws_account_id, account.access.role_name, account.access.external_id
+        )
+
+        match assume_role_result:
+            case AssumeRoleResults.Failure(reason):
+                msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
+                log.info(msg)
+                raise RuntimeError(msg)
+
+        await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
+        log.info(f"Account {cloud_account_id} configured")
+        await self.domain_events.publish(
+            AwsAccountConfigured(
+                cloud_account_id=cloud_account_id,
+                tenant_id=account.workspace_id,
+                aws_account_id=account.access.aws_account_id,
             )
-        else:
-            raise RuntimeError("Cannot assume role yet, waiting")
+        )
 
     async def create_aws_account(
         self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId

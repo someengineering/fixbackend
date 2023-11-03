@@ -103,7 +103,7 @@ class DispatcherService(Service):
 
             case AwsAccountConfigured.kind:
                 awd_event = AwsAccountConfigured.from_json(message)
-                await self.cloud_account_created(awd_event.cloud_account_id)
+                await self.cloud_account_configured(awd_event.cloud_account_id)
 
             case _:
                 pass  # ignore other domain events
@@ -236,11 +236,13 @@ class DispatcherService(Service):
         next_run_at = await self.compute_next_run(workspace_id)
         await self.next_run_repo.create(workspace_id, next_run_at)
 
-    async def cloud_account_created(self, cloud_account_id: FixCloudAccountId) -> None:
+    async def cloud_account_configured(self, cloud_account_id: FixCloudAccountId) -> None:
         if account := await self.cloud_account_repo.get(cloud_account_id):
             await self.trigger_collect(account)
         else:
-            log.error("Received a message, that a cloud account is created, but it does not exist in the database")
+            log.error(
+                f"Received cloud account {cloud_account_id} configured message, but it does not exist in the database"
+            )
 
     async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
         now = utc()
@@ -314,13 +316,10 @@ class DispatcherService(Service):
         now = utc()
 
         async for workspace_id, at in self.next_run_repo.older_than(now):
-            if accounts := await self.cloud_account_repo.list_by_workspace_id(
-                workspace_id, enabled=True, configured=True
-            ):
-                for account in accounts:
-                    await self.trigger_collect(account)
-                next_run_at = await self.compute_next_run(workspace_id, at)
-                await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
-            else:
-                log.error("Received a message, that a cloud account is created, but it does not exist in the database")
-                continue
+            accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, enabled=True, configured=True)
+            log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
+            for account in accounts:
+                await self.trigger_collect(account)
+            next_run_at = await self.compute_next_run(workspace_id, at)
+            log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")
+            await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
