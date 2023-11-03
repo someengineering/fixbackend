@@ -27,7 +27,7 @@ from itertools import islice
 from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
 
 from fixcloudutils.service import Service
-from fixcloudutils.types import Json
+from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable
@@ -91,6 +91,11 @@ class InventoryService(Service):
             report += " --only-failing"
 
         return self.client.execute_single(db, report + " | dump")  # type: ignore
+
+    async def search_table(self, db: GraphDatabaseAccess, query: str) -> AsyncIterator[JsonElement]:
+        if not query.startswith("search"):
+            query = "search " + query
+        return self.client.execute_single(db, query + " | list --json-table")
 
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:

@@ -294,6 +294,11 @@ async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[Inventor
                 [{"id": "123", "name": "foo", "cloud": "aws"},  # fmt: skip
                  {"id": "234", "name": "bla", "cloud": "gcp"}]  # fmt: skip
             )
+        elif request.url.path == "/cli/execute" and content == "search is(account) and name==foo | list --json-table":
+            return nd_json_response(
+                [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
+                 {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
+            )
         elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
             return nd_json_response(
                 [{"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},  # fmt: skip

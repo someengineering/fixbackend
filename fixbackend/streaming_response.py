@@ -23,10 +23,10 @@ import json
 from typing import AsyncIterator
 
 from fastapi.responses import StreamingResponse
-from fixcloudutils.types import Json
+from fixcloudutils.types import JsonElement
 
 
-async def json_serializer(input_iterator: AsyncIterator[Json]) -> AsyncIterator[str]:
+async def json_serializer(input_iterator: AsyncIterator[JsonElement]) -> AsyncIterator[str]:
     yield "["
     flag = False
     async for item in input_iterator:
@@ -36,12 +36,12 @@ async def json_serializer(input_iterator: AsyncIterator[Json]) -> AsyncIterator[
     yield "]"
 
 
-async def ndjson_serializer(input_iterator: AsyncIterator[Json]) -> AsyncIterator[str]:
+async def ndjson_serializer(input_iterator: AsyncIterator[JsonElement]) -> AsyncIterator[str]:
     async for item in input_iterator:
         yield json.dumps(item) + "\n"
 
 
-def streaming_response(accept: str, gen: AsyncIterator[Json]) -> StreamingResponse:
+def streaming_response(accept: str, gen: AsyncIterator[JsonElement]) -> StreamingResponse:
     if accept in ["application/x-ndjson", "application/ndjson"]:
         return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson")
     elif accept == "application/json":
