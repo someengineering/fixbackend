@@ -28,6 +28,7 @@ from fixbackend.auth.depedencies import OptionalAuthenticatedUser
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
+from fixbackend.logging_context import set_workspace_id, set_user_id
 
 
 WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized"]
@@ -41,6 +42,8 @@ async def get_optional_user_workspace(
     if user is None:
         return "Unauthorized"
 
+    set_workspace_id(workspace_id)
+    set_user_id(user.id)
     workspace = await workspace_repository.get_workspace(workspace_id)
     if workspace is None:
         return "WorkspaceNotFound"

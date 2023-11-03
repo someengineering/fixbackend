@@ -64,6 +64,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
+from fixbackend.logging_context import get_logging_context
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
@@ -420,7 +421,7 @@ def setup_process() -> FastAPI:
     """
     current_config = config.get_config()
     level = logging.DEBUG if current_config.args.debug else logging.INFO
-    setup_logger("fixbackend", level=level)
+    setup_logger("fixbackend", level=level, get_logging_context=get_logging_context)
 
     # Replace all special uvicorn handlers
     for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:

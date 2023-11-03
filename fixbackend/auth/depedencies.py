@@ -11,14 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU Affero General Public License for more details.
-#
-#  You should have received a copy of the GNU Affero General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 from typing import Annotated, Optional
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -31,6 +24,7 @@ from fixbackend.auth.auth_backend import get_auth_backend, get_session_strategy,
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
+from fixbackend.logging_context import set_user_id
 
 # todo: use dependency injection
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
@@ -51,6 +45,9 @@ async def get_current_active_verified_user(
     # if this is called for websocket - skip the rest
     if not isinstance(connection, Request):
         return user
+
+    set_user_id(user.id)
+
     # if we get the authenticated user, the jwt cookie should be there.
     if session_token and (token := strategy.decode_token(session_token)):
         # if the token is to be expired in 1 hour, we need to refresh it

@@ -17,6 +17,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, cast
+from uuid import UUID
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
@@ -30,17 +31,17 @@ from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInfor
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
-    TenantAccountsCollected,
-    WorkspaceCreated,
     AwsAccountConfigured,
     CloudAccountCollectInfo,
+    TenantAccountsCollected,
+    WorkspaceCreated,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, WorkspaceId
+from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
-from uuid import UUID
 
 log = logging.getLogger(__name__)
 
@@ -99,10 +100,14 @@ class DispatcherService(Service):
         match context.kind:
             case WorkspaceCreated.kind:
                 wc_event = WorkspaceCreated.from_json(message)
+                set_workspace_id(wc_event.workspace_id)
                 await self.workspace_created(wc_event.workspace_id)
 
             case AwsAccountConfigured.kind:
                 awd_event = AwsAccountConfigured.from_json(message)
+                set_fix_cloud_account_id(awd_event.cloud_account_id)
+                set_workspace_id(awd_event.tenant_id)
+                set_cloud_account_id(awd_event.aws_account_id)
                 await self.cloud_account_configured(awd_event.cloud_account_id)
 
             case _:
@@ -207,6 +212,7 @@ class DispatcherService(Service):
             )
             for account_id, account_details in account_info.items()
         ]
+        set_workspace_id(workspace_id)
         # lookup the cloud account id from the job_id
         cloud_account_id: Optional[str] = await self.temp_store_redis.hget(
             self._jobs_hash_key(workspace_id), job_id

@@ -13,20 +13,20 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+from typing import List
 
 from fastapi import APIRouter
 
-from typing import List
-
+from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.schemas import (
+    AwsCloudAccountUpdate,
     AwsCloudFormationLambdaCallbackParameters,
+    CloudAccountRead,
     LastScanInfo,
     ScannedAccount,
-    CloudAccountRead,
-    AwsCloudAccountUpdate,
 )
-from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.ids import FixCloudAccountId
+from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 log = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
+        set_fix_cloud_account_id(cloud_account_id)
         cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
         return CloudAccountRead.from_model(cloud_account)
 
@@ -64,6 +65,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         update: AwsCloudAccountUpdate,
     ) -> CloudAccountRead:
+        set_fix_cloud_account_id(cloud_account_id)
         updated = await service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
         return CloudAccountRead.from_model(updated)
 
@@ -73,6 +75,7 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> None:
+        set_fix_cloud_account_id(cloud_account_id)
         await service.delete_cloud_account(cloud_account_id, workspace.id)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/enable")
@@ -81,6 +84,7 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
+        set_fix_cloud_account_id(cloud_account_id)
         updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
         return CloudAccountRead.from_model(updated)
 
@@ -90,6 +94,7 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
+        set_fix_cloud_account_id(cloud_account_id)
         updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
         return CloudAccountRead.from_model(updated)
 
@@ -125,6 +130,8 @@ def cloud_accounts_callback_router() -> APIRouter:
     async def aws_cloudformation_callback(
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
+        set_workspace_id(payload.workspace_id)
+        set_cloud_account_id(payload.account_id)
         await service.create_aws_account(
             payload.workspace_id, payload.account_id, payload.role_name, payload.external_id
         )
