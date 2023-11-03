@@ -166,7 +166,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cloud_accounts_redis_publisher,
                 domain_event_publisher,
                 LastScanRepository(session_maker),
-                arq_redis,
+                readwrite_redis,
                 cfg,
                 AwsAccountSetupHelper(boto_session),
             ),
