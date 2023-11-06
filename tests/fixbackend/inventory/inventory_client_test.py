@@ -52,6 +52,10 @@ def mocked_inventory_client(inventory_client: InventoryClient, inventory_mock: I
             return nd_json_response([dict(id="123", reported={})])
         elif request.method == "DELETE" and request.url.path == "/graph/resoto/node/123":
             return nd_json_response([dict(id="123", reported={})])
+        elif request.url.path == "/graph/resoto/property/attributes":
+            return nd_json_response(["prop_a", "prop_b", "prop_c"])
+        elif request.url.path == "/graph/resoto/property/values":
+            return nd_json_response(["val_a", "val_b", "val_c"])
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
 
@@ -73,3 +77,12 @@ async def test_report_benchmarks(mocked_inventory_client: InventoryClient) -> No
 
 async def test_deletion(mocked_inventory_client: InventoryClient) -> None:
     await mocked_inventory_client.delete_account(db_access, cloud="aws", account_id=CloudAccountId("test"))
+
+
+async def test_possible_values(mocked_inventory_client: InventoryClient) -> None:
+    keys = mocked_inventory_client.possible_values(
+        db_access, query="is(account)", prop_or_predicate="tags", detail="attributes"
+    )
+    assert [e async for e in keys] == ["prop_a", "prop_b", "prop_c"]
+    vals = mocked_inventory_client.possible_values(db_access, query="is(account)", prop_or_predicate="id")
+    assert [e async for e in vals] == ["val_a", "val_b", "val_c"]
