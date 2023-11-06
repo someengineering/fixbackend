@@ -31,7 +31,7 @@ fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get
 
 # the value below is a dependency itself
 get_current_active_user = fastapi_users.current_user(active=True, verified=True)
-maybe_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
+get_optional_current_active_verified_user = fastapi_users.current_user(active=True, verified=True, optional=True)
 
 refreshed_session_scope = "refreshed_session"
 
@@ -46,7 +46,7 @@ async def get_current_active_verified_user(
     if not isinstance(connection, Request):
         return user
 
-    set_user_id(user.id)
+    set_user_id(str(user.id))
 
     # if we get the authenticated user, the jwt cookie should be there.
     if session_token and (token := strategy.decode_token(session_token)):
@@ -55,6 +55,15 @@ async def get_current_active_verified_user(
             connection.scope[refreshed_session_scope] = await strategy.write_token(user)
 
     return user
+
+
+def maybe_current_active_verified_user(
+    maybe_user: Annotated[Optional[User], Depends(get_optional_current_active_verified_user)]
+) -> Optional[User]:
+    if maybe_user:
+        set_user_id(str(maybe_user.id))
+
+    return maybe_user
 
 
 AuthenticatedUser = Annotated[User, Depends(get_current_active_verified_user)]

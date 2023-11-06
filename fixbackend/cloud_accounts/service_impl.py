@@ -99,7 +99,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         match context.kind:
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
-                set_workspace_id(event.tenant_id)
+                set_workspace_id(str(event.tenant_id))
                 await self.last_scan_repo.set_last_scan(
                     event.tenant_id,
                     LastScanInfo(
@@ -119,8 +119,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
                 set_cloud_account_id(discovered_event.aws_account_id)
-                set_fix_cloud_account_id(discovered_event.cloud_account_id)
-                set_workspace_id(discovered_event.tenant_id)
+                set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
+                set_workspace_id(str(discovered_event.tenant_id))
                 await self.try_configure_account(discovered_event.cloud_account_id)
 
             case _:

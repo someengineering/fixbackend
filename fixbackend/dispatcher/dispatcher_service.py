@@ -100,14 +100,14 @@ class DispatcherService(Service):
         match context.kind:
             case WorkspaceCreated.kind:
                 wc_event = WorkspaceCreated.from_json(message)
-                set_workspace_id(wc_event.workspace_id)
+                set_workspace_id(str(wc_event.workspace_id))
                 await self.workspace_created(wc_event.workspace_id)
 
             case AwsAccountConfigured.kind:
                 awd_event = AwsAccountConfigured.from_json(message)
-                set_fix_cloud_account_id(awd_event.cloud_account_id)
-                set_workspace_id(awd_event.tenant_id)
-                set_cloud_account_id(awd_event.aws_account_id)
+                set_fix_cloud_account_id(str(awd_event.cloud_account_id))
+                set_workspace_id(str(awd_event.tenant_id))
+                set_cloud_account_id(str(awd_event.aws_account_id))
                 await self.cloud_account_configured(awd_event.cloud_account_id)
 
             case _:
@@ -212,7 +212,7 @@ class DispatcherService(Service):
             )
             for account_id, account_details in account_info.items()
         ]
-        set_workspace_id(workspace_id)
+        set_workspace_id(str(workspace_id))
         # lookup the cloud account id from the job_id
         cloud_account_id: Optional[str] = await self.temp_store_redis.hget(
             self._jobs_hash_key(workspace_id), job_id
