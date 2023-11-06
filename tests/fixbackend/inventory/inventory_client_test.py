@@ -26,7 +26,7 @@ import pytest
 from httpx import Request, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, CloudAccountId
 from fixbackend.inventory.inventory_client import InventoryClient
 from tests.fixbackend.conftest import InventoryMock, nd_json_response
 
@@ -72,4 +72,4 @@ async def test_report_benchmarks(mocked_inventory_client: InventoryClient) -> No
 
 
 async def test_deletion(mocked_inventory_client: InventoryClient) -> None:
-    await mocked_inventory_client.delete_account(db_access, cloud="aws", account_id="test")
+    await mocked_inventory_client.delete_account(db_access, cloud="aws", account_id=CloudAccountId("test"))

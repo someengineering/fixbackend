@@ -27,6 +27,7 @@ from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import CloudAccountId
 
 
 class GraphDatabaseException(Exception):
@@ -146,7 +147,7 @@ class InventoryClient(Service):
         access: GraphDatabaseAccess,
         *,
         cloud: str,
-        account_id: str,
+        account_id: CloudAccountId,
         graph: str = "resoto",
     ) -> None:
         query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
