@@ -15,7 +15,7 @@
 
 import uuid
 from datetime import datetime
-from typing import AsyncIterator, Dict, List
+from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -69,7 +69,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: str,
+        name: Optional[str],
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         account = evolve(account, name=name)
@@ -261,7 +261,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         enabled=True,
     )
 
-    payload = {
+    payload: Dict[str, Optional[str]] = {
         "name": "bar",
     }
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}", json=payload)
@@ -271,6 +271,15 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     assert data["cloud"] == "aws"
     assert data["account_id"] == "123456789012"
     assert data["name"] == "bar"
+
+    # set name to None
+    payload = {
+        "name": None,
+    }
+    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] is None
 
 
 @pytest.mark.asyncio

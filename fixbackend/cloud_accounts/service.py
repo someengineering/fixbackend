@@ -58,7 +58,7 @@ class CloudAccountService(ABC):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: str,
+        name: Optional[str],
     ) -> CloudAccount:
         """Update a cloud account."""
         raise NotImplementedError

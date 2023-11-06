@@ -380,6 +380,13 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
     assert updated.access == account.access
     assert updated.workspace_id == account.workspace_id
 
+    # set name to None
+    updated = await service.update_cloud_account_name(test_workspace_id, account.id, None)
+    assert updated.name is None
+    assert updated.id == account.id
+    assert updated.access == account.access
+    assert updated.workspace_id == account.workspace_id
+
     # wrong tenant id
     with pytest.raises(AccessDenied):
         await service.update_cloud_account_name(WorkspaceId(uuid.uuid4()), account.id, "foo")

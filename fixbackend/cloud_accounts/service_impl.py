@@ -241,7 +241,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: str,
+        name: Optional[str],
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)
