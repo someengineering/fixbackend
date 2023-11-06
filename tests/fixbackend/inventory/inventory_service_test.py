@@ -19,9 +19,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import uuid
 from typing import List
 
+import pytest
 from fixcloudutils.types import Json
 from httpx import AsyncClient, Response, Request, MockTransport
 
@@ -36,16 +38,68 @@ from fixbackend.inventory.schemas import (
     CheckSummary,
     SearchCloudResource,
 )
+from tests.fixbackend.conftest import InventoryMock, nd_json_response
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
 
-async def test_benchmark_command(inventory_service: InventoryService, benchmark_json: List[Json]) -> None:
+@pytest.fixture
+def mocked_answers(inventory_mock: InventoryMock, benchmark_json: List[Json]) -> InventoryMock:
+    async def mock(request: Request) -> Response:
+        content = request.content.decode("utf-8")
+        if request.url.path == "/cli/execute" and content.endswith("jq --no-rewrite .group"):
+            return nd_json_response(
+                [{"id": "123", "name": "foo", "cloud": "aws"},  # fmt: skip
+                 {"id": "234", "name": "bla", "cloud": "gcp"}]  # fmt: skip
+            )
+        elif request.url.path == "/cli/execute" and content == "search is(account) and name==foo | list --json-table":
+            return nd_json_response(
+                [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
+                 {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
+            )
+        elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
+            return nd_json_response(
+                [{"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},  # fmt: skip
+                 {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}}],  # fmt: skip
+            )
+        elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
+            return nd_json_response(benchmark_json)
+        elif request.url.path == "/report/checks":
+            info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
+            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
+        elif request.url.path == "/report/benchmarks":
+            benchmarks = [
+                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
+            ]
+            return Response(
+                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
+            )
+        elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
+            return nd_json_response(
+                [{"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
+                 {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}]  # fmt: skip
+            )
+        elif request.url.path == "/graph/resoto/search/aggregate":
+            return nd_json_response(
+                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
+                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}]  # fmt: skip
+            )
+        else:
+            raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
+
+    inventory_mock.append(mock)
+    return inventory_mock
+
+
+async def test_benchmark_command(
+    inventory_service: InventoryService, benchmark_json: List[Json], mocked_answers: InventoryMock
+) -> None:
     response = [a async for a in await inventory_service.benchmark(db, "benchmark_name")]
     assert response == benchmark_json
 
 
-async def test_summary(inventory_service: InventoryService) -> None:
+async def test_summary(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
     summary = await inventory_service.summary(db)
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 42
@@ -111,7 +165,7 @@ async def test_dict_values_by() -> None:
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
 
 
-async def test_search_list(inventory_service: InventoryService) -> None:
+async def test_search_list(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
     result = [e async for e in await inventory_service.search_table(db, "is(account) and name==foo")]
     assert result == [
         {
@@ -124,7 +178,7 @@ async def test_search_list(inventory_service: InventoryService) -> None:
     ]
 
 
-async def test_search_start_data(inventory_service: InventoryService) -> None:
+async def test_search_start_data(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
     result = [
         SearchCloudResource(id="123", name="foo", cloud="aws"),
         SearchCloudResource(id="234", name="bla", cloud="gcp"),
