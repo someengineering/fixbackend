@@ -19,22 +19,57 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import uuid
+
+import pytest
+from httpx import Request, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
+from tests.fixbackend.conftest import InventoryMock, nd_json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
 
-async def test_execute_single(inventory_client: InventoryClient) -> None:
-    assert [a async for a in inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
+@pytest.fixture
+def mocked_inventory_client(inventory_client: InventoryClient, inventory_mock: InventoryMock) -> InventoryClient:
+    async def mock(request: Request) -> Response:
+        content = request.content.decode("utf-8")
+        if request.url.path == "/cli/execute" and content == "json [1,2,3]":
+            return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
+        elif request.url.path == "/report/benchmarks":
+            benchmarks = [
+                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
+            ]
+            return Response(
+                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
+            )
+
+        elif request.url.path == "/graph/resoto/search/list":
+            return nd_json_response([dict(id="123", reported={})])
+        elif request.method == "DELETE" and request.url.path == "/graph/resoto/node/123":
+            return nd_json_response([dict(id="123", reported={})])
+        else:
+            raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
+
+    inventory_mock.append(mock)
+    return inventory_client
 
 
-async def test_report_benchmarks(inventory_client: InventoryClient) -> None:
-    result = await inventory_client.benchmarks(db_access, short=True, with_checks=True)
+async def test_execute_single(mocked_inventory_client: InventoryClient) -> None:
+    assert [a async for a in mocked_inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
+
+
+async def test_report_benchmarks(mocked_inventory_client: InventoryClient) -> None:
+    result = await mocked_inventory_client.benchmarks(db_access, short=True, with_checks=True)
     assert len(result) == 2
     for entry in result:
         for prop in ["id", "title", "framework", "version", "clouds", "description", "report_checks"]:
             assert prop in entry
+
+
+async def test_deletion(mocked_inventory_client: InventoryClient) -> None:
+    await mocked_inventory_client.delete_account(db_access, cloud="aws", account_id="test")

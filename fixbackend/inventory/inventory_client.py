@@ -141,6 +141,21 @@ class InventoryClient(Service):
         self.__raise_on_error(response)
         return cast(List[Json], response.json())
 
+    async def delete_account(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        cloud: str,
+        account_id: str,
+        graph: str = "resoto",
+    ) -> None:
+        query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
+        headers = self.__headers(access)
+        async for node in self.search_list(access, query):
+            node_id = node["id"]
+            response = await self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
+            self.__raise_on_error(response)
+
     def __headers(
         self,
         access: GraphDatabaseAccess,

@@ -17,7 +17,7 @@ import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
-from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple
+from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple, Callable, Awaitable
 from unittest.mock import patch
 
 import pytest
@@ -63,7 +63,7 @@ import os
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
-
+InventoryMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
 
 
@@ -277,58 +277,27 @@ async def benchmark_json() -> List[Json]:
     ]
 
 
-@pytest.fixture
-async def inventory_client(benchmark_json: List[Json]) -> AsyncIterator[InventoryClient]:
-    def nd_json_response(content: List[Json]) -> Response:
-        response = ""
-        for a in content:
-            response += json.dumps(a) + "\n"
-        return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
+def nd_json_response(content: List[Json]) -> Response:
+    response = ""
+    for a in content:
+        response += json.dumps(a) + "\n"
+    return Response(200, content=response.encode("utf-8"), headers={"content-type": "application/x-ndjson"})
 
+
+@pytest.fixture
+async def inventory_mock() -> InventoryMock:
+    return []
+
+
+@pytest.fixture
+async def inventory_client(inventory_mock: InventoryMock) -> AsyncIterator[InventoryClient]:
     async def app(request: Request) -> Response:
-        content = request.content.decode("utf-8")
-        if request.url.path == "/cli/execute" and content == "json [1,2,3]":
-            return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
-        elif request.url.path == "/cli/execute" and content.endswith("jq --no-rewrite .group"):
-            return nd_json_response(
-                [{"id": "123", "name": "foo", "cloud": "aws"},  # fmt: skip
-                 {"id": "234", "name": "bla", "cloud": "gcp"}]  # fmt: skip
-            )
-        elif request.url.path == "/cli/execute" and content == "search is(account) and name==foo | list --json-table":
-            return nd_json_response(
-                [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
-                 {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
-            )
-        elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
-            return nd_json_response(
-                [{"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},  # fmt: skip
-                 {"count": 87, "group": {"account_id": "234", "severity": "medium", "kind": "aws_instance"}}],  # fmt: skip
-            )
-        elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
-            return nd_json_response(benchmark_json)
-        elif request.url.path == "/report/checks":
-            info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
-            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
-        elif request.url.path == "/report/benchmarks":
-            benchmarks = [
-                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
-                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
-            ]
-            return Response(
-                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
-            )
-        elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
-            return nd_json_response(
-                [{"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
-                 {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}]  # fmt: skip
-            )
-        elif request.url.path == "/graph/resoto/search/aggregate":
-            return nd_json_response(
-                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
-                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}]  # fmt: skip
-            )
-        else:
-            raise Exception(f"Unexpected request: {request.url.path} with content {content}")
+        for mock in inventory_mock:
+            try:
+                return await mock(request)
+            except AttributeError:
+                pass
+        raise AttributeError(f'Unexpected request: {request.url.path} with content {request.content.decode("utf-8")}')
 
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
