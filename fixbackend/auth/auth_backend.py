@@ -13,8 +13,9 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import hashlib
+import os
 from datetime import datetime, timedelta
-from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
@@ -32,7 +33,7 @@ from fixbackend.auth.transport import CookieTransport
 from fixbackend.certificates.cert_store import CertKeyPair
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency
-import os
+from fixbackend.certificates.cert_store import load_cert_key_pair
 
 # copied from jwt package
 AllowedPrivateKeys = Union[
@@ -121,9 +122,14 @@ class FixJWTStrategy(Strategy[User, UUID]):
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-# cache it for the duration of the process
-@lru_cache(maxsize=1)
-def get_ephemeral_key_pair() -> List[CertKeyPair]:
+async def get_localhost_key_pair() -> List[CertKeyPair]:
+    local_signing_key_path = Path("/tmp/fixbackend/local_jwt_signing.key")
+    local_signing_crt_path = Path("/tmp/fixbackend/local_jwt_signing.crt")
+
+    if local_signing_key_path.exists() and local_signing_crt_path.exists():
+        key_pair = await load_cert_key_pair(local_signing_crt_path, local_signing_key_path)
+        return [key_pair]
+
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     cert = (
         x509.CertificateBuilder()
@@ -135,13 +141,25 @@ def get_ephemeral_key_pair() -> List[CertKeyPair]:
         .not_valid_after(datetime.utcnow() + timedelta(days=1))
         .sign(key, hashes.SHA256())
     )
+
+    local_signing_crt_path.parent.mkdir(parents=True, exist_ok=True)
+    local_signing_key_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(local_signing_key_path, "wb") as f:
+        f.write(
+            key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+            )
+        )
+    with open(local_signing_crt_path, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
     return [CertKeyPair(cert=cert, private_key=key)]
 
 
 async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
     # only to make it easier to run locally
     if os.environ.get("LOCAL_DEV_ENV") is not None:
-        cert_key_pairs = get_ephemeral_key_pair()
+        cert_key_pairs = await get_localhost_key_pair()
     else:
         cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
     return FixJWTStrategy(

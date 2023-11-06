@@ -64,6 +64,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
+from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
@@ -307,6 +308,28 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app.add_middleware(RealIpMiddleware)
 
+    workspaces_prefix = f"{API_PREFIX}/workspaces"
+
+    @app.middleware("http")
+    async def add_logging_context(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        path = request.url.path
+        if path.startswith(workspaces_prefix):
+            splitted = iter(path.split("/"))
+            for part in splitted:
+                match part:
+                    case "api" | "":
+                        continue
+                    case "workspaces":
+                        if workspace_id := next(splitted, None):
+                            set_workspace_id(workspace_id)
+                    case "cloud_account":
+                        if cloud_account_id := next(splitted, None):
+                            set_fix_cloud_account_id(cloud_account_id)
+
+        response = await call_next(request)
+
+        return response
+
     @app.exception_handler(AccessDenied)
     async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
@@ -420,7 +443,7 @@ def setup_process() -> FastAPI:
     """
     current_config = config.get_config()
     level = logging.DEBUG if current_config.args.debug else logging.INFO
-    setup_logger("fixbackend", level=level)
+    setup_logger("fixbackend", level=level, get_logging_context=get_logging_context)
 
     # Replace all special uvicorn handlers
     for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
