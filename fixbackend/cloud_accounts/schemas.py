@@ -66,7 +66,7 @@ class CloudAccountRead(BaseModel):
 
 
 class AwsCloudAccountUpdate(BaseModel):
-    name: str = Field(description="Name of the cloud account", max_length=64)
+    name: Optional[str] = Field(None, description="Name of the cloud account", max_length=64)
 
 
 class ScannedAccount(BaseModel):
