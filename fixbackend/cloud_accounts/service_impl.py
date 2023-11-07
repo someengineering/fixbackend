@@ -328,7 +328,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         cloud_account_id: FixCloudAccountId,
     ) -> CloudAccount:
         # make sure access is possible
-        await self.get_cloud_account(cloud_account_id, workspace_id)
+        account = await self.get_cloud_account(cloud_account_id, workspace_id)
+        if not account.is_configured:
+            raise ValueError(f"Account {cloud_account_id} is not configured, cannot enable account")
         result = await self.cloud_account_repository.update(cloud_account_id, lambda acc: evolve(acc, enabled=True))
         return result
 

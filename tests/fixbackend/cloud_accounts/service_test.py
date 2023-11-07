@@ -14,29 +14,34 @@
 
 
 import uuid
-from typing import Dict, List, Optional, Tuple, Callable
+from datetime import datetime
+from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
-from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from attrs import evolve
+from fixcloudutils.redis.event_stream import MessageContext, RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
 from redis.asyncio import Redis
 
+from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
+from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanInfo
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
-from fixbackend.domain_events.events import AwsAccountDiscovered, Event, AwsAccountConfigured
+from fixbackend.config import Config
+from fixbackend.domain_events.events import (
+    AwsAccountConfigured,
+    AwsAccountDiscovered,
+    CloudAccountCollectInfo,
+    Event,
+    TenantAccountsCollected,
+)
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId, AwsRoleName
+from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.ids import AwsRoleName, CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
-from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
-from datetime import datetime
-from fixcloudutils.redis.event_stream import MessageContext
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
-from fixbackend.config import Config
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResult, AssumeRoleResults
-from fixbackend.errors import ResourceNotFound, AccessDenied
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -784,6 +789,12 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
         account_name=None,
     )
     assert len(repository.accounts) == 1
+
+    # account is not configured, cannot be enabled
+    with pytest.raises(Exception):
+        await service.enable_cloud_account(WorkspaceId(uuid.uuid4()), account.id)
+
+    repository.accounts[account.id] = evolve(account, is_configured=True)
 
     # success
     updated = await service.enable_cloud_account(
