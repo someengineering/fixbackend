@@ -34,7 +34,7 @@ from fixbackend.domain_events.events import (
     AwsAccountConfigured,
     CloudAccountCollectInfo,
 )
-from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId, AwsRoleName
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
@@ -53,12 +53,14 @@ async def test_receive_workspace_created(
     aws_account_id = CloudAccountId("123")
     await cloud_account_repository.create(
         CloudAccount(
-            cloud_account_id,
-            workspace.id,
-            "foo",
-            AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
+            id=cloud_account_id,
+            workspace_id=workspace.id,
+            api_account_name="foo",
+            access=AwsCloudAccess(aws_account_id, workspace.external_id, AwsRoleName("test"), False),
             is_configured=False,
             enabled=True,
+            api_account_alias="foo_alias",
+            user_account_name="foo_user",
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -89,9 +91,11 @@ async def test_receive_aws_account_discovered(
         cloud_account_id,
         workspace.id,
         "foo",
-        AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
+        AwsCloudAccess(aws_account_id, workspace.external_id, AwsRoleName("test"), can_discover_names=False),
         is_configured=False,
         enabled=True,
+        api_account_alias="foo_alias",
+        user_account_name="foo_user",
     )
     await cloud_account_repository.create(account)
 

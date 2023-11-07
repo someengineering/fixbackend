@@ -126,7 +126,12 @@ def cloud_accounts_callback_router() -> APIRouter:
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
         await service.create_aws_account(
-            payload.workspace_id, payload.account_id, payload.role_name, payload.external_id
+            workspace_id=payload.workspace_id,
+            account_id=payload.account_id,
+            role_name=payload.role_name,
+            external_id=payload.external_id,
+            enabled=True,
+            account_name=None,
         )
         return None
 

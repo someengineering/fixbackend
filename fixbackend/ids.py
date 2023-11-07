@@ -9,3 +9,4 @@ CloudAccountId = NewType("CloudAccountId", str)  # cloud account id, e.g. AWS ac
 ExternalId = NewType("ExternalId", UUID)
 SubscriptionId = NewType("SubscriptionId", UUID)
 BillingId = NewType("BillingId", UUID)
+AwsRoleName = NewType("AwsRoleName", str)

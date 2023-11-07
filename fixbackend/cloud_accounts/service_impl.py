@@ -41,7 +41,7 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
-from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
+from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId, AwsRoleName
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResults
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff
@@ -132,10 +132,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not isinstance(account.access, AwsCloudAccess):
             raise ValueError(f"Account {cloud_account_id} has unknown access type {type(account.access)}")
 
+        role_name = account.access.role_name
+
+        if role_name is None:
+            log.warn(f"Account {cloud_account_id} has no role name, cannot setup account")
+            return None
+
         log.info(f"Waiting for account {cloud_account_id} to be configured")
 
         assume_role_result = await self.account_setup_helper.can_assume_role(
-            account.access.aws_account_id, account.access.role_name, account.access.external_id
+            account.access.aws_account_id, role_name, account.access.external_id
         )
 
         match assume_role_result:
@@ -143,6 +149,29 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
                 log.info(msg)
                 raise RuntimeError(msg)
+
+            case AssumeRoleResults.Success() as assume_role_result:
+                if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
+                    log.info(f"Found accounts {organization_accounts}")
+                    await self.mark_as_can_discover_names(account.id)
+
+                    for acc_id, name in organization_accounts.items():
+                        log.info(f"Found account, creating or updating names {acc_id}")
+                        await self.create_aws_account(
+                            workspace_id=account.workspace_id,
+                            account_id=acc_id,
+                            role_name=None,
+                            external_id=account.access.external_id,
+                            enabled=False,
+                            account_name=name,
+                        )
+                else:
+                    alias = await self.account_setup_helper.list_account_aliases(assume_role_result)
+                    log.info(f"Calling list_accounts is not allowed, using alias {alias} as an alternative")
+                    if alias:
+                        await self.cloud_account_repository.update(
+                            account.id, lambda account: evolve(account, api_account_alias=alias)
+                        )
 
         await self.cloud_account_repository.update(account.id, lambda account: evolve(account, is_configured=True))
         log.info(f"Account {cloud_account_id} configured")
@@ -155,7 +184,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         )
 
     async def create_aws_account(
-        self, workspace_id: WorkspaceId, account_id: CloudAccountId, role_name: str, external_id: ExternalId
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        role_name: Optional[AwsRoleName],
+        external_id: ExternalId,
+        enabled: bool,
+        account_name: Optional[str],
     ) -> CloudAccount:
         """Create a cloud account."""
 
@@ -164,6 +200,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise ValueError("Organization does not exist")
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
+        if enabled:
+            if not role_name:
+                raise ValueError("Role name must be provided for enabled accounts")
 
         async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> Optional[CloudAccount]:
             accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
@@ -182,16 +221,31 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
             workspace_id=workspace_id,
-            access=AwsCloudAccess(aws_account_id=account_id, external_id=external_id, role_name=role_name),
-            name=None,
+            access=AwsCloudAccess(
+                aws_account_id=account_id, external_id=external_id, role_name=role_name, can_discover_names=False
+            ),
             is_configured=False,
-            enabled=True,
+            enabled=enabled,
+            api_account_alias=None,
+            api_account_name=account_name,
+            user_account_name=None,
         )
+        # if existing, only update name and aliases, no need for events
         if existing := await account_already_exists(workspace_id, account_id):
-            account = evolve(account, id=existing.id)
-            result = await self.cloud_account_repository.update(existing.id, lambda _: account)
+            result = await self.cloud_account_repository.update(
+                existing.id, lambda acc: evolve(acc, api_account_name=account_name)
+            )
+            # if existing is already configured, no need to publish any events
+            if existing.is_configured:
+                return result
         else:
+            # create new account
             result = await self.cloud_account_repository.create(account)
+
+        # now we quit early if the account is not enabled at creation time
+        # and skip event publishing
+        if not enabled:
+            return result
 
         message = {
             "cloud_account_id": str(result.id),
@@ -245,7 +299,25 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)
-        return await self.cloud_account_repository.update(cloud_account_id, lambda acc: evolve(acc, name=name))
+        return await self.cloud_account_repository.update(
+            cloud_account_id, lambda acc: evolve(acc, user_account_name=name)
+        )
+
+    async def mark_as_can_discover_names(self, account_id: FixCloudAccountId) -> None:
+        def update_fn(account: CloudAccount) -> CloudAccount:
+            if isinstance(account.access, AwsCloudAccess):
+                return evolve(account, access=evolve(account.access, can_discover_names=True))
+            return account
+
+        account = await self.cloud_account_repository.get(account_id)
+        if account is None:
+            log.warn(f"Account {account_id} not found, cannot mark as can discover names")
+            return None
+        if isinstance(account.access, AwsCloudAccess):
+            await self.cloud_account_repository.update(account_id, update_fn)
+        else:
+            log.warn(f"Account {account_id} is not an AWS account, cannot mark as can discover names")
+            return None
 
     async def enable_cloud_account(
         self,

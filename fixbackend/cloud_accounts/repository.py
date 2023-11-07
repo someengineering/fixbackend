@@ -63,9 +63,12 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                     account_id=cloud_account.access.aws_account_id,
                     aws_role_name=cloud_account.access.role_name,
                     aws_external_id=cloud_account.access.external_id,
-                    name=cloud_account.name,
+                    api_account_name=cloud_account.api_account_name,
                     is_configured=cloud_account.is_configured,
                     enabled=cloud_account.enabled,
+                    api_account_alias=cloud_account.api_account_alias,
+                    aws_can_discover_names=cloud_account.access.can_discover_names,
+                    user_account_name=cloud_account.user_account_name,
                 )
             else:
                 raise ValueError(f"Unknown cloud {cloud_account.access}")
@@ -88,17 +91,20 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
             cloud_account = update_fn(stored_account.to_model())
 
-            stored_account.name = cloud_account.name
+            stored_account.api_account_name = cloud_account.api_account_name
             stored_account.is_configured = cloud_account.is_configured
             stored_account.enabled = cloud_account.enabled
+            stored_account.api_account_alias = cloud_account.api_account_alias
+            stored_account.user_account_name = cloud_account.user_account_name
 
             match cloud_account.access:
-                case AwsCloudAccess(account_id, external_id, role_name):
+                case AwsCloudAccess(account_id, external_id, role_name, can_discover_names):
                     stored_account.tenant_id = cloud_account.workspace_id
                     stored_account.cloud = "aws"
                     stored_account.account_id = account_id
                     stored_account.aws_external_id = external_id
                     stored_account.aws_role_name = role_name
+                    stored_account.aws_can_discover_names = can_discover_names
 
                 case _:
                     raise ValueError(f"Unknown cloud {cloud_account.access}")

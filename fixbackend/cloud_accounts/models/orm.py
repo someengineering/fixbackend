@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
-from fixbackend.ids import WorkspaceId, FixCloudAccountId, ExternalId, CloudAccountId
+from fixbackend.ids import WorkspaceId, FixCloudAccountId, ExternalId, CloudAccountId, AwsRoleName
 
 
 class CloudAccount(Base):
@@ -33,8 +33,11 @@ class CloudAccount(Base):
     cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
-    aws_role_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
-    name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=64), nullable=True)
+    aws_can_discover_names: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    user_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    api_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    api_account_alias: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     is_configured: Mapped[bool] = mapped_column(Boolean, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
@@ -44,7 +47,10 @@ class CloudAccount(Base):
             match self.cloud:
                 case "aws":
                     return models.AwsCloudAccess(
-                        aws_account_id=self.account_id, external_id=self.aws_external_id, role_name=self.aws_role_name
+                        aws_account_id=self.account_id,
+                        external_id=self.aws_external_id,
+                        role_name=self.aws_role_name,
+                        can_discover_names=self.aws_can_discover_names,
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
@@ -53,7 +59,9 @@ class CloudAccount(Base):
             id=self.id,
             workspace_id=self.tenant_id,
             access=access(),
-            name=self.name,
+            api_account_name=self.api_account_name,
             is_configured=self.is_configured,
             enabled=self.enabled,
+            api_account_alias=self.api_account_alias,
+            user_account_name=self.user_account_name,
         )

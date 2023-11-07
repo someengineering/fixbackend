@@ -18,7 +18,7 @@ from typing import ClassVar, Dict, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
+from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId, AwsRoleName
 
 
 @frozen
@@ -36,7 +36,8 @@ class AwsCloudAccess(CloudAccess):
 
     aws_account_id: CloudAccountId
     external_id: ExternalId
-    role_name: str
+    role_name: Optional[AwsRoleName]
+    can_discover_names: bool
 
     def account_id(self) -> CloudAccountId:
         return self.aws_account_id
@@ -56,10 +57,12 @@ class GcpCloudAccess(CloudAccess):
 class CloudAccount:
     id: FixCloudAccountId
     workspace_id: WorkspaceId
-    name: Optional[str]
+    api_account_name: Optional[str]
     access: CloudAccess
     is_configured: bool
     enabled: bool
+    api_account_alias: Optional[str]
+    user_account_name: Optional[str]
 
 
 @frozen
