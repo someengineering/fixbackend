@@ -17,7 +17,9 @@
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "bash .devcontainer/postCreate.sh",
-	"containerEnv": {},
+	"containerEnv": {
+		"LOCAL_DEV_ENV": "true"
+	},
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
