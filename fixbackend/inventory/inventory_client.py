@@ -181,6 +181,31 @@ class InventoryClient(Service):
         async for line in response.aiter_lines():
             yield json.loads(line)
 
+    async def model(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        result_format: Optional[str] = None,
+        kind: Optional[List[str]] = None,
+        kind_filter: Optional[List[str]] = None,
+        with_bases: bool = False,
+        with_property_kinds: bool = False,
+        flat: bool = False,
+        graph: str = "resoto",
+    ) -> List[Json]:
+        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        params = {
+            "format": result_format,
+            "kind": ",".join(kind) if kind else None,
+            "filter": ",".join(kind_filter) if kind_filter else None,
+            "with_bases": json.dumps(with_bases),
+            "with_property_kinds": json.dumps(with_property_kinds),
+            "flat": json.dumps(flat),
+        }
+        response = await self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers)
+        self.__raise_on_error(response, ("application/json",))
+        return cast(List[Json], response.json())
+
     def __headers(
         self,
         access: GraphDatabaseAccess,

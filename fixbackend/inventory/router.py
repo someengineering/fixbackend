@@ -24,6 +24,7 @@ from typing import List, Optional, Annotated
 
 from fastapi import APIRouter, Query, Request, Depends, Form
 from fastapi.responses import StreamingResponse
+from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -67,6 +68,27 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
+    @router.get("/{workspace_id}/inventory/search/start")
+    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
+        return await fix.inventory.search_start_data(graph_db)
+
+    @router.get("/{workspace_id}/inventory/model")
+    async def model(
+        graph_db: CurrentGraphDbDependency,
+        kind: List[str] = Query(description="Kinds to return."),
+        with_bases: bool = Query(default=False, description="Include base kinds."),
+        with_property_kinds: bool = Query(default=False, description="Include property kinds."),
+        flat: bool = Query(default=True, description="Return a flat list of kinds."),
+    ) -> List[Json]:
+        return await fix.inventory.client.model(
+            graph_db,
+            result_format="simple",
+            kind=kind,
+            with_bases=with_bases,
+            with_property_kinds=with_property_kinds,
+            flat=flat,
+        )
+
     @router.post("/{workspace_id}/inventory/property/attributes")
     async def property_attributes(
         graph_db: CurrentGraphDbDependency,
@@ -103,9 +125,5 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     ) -> StreamingResponse:
         search_result = await fix.inventory.search_table(graph_db, query)
         return streaming_response(request.headers.get("accept", "application/json"), search_result)
-
-    @router.get("/{workspace_id}/inventory/search/start")
-    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
-        return await fix.inventory.search_start_data(graph_db)
 
     return router
