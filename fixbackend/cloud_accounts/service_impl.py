@@ -14,19 +14,19 @@
 
 
 import uuid
+from collections import defaultdict
 from datetime import timedelta
 from hmac import compare_digest
 from logging import getLogger
 from typing import Any, List, Optional
 
-from collections import defaultdict
-
 from attrs import evolve
-from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
+from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff, Json, MessageContext, RedisStreamListener
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.service import Service
 from redis.asyncio import Redis
 
+from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanAccountInfo, LastScanInfo
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -34,17 +34,16 @@ from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternal
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
+    AwsAccountConfigured,
     AwsAccountDeleted,
     AwsAccountDiscovered,
     TenantAccountsCollected,
-    AwsAccountConfigured,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
 from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId
+from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper, AssumeRoleResults
-from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff
 
 log = getLogger(__name__)
 
@@ -100,6 +99,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         match context.kind:
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
+                set_workspace_id(str(event.tenant_id))
                 await self.last_scan_repo.set_last_scan(
                     event.tenant_id,
                     LastScanInfo(
@@ -118,6 +118,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
+                set_cloud_account_id(discovered_event.aws_account_id)
+                set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
+                set_workspace_id(str(discovered_event.tenant_id))
                 await self.try_configure_account(discovered_event.cloud_account_id)
 
             case _:
@@ -241,7 +244,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: str,
+        name: Optional[str],
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)

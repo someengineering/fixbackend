@@ -806,13 +806,13 @@ sqlalchemy = {version = ">=2.0.0,<2.1.0", extras = ["asyncio"]}
 
 [[package]]
 name = "fixcloudutils"
-version = "1.8.0"
+version = "1.10.0"
 description = "Utilities for fixcloud."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "fixcloudutils-1.8.0-py3-none-any.whl", hash = "sha256:fe2ffcc8c107713e061fd59f8bbad1d1f69086510dea6cd67b7c0e95fea351dc"},
-    {file = "fixcloudutils-1.8.0.tar.gz", hash = "sha256:d3377d2f103e4d5766d6773c79b75b5e6532c69f265e7f773b924db3fb4ee268"},
+    {file = "fixcloudutils-1.10.0-py3-none-any.whl", hash = "sha256:0e37c59b890e84c03157d63b52c60f165c49afdbddf875380e67b033b9f158f9"},
+    {file = "fixcloudutils-1.10.0.tar.gz", hash = "sha256:4ac55b26456f368f5ee1ef7184bf2cca5248f77c4a9bd2446314e71e6692e187"},
 ]
 
 [package.dependencies]
@@ -3012,4 +3012,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "5ae8a5e48c01e28f39c33a66b1d1e0f518cee06054aad1128e544b2e4c1baf1a"
+content-hash = "1f6540a98b219889a6e24a35498f3deeced9172deec4da08205a961e97f51b5f"
