@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import Optional, Dict, AsyncIterator, List, cast, Union
+from typing import Optional, Dict, AsyncIterator, List, cast, Union, Literal, Tuple
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
@@ -54,11 +54,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + "/cli/execute", content=command, params=env, headers=headers
         )
-        self.__raise_on_error(response)
-        if response.is_error:
-            raise Exception(f"Inventory error: {response.status_code} {response.text}")
-        content_type: str = response.headers.get("content-type", "")
-        assert content_type in ("application/x-ndjson", "application/json"), f"ndjson expected, but got {content_type}"
+        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
         async for line in response.aiter_lines():
             yield json.loads(line)
 
@@ -75,7 +71,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
         )
-        self.__raise_on_error(response)
+        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
         async for line in response.aiter_lines():
             yield json.loads(line)
 
@@ -92,7 +88,7 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/aggregate", content=query, params=params, headers=headers
         )
-        self.__raise_on_error(response)
+        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
         async for line in response.aiter_lines():
             yield json.loads(line)
 
@@ -113,7 +109,7 @@ class InventoryClient(Service):
             params["with_checks"] = with_checks
         headers = self.__headers(access)
         response = await self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers)
-        self.__raise_on_error(response)
+        self.__raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
     async def issues(
@@ -139,7 +135,7 @@ class InventoryClient(Service):
             params["id"] = ",".join(check_ids)
         headers = self.__headers(access)
         response = await self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers)
-        self.__raise_on_error(response)
+        self.__raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
     async def delete_account(
@@ -156,6 +152,59 @@ class InventoryClient(Service):
             node_id = node["id"]
             response = await self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
             self.__raise_on_error(response)
+
+    async def possible_values(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        query: str,
+        prop_or_predicate: str,
+        detail: Literal["attributes", "values"] = "values",
+        limit: int = 10,
+        skip: int = 0,
+        count: bool = False,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> AsyncIterator[JsonElement]:
+        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        params = {
+            "section": section,
+            "prop": prop_or_predicate,
+            "limit": str(limit),
+            "skip": str(skip),
+            "count": json.dumps(count),
+        }
+        response = await self.client.post(
+            self.inventory_url + f"/graph/{graph}/property/{detail}", content=query, params=params, headers=headers
+        )
+        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
+        async for line in response.aiter_lines():
+            yield json.loads(line)
+
+    async def model(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        result_format: Optional[str] = None,
+        kind: Optional[List[str]] = None,
+        kind_filter: Optional[List[str]] = None,
+        with_bases: bool = False,
+        with_property_kinds: bool = False,
+        flat: bool = False,
+        graph: str = "resoto",
+    ) -> List[Json]:
+        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        params = {
+            "format": result_format,
+            "kind": ",".join(kind) if kind else None,
+            "filter": ",".join(kind_filter) if kind_filter else None,
+            "with_bases": json.dumps(with_bases),
+            "with_property_kinds": json.dumps(with_property_kinds),
+            "flat": json.dumps(flat),
+        }
+        response = await self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers)
+        self.__raise_on_error(response, ("application/json",))
+        return cast(List[Json], response.json())
 
     def __headers(
         self,
@@ -175,12 +224,17 @@ class InventoryClient(Service):
             result["Content-Type"] = content_type
         return result
 
-    def __raise_on_error(self, response: Response, message: Optional[str] = None) -> None:
+    def __raise_on_error(self, response: Response, expected_media_types: Optional[Tuple[str, ...]] = None) -> None:
         if response.is_error:
-            msg = message or f"Inventory error: {response.status_code} {response.text}"
+            msg = f"Inventory error: {response.status_code} {response.text}"
             if response.status_code == 401:
                 raise GraphDatabaseForbidden(msg)
             elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
                 raise GraphDatabaseNotAvailable(msg)
             else:
                 raise GraphDatabaseException(msg)
+        if expected_media_types is not None:
+            media_type, *params = response.headers.get("content-type", "").split(";")
+            assert (
+                media_type in expected_media_types
+            ), f"Expected content type {expected_media_types}, but got {media_type}"
