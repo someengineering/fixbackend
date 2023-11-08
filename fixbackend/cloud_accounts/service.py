@@ -32,9 +32,8 @@ class CloudAccountService(ABC):
         *,
         workspace_id: WorkspaceId,
         account_id: CloudAccountId,
-        role_name: AwsRoleName,
+        role_name: Optional[AwsRoleName],
         external_id: ExternalId,
-        enabled: bool,
         account_name: Optional[str],
     ) -> CloudAccount:
         """Create a cloud account."""

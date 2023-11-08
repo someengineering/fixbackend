@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId, AwsRoleName
-from fixbackend.cloud_accounts.models import CloudAccount, LastScanAccountInfo
+from fixbackend.cloud_accounts.models import CloudAccount, LastScanAccountInfo, CloudAccountStates
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
@@ -54,22 +54,31 @@ class CloudAccountRead(BaseModel):
     api_account_name: Optional[str] = Field(
         description="Name of the cloud account, as provided by the cloud", max_length=64
     )
+    state: str = Field(description="State of the cloud account")
 
     @staticmethod
     def from_model(
         model: CloudAccount, last_scan_info: Optional[LastScanAccountInfo] = None, next_scan: Optional[datetime] = None
     ) -> "CloudAccountRead":
+        enabled = False
+        is_configured = False
+        match model.state:
+            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+                enabled = model.state.enabled
+                is_configured = True
+
         return CloudAccountRead(
             id=model.id,
-            cloud=model.access.cloud,
-            account_id=model.access.account_id(),
+            cloud=model.cloud,
+            account_id=model.account_id,
             user_account_name=model.user_account_name,
-            enabled=model.enabled,
-            is_configured=model.is_configured,
+            enabled=enabled,
+            is_configured=is_configured,
             resources=last_scan_info.resources_scanned if last_scan_info else None,
             next_scan=next_scan,
             api_account_alias=model.api_account_alias,
             api_account_name=model.api_account_name,
+            state=model.state.state_name,
         )
 
 

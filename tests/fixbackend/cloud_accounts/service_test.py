@@ -26,7 +26,7 @@ from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanInfo
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanInfo, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.config import Config
@@ -60,13 +60,15 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
         return self.accounts[id]
 
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
     ) -> List[CloudAccount]:
         accounts = [account for account in self.accounts.values() if account.workspace_id == workspace_id]
-        if enabled is not None:
-            accounts = [account for account in accounts if account.enabled == enabled]
-        if configured is not None:
-            accounts = [account for account in accounts if account.is_configured == configured]
+        if ready_for_collection is not None:
+            accounts = [
+                account
+                for account in accounts
+                if isinstance(account.state, (CloudAccountStates.Configured, CloudAccountStates.Degraded))
+            ]
         return accounts
 
     async def delete(self, id: FixCloudAccountId) -> None:
@@ -182,20 +184,18 @@ async def test_create_aws_account(
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name="foo",
     )
     assert len(repository.accounts) == 1
     account = repository.accounts.get(acc.id)
     assert account is not None
     assert account.workspace_id == test_workspace_id
-    assert isinstance(account.access, AwsCloudAccess)
-    assert account.access.aws_account_id == account_id
-    assert account.access.role_name == role_name
-    assert account.access.external_id == external_id
+    assert account.account_id == account_id
     assert account.api_account_name == "foo"
-    assert account.is_configured is False
-    assert account.enabled is True
+    assert isinstance(account.state, CloudAccountStates.Discovered)
+    assert isinstance(account.state.access, AwsCloudAccess)
+    assert account.state.access.role_name == role_name
+    assert account.state.access.external_id == external_id
 
     message = {
         "cloud_account_id": str(account.id),
@@ -221,7 +221,6 @@ async def test_create_aws_account(
         account_id=account_id,
         role_name=None,
         external_id=external_id,
-        enabled=False,
         account_name="foo",
     )
     # no extra account should be created
@@ -236,32 +235,28 @@ async def test_create_aws_account(
         account_id=account_id,
         role_name=None,
         external_id=external_id,
-        enabled=False,
         account_name="foobar",
     )
     assert len(repository.accounts) == 1
     # domain event should not be published
     assert len(domain_sender.events) == 1
     assert with_updated_name.workspace_id == acc.workspace_id
-    assert with_updated_name.access == acc.access
+    assert with_updated_name.state == acc.state
     assert with_updated_name.api_account_name == "foobar"
-    assert with_updated_name.is_configured == acc.is_configured
-    assert with_updated_name.enabled == acc.enabled
     assert with_updated_name.user_account_name == acc.user_account_name
     assert with_updated_name.id == acc.id
     assert with_updated_name.api_account_alias == acc.api_account_alias
 
-    # account with enable=False should not create any events
-    disabled_account_id = CloudAccountId("foobar2")
-    disabled_account = await service.create_aws_account(
+    # account with role_name=None should end up as detected not create any events
+    detected_account_id = CloudAccountId("foobar2")
+    detected_account = await service.create_aws_account(
         workspace_id=test_workspace_id,
-        account_id=disabled_account_id,
+        account_id=detected_account_id,
         role_name=None,
         external_id=external_id,
-        enabled=False,
         account_name="foo",
     )
-    assert disabled_account.enabled is False
+    assert detected_account.state == CloudAccountStates.Detected()
     # a new account should be created
     assert len(repository.accounts) == 2
     # domain event should not be published
@@ -274,7 +269,6 @@ async def test_create_aws_account(
             account_id=account_id,
             role_name=role_name,
             external_id=ExternalId(uuid.uuid4()),
-            enabled=True,
             account_name=None,
         )
 
@@ -285,18 +279,6 @@ async def test_create_aws_account(
             account_id=account_id,
             role_name=role_name,
             external_id=external_id,
-            enabled=True,
-            account_name=None,
-        )
-
-    # no role_name provided and enabled=True
-    with pytest.raises(Exception):
-        await service.create_aws_account(
-            workspace_id=WorkspaceId(uuid.uuid4()),
-            account_id=account_id,
-            role_name=None,
-            external_id=external_id,
-            enabled=True,
             account_name=None,
         )
 
@@ -325,7 +307,6 @@ async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> N
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -403,7 +384,6 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name="foo",
     )
     assert len(repository.accounts) == 1
@@ -412,11 +392,12 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
     cloud_account = await service.get_cloud_account(account.id, test_workspace_id)
     assert cloud_account is not None
     assert cloud_account.id == account.id
-    assert cloud_account.access.cloud == "aws"
-    assert cloud_account.access.account_id() == account_id
+    assert cloud_account.cloud == "aws"
+    assert cloud_account.account_id == account_id
     assert cloud_account.api_account_name == "foo"
-    assert cloud_account.is_configured is False
-    assert cloud_account.enabled is True
+    assert isinstance(cloud_account.state, CloudAccountStates.Discovered)
+    assert isinstance(cloud_account.state.access, AwsCloudAccess)
+
     assert cloud_account.api_account_alias is None
     assert cloud_account.user_account_name is None
 
@@ -453,7 +434,6 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -462,8 +442,8 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
     cloud_accounts = await service.list_accounts(test_workspace_id)
     assert len(cloud_accounts) == 1
     assert cloud_accounts[0].id == account.id
-    assert cloud_accounts[0].access.cloud == "aws"
-    assert cloud_accounts[0].access.account_id() == account_id
+    assert cloud_accounts[0].cloud == "aws"
+    assert cloud_accounts[0].account_id == account_id
     assert cloud_accounts[0].api_account_name is None
 
     # wrong tenant id
@@ -495,7 +475,6 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name="foobar",
     )
     assert len(repository.accounts) == 1
@@ -506,7 +485,7 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
     assert updated.api_account_name == "foobar"
     assert updated.api_account_alias is None
     assert updated.id == account.id
-    assert updated.access == account.access
+    assert updated.state == account.state
     assert updated.workspace_id == account.workspace_id
 
     # set name to None
@@ -514,7 +493,7 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
     assert updated.user_account_name is None
     assert updated.api_account_name == "foobar"
     assert updated.id == account.id
-    assert updated.access == account.access
+    assert updated.state == account.state
     assert updated.workspace_id == account.workspace_id
 
     # wrong tenant id
@@ -550,7 +529,6 @@ async def test_handle_account_discovered_success(arq_redis: Redis, default_confi
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -599,7 +577,6 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -627,15 +604,16 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
     assert event.aws_account_id == account_id
     assert event.tenant_id == account.workspace_id
 
-    after_discovered = await service.get_cloud_account(account.id, test_workspace_id)
+    after_configured = await service.get_cloud_account(account.id, test_workspace_id)
 
-    assert after_discovered is not None
-    assert after_discovered.is_configured is True
-    assert after_discovered.access == account.access
-    assert after_discovered.workspace_id == account.workspace_id
-    assert after_discovered.api_account_name == account.api_account_name
-    assert after_discovered.id == account.id
-    assert after_discovered.enabled == account.enabled
+    assert after_configured is not None
+    assert after_configured.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), privileged=False, enabled=True
+    )
+    assert after_configured.workspace_id == account.workspace_id
+    assert after_configured.api_account_name == account.api_account_name
+    assert after_configured.id == account.id
+    assert after_configured.account_id == account.account_id
 
 
 @pytest.mark.asyncio
@@ -664,7 +642,6 @@ async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis,
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -684,18 +661,14 @@ async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis,
     after_discovered = await service.get_cloud_account(account.id, test_workspace_id)
 
     assert after_discovered is not None
-    assert after_discovered.is_configured is True
     assert after_discovered.workspace_id == account.workspace_id
     assert after_discovered.api_account_name == "foobar"
     assert after_discovered.id == account.id
-    assert after_discovered.enabled == account.enabled
+    assert after_discovered.account_id == account.account_id
 
-    assert isinstance(after_discovered.access, AwsCloudAccess)
-    access = after_discovered.access
-    assert access.aws_account_id == account_id
-    assert access.role_name == role_name
-    assert access.external_id == external_id
-    assert access.can_discover_names is True
+    assert after_discovered.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), privileged=True, enabled=True
+    )
 
 
 @pytest.mark.asyncio
@@ -725,7 +698,6 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -746,19 +718,14 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
     after_discovered = await service.get_cloud_account(account.id, test_workspace_id)
 
     assert after_discovered is not None
-    assert after_discovered.is_configured is True
     assert after_discovered.workspace_id == account.workspace_id
     assert after_discovered.api_account_name is None
     assert after_discovered.api_account_alias == "foobar_alias"
     assert after_discovered.id == account.id
-    assert after_discovered.enabled == account.enabled
-
-    assert isinstance(after_discovered.access, AwsCloudAccess)
-    access = after_discovered.access
-    assert access.aws_account_id == account_id
-    assert access.role_name == role_name
-    assert access.external_id == external_id
-    assert access.can_discover_names is False
+    assert after_discovered.account_id == account.account_id
+    assert after_discovered.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), privileged=False, enabled=True
+    )
 
 
 @pytest.mark.asyncio
@@ -785,7 +752,6 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
         account_id=account_id,
         role_name=role_name,
         external_id=external_id,
-        enabled=True,
         account_name=None,
     )
     assert len(repository.accounts) == 1
@@ -794,22 +760,47 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
     with pytest.raises(Exception):
         await service.enable_cloud_account(WorkspaceId(uuid.uuid4()), account.id)
 
-    repository.accounts[account.id] = evolve(account, is_configured=True)
+    repository.accounts[account.id] = evolve(
+        account,
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=False, enabled=False),
+    )
 
     # success
     updated = await service.enable_cloud_account(
         test_workspace_id,
         account.id,
     )
-    assert updated.enabled is True
-    assert repository.accounts[account.id].enabled is True
+    assert isinstance(updated.state, CloudAccountStates.Configured)
+    assert updated.state.access == AwsCloudAccess(external_id, role_name)
+    assert updated.state.privileged is False
+    assert updated.state.enabled is True
+    assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Configured)
 
     updated = await service.disable_cloud_account(
         test_workspace_id,
         account.id,
     )
-    assert updated.enabled is False
-    assert repository.accounts[account.id].enabled is False
+    assert isinstance(updated.state, CloudAccountStates.Configured)
+    assert updated.state.access == AwsCloudAccess(external_id, role_name)
+    assert updated.state.privileged is False
+    assert updated.state.enabled is False
+
+    # works for degraded accounts too
+    repository.accounts[account.id] = evolve(
+        account,
+        state=CloudAccountStates.Degraded(
+            AwsCloudAccess(external_id, role_name), privileged=False, enabled=False, error="test error"
+        ),
+    )
+
+    updated = await service.enable_cloud_account(
+        test_workspace_id,
+        account.id,
+    )
+    assert isinstance(updated.state, CloudAccountStates.Degraded)
+    assert updated.state.access == AwsCloudAccess(external_id, role_name)
+    assert updated.state.privileged is False
+    assert updated.state.enabled is True
 
     # wrong tenant id
     with pytest.raises(Exception):

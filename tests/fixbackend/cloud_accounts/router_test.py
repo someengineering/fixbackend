@@ -22,7 +22,13 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, LastScanAccountInfo, LastScanInfo
+from fixbackend.cloud_accounts.models import (
+    AwsCloudAccess,
+    CloudAccount,
+    LastScanAccountInfo,
+    LastScanInfo,
+    CloudAccountStates,
+)
 from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.config import Config
@@ -44,18 +50,18 @@ class InMemoryCloudAccountService(CloudAccountService):
         *,
         workspace_id: WorkspaceId,
         account_id: CloudAccountId,
-        role_name: AwsRoleName,
+        role_name: Optional[AwsRoleName],
         external_id: ExternalId,
-        enabled: bool = True,
         account_name: Optional[str] = None,
     ) -> CloudAccount:
+        assert role_name is not None
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
+            account_id=account_id,
             workspace_id=workspace_id,
-            access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+            cloud="aws",
+            state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)),
             api_account_name=account_name,
-            is_configured=False,
-            enabled=enabled,
             api_account_alias=None,
             user_account_name=None,
         )
@@ -91,7 +97,10 @@ class InMemoryCloudAccountService(CloudAccountService):
         cloud_account_id: FixCloudAccountId,
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
-        account = evolve(account, enabled=True)
+        match account.state:
+            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+                account = evolve(account, state=evolve(account.state, enabled=True))
+
         self.accounts[cloud_account_id] = account
         return account
 
@@ -101,7 +110,10 @@ class InMemoryCloudAccountService(CloudAccountService):
         cloud_account_id: FixCloudAccountId,
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
-        account = evolve(account, enabled=False)
+        match account.state:
+            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+                account = evolve(account, state=evolve(account.state, enabled=False))
+
         self.accounts[cloud_account_id] = account
         return account
 
@@ -141,11 +153,18 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
     assert response.status_code == 200
     saved_account = list(cloud_account_service.accounts.values())[0]
     assert saved_account.workspace_id == workspace_id
-    match saved_account.access:
-        case AwsCloudAccess(a_id, e_id, r_name):
-            assert a_id == account_id
+    assert saved_account.account_id == account_id
+    assert saved_account.cloud == "aws"
+    assert saved_account.api_account_name is None
+    assert saved_account.api_account_alias is None
+    assert saved_account.user_account_name is None
+    match saved_account.state:
+        case CloudAccountStates.Discovered(AwsCloudAccess(e_id, r_name)):
             assert e_id == external_id
             assert r_name == role_name
+
+        case _:
+            assert False, "Unexpected state"
 
 
 @pytest.mark.asyncio
@@ -154,11 +173,11 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
+        account_id=account_id,
+        cloud="aws",
         workspace_id=workspace_id,
-        access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+        state=CloudAccountStates.Detected(),
         api_account_name="foo",
-        is_configured=False,
-        enabled=True,
         api_account_alias=None,
         user_account_name=None,
     )
@@ -201,11 +220,11 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
+        account_id=account_id,
         workspace_id=workspace_id,
-        access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+        cloud="aws",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
         api_account_name="foo",
-        is_configured=False,
-        enabled=True,
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
@@ -219,7 +238,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["api_account_alias"] == "foo_alias"
     assert data["api_account_name"] == "foo"
     assert data["user_account_name"] == "foo_user"
-    assert data["is_configured"] is False
+    assert data["is_configured"] is True
     assert data["enabled"] is True
 
 
@@ -230,11 +249,11 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
+        account_id=account_id,
         workspace_id=workspace_id,
-        access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+        cloud="aws",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
         api_account_name="foo",
-        is_configured=False,
-        enabled=True,
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
@@ -258,8 +277,9 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     assert data[0]["id"] == str(cloud_account_id)
     assert data[0]["cloud"] == "aws"
     assert data[0]["account_id"] == "123456789012"
-    assert data[0]["is_configured"] is False
+    assert data[0]["is_configured"] is True
     assert data[0]["enabled"] is True
+    assert data[0]["state"] == "configured"
     assert data[0]["resources"] == 100
     assert data[0]["next_scan"] == next_scan.isoformat()
     assert data[0]["api_account_alias"] == "foo_alias"
@@ -274,10 +294,10 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         workspace_id=workspace_id,
-        access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+        account_id=account_id,
+        cloud="aws",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=False, enabled=True),
         api_account_name="foo",
-        is_configured=False,
-        enabled=True,
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
@@ -310,10 +330,10 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         workspace_id=workspace_id,
-        access=AwsCloudAccess(account_id, external_id, role_name, can_discover_names=False),
+        account_id=account_id,
+        cloud="aws",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
         api_account_name="foo",
-        is_configured=False,
-        enabled=True,
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
@@ -326,7 +346,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["account_id"] == "123456789012"
     assert data["user_account_name"] == "foo_user"
     assert data["enabled"] is False
-    assert data["is_configured"] is False
+    assert data["is_configured"] is True
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/enable")
     assert response.status_code == 200
@@ -336,4 +356,4 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["account_id"] == "123456789012"
     assert data["user_account_name"] == "foo_user"
     assert data["enabled"] is True
-    assert data["is_configured"] is False
+    assert data["is_configured"] is True

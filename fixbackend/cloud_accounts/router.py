@@ -132,7 +132,6 @@ def cloud_accounts_callback_router() -> APIRouter:
             account_id=payload.account_id,
             role_name=payload.role_name,
             external_id=payload.external_id,
-            enabled=True,
             account_name=None,
         )
         return None

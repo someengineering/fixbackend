@@ -25,7 +25,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.util import parse_utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInformation, CollectQueue
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress
@@ -296,16 +296,21 @@ class DispatcherService(Service):
             return
 
         def account_information() -> Optional[AccountInformation]:
-            match account.access:
-                case AwsCloudAccess(aws_account_id=aws_account_id, role_name=role_name, external_id=external_id):
-                    return AwsAccountInformation(
-                        aws_account_id=aws_account_id,
-                        aws_account_name=None,
-                        aws_role_arn=f"arn:aws:iam::{aws_account_id}:role/{role_name}",
-                        external_id=str(external_id),
-                    )
+            match account.state:
+                case CloudAccountStates.Configured(access, _) | CloudAccountStates.Degraded(access, _):
+                    match access:
+                        case AwsCloudAccess(role_name, external_id):
+                            return AwsAccountInformation(
+                                aws_account_id=account.account_id,
+                                aws_account_name=account.api_account_name,
+                                aws_role_arn=f"arn:aws:iam::{account.account_id}:role/{role_name}",
+                                external_id=str(external_id),
+                            )
+                        case _:
+                            log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")
+                            return None
                 case _:
-                    log.error(f"Don't know how to handle this cloud access {account.access}. Ignore it.")
+                    log.error(f"Account {account.id} is not in configured state. Ignore it.")
                     return None
 
         if (ai := account_information()) and (
@@ -322,7 +327,7 @@ class DispatcherService(Service):
         now = utc()
 
         async for workspace_id, at in self.next_run_repo.older_than(now):
-            accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, enabled=True, configured=True)
+            accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, ready_for_collection=True)
             log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
             for account in accounts:
                 await self.trigger_collect(account)

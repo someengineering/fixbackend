@@ -17,10 +17,10 @@ from typing import Annotated, Callable, List, Optional
 from fastapi import Depends
 from sqlalchemy import select
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, orm
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
 from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import FixCloudAccountId, WorkspaceId
+from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
 
 
@@ -39,7 +39,7 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
     ) -> List[CloudAccount]:
         raise NotImplementedError
 
@@ -52,26 +52,72 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
+    def _update_state_dependent_fields(
+        self, orm_cloud_account: orm.CloudAccount, account_state: CloudAccountState
+    ) -> None:
+        role_name: Optional[AwsRoleName] = None
+        external_id: Optional[ExternalId] = None
+        privileged = False
+        enabled = False
+        error: Optional[str] = None
+        state: Optional[str] = None
+        match account_state:
+            case CloudAccountStates.Detected():
+                state = CloudAccountStates.Detected.state_name
+
+            case CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)):
+                role_name = role_name
+                external_id = external_id
+                state = CloudAccountStates.Discovered.state_name
+
+            case CloudAccountStates.Misconfigured(AwsCloudAccess(external_id, role_name), error):
+                error = error
+                external_id = external_id
+                privileged = privileged
+                role_name = role_name
+                state = CloudAccountStates.Misconfigured.state_name
+
+            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged, enabled):
+                external_id = external_id
+                privileged = privileged
+                enabled = enabled
+                state = CloudAccountStates.Configured.state_name
+
+            case CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), privileged, enabled, error):
+                external_id = external_id
+                privileged = privileged
+                role_name = role_name
+                error = error
+                enabled = enabled
+                state = CloudAccountStates.Degraded.state_name
+
+            case _:
+                raise ValueError(f"Unknown state {account_state}")
+
+        orm_cloud_account.aws_external_id = external_id
+        orm_cloud_account.aws_role_name = role_name
+        orm_cloud_account.privileged = privileged
+        orm_cloud_account.state = state
+        orm_cloud_account.error = error
+        orm_cloud_account.enabled = enabled
+
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         """Create a cloud account."""
         async with self.session_maker() as session:
-            if isinstance(cloud_account.access, AwsCloudAccess):
-                orm_cloud_account = orm.CloudAccount(
-                    id=cloud_account.id,
-                    tenant_id=cloud_account.workspace_id,
-                    cloud="aws",
-                    account_id=cloud_account.access.aws_account_id,
-                    aws_role_name=cloud_account.access.role_name,
-                    aws_external_id=cloud_account.access.external_id,
-                    api_account_name=cloud_account.api_account_name,
-                    is_configured=cloud_account.is_configured,
-                    enabled=cloud_account.enabled,
-                    api_account_alias=cloud_account.api_account_alias,
-                    aws_can_discover_names=cloud_account.access.can_discover_names,
-                    user_account_name=cloud_account.user_account_name,
-                )
-            else:
-                raise ValueError(f"Unknown cloud {cloud_account.access}")
+            if cloud_account.cloud != "aws":
+                raise ValueError(f"Unknown cloud {cloud_account.cloud}")
+
+            orm_cloud_account = orm.CloudAccount(
+                id=cloud_account.id,
+                tenant_id=cloud_account.workspace_id,
+                cloud=cloud_account.cloud,
+                account_id=cloud_account.account_id,
+                user_account_name=cloud_account.user_account_name,
+                api_account_name=cloud_account.api_account_name,
+                api_account_alias=cloud_account.api_account_alias,
+                is_configured=False,  # to keep backwards compatibility, remove in the next release
+            )
+            self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
             await session.commit()
             await session.refresh(orm_cloud_account)
@@ -91,38 +137,29 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
             cloud_account = update_fn(stored_account.to_model())
 
+            stored_account.tenant_id = cloud_account.workspace_id
+            stored_account.cloud = cloud_account.cloud
+            stored_account.account_id = cloud_account.account_id
             stored_account.api_account_name = cloud_account.api_account_name
-            stored_account.is_configured = cloud_account.is_configured
-            stored_account.enabled = cloud_account.enabled
             stored_account.api_account_alias = cloud_account.api_account_alias
             stored_account.user_account_name = cloud_account.user_account_name
-
-            match cloud_account.access:
-                case AwsCloudAccess(account_id, external_id, role_name, can_discover_names):
-                    stored_account.tenant_id = cloud_account.workspace_id
-                    stored_account.cloud = "aws"
-                    stored_account.account_id = account_id
-                    stored_account.aws_external_id = external_id
-                    stored_account.aws_role_name = role_name
-                    stored_account.aws_can_discover_names = can_discover_names
-
-                case _:
-                    raise ValueError(f"Unknown cloud {cloud_account.access}")
+            self._update_state_dependent_fields(stored_account, cloud_account.state)
 
             await session.commit()
             await session.refresh(stored_account)
             return stored_account.to_model()
 
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, enabled: Optional[bool] = None, configured: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
     ) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
-            if enabled is not None:
-                statement = statement.where(orm.CloudAccount.enabled == enabled)
-            if configured is not None:
-                statement = statement.where(orm.CloudAccount.is_configured == configured)
+            if ready_for_collection is not None:
+                statement = statement.where(
+                    (orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
+                    | (orm.CloudAccount.state == CloudAccountStates.Degraded.state_name)
+                )
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]

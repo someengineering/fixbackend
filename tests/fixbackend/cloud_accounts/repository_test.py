@@ -15,11 +15,12 @@
 import uuid
 
 import pytest
+from typing import List
 
 from fixbackend.ids import FixCloudAccountId, ExternalId, CloudAccountId, AwsRoleName
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess
+from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess, CloudAccountState, CloudAccountStates
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.models import User
 from attrs import evolve
@@ -32,51 +33,79 @@ async def test_create_cloud_account(
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
-    account = CloudAccount(
-        id=FixCloudAccountId(uuid.uuid4()),
-        workspace_id=workspace_id,
-        access=AwsCloudAccess(
-            aws_account_id=CloudAccountId("123456789012"),
-            role_name=AwsRoleName("foo"),
-            external_id=ExternalId(uuid.uuid4()),
-            can_discover_names=False,
-        ),
-        api_account_name="foo",
-        is_configured=False,
-        enabled=True,
-        api_account_alias="foo_alias",
-        user_account_name="foo_user_provided_name",
+
+    cloud_access = AwsCloudAccess(
+        role_name=AwsRoleName("foo"),
+        external_id=ExternalId(uuid.uuid4()),
     )
 
-    # create
-    created = await cloud_account_repository.create(cloud_account=account)
-    assert created == account
+    account_states: List[CloudAccountState] = [
+        CloudAccountStates.Detected(),
+        CloudAccountStates.Discovered(cloud_access),
+        CloudAccountStates.Misconfigured(cloud_access, error="test error"),
+        CloudAccountStates.Configured(cloud_access, privileged=True, enabled=True),
+        CloudAccountStates.Degraded(cloud_access, privileged=True, enabled=True, error="test error"),
+    ]
 
-    # get
-    stored_account = await cloud_account_repository.get(id=account.id)
-    assert account == stored_account
+    configured_account_id: FixCloudAccountId | None = None
+
+    for idx, account_state in enumerate(account_states):
+        account = CloudAccount(
+            id=FixCloudAccountId(uuid.uuid4()),
+            account_id=CloudAccountId(str(idx)),
+            workspace_id=workspace_id,
+            cloud="aws",
+            state=account_state,
+            api_account_name="foo",
+            api_account_alias="foo_alias",
+            user_account_name="foo_user_provided_name",
+        )
+
+        if isinstance(account_state, CloudAccountStates.Configured):
+            configured_account_id = account.id
+
+        # create
+        created = await cloud_account_repository.create(cloud_account=account)
+        assert created == account
+
+        # get
+        stored_account = await cloud_account_repository.get(id=account.id)
+        assert account == stored_account
+
+    assert configured_account_id is not None
 
     # list
     accounts = await cloud_account_repository.list_by_workspace_id(workspace_id=workspace_id)
-    assert len(accounts) == 1
-    assert accounts[0] == account
+    assert len(accounts) == len(account_states)
+    collectable_accounts = await cloud_account_repository.list_by_workspace_id(
+        workspace_id=workspace_id, ready_for_collection=True
+    )
+    assert len(collectable_accounts) == 2
 
     new_cloud_access = AwsCloudAccess(
-        aws_account_id=CloudAccountId("42"),
         role_name=AwsRoleName("bar"),
         external_id=ExternalId(uuid.uuid4()),
-        can_discover_names=False,
     )
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:
-        return evolve(account, access=new_cloud_access)
+        match account.state:
+            case CloudAccountStates.Configured(AwsCloudAccess(_, _), _):
+                return evolve(account, state=evolve(account.state, access=new_cloud_access))
 
-    updated = await cloud_account_repository.update(id=account.id, update_fn=update_account)
-    stored_account = await cloud_account_repository.get(id=account.id)
+            case _:
+                raise ValueError("Invalid state")
+
+    updated = await cloud_account_repository.update(id=configured_account_id, update_fn=update_account)
+    stored_account = await cloud_account_repository.get(id=configured_account_id)
     assert updated == stored_account
-    assert updated.access == new_cloud_access
+    match updated.state:
+        case CloudAccountStates.Configured(AwsCloudAccess(exteral_id, role_name), True):
+            assert exteral_id == new_cloud_access.external_id
+            assert role_name == new_cloud_access.role_name
+        case _:
+            raise ValueError("Invalid state")
 
     # delete
-    await cloud_account_repository.delete(id=account.id)
-    assert await cloud_account_repository.get(id=account.id) is None
+    await cloud_account_repository.delete(id=configured_account_id)
+    assert await cloud_account_repository.get(id=configured_account_id) is None

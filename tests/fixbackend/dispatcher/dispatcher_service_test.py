@@ -23,7 +23,7 @@ from pytest import approx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
@@ -56,9 +56,16 @@ async def test_receive_workspace_created(
             id=cloud_account_id,
             workspace_id=workspace.id,
             api_account_name="foo",
-            access=AwsCloudAccess(aws_account_id, workspace.external_id, AwsRoleName("test"), False),
-            is_configured=False,
-            enabled=True,
+            account_id=aws_account_id,
+            cloud="aws",
+            state=CloudAccountStates.Configured(
+                AwsCloudAccess(
+                    workspace.external_id,
+                    AwsRoleName("test"),
+                ),
+                privileged=False,
+                enabled=True,
+            ),
             api_account_alias="foo_alias",
             user_account_name="foo_user",
         )
@@ -75,7 +82,7 @@ async def test_receive_workspace_created(
 
 
 @pytest.mark.asyncio
-async def test_receive_aws_account_discovered(
+async def test_receive_aws_account_configured(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
@@ -88,12 +95,14 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id,
-        workspace.id,
-        "foo",
-        AwsCloudAccess(aws_account_id, workspace.external_id, AwsRoleName("test"), can_discover_names=False),
-        is_configured=False,
-        enabled=True,
+        id=cloud_account_id,
+        workspace_id=workspace.id,
+        account_id=aws_account_id,
+        cloud="aws",
+        api_account_name="foo",
+        state=CloudAccountStates.Configured(
+            AwsCloudAccess(workspace.external_id, AwsRoleName("test")), privileged=False, enabled=True
+        ),
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )

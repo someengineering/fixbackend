@@ -32,36 +32,68 @@ class CloudAccount(Base):
     tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
     cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
-    aws_external_id: Mapped[ExternalId] = mapped_column(GUID, nullable=False)
+    aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
     aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=64), nullable=True)
-    aws_can_discover_names: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)
     user_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     api_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     api_account_alias: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     is_configured: Mapped[bool] = mapped_column(Boolean, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    state: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
     def to_model(self) -> models.CloudAccount:
         def access() -> models.CloudAccess:
             match self.cloud:
                 case "aws":
+                    if self.aws_role_name is None or self.aws_external_id is None:
+                        raise ValueError("AWS role name or external_id is not set")
                     return models.AwsCloudAccess(
-                        aws_account_id=self.account_id,
                         external_id=self.aws_external_id,
                         role_name=self.aws_role_name,
-                        can_discover_names=self.aws_can_discover_names,
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
 
+        def state() -> models.CloudAccountState:
+            match self.state:
+                case None:  # backwards compatibility when we didn't have a state
+                    if self.is_configured:
+                        return models.CloudAccountStates.Configured(
+                            access=access(), privileged=self.privileged, enabled=self.enabled
+                        )
+                    return models.CloudAccountStates.Discovered(access=access())
+
+                case models.CloudAccountStates.Detected.state_name:
+                    return models.CloudAccountStates.Detected()
+                case models.CloudAccountStates.Discovered.state_name:
+                    return models.CloudAccountStates.Discovered(access=access())
+                case models.CloudAccountStates.Configured.state_name:
+                    return models.CloudAccountStates.Configured(
+                        access=access(), privileged=self.privileged, enabled=self.enabled
+                    )
+                case models.CloudAccountStates.Misconfigured.state_name:
+                    if self.error is None:
+                        raise ValueError("Misconfigured account must have an error")
+                    return models.CloudAccountStates.Misconfigured(access=access(), error=self.error)
+                case models.CloudAccountStates.Degraded.state_name:
+                    if self.error is None:
+                        raise ValueError("Degraded account must have an error")
+                    return models.CloudAccountStates.Degraded(
+                        access=access(), privileged=self.privileged, error=self.error, enabled=self.enabled
+                    )
+                case _:
+                    raise ValueError(f"Unknown state {self.state}")
+
         return models.CloudAccount(
             id=self.id,
+            account_id=self.account_id,
             workspace_id=self.tenant_id,
-            access=access(),
+            cloud=self.cloud,
+            state=state(),
             api_account_name=self.api_account_name,
-            is_configured=self.is_configured,
-            enabled=self.enabled,
             api_account_alias=self.api_account_alias,
             user_account_name=self.user_account_name,
         )
