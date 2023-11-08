@@ -225,10 +225,10 @@ class DispatcherService(Service):
         # lookup the cloud account id from the job_id
         wsh = self._jobs_hash_key(workspace_id)
         fix_cloud_account_id: Optional[str] = await self.temp_store_redis.hget(wsh, job_id)  # type: ignore
-        set_fix_cloud_account_id(fix_cloud_account_id)
         if fix_cloud_account_id is None:
             log.error(f"Could not find cloud account id for job id {job_id}")
             return
+        set_fix_cloud_account_id(fix_cloud_account_id)
         await self.metering_repo.add(records)
 
         account_progress_str: Optional[str] = await self.temp_store_redis.hget(
