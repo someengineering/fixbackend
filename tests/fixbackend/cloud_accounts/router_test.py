@@ -228,6 +228,18 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
+    next_scan = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            cloud_account_id: LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=datetime.utcnow(),
+            )
+        },
+        next_scan=next_scan,
+    )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -240,6 +252,8 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["user_account_name"] == "foo_user"
     assert data["is_configured"] is True
     assert data["enabled"] is True
+    assert data["resources"] == 100
+    assert data["next_scan"] == next_scan.isoformat()
 
 
 @pytest.mark.asyncio
@@ -301,6 +315,18 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
+    next_scan = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            cloud_account_id: LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=datetime.utcnow(),
+            )
+        },
+        next_scan=next_scan,
+    )
 
     payload: Dict[str, Optional[str]] = {
         "name": "bar",
@@ -312,6 +338,8 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     assert data["cloud"] == "aws"
     assert data["account_id"] == "123456789012"
     assert data["user_account_name"] == "bar"
+    assert data["resources"] == 100
+    assert data["next_scan"] == next_scan.isoformat()
 
     # set name to None
     payload = {
@@ -337,6 +365,18 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         api_account_alias="foo_alias",
         user_account_name="foo_user",
     )
+    next_scan = datetime.utcnow()
+    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
+        accounts={
+            cloud_account_id: LastScanAccountInfo(
+                account_id=CloudAccountId("123456789012"),
+                duration_seconds=10,
+                resources_scanned=100,
+                started_at=datetime.utcnow(),
+            )
+        },
+        next_scan=next_scan,
+    )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")
     assert response.status_code == 200
@@ -347,6 +387,8 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["user_account_name"] == "foo_user"
     assert data["enabled"] is False
     assert data["is_configured"] is True
+    assert data["resources"] == 100
+    assert data["next_scan"] == next_scan.isoformat()
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/enable")
     assert response.status_code == 200
@@ -357,3 +399,5 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["user_account_name"] == "foo_user"
     assert data["enabled"] is True
     assert data["is_configured"] is True
+    assert data["resources"] == 100
+    assert data["next_scan"] == next_scan.isoformat()

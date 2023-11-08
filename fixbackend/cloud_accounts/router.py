@@ -14,6 +14,7 @@
 
 import logging
 from typing import List
+import asyncio
 
 from fastapi import APIRouter
 
@@ -41,15 +42,24 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
-        cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
-        return CloudAccountRead.from_model(cloud_account)
+        async with asyncio.TaskGroup() as tg:
+            cloud_account_task = tg.create_task(service.get_cloud_account(cloud_account_id, workspace.id))
+            last_scan_task = tg.create_task(service.last_scan(workspace.id))
+        cloud_account = await cloud_account_task
+        last_scan = await last_scan_task
+        accounts = last_scan.accounts if last_scan else {}
+        next_scan = last_scan.next_scan if last_scan else None
+        return CloudAccountRead.from_model(cloud_account, accounts.get(cloud_account.id), next_scan)
 
     @router.get("/{workspace_id}/cloud_accounts")
     async def list_cloud_accounts(
         workspace: UserWorkspaceDependency, service: CloudAccountServiceDependency
     ) -> List[CloudAccountRead]:
-        cloud_accounts = await service.list_accounts(workspace.id)
-        last_scan = await service.last_scan(workspace.id)
+        async with asyncio.TaskGroup() as tg:
+            cloud_accounts_task = tg.create_task(service.list_accounts(workspace.id))
+            last_scan_task = tg.create_task(service.last_scan(workspace.id))
+        cloud_accounts = await cloud_accounts_task
+        last_scan = await last_scan_task
         accounts = last_scan.accounts if last_scan else {}
         next_scan = last_scan.next_scan if last_scan else None
         return [
@@ -64,8 +74,16 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         update: AwsCloudAccountUpdate,
     ) -> CloudAccountRead:
-        updated = await service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
-        return CloudAccountRead.from_model(updated)
+        async with asyncio.TaskGroup() as tg:
+            last_scan_task = tg.create_task(service.last_scan(workspace.id))
+            updated_task = tg.create_task(
+                service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
+            )
+        last_scan = await last_scan_task
+        updated = await updated_task
+        accounts = last_scan.accounts if last_scan else {}
+        next_scan = last_scan.next_scan if last_scan else None
+        return CloudAccountRead.from_model(updated, accounts.get(updated.id), next_scan)
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def delete_cloud_account(
@@ -81,8 +99,14 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
-        updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
-        return CloudAccountRead.from_model(updated)
+        async with asyncio.TaskGroup() as tg:
+            last_scan_task = tg.create_task(service.last_scan(workspace.id))
+            updated_task = tg.create_task(service.enable_cloud_account(workspace.id, cloud_account_id))
+        last_scan = await last_scan_task
+        updated = await updated_task
+        accounts = last_scan.accounts if last_scan else {}
+        next_scan = last_scan.next_scan if last_scan else None
+        return CloudAccountRead.from_model(updated, accounts.get(updated.id), next_scan)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/disable")
     async def disable_cloud_account(
@@ -90,8 +114,14 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
-        updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
-        return CloudAccountRead.from_model(updated)
+        async with asyncio.TaskGroup() as tg:
+            last_scan_task = tg.create_task(service.last_scan(workspace.id))
+            updated_task = tg.create_task(service.disable_cloud_account(workspace.id, cloud_account_id))
+        last_scan = await last_scan_task
+        updated = await updated_task
+        accounts = last_scan.accounts if last_scan else {}
+        next_scan = last_scan.next_scan if last_scan else None
+        return CloudAccountRead.from_model(updated, accounts.get(updated.id), next_scan)
 
     @router.get("/{workspace_id}/cloud_accounts/last_scan")
     async def last_scan(
