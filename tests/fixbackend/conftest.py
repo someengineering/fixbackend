@@ -17,7 +17,7 @@ import json
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
-from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple, Callable, Awaitable
+from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple, Callable, Awaitable, Sequence
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +27,7 @@ from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
-from fixcloudutils.types import Json
+from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
@@ -277,7 +277,7 @@ async def benchmark_json() -> List[Json]:
     ]
 
 
-def nd_json_response(content: List[Json]) -> Response:
+def nd_json_response(content: Sequence[JsonElement]) -> Response:
     response = ""
     for a in content:
         response += json.dumps(a) + "\n"

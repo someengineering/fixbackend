@@ -24,10 +24,10 @@ from typing import List, Optional, Annotated
 
 from fastapi import APIRouter, Query, Request, Depends, Form
 from fastapi.responses import StreamingResponse
+from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.schemas import ReportSummary, SearchStartData
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -51,7 +51,6 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/{workspace_id}/inventory/report/{benchmark_name}")
     async def report(
-        workspace_id: WorkspaceId,
         benchmark_name: str,
         graph_db: CurrentGraphDbDependency,
         request: Request,
@@ -66,21 +65,65 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return streaming_response(request.headers.get("accept", "application/json"), result)
 
     @router.get("/{workspace_id}/inventory/report-summary")
-    async def summary(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> ReportSummary:
+    async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
-    @router.post("/{workspace_id}/inventory/search/table")
-    async def search_list(
-        workspace_id: WorkspaceId,
+    @router.get("/{workspace_id}/inventory/search/start")
+    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
+        return await fix.inventory.search_start_data(graph_db)
+
+    @router.get("/{workspace_id}/inventory/model")
+    async def model(
+        graph_db: CurrentGraphDbDependency,
+        kind: List[str] = Query(description="Kinds to return."),
+        with_bases: bool = Query(default=False, description="Include base kinds."),
+        with_property_kinds: bool = Query(default=False, description="Include property kinds."),
+        flat: bool = Query(default=True, description="Return a flat list of kinds."),
+    ) -> List[Json]:
+        return await fix.inventory.client.model(
+            graph_db,
+            result_format="simple",
+            kind=kind,
+            with_bases=with_bases,
+            with_property_kinds=with_property_kinds,
+            flat=flat,
+        )
+
+    @router.post("/{workspace_id}/inventory/property/attributes")
+    async def property_attributes(
         graph_db: CurrentGraphDbDependency,
         request: Request,
         query: str = Form(),
+        prop: str = Form(),
+        skip: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=0, le=50),
+        count: bool = Query(default=False),
+    ) -> StreamingResponse:
+        result = fix.inventory.client.possible_values(
+            graph_db, query=query, prop_or_predicate=prop, detail="attributes", skip=skip, limit=limit, count=count
+        )
+        return streaming_response(request.headers.get("accept", "application/json"), result)
+
+    @router.post("/{workspace_id}/inventory/property/values")
+    async def property_values(
+        graph_db: CurrentGraphDbDependency,
+        request: Request,
+        query: str = Form(),
+        prop: str = Form(),
+        skip: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=0, le=50),
+        count: bool = Query(default=False),
+    ) -> StreamingResponse:
+        result = fix.inventory.client.possible_values(
+            graph_db, query=query, prop_or_predicate=prop, detail="values", skip=skip, limit=limit, count=count
+        )
+        return streaming_response(request.headers.get("accept", "application/json"), result)
+
+    @router.post("/{workspace_id}/inventory/search/table")
+    async def search_list(
+        graph_db: CurrentGraphDbDependency, request: Request, query: str = Form()
     ) -> StreamingResponse:
         search_result = await fix.inventory.search_table(graph_db, query)
         return streaming_response(request.headers.get("accept", "application/json"), search_result)
-
-    @router.get("/{workspace_id}/inventory/search/start")
-    async def search_start(workspace_id: WorkspaceId, graph_db: CurrentGraphDbDependency) -> SearchStartData:
-        return await fix.inventory.search_start_data(graph_db)
 
     return router
