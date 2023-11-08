@@ -22,12 +22,13 @@
 import logging
 from typing import List, Optional, Annotated
 
-from fastapi import APIRouter, Query, Request, Depends, Form
+from fastapi import APIRouter, Query, Request, Depends, Form, Path
 from fastapi.responses import StreamingResponse
 from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import NodeId
 from fixbackend.inventory.schemas import ReportSummary, SearchStartData
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -125,5 +126,9 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     ) -> StreamingResponse:
         search_result = await fix.inventory.search_table(graph_db, query)
         return streaming_response(request.headers.get("accept", "application/json"), search_result)
+
+    @router.post("/{workspace_id}/inventory/node/{node_id}")
+    async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
+        return await fix.inventory.resource(graph_db, node_id)
 
     return router
