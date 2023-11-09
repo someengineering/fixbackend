@@ -242,7 +242,7 @@ async def test_receive_collect_done_message(
         {
             cloud_account_id_1: CloudAccountCollectInfo(
                 mr_1.account_id,
-                mr_1.nr_of_resources_collected,
+                mr_1.nr_of_resources_collected + mr_2.nr_of_resources_collected,
                 mr_1.duration,
                 now,
             )

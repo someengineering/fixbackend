@@ -15,29 +15,30 @@
 from contextvars import ContextVar
 from typing import Dict, Any
 
+from fixbackend.ids import WorkspaceId, FixCloudAccountId, CloudAccountId, UserId
 
 context_var: ContextVar[Dict[str, str]] = ContextVar("logging_context", default={})
 
 
 def set_context(key: str, value: Any) -> None:
     context = dict(context_var.get())
-    context[key] = value
+    context[key] = str(value)
     context_var.set(context)
 
 
-def set_workspace_id(workspace_id: str) -> None:
+def set_workspace_id(workspace_id: str | WorkspaceId) -> None:
     set_context("workspace_id", workspace_id)
 
 
-def set_user_id(user_id: str) -> None:
+def set_user_id(user_id: str | UserId) -> None:
     set_context("user_id", user_id)
 
 
-def set_fix_cloud_account_id(fix_cloud_account_id: str) -> None:
+def set_fix_cloud_account_id(fix_cloud_account_id: str | FixCloudAccountId) -> None:
     set_context("fix_cloud_account_id", fix_cloud_account_id)
 
 
-def set_cloud_account_id(cloud_account_id: str) -> None:
+def set_cloud_account_id(cloud_account_id: str | CloudAccountId) -> None:
     set_context("cloud_account_id", cloud_account_id)
 
 
