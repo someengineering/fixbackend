@@ -30,6 +30,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import NodeId
 from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable
 from fixbackend.inventory.schemas import (
     AccountSummary,
@@ -116,6 +117,23 @@ class InventoryService(Service):
             cloud_resource("all", "kind", "kind"),
         )
         return SearchStartData(accounts=accounts, regions=regions, kinds=kinds, severity=ReportSeverityList)
+
+    async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
+        async def neighborhood(cmd: str) -> List[JsonElement]:
+            return [n async for n in self.client.execute_single(db, cmd, env={"with-kind": "true"})]
+
+        jq_reported = "{id: .reported.id, name: .reported.name, kind: .reported.kind}"
+        jq_arg = (
+            # properties to include in the result
+            "{id:.id,type:.type,from:.from,to:.to,metadata:.kind.metadata,age:.reported.age,tags:.reported.tags,"
+            # also include the defined reported section for every node (not edge)
+            f"reported: (if .reported!=null then {jq_reported} else null end) }}"
+            # strip null values from the result
+            '| walk(if type == "object" then with_entries(select(.value != null)) else . end)'
+        )
+        cmd = f"search --with-edges id({resource_id}) <-[0:2]-> | jq --no-rewrite '{jq_arg}'"
+        resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
+        return dict(resource=resource, neighborhood=nb)
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def issues_since(

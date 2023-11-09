@@ -20,14 +20,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import Optional, Dict, AsyncIterator, List, cast, Union, Literal, Tuple
+from typing import Optional, Dict, AsyncIterator, List, cast, Union, Literal, Tuple, Set
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import CloudAccountId, NodeId
 
 
 class GraphDatabaseException(Exception):
@@ -181,6 +181,12 @@ class InventoryClient(Service):
         async for line in response.aiter_lines():
             yield json.loads(line)
 
+    async def resource(self, access: GraphDatabaseAccess, *, id: NodeId, graph: str = "resoto") -> Optional[Json]:
+        headers = self.__headers(access, accept="application/json", content_type="text/plain")
+        response = await self.client.get(self.inventory_url + f"/graph/{graph}/node/{id}", headers=headers)
+        self.__raise_on_error(response, ("application/json",), allowed_error_codes={404})
+        return None if response.status_code == 404 else response.json()
+
     async def model(
         self,
         access: GraphDatabaseAccess,
@@ -224,8 +230,13 @@ class InventoryClient(Service):
             result["Content-Type"] = content_type
         return result
 
-    def __raise_on_error(self, response: Response, expected_media_types: Optional[Tuple[str, ...]] = None) -> None:
-        if response.is_error:
+    def __raise_on_error(
+        self,
+        response: Response,
+        expected_media_types: Optional[Tuple[str, ...]] = None,
+        allowed_error_codes: Optional[Set[int]] = None,
+    ) -> None:
+        if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
             msg = f"Inventory error: {response.status_code} {response.text}"
             if response.status_code == 401:
                 raise GraphDatabaseForbidden(msg)

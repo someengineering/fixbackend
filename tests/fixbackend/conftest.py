@@ -269,12 +269,58 @@ async def collect_queue(arq_redis: ArqRedis) -> RedisCollectQueue:
 
 
 @pytest.fixture
-async def benchmark_json() -> List[Json]:
+def benchmark_json() -> List[Json]:
     return [
         {"id": "a", "type": "node", "reported": {"kind": "report_benchmark", "name": "benchmark_name"}},
         {"id": "b", "type": "node", "reported": {"kind": "report_check_result", "title": "Something"}},
         {"from": "a", "to": "b", "type": "edge", "edge_type": "default"},
     ]
+
+
+@pytest.fixture
+def aws_ec2_model_json() -> Json:
+    return {
+        "type": "object",
+        "fqn": "aws_ec2_instance",
+        "bases": ["aws_resource", "instance", "resource"],
+        "allow_unknown_props": False,
+        "predecessor_kinds": {"default": ["aws_elb"], "delete": []},
+        "successor_kinds": {"default": ["aws_ec2_volume"], "delete": []},
+        "aggregate_root": True,
+        "metadata": {"icon": "instance", "group": "compute"},
+        "properties": {"id": {"kind": {"type": "simple", "fqn": "string"}, "required": False}},
+    }
+
+
+@pytest.fixture
+def azure_virtual_machine_resource_json() -> Json:
+    return {
+        "id": "some_node_id",
+        "type": "node",
+        "revision": "_g1sTwKq--_",
+        "reported": {
+            "id": "/subscriptions/test/resourceGroups/foo/providers/Microsoft.Compute/virtualMachines/test",
+            "kind": "azure_virtual_machine",
+            "tags": {"foo": "bla"},
+            "name": "test",
+            "instance_cores": 5,
+            "instance_memory": 1024,
+            "instance_type": "Standard_B1ls",
+            "instance_status": "running",
+            "ctime": "2023-07-10T16:25:09Z",
+            "vm_id": "de2afccb-585d-48cd-a68e-fb6f20639084",
+            "age": "3mo27d",
+        },
+        "ancestors": {
+            "cloud": {"reported": {"name": "azure", "id": "azure"}},
+            "account": {"reported": {"name": "/subscriptions/test", "id": "/subscriptions/test"}},
+            "region": {"reported": {"name": "westeurope", "id": "/subscriptions/test/locations/westeurope"}},
+        },
+    }
+
+
+def json_response(content: JsonElement) -> Response:
+    return Response(200, content=json.dumps(content).encode("utf-8"), headers={"content-type": "application/json"})
 
 
 def nd_json_response(content: Sequence[JsonElement]) -> Response:
