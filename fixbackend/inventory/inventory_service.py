@@ -281,6 +281,7 @@ class InventoryService(Service):
 
             # get issues for the top 5 issue_ids
             tops = await top_issues(failed_checks_by_severity, num=5)
+            tops = list(reversed(tops))
 
             return ReportSummary(
                 check_summary=CheckSummary(
