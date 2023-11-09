@@ -127,7 +127,11 @@ class DispatcherService(Service):
         return f"dispatching:collect_jobs_in_progress:{workspace_id}:jobs"
 
     async def complete_collect_job(
-        self, tenant_id: WorkspaceId, cloud_account_id: FixCloudAccountId, record: MeteringRecord
+        self,
+        tenant_id: WorkspaceId,
+        cloud_account_id: FixCloudAccountId,
+        nr_of_resources_collected: int,
+        scan_duration_seconds: int,
     ) -> None:
         redis_set_key = self._collect_progress_hash_key(tenant_id)
 
@@ -144,7 +148,7 @@ class DispatcherService(Service):
             if cloud_account_id not in collect_state:
                 raise Exception(f"Could not find collect job context for accound id {cloud_account_id}")
             collect_progress_done = collect_state[cloud_account_id].done(
-                scanned_resources=record.nr_of_resources_collected, scan_duration=record.duration
+                scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds
             )
             await self.temp_store_redis.hset(
                 redis_set_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str()
@@ -180,6 +184,7 @@ class DispatcherService(Service):
         tenant_collect_state = await mark_as_done(tenant_collect_state)
         # check if we can send the domain event
         if not all_jobs_finished(tenant_collect_state):
+            log.info("One of multiple jobs finished. Waiting for the remaining jobs.")
             return
 
         # all jobs are finished, send domain event and delete the hash
@@ -195,6 +200,11 @@ class DispatcherService(Service):
         messages = message["messages"]
         started_at = parse_utc_str(message["started_at"])
         duration = message["duration"]
+        set_workspace_id(workspace_id)
+        log.info(
+            f"Collect job finished: job_id={job_id}, task_id={task_id}, workspace_id={workspace_id}. "
+            f"Took {duration}. Messages: {messages}"
+        )
         records = [
             MeteringRecord(
                 id=uuid.uuid4(),
@@ -212,30 +222,27 @@ class DispatcherService(Service):
             )
             for account_id, account_details in account_info.items()
         ]
-        set_workspace_id(str(workspace_id))
         # lookup the cloud account id from the job_id
-        cloud_account_id: Optional[str] = await self.temp_store_redis.hget(
-            self._jobs_hash_key(workspace_id), job_id
-        )  # type: ignore
-        if cloud_account_id is None:
+        wsh = self._jobs_hash_key(workspace_id)
+        fix_cloud_account_id: Optional[str] = await self.temp_store_redis.hget(wsh, job_id)  # type: ignore
+        if fix_cloud_account_id is None:
             log.error(f"Could not find cloud account id for job id {job_id}")
             return
+        set_fix_cloud_account_id(fix_cloud_account_id)
+        await self.metering_repo.add(records)
 
         account_progress_str: Optional[str] = await self.temp_store_redis.hget(
-            self._collect_progress_hash_key(workspace_id), cloud_account_id
+            self._collect_progress_hash_key(workspace_id), fix_cloud_account_id
         )  # type: ignore
         if account_progress_str is None:
-            log.error(f"Could not find collect job context for cloud account id {cloud_account_id}")
+            log.error(f"Could not find collect job context for cloud account id {fix_cloud_account_id}")
             return
 
         account_progress = AccountCollectProgress.from_json_str(account_progress_str)
-        record = next((r for r in records if r.account_id == account_progress.account_id), None)
-        if record is None:
-            log.error(f"Could not find metering record for cloud account id {cloud_account_id}")
-            return
-
-        await self.metering_repo.add(records)
-        await self.complete_collect_job(workspace_id, account_progress.cloud_account_id, record)
+        await self.complete_collect_job(
+            workspace_id, account_progress.cloud_account_id, sum(r.nr_of_resources_collected for r in records), duration
+        )
+        log.info("Successfully processed collect job finished message")
 
     async def workspace_created(self, workspace_id: WorkspaceId) -> None:
         # store an entry in the next_run table
