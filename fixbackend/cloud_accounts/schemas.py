@@ -63,7 +63,7 @@ class CloudAccountRead(BaseModel):
         enabled = False
         is_configured = False
         match model.state:
-            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+            case CloudAccountStates.Configured():
                 enabled = model.state.enabled
                 is_configured = True
 
@@ -76,8 +76,8 @@ class CloudAccountRead(BaseModel):
             is_configured=is_configured,
             resources=last_scan_info.resources_scanned if last_scan_info else None,
             next_scan=next_scan,
-            api_account_alias=model.api_account_alias,
-            api_account_name=model.api_account_name,
+            api_account_alias=model.account_alias,
+            api_account_name=model.account_name,
             state=model.state.state_name,
         )
 

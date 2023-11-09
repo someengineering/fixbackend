@@ -61,9 +61,7 @@ class CloudAccount(Base):
             match self.state:
                 case None:  # backwards compatibility when we didn't have a state
                     if self.is_configured:
-                        return models.CloudAccountStates.Configured(
-                            access=access(), privileged=self.privileged, enabled=self.enabled
-                        )
+                        return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled)
                     return models.CloudAccountStates.Discovered(access=access())
 
                 case models.CloudAccountStates.Detected.state_name:
@@ -71,19 +69,11 @@ class CloudAccount(Base):
                 case models.CloudAccountStates.Discovered.state_name:
                     return models.CloudAccountStates.Discovered(access=access())
                 case models.CloudAccountStates.Configured.state_name:
-                    return models.CloudAccountStates.Configured(
-                        access=access(), privileged=self.privileged, enabled=self.enabled
-                    )
-                case models.CloudAccountStates.Misconfigured.state_name:
-                    if self.error is None:
-                        raise ValueError("Misconfigured account must have an error")
-                    return models.CloudAccountStates.Misconfigured(access=access(), error=self.error)
+                    return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled)
                 case models.CloudAccountStates.Degraded.state_name:
                     if self.error is None:
                         raise ValueError("Degraded account must have an error")
-                    return models.CloudAccountStates.Degraded(
-                        access=access(), privileged=self.privileged, error=self.error, enabled=self.enabled
-                    )
+                    return models.CloudAccountStates.Degraded(access=access(), error=self.error)
                 case _:
                     raise ValueError(f"Unknown state {self.state}")
 
@@ -93,7 +83,8 @@ class CloudAccount(Base):
             workspace_id=self.tenant_id,
             cloud=self.cloud,
             state=state(),
-            api_account_name=self.api_account_name,
-            api_account_alias=self.api_account_alias,
+            account_name=self.api_account_name,
+            account_alias=self.api_account_alias,
             user_account_name=self.user_account_name,
+            privileged=self.privileged,
         )

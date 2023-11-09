@@ -42,9 +42,8 @@ async def test_create_cloud_account(
     account_states: List[CloudAccountState] = [
         CloudAccountStates.Detected(),
         CloudAccountStates.Discovered(cloud_access),
-        CloudAccountStates.Misconfigured(cloud_access, error="test error"),
-        CloudAccountStates.Configured(cloud_access, privileged=True, enabled=True),
-        CloudAccountStates.Degraded(cloud_access, privileged=True, enabled=True, error="test error"),
+        CloudAccountStates.Configured(cloud_access, enabled=True),
+        CloudAccountStates.Degraded(cloud_access, error="test error"),
     ]
 
     configured_account_id: FixCloudAccountId | None = None
@@ -56,9 +55,10 @@ async def test_create_cloud_account(
             workspace_id=workspace_id,
             cloud="aws",
             state=account_state,
-            api_account_name="foo",
-            api_account_alias="foo_alias",
+            account_name="foo",
+            account_alias="foo_alias",
             user_account_name="foo_user_provided_name",
+            privileged=False,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -80,7 +80,7 @@ async def test_create_cloud_account(
     collectable_accounts = await cloud_account_repository.list_by_workspace_id(
         workspace_id=workspace_id, ready_for_collection=True
     )
-    assert len(collectable_accounts) == 2
+    assert len(collectable_accounts) == 1
 
     new_cloud_access = AwsCloudAccess(
         role_name=AwsRoleName("bar"),

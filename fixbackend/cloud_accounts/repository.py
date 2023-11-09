@@ -57,7 +57,6 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     ) -> None:
         role_name: Optional[AwsRoleName] = None
         external_id: Optional[ExternalId] = None
-        privileged = False
         enabled = False
         error: Optional[str] = None
         state: Optional[str] = None
@@ -70,25 +69,15 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 external_id = external_id
                 state = CloudAccountStates.Discovered.state_name
 
-            case CloudAccountStates.Misconfigured(AwsCloudAccess(external_id, role_name), error):
-                error = error
+            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled):
                 external_id = external_id
-                privileged = privileged
-                role_name = role_name
-                state = CloudAccountStates.Misconfigured.state_name
-
-            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged, enabled):
-                external_id = external_id
-                privileged = privileged
                 enabled = enabled
                 state = CloudAccountStates.Configured.state_name
 
-            case CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), privileged, enabled, error):
+            case CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), error):
                 external_id = external_id
-                privileged = privileged
                 role_name = role_name
                 error = error
-                enabled = enabled
                 state = CloudAccountStates.Degraded.state_name
 
             case _:
@@ -96,7 +85,6 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
         orm_cloud_account.aws_external_id = external_id
         orm_cloud_account.aws_role_name = role_name
-        orm_cloud_account.privileged = privileged
         orm_cloud_account.state = state
         orm_cloud_account.error = error
         orm_cloud_account.enabled = enabled
@@ -113,9 +101,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 cloud=cloud_account.cloud,
                 account_id=cloud_account.account_id,
                 user_account_name=cloud_account.user_account_name,
-                api_account_name=cloud_account.api_account_name,
-                api_account_alias=cloud_account.api_account_alias,
+                api_account_name=cloud_account.account_name,
+                api_account_alias=cloud_account.account_alias,
                 is_configured=False,  # to keep backwards compatibility, remove in the next release
+                privileged=cloud_account.privileged,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
@@ -140,9 +129,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             stored_account.tenant_id = cloud_account.workspace_id
             stored_account.cloud = cloud_account.cloud
             stored_account.account_id = cloud_account.account_id
-            stored_account.api_account_name = cloud_account.api_account_name
-            stored_account.api_account_alias = cloud_account.api_account_alias
+            stored_account.api_account_name = cloud_account.account_name
+            stored_account.api_account_alias = cloud_account.account_alias
             stored_account.user_account_name = cloud_account.user_account_name
+            stored_account.privileged = cloud_account.privileged
             self._update_state_dependent_fields(stored_account, cloud_account.state)
 
             await session.commit()
@@ -156,9 +146,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
             if ready_for_collection is not None:
-                statement = statement.where(
-                    (orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
-                    | (orm.CloudAccount.state == CloudAccountStates.Degraded.state_name)
+                statement = statement.where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name).where(
+                    orm.CloudAccount.enabled.is_(True)
                 )
             results = await session.execute(statement)
             accounts = results.scalars().all()

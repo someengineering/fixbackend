@@ -55,7 +55,7 @@ async def test_receive_workspace_created(
         CloudAccount(
             id=cloud_account_id,
             workspace_id=workspace.id,
-            api_account_name="foo",
+            account_name="foo",
             account_id=aws_account_id,
             cloud="aws",
             state=CloudAccountStates.Configured(
@@ -63,11 +63,11 @@ async def test_receive_workspace_created(
                     workspace.external_id,
                     AwsRoleName("test"),
                 ),
-                privileged=False,
                 enabled=True,
             ),
-            api_account_alias="foo_alias",
+            account_alias="foo_alias",
             user_account_name="foo_user",
+            privileged=False,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -99,12 +99,11 @@ async def test_receive_aws_account_configured(
         workspace_id=workspace.id,
         account_id=aws_account_id,
         cloud="aws",
-        api_account_name="foo",
-        state=CloudAccountStates.Configured(
-            AwsCloudAccess(workspace.external_id, AwsRoleName("test")), privileged=False, enabled=True
-        ),
-        api_account_alias="foo_alias",
+        account_name="foo",
+        state=CloudAccountStates.Configured(AwsCloudAccess(workspace.external_id, AwsRoleName("test")), enabled=True),
+        account_alias="foo_alias",
         user_account_name="foo_user",
+        privileged=False,
     )
     await cloud_account_repository.create(account)
 

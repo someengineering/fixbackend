@@ -302,7 +302,7 @@ class DispatcherService(Service):
                         case AwsCloudAccess(role_name, external_id):
                             return AwsAccountInformation(
                                 aws_account_id=account.account_id,
-                                aws_account_name=account.api_account_name,
+                                aws_account_name=account.account_name,
                                 aws_role_arn=f"arn:aws:iam::{account.account_id}:role/{role_name}",
                                 external_id=str(external_id),
                             )

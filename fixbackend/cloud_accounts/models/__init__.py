@@ -76,16 +76,6 @@ class CloudAccountStates:
         access: CloudAccess
 
     @frozen
-    class Misconfigured(CloudAccountState):
-        """
-        Configuring an account failed for some reason.
-        """
-
-        state_name: ClassVar[str] = "misconfigured"
-        access: CloudAccess
-        error: str
-
-    @frozen
     class Configured(CloudAccountState):
         """
         We have configured the account and it is ready for collection.
@@ -93,7 +83,6 @@ class CloudAccountStates:
 
         state_name: ClassVar[str] = "configured"
         access: CloudAccess
-        privileged: bool  # can possibly do some administative tasks
         enabled: bool  # is enabled for collection
 
     @frozen
@@ -105,8 +94,6 @@ class CloudAccountStates:
 
         state_name: ClassVar[str] = "degraded"
         access: CloudAccess
-        privileged: bool
-        enabled: bool
         error: str
 
 
@@ -117,9 +104,10 @@ class CloudAccount:
     workspace_id: WorkspaceId
     cloud: str
     state: CloudAccountState
-    api_account_name: Optional[str]
-    api_account_alias: Optional[str]
+    account_name: Optional[str]
+    account_alias: Optional[str]
     user_account_name: Optional[str]
+    privileged: bool  # can do administrative tasks
 
 
 @frozen

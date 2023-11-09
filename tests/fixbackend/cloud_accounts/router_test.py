@@ -61,9 +61,10 @@ class InMemoryCloudAccountService(CloudAccountService):
             workspace_id=workspace_id,
             cloud="aws",
             state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)),
-            api_account_name=account_name,
-            api_account_alias=None,
+            account_name=account_name,
+            account_alias=None,
             user_account_name=None,
+            privileged=False,
         )
         self.accounts[account.id] = account
         return account
@@ -98,7 +99,7 @@ class InMemoryCloudAccountService(CloudAccountService):
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         match account.state:
-            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+            case CloudAccountStates.Configured():
                 account = evolve(account, state=evolve(account.state, enabled=True))
 
         self.accounts[cloud_account_id] = account
@@ -111,7 +112,7 @@ class InMemoryCloudAccountService(CloudAccountService):
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         match account.state:
-            case CloudAccountStates.Configured() | CloudAccountStates.Degraded():
+            case CloudAccountStates.Configured():
                 account = evolve(account, state=evolve(account.state, enabled=False))
 
         self.accounts[cloud_account_id] = account
@@ -155,8 +156,8 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
     assert saved_account.workspace_id == workspace_id
     assert saved_account.account_id == account_id
     assert saved_account.cloud == "aws"
-    assert saved_account.api_account_name is None
-    assert saved_account.api_account_alias is None
+    assert saved_account.account_name is None
+    assert saved_account.account_alias is None
     assert saved_account.user_account_name is None
     match saved_account.state:
         case CloudAccountStates.Discovered(AwsCloudAccess(e_id, r_name)):
@@ -177,9 +178,10 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         cloud="aws",
         workspace_id=workspace_id,
         state=CloudAccountStates.Detected(),
-        api_account_name="foo",
-        api_account_alias=None,
+        account_name="foo",
+        account_alias=None,
         user_account_name=None,
+        privileged=False,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -223,10 +225,11 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         account_id=account_id,
         workspace_id=workspace_id,
         cloud="aws",
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
-        api_account_name="foo",
-        api_account_alias="foo_alias",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        account_name="foo",
+        account_alias="foo_alias",
         user_account_name="foo_user",
+        privileged=True,
     )
     next_scan = datetime.utcnow()
     cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
@@ -266,10 +269,11 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         account_id=account_id,
         workspace_id=workspace_id,
         cloud="aws",
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
-        api_account_name="foo",
-        api_account_alias="foo_alias",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        account_name="foo",
+        account_alias="foo_alias",
         user_account_name="foo_user",
+        privileged=True,
     )
     next_scan = datetime.utcnow()
     cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
@@ -310,10 +314,11 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         account_id=account_id,
         cloud="aws",
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=False, enabled=True),
-        api_account_name="foo",
-        api_account_alias="foo_alias",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        account_name="foo",
+        account_alias="foo_alias",
         user_account_name="foo_user",
+        privileged=False,
     )
     next_scan = datetime.utcnow()
     cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
@@ -360,10 +365,11 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         account_id=account_id,
         cloud="aws",
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), privileged=True, enabled=True),
-        api_account_name="foo",
-        api_account_alias="foo_alias",
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        account_name="foo",
+        account_alias="foo_alias",
         user_account_name="foo_user",
+        privileged=True,
     )
     next_scan = datetime.utcnow()
     cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
