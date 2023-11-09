@@ -215,7 +215,7 @@ async def test_create_aws_account(
     assert event.aws_account_id == account_id
     assert event.tenant_id == acc.workspace_id
 
-    # account already exists, account_name should be updated, but nothing else
+    # account already exists, account_name should be updated, and nothing else
     idempotent_account = await service.create_aws_account(
         workspace_id=test_workspace_id,
         account_id=account_id,
