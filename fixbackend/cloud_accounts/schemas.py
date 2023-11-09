@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId, AwsRoleName
-from fixbackend.cloud_accounts.models import CloudAccount, LastScanAccountInfo, CloudAccountStates
+from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
