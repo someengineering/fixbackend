@@ -49,13 +49,12 @@ class CloudAccountStates:
     @startuml
     hide empty description
     [*] --> Discovered: CF Stack
-    Discovered --> Misconfigured: can not assume the role
-    Misconfigured --> Discovered: Redeploy CF Stack
-    Configured -[dotted]-> Detected: find other accounts in org
     Discovered --> Configured: can assume role
+    Discovered --> Degraded: can not assume the role
+    Degraded --> Discovered: Redeploy CF Stack
+    Configured -[dotted]-> Detected: find other accounts in org
     Configured --> Degraded: collection failed
     Degraded --> Configured: backend test
-    Degraded --> Discovered: Redeploy CF Stack
     @enduml
     """
 
