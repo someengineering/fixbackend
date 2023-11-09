@@ -88,8 +88,7 @@ class CloudAccountStates:
     @frozen
     class Degraded(CloudAccountState):
         """
-        The account is configured, but resource collection did not finish succesfully.
-        We will still try to collect resources from this account.
+        Resource collection is not possible. We will still try to probe this account to come back to configured.
         """
 
         state_name: ClassVar[str] = "degraded"

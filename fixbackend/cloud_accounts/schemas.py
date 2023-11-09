@@ -58,7 +58,7 @@ class CloudAccountRead(BaseModel):
 
     @staticmethod
     def from_model(
-        model: CloudAccount, last_scan_info: Optional[LastScanAccountInfo] = None, next_scan: Optional[datetime] = None
+        model: CloudAccount, resources_scanned: Optional[int] = None, next_scan: Optional[datetime] = None
     ) -> "CloudAccountRead":
         enabled = False
         is_configured = False
@@ -74,7 +74,7 @@ class CloudAccountRead(BaseModel):
             user_account_name=model.user_account_name,
             enabled=enabled,
             is_configured=is_configured,
-            resources=last_scan_info.resources_scanned if last_scan_info else None,
+            resources=resources_scanned,
             next_scan=next_scan,
             api_account_alias=model.account_alias,
             api_account_name=model.account_name,
