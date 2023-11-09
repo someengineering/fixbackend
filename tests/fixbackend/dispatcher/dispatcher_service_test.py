@@ -23,7 +23,7 @@ from pytest import approx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
@@ -34,7 +34,7 @@ from fixbackend.domain_events.events import (
     AwsAccountConfigured,
     CloudAccountCollectInfo,
 )
-from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId, AwsRoleName
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
@@ -53,12 +53,21 @@ async def test_receive_workspace_created(
     aws_account_id = CloudAccountId("123")
     await cloud_account_repository.create(
         CloudAccount(
-            cloud_account_id,
-            workspace.id,
-            "foo",
-            AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
-            is_configured=False,
-            enabled=True,
+            id=cloud_account_id,
+            workspace_id=workspace.id,
+            account_name="foo",
+            account_id=aws_account_id,
+            cloud="aws",
+            state=CloudAccountStates.Configured(
+                AwsCloudAccess(
+                    workspace.external_id,
+                    AwsRoleName("test"),
+                ),
+                enabled=True,
+            ),
+            account_alias="foo_alias",
+            user_account_name="foo_user",
+            privileged=False,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -73,7 +82,7 @@ async def test_receive_workspace_created(
 
 
 @pytest.mark.asyncio
-async def test_receive_aws_account_discovered(
+async def test_receive_aws_account_configured(
     dispatcher: DispatcherService,
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
@@ -86,12 +95,15 @@ async def test_receive_aws_account_discovered(
     aws_account_id = CloudAccountId("123")
 
     account = CloudAccount(
-        cloud_account_id,
-        workspace.id,
-        "foo",
-        AwsCloudAccess(aws_account_id, workspace.external_id, "test"),
-        is_configured=False,
-        enabled=True,
+        id=cloud_account_id,
+        workspace_id=workspace.id,
+        account_id=aws_account_id,
+        cloud="aws",
+        account_name="foo",
+        state=CloudAccountStates.Configured(AwsCloudAccess(workspace.external_id, AwsRoleName("test")), enabled=True),
+        account_alias="foo_alias",
+        user_account_name="foo_user",
+        privileged=False,
     )
     await cloud_account_repository.create(account)
 

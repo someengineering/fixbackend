@@ -15,15 +15,15 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
-from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId
-from fixbackend.cloud_accounts.models import CloudAccount, LastScanAccountInfo
+from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId, AwsRoleName
+from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
     workspace_id: WorkspaceId = Field(description="Your FIX-assigned Workspace ID")
     external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: CloudAccountId = Field(description="AWS account ID", pattern=r"^\d{12}$")
-    role_name: str = Field(description="AWS role name", max_length=64)
+    role_name: AwsRoleName = Field(description="AWS role name", max_length=64)
 
     model_config = {
         "json_schema_extra": {
@@ -43,25 +43,42 @@ class CloudAccountRead(BaseModel):
     id: FixCloudAccountId = Field(description="Fix internal cloud account ID, users should not typically see this")
     cloud: str = Field(description="Cloud provider")
     account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
-    name: Optional[str] = Field(description="Name of the cloud account", max_length=64)
     enabled: bool = Field(description="Whether the cloud account is enabled for collection")
     is_configured: bool = Field(description="Is account correctly configured")
     resources: Optional[int] = Field(description="Number of resources in the account")
     next_scan: Optional[datetime] = Field(description="Next scheduled scan")
+    user_account_name: Optional[str] = Field(description="Name of the cloud account, as set by the user", max_length=64)
+    api_account_alias: Optional[str] = Field(
+        description="Alias of the cloud account, provided by the cloud", max_length=64
+    )
+    api_account_name: Optional[str] = Field(
+        description="Name of the cloud account, as provided by the cloud", max_length=64
+    )
+    state: str = Field(description="State of the cloud account")
 
     @staticmethod
     def from_model(
-        model: CloudAccount, last_scan_info: Optional[LastScanAccountInfo] = None, next_scan: Optional[datetime] = None
+        model: CloudAccount, resources_scanned: Optional[int] = None, next_scan: Optional[datetime] = None
     ) -> "CloudAccountRead":
+        enabled = False
+        is_configured = False
+        match model.state:
+            case CloudAccountStates.Configured():
+                enabled = model.state.enabled
+                is_configured = True
+
         return CloudAccountRead(
             id=model.id,
-            cloud=model.access.cloud,
-            account_id=model.access.account_id(),
-            name=model.name,
-            enabled=model.enabled,
-            is_configured=model.is_configured,
-            resources=last_scan_info.resources_scanned if last_scan_info else None,
+            cloud=model.cloud,
+            account_id=model.account_id,
+            user_account_name=model.user_account_name,
+            enabled=enabled,
+            is_configured=is_configured,
+            resources=resources_scanned,
             next_scan=next_scan,
+            api_account_alias=model.account_alias,
+            api_account_name=model.account_name,
+            state=model.state.state_name,
         )
 
 
