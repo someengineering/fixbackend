@@ -23,6 +23,7 @@ import json
 import uuid
 
 import pytest
+from fixcloudutils.types import Json
 from httpx import Request, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -32,45 +33,14 @@ from tests.fixbackend.conftest import InventoryMock, nd_json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
-aws_ec2_model_simplified = {
-    "type": "object",
-    "fqn": "aws_ec2_instance",
-    "bases": ["aws_resource", "instance", "resource"],
-    "allow_unknown_props": False,
-    "predecessor_kinds": {"default": ["aws_elb"], "delete": []},
-    "successor_kinds": {"default": ["aws_ec2_volume"], "delete": []},
-    "aggregate_root": True,
-    "metadata": {"icon": "instance", "group": "compute"},
-    "properties": {"id": {"kind": {"type": "simple", "fqn": "string"}, "required": False}},
-}
-
-azure_virtual_machine = {
-    "id": "some_node_id",
-    "type": "node",
-    "revision": "_g1sTwKq--_",
-    "reported": {
-        "id": "/subscriptions/test/resourceGroups/foo/providers/Microsoft.Compute/virtualMachines/test",
-        "kind": "azure_virtual_machine",
-        "tags": {"foo": "bla"},
-        "name": "test",
-        "instance_cores": 5,
-        "instance_memory": 1024,
-        "instance_type": "Standard_B1ls",
-        "instance_status": "running",
-        "ctime": "2023-07-10T16:25:09Z",
-        "vm_id": "de2afccb-585d-48cd-a68e-fb6f20639084",
-        "age": "3mo27d",
-    },
-    "ancestors": {
-        "cloud": {"reported": {"name": "azure", "id": "azure"}},
-        "account": {"reported": {"name": "/subscriptions/test", "id": "/subscriptions/test"}},
-        "region": {"reported": {"name": "westeurope", "id": "/subscriptions/test/locations/westeurope"}},
-    },
-}
-
 
 @pytest.fixture
-def mocked_inventory_client(inventory_client: InventoryClient, inventory_mock: InventoryMock) -> InventoryClient:
+def mocked_inventory_client(
+    inventory_client: InventoryClient,
+    inventory_mock: InventoryMock,
+    azure_virtual_machine_resource_json: Json,
+    aws_ec2_model_json: Json,
+) -> InventoryClient:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
@@ -95,13 +65,13 @@ def mocked_inventory_client(inventory_client: InventoryClient, inventory_mock: I
         elif request.url.path == "/graph/resoto/model":
             return Response(
                 200,
-                content=json.dumps([aws_ec2_model_simplified]).encode("utf-8"),
+                content=json.dumps([aws_ec2_model_json]).encode("utf-8"),
                 headers={"content-type": "application/json"},
             )
         elif request.url.path == "/graph/resoto/node/some_node_id":
             return Response(
                 200,
-                content=json.dumps(azure_virtual_machine).encode("utf-8"),
+                content=json.dumps(azure_virtual_machine_resource_json).encode("utf-8"),
                 headers={"content-type": "application/json"},
             )
         else:
@@ -136,11 +106,11 @@ async def test_possible_values(mocked_inventory_client: InventoryClient) -> None
     assert [e async for e in vals] == ["val_a", "val_b", "val_c"]
 
 
-async def test_model(mocked_inventory_client: InventoryClient) -> None:
+async def test_model(mocked_inventory_client: InventoryClient, aws_ec2_model_json: Json) -> None:
     result = await mocked_inventory_client.model(db_access, kind=["aws_ec2_instance"], result_format="simple")
-    assert result == [aws_ec2_model_simplified]
+    assert result == [aws_ec2_model_json]
 
 
-async def test_resource(mocked_inventory_client: InventoryClient) -> None:
+async def test_resource(mocked_inventory_client: InventoryClient, azure_virtual_machine_resource_json: Json) -> None:
     result = await mocked_inventory_client.resource(db_access, id=NodeId("some_node_id"))
-    assert result == azure_virtual_machine
+    assert result == azure_virtual_machine_resource_json
