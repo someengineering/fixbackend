@@ -19,7 +19,6 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import json
 import uuid
 from typing import List
 
@@ -28,7 +27,7 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient, Response, Request, MockTransport
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import (
@@ -38,13 +37,25 @@ from fixbackend.inventory.schemas import (
     CheckSummary,
     SearchCloudResource,
 )
-from tests.fixbackend.conftest import InventoryMock, nd_json_response
+from tests.fixbackend.conftest import InventoryMock, nd_json_response, json_response
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
+neighborhood: List[Json] = [
+    {"id": "some_node_id", "type": "node", "reported": {"kind": "kubernetes_pod"}},
+    {"id": "successor_id", "type": "node", "reported": {"kind": "kubernetes_secret"}},
+    {"id": "predecessor_id", "type": "node", "reported": {"kind": "kubernetes_stateful_set"}},
+    {"type": "edge", "from": "predecessor_id", "to": "some_node_id"},
+    {"type": "edge", "from": "some_node_id", "to": "successor_id"},
+]
+
 
 @pytest.fixture
-def mocked_answers(inventory_mock: InventoryMock, benchmark_json: List[Json]) -> InventoryMock:
+def mocked_answers(
+    inventory_mock: InventoryMock,
+    benchmark_json: List[Json],
+    azure_virtual_machine_resource_json: Json,
+) -> InventoryMock:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content.endswith("jq --no-rewrite .group"):
@@ -64,16 +75,14 @@ def mocked_answers(inventory_mock: InventoryMock, benchmark_json: List[Json]) ->
             )
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
             return nd_json_response(benchmark_json)
+        elif request.url.path == "/cli/execute" and "<-[0:2]->" in content:
+            return nd_json_response(neighborhood)
         elif request.url.path == "/report/checks":
-            info = [{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}]  # fmt: skip
-            return Response(200, content=json.dumps(info).encode("utf-8"), headers={"content-type": "application/json"})
+            return json_response([{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}])  # fmt: skip
         elif request.url.path == "/report/benchmarks":
-            benchmarks = [
-                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
-                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
-            ]
-            return Response(
-                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
+            return json_response(
+                [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                 {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
         elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
             return nd_json_response(
@@ -85,6 +94,8 @@ def mocked_answers(inventory_mock: InventoryMock, benchmark_json: List[Json]) ->
                 [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
                  {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}]  # fmt: skip
             )
+        elif request.url.path == "/graph/resoto/node/some_node_id":
+            return json_response(azure_virtual_machine_resource_json)
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
 
@@ -187,3 +198,11 @@ async def test_search_start_data(inventory_service: InventoryService, mocked_ans
     assert start_data.accounts == result
     assert start_data.regions == result
     assert start_data.kinds == result
+
+
+async def test_resource(
+    inventory_service: InventoryService, mocked_answers: InventoryMock, azure_virtual_machine_resource_json: Json
+) -> None:
+    res = await inventory_service.resource(db, NodeId("some_node_id"))
+    assert res["neighborhood"] == neighborhood
+    assert res["resource"] == azure_virtual_machine_resource_json
