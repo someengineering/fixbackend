@@ -28,6 +28,7 @@ from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal, Typ
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
+from fixcloudutils.util import value_in_path
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
@@ -73,6 +74,7 @@ def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterab
 class InventoryService(Service):
     def __init__(self, client: InventoryClient) -> None:
         self.client = client
+        self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
 
     async def benchmark(
         self,
@@ -111,11 +113,18 @@ class InventoryService(Service):
                 if isinstance(n, dict) and n.get("cloud") is not None
             ]
 
-        (accounts, regions, kinds) = await asyncio.gather(
+        (accounts, regions, kinds, roots) = await asyncio.gather(
             cloud_resource("is(account)", "id", "name"),
             cloud_resource("is(region)", "id", "name"),
             cloud_resource("all", "kind", "kind"),
+            self.__aggregate_roots(db),
         )
+
+        # lookup the kind name from the model
+        for k in kinds:
+            if (kind := roots.get(k.id)) and (kn := value_in_path(kind, ["metadata", "name"])):
+                k.name = kn
+
         return SearchStartData(accounts=accounts, regions=regions, kinds=kinds, severity=ReportSeverityList)
 
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
@@ -309,3 +318,14 @@ class InventoryService(Service):
                 changed_compliant=NoVulnerabilitiesChanged,
                 top_checks=[],
             )
+
+    async def __aggregate_roots(self, db: GraphDatabaseAccess) -> Dict[str, Json]:
+        if self.__cached_aggregate_roots is not None:
+            return self.__cached_aggregate_roots
+        else:
+            root_list = await self.client.model(
+                db, aggregate_roots_only=True, with_properties=False, with_relatives=False
+            )
+            result = {k["fqn"]: k for k in root_list}
+            self.__cached_aggregate_roots = result
+            return result
