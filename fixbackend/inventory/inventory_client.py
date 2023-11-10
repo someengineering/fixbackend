@@ -192,11 +192,17 @@ class InventoryClient(Service):
         access: GraphDatabaseAccess,
         *,
         result_format: Optional[str] = None,
-        kind: Optional[List[str]] = None,
-        kind_filter: Optional[List[str]] = None,
+        flat: bool = False,
+        # kind selection options
         with_bases: bool = False,
         with_property_kinds: bool = False,
-        flat: bool = False,
+        kind: Optional[List[str]] = None,
+        kind_filter: Optional[List[str]] = None,
+        aggregate_roots_only: bool = False,
+        # format options
+        with_properties: bool = True,
+        with_relatives: bool = True,
+        with_metadata: bool = True,
         graph: str = "resoto",
     ) -> List[Json]:
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
@@ -207,6 +213,10 @@ class InventoryClient(Service):
             "with_bases": json.dumps(with_bases),
             "with_property_kinds": json.dumps(with_property_kinds),
             "flat": json.dumps(flat),
+            "aggregate_roots_only": json.dumps(aggregate_roots_only),
+            "with_properties": json.dumps(with_properties),
+            "with_relatives": json.dumps(with_relatives),
+            "with_metadata": json.dumps(with_metadata),
         }
         response = await self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers)
         self.__raise_on_error(response, ("application/json",))

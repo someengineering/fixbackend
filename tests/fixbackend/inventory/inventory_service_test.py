@@ -96,6 +96,8 @@ def mocked_answers(
             )
         elif request.url.path == "/graph/resoto/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
+        elif request.url.path == "/graph/resoto/model":
+            return json_response([{"fqn": "123", "metadata": {"name": "Some name"}}])
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
 
@@ -197,6 +199,7 @@ async def test_search_start_data(inventory_service: InventoryService, mocked_ans
     start_data = await inventory_service.search_start_data(db)
     assert start_data.accounts == result
     assert start_data.regions == result
+    result[0].name = "Some name"  # kind name is looked up and changed
     assert start_data.kinds == result
 
 
