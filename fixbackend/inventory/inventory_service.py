@@ -217,7 +217,7 @@ class InventoryService(Service):
             checks = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
             top = list(islice(checks, num))
             issues = await self.client.issues(db, check_ids=top)
-            return sorted(issues, key=lambda x: ReportSeverityPriority[x.get("severity", 0)], reverse=True)
+            return sorted(issues, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
 
         def bench_account_score(failing_checks: Dict[str, int], benchmark_checks: Dict[str, int]) -> int:
             # Compute the score of an account with respect to a benchmark
