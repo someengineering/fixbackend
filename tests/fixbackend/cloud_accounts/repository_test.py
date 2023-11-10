@@ -17,7 +17,16 @@ import uuid
 import pytest
 from typing import List
 
-from fixbackend.ids import FixCloudAccountId, ExternalId, CloudAccountId, AwsRoleName
+from fixbackend.ids import (
+    FixCloudAccountId,
+    ExternalId,
+    CloudAccountId,
+    AwsRoleName,
+    CloudNames,
+    CloudAccountName,
+    CloudAccountAlias,
+    UserCloudAccountName,
+)
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess, CloudAccountState, CloudAccountStates
@@ -53,11 +62,11 @@ async def test_create_cloud_account(
             id=FixCloudAccountId(uuid.uuid4()),
             account_id=CloudAccountId(str(idx)),
             workspace_id=workspace_id,
-            cloud="aws",
+            cloud=CloudNames.AWS,
             state=account_state,
-            account_name="foo",
-            account_alias="foo_alias",
-            user_account_name="foo_user_provided_name",
+            account_name=CloudAccountName("foo"),
+            account_alias=CloudAccountAlias("foo_alias"),
+            user_account_name=UserCloudAccountName("foo_user_provided_name"),
             privileged=False,
         )
 

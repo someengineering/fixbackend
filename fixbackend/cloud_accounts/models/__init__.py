@@ -18,17 +18,28 @@ from abc import ABC
 
 from attrs import frozen
 
-from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId, AwsRoleName
+from fixbackend.ids import (
+    CloudAccountId,
+    ExternalId,
+    FixCloudAccountId,
+    WorkspaceId,
+    AwsRoleName,
+    CloudAccountName,
+    CloudAccountAlias,
+    UserCloudAccountName,
+    CloudName,
+    CloudNames,
+)
 
 
 @frozen
 class CloudAccess(ABC):
-    cloud: ClassVar[str]
+    cloud: ClassVar[CloudName]
 
 
 @frozen
 class AwsCloudAccess(CloudAccess):
-    cloud: ClassVar[str] = "aws"
+    cloud: ClassVar[CloudName] = CloudNames.AWS
 
     external_id: ExternalId
     role_name: AwsRoleName
@@ -36,7 +47,7 @@ class AwsCloudAccess(CloudAccess):
 
 @frozen
 class GcpCloudAccess(CloudAccess):
-    cloud: ClassVar[str] = "gcp"
+    cloud: ClassVar[CloudName] = CloudNames.GCP
 
 
 @frozen
@@ -101,11 +112,11 @@ class CloudAccount:
     id: FixCloudAccountId
     account_id: CloudAccountId
     workspace_id: WorkspaceId
-    cloud: str
+    cloud: CloudName
     state: CloudAccountState
-    account_name: Optional[str]
-    account_alias: Optional[str]
-    user_account_name: Optional[str]
+    account_name: Optional[CloudAccountName]
+    account_alias: Optional[CloudAccountAlias]
+    user_account_name: Optional[UserCloudAccountName]
     privileged: bool  # can do administrative tasks
 
 
