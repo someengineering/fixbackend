@@ -25,20 +25,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.collect.collect_queue import AwsAccountInformation
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
 from fixbackend.domain_events.events import (
-    TenantAccountsCollected,
-    WorkspaceCreated,
     AwsAccountConfigured,
     CloudAccountCollectInfo,
+    TenantAccountsCollected,
+    WorkspaceCreated,
 )
-from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId, AwsRoleName
+from fixbackend.ids import (
+    AwsARN,
+    AwsRoleName,
+    CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
+    UserCloudAccountName,
+    WorkspaceId,
+)
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
-from fixbackend.collect.collect_queue import AwsAccountInformation
 
 
 @pytest.mark.asyncio
@@ -55,9 +66,9 @@ async def test_receive_workspace_created(
         CloudAccount(
             id=cloud_account_id,
             workspace_id=workspace.id,
-            account_name="foo",
+            account_name=CloudAccountName("foo"),
             account_id=aws_account_id,
-            cloud="aws",
+            cloud=CloudNames.AWS,
             state=CloudAccountStates.Configured(
                 AwsCloudAccess(
                     workspace.external_id,
@@ -65,8 +76,8 @@ async def test_receive_workspace_created(
                 ),
                 enabled=True,
             ),
-            account_alias="foo_alias",
-            user_account_name="foo_user",
+            account_alias=CloudAccountAlias("foo_alias"),
+            user_account_name=UserCloudAccountName("foo_user"),
             privileged=False,
         )
     )
@@ -98,11 +109,11 @@ async def test_receive_aws_account_configured(
         id=cloud_account_id,
         workspace_id=workspace.id,
         account_id=aws_account_id,
-        cloud="aws",
-        account_name="foo",
+        cloud=CloudNames.AWS,
+        account_name=CloudAccountName("foo"),
         state=CloudAccountStates.Configured(AwsCloudAccess(workspace.external_id, AwsRoleName("test")), enabled=True),
-        account_alias="foo_alias",
-        user_account_name="foo_user",
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
         privileged=False,
     )
     await cloud_account_repository.create(account)
@@ -196,11 +207,15 @@ async def test_receive_collect_done_message(
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
     now = utc()
+    external_id = ExternalId(uuid.uuid4())
     await dispatcher._add_collect_in_progress_account(
         workspace.id,
         cloud_account_id_1,
         AwsAccountInformation(
-            aws_account_id=aws_account_id, aws_account_name="test", aws_role_arn="arn", external_id="ext_id"
+            aws_account_id=aws_account_id,
+            aws_account_name=CloudAccountName("test"),
+            aws_role_arn=AwsARN("arn"),
+            external_id=external_id,
         ),
         job_id,
         now,

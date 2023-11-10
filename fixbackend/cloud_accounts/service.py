@@ -14,11 +14,18 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
 from fixbackend.cloud_accounts.models import CloudAccount, LastScanInfo
-
-from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId, AwsRoleName
+from fixbackend.ids import (
+    AwsRoleName,
+    CloudAccountId,
+    CloudAccountName,
+    ExternalId,
+    FixCloudAccountId,
+    UserCloudAccountName,
+    WorkspaceId,
+)
 
 
 class WrongExternalId(Exception):
@@ -34,7 +41,7 @@ class CloudAccountService(ABC):
         account_id: CloudAccountId,
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
-        account_name: Optional[str],
+        account_name: Optional[CloudAccountName],
     ) -> CloudAccount:
         """Create a cloud account."""
         raise NotImplementedError
@@ -64,7 +71,7 @@ class CloudAccountService(ABC):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: Optional[str],
+        name: Optional[UserCloudAccountName],
     ) -> CloudAccount:
         """Update a cloud account."""
         raise NotImplementedError

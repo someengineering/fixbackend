@@ -17,13 +17,18 @@ from typing import Dict, Optional, ClassVar
 
 from arq import ArqRedis
 from attrs import define
-from cattr import unstructure
+from cattrs.preconf.json import make_converter
 from fixcloudutils.types import Json
-from fixbackend.ids import CloudAccountId
-
+from fixbackend.ids import CloudAccountId, AwsARN, ExternalId, CloudAccountName
+from uuid import UUID
 from fixbackend.graph_db.models import GraphDatabaseAccess
 
 log = logging.getLogger(__name__)
+
+json_converter = make_converter()
+
+json_converter.register_structure_hook(UUID, lambda v, _: UUID(v))
+json_converter.register_unstructure_hook(UUID, lambda v: str(v))
 
 
 class JobAlreadyEnqueued(Exception):
@@ -36,7 +41,7 @@ class AccountInformation(ABC):
     kind: ClassVar[str] = "account_information"
 
     def to_json(self) -> Json:
-        js: Json = unstructure(self)
+        js: Json = json_converter.unstructure(self)
         js["kind"] = self.kind
         return js
 
@@ -45,9 +50,9 @@ class AccountInformation(ABC):
 class AwsAccountInformation(AccountInformation):
     kind: ClassVar[str] = "aws_account_information"
     aws_account_id: CloudAccountId
-    aws_account_name: Optional[str]
-    aws_role_arn: str
-    external_id: str
+    aws_account_name: Optional[CloudAccountName]
+    aws_role_arn: AwsARN
+    external_id: ExternalId
 
 
 class CollectQueue(ABC):
