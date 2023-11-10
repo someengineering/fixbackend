@@ -132,7 +132,7 @@ async def test_receive_aws_account_configured(
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2
     in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-        dispatcher._collect_progress_hash_key(workspace.id)
+        dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(in_progress_hash) == 1
     progress = AccountCollectProgress.from_json_str(list(in_progress_hash.values())[0])
@@ -149,7 +149,7 @@ async def test_receive_aws_account_configured(
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 2
     new_in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-        dispatcher._collect_progress_hash_key(workspace.id)
+        dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
     assert len(new_in_progress_hash) == 1
     assert AccountCollectProgress.from_json_str(list(new_in_progress_hash.values())[0]) == progress
@@ -166,13 +166,13 @@ async def test_receive_collect_done_message(
 ) -> None:
     async def in_progress_hash_len() -> int:
         in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher._collect_progress_hash_key(workspace.id)
+            dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
     async def jobs_mapping_hash_len() -> int:
         in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher._jobs_hash_key(workspace.id)
+            dispatcher.collect_progress._jobs_hash_key(workspace.id)
         )  # type: ignore # noqa
         return len(in_progress_hash)
 
@@ -208,7 +208,7 @@ async def test_receive_collect_done_message(
     context = MessageContext("test", "collect-done", "test", utc(), utc())
     now = utc()
     external_id = ExternalId(uuid.uuid4())
-    await dispatcher._add_collect_in_progress_account(
+    await dispatcher.collect_progress.track_account_collection_progress(
         workspace.id,
         cloud_account_id_1,
         AwsAccountInformation(
