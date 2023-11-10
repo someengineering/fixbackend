@@ -18,7 +18,7 @@ from collections import defaultdict
 from datetime import timedelta
 from hmac import compare_digest
 from logging import getLogger
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional
 
 from attrs import evolve
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff, Json, MessageContext, RedisStreamListener
@@ -31,10 +31,10 @@ from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
+    CloudAccountState,
+    CloudAccountStates,
     LastScanAccountInfo,
     LastScanInfo,
-    CloudAccountStates,
-    CloudAccountState,
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
@@ -48,7 +48,16 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
-from fixbackend.ids import CloudAccountId, ExternalId, FixCloudAccountId, WorkspaceId, AwsRoleName
+from fixbackend.ids import (
+    AwsRoleName,
+    CloudAccountId,
+    CloudAccountName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
+    UserCloudAccountName,
+    WorkspaceId,
+)
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -212,7 +221,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account_id: CloudAccountId,
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
-        account_name: Optional[str],
+        account_name: Optional[CloudAccountName],
     ) -> CloudAccount:
         """Create a cloud account."""
 
@@ -271,7 +280,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 id=FixCloudAccountId(uuid.uuid4()),
                 account_id=account_id,
                 workspace_id=workspace_id,
-                cloud="aws",
+                cloud=CloudNames.AWS,
                 state=new_state,
                 account_alias=None,
                 account_name=account_name,
@@ -330,7 +339,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: Optional[str],
+        name: Optional[UserCloudAccountName],
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)

@@ -22,7 +22,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
-from fixbackend.ids import WorkspaceId, FixCloudAccountId, ExternalId, CloudAccountId, AwsRoleName
+from fixbackend.ids import (
+    WorkspaceId,
+    FixCloudAccountId,
+    ExternalId,
+    CloudAccountId,
+    AwsRoleName,
+    CloudName,
+    CloudNames,
+    CloudAccountName,
+    CloudAccountAlias,
+    UserCloudAccountName,
+)
 
 
 class CloudAccount(Base):
@@ -30,14 +41,14 @@ class CloudAccount(Base):
 
     id: Mapped[FixCloudAccountId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
-    cloud: Mapped[str] = mapped_column(String(length=12), nullable=False)
+    cloud: Mapped[CloudName] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
     aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=64), nullable=True)
     privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    user_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
-    api_account_name: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
-    api_account_alias: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    user_account_name: Mapped[Optional[UserCloudAccountName]] = mapped_column(String(length=64), nullable=True)
+    api_account_name: Mapped[Optional[CloudAccountName]] = mapped_column(String(length=64), nullable=True)
+    api_account_alias: Mapped[Optional[CloudAccountAlias]] = mapped_column(String(length=64), nullable=True)
     is_configured: Mapped[bool] = mapped_column(Boolean, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     state: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
@@ -47,7 +58,7 @@ class CloudAccount(Base):
     def to_model(self) -> models.CloudAccount:
         def access() -> models.CloudAccess:
             match self.cloud:
-                case "aws":
+                case CloudNames.AWS:
                     if self.aws_role_name is None or self.aws_external_id is None:
                         raise ValueError("AWS role name or external_id is not set")
                     return models.AwsCloudAccess(

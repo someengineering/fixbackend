@@ -18,26 +18,36 @@ from datetime import datetime
 from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
+from attrs import evolve
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
+from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
+    CloudAccountStates,
     LastScanAccountInfo,
     LastScanInfo,
-    CloudAccountStates,
 )
 from fixbackend.cloud_accounts.service import CloudAccountService
-from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import FixCloudAccountId, ExternalId, WorkspaceId, CloudAccountId, AwsRoleName
+from fixbackend.ids import (
+    AwsRoleName,
+    CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
+    UserCloudAccountName,
+    WorkspaceId,
+)
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from attrs import evolve
 
 
 class InMemoryCloudAccountService(CloudAccountService):
@@ -52,14 +62,14 @@ class InMemoryCloudAccountService(CloudAccountService):
         account_id: CloudAccountId,
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
-        account_name: Optional[str] = None,
+        account_name: Optional[CloudAccountName] = None,
     ) -> CloudAccount:
         assert role_name is not None
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
             account_id=account_id,
             workspace_id=workspace_id,
-            cloud="aws",
+            cloud=CloudNames.AWS,
             state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)),
             account_name=account_name,
             account_alias=None,
@@ -85,7 +95,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         self,
         workspace_id: WorkspaceId,
         cloud_account_id: FixCloudAccountId,
-        name: Optional[str],
+        name: Optional[UserCloudAccountName],
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         account = evolve(account, user_account_name=name)
@@ -175,10 +185,10 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
-        cloud="aws",
+        cloud=CloudNames.AWS,
         workspace_id=workspace_id,
         state=CloudAccountStates.Detected(),
-        account_name="foo",
+        account_name=CloudAccountName("foo"),
         account_alias=None,
         user_account_name=None,
         privileged=False,
@@ -224,11 +234,11 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         id=cloud_account_id,
         account_id=account_id,
         workspace_id=workspace_id,
-        cloud="aws",
+        cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
-        account_name="foo",
-        account_alias="foo_alias",
-        user_account_name="foo_user",
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
     )
     next_scan = datetime.utcnow()
@@ -268,11 +278,11 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         id=cloud_account_id,
         account_id=account_id,
         workspace_id=workspace_id,
-        cloud="aws",
+        cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
-        account_name="foo",
-        account_alias="foo_alias",
-        user_account_name="foo_user",
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
     )
     next_scan = datetime.utcnow()
@@ -313,11 +323,11 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         id=cloud_account_id,
         workspace_id=workspace_id,
         account_id=account_id,
-        cloud="aws",
+        cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
-        account_name="foo",
-        account_alias="foo_alias",
-        user_account_name="foo_user",
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
         privileged=False,
     )
     next_scan = datetime.utcnow()
@@ -364,11 +374,11 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         id=cloud_account_id,
         workspace_id=workspace_id,
         account_id=account_id,
-        cloud="aws",
+        cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
-        account_name="foo",
-        account_alias="foo_alias",
-        user_account_name="foo_user",
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
     )
     next_scan = datetime.utcnow()

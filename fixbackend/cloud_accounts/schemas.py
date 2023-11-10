@@ -12,11 +12,22 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
 from datetime import datetime
-from fixbackend.ids import WorkspaceId, ExternalId, CloudAccountId, FixCloudAccountId, AwsRoleName
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates
+from fixbackend.ids import (
+    AwsRoleName,
+    CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
+    ExternalId,
+    FixCloudAccountId,
+    UserCloudAccountName,
+    WorkspaceId,
+)
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
@@ -47,11 +58,13 @@ class CloudAccountRead(BaseModel):
     is_configured: bool = Field(description="Is account correctly configured")
     resources: Optional[int] = Field(description="Number of resources in the account")
     next_scan: Optional[datetime] = Field(description="Next scheduled scan")
-    user_account_name: Optional[str] = Field(description="Name of the cloud account, as set by the user", max_length=64)
-    api_account_alias: Optional[str] = Field(
+    user_account_name: Optional[UserCloudAccountName] = Field(
+        description="Name of the cloud account, as set by the user", max_length=64
+    )
+    api_account_alias: Optional[CloudAccountAlias] = Field(
         description="Alias of the cloud account, provided by the cloud", max_length=64
     )
-    api_account_name: Optional[str] = Field(
+    api_account_name: Optional[CloudAccountName] = Field(
         description="Name of the cloud account, as provided by the cloud", max_length=64
     )
     state: str = Field(description="State of the cloud account")
@@ -83,7 +96,7 @@ class CloudAccountRead(BaseModel):
 
 
 class AwsCloudAccountUpdate(BaseModel):
-    name: Optional[str] = Field(None, description="Name of the cloud account", max_length=64)
+    name: Optional[UserCloudAccountName] = Field(None, description="Name of the cloud account", max_length=64)
 
 
 class ScannedAccount(BaseModel):
