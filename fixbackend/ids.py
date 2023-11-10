@@ -11,3 +11,13 @@ SubscriptionId = NewType("SubscriptionId", UUID)
 BillingId = NewType("BillingId", UUID)
 NodeId = NewType("NodeId", str)
 AwsRoleName = NewType("AwsRoleName", str)
+AwsARN = NewType("AwsARN", str)
+CloudAccountName = NewType("CloudAccountName", str)
+CloudAccountAlias = NewType("CloudAccountAlias", str)
+UserCloudAccountName = NewType("UserCloudAccountName", str)
+CloudName = NewType("CloudName", str)
+
+
+class CloudNames:
+    AWS: CloudName = CloudName("aws")
+    GCP: CloudName = CloudName("gcp")

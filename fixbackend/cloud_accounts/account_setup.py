@@ -18,7 +18,7 @@ from abc import ABC
 import logging
 from typing import Optional, Dict
 from fixcloudutils.asyncio.async_extensions import run_async
-from fixbackend.ids import ExternalId
+from fixbackend.ids import ExternalId, CloudAccountAlias, CloudAccountName
 from attrs import frozen
 from datetime import datetime
 from fixbackend.ids import CloudAccountId, AwsRoleName
@@ -50,7 +50,7 @@ class AwsAccountSetupHelper:
         self.organizations_client = session.client("organizations")
 
     async def can_assume_role(
-        self, account_id: str, role_name: AwsRoleName, external_id: ExternalId
+        self, account_id: CloudAccountId, role_name: AwsRoleName, external_id: ExternalId
     ) -> AssumeRoleResult:
         try:
             result = await run_async(
@@ -72,7 +72,9 @@ class AwsAccountSetupHelper:
         except Exception as ex:
             return AssumeRoleResults.Failure(str(ex))
 
-    async def list_accounts(self, assume_role_result: AssumeRoleResults.Success) -> Dict[CloudAccountId, str]:
+    async def list_accounts(
+        self, assume_role_result: AssumeRoleResults.Success
+    ) -> Dict[CloudAccountId, CloudAccountName]:
         session = boto3.Session(
             aws_access_key_id=assume_role_result.access_key_id,
             aws_secret_access_key=assume_role_result.secret_access_key,
@@ -94,9 +96,9 @@ class AwsAccountSetupHelper:
         except Exception:
             return {}
 
-        return {CloudAccountId(account["Id"]): account["Name"] for account in accounts}
+        return {CloudAccountId(account["Id"]): CloudAccountName(account["Name"]) for account in accounts}
 
-    async def list_account_aliases(self, assume_role_result: AssumeRoleResults.Success) -> Optional[str]:
+    async def list_account_aliases(self, assume_role_result: AssumeRoleResults.Success) -> Optional[CloudAccountAlias]:
         session = boto3.Session(
             aws_access_key_id=assume_role_result.access_key_id,
             aws_secret_access_key=assume_role_result.secret_access_key,
@@ -106,6 +108,6 @@ class AwsAccountSetupHelper:
         try:
             response = await run_async(iam_client.list_account_aliases)
             aliases = response.get("AccountAliases", [])
-            return None if len(aliases) == 0 else aliases[0]
+            return None if len(aliases) == 0 else CloudAccountAlias(aliases[0])
         except Exception:
             return None

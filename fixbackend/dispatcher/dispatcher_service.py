@@ -38,7 +38,7 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, WorkspaceId
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -306,12 +306,12 @@ class DispatcherService(Service):
             match account.state:
                 case CloudAccountStates.Configured(access, _) | CloudAccountStates.Degraded(access, _):
                     match access:
-                        case AwsCloudAccess(role_name, external_id):
+                        case AwsCloudAccess(external_id, role_name):
                             return AwsAccountInformation(
                                 aws_account_id=account.account_id,
                                 aws_account_name=account.account_name,
-                                aws_role_arn=f"arn:aws:iam::{account.account_id}:role/{role_name}",
-                                external_id=str(external_id),
+                                aws_role_arn=AwsARN(f"arn:aws:iam::{account.account_id}:role/{role_name}"),
+                                external_id=external_id,
                             )
                         case _:
                             log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")
