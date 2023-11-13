@@ -95,7 +95,6 @@ class CollectAccountProgress:
         hash_key = self._collect_progress_hash_key(workspace_id)
         account_progress_str: Optional[str] = await self.redis.hget(hash_key, str(account_id))  # type: ignore
         if account_progress_str is None:
-            log.warn(f"Could not find collect job context for cloud account id {account_id}")
             return None
         return AccountCollectProgress.from_json_str(account_progress_str)
 
@@ -108,7 +107,10 @@ class CollectAccountProgress:
             log.warn(f"Could not find cloud account id for job id {job_id}")
             return None
         set_fix_cloud_account_id(fix_cloud_account_id)
-        return await self.get_account_collect_state(workspace_id, fix_cloud_account_id)
+        account = await self.get_account_collect_state(workspace_id, fix_cloud_account_id)
+        if account is None:
+            log.warn(f"Could not find account for cloud account id {fix_cloud_account_id}")
+        return account
 
     async def account_collection_ongoing(self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId) -> bool:
         collect_state = await self.get_account_collect_state(workspace_id, cloud_account_id)
