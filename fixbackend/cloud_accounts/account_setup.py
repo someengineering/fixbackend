@@ -26,7 +26,6 @@ from fixbackend.ids import CloudAccountId, AwsRoleName
 log = logging.getLogger(__name__)
 
 
-@frozen
 class AssumeRoleResult(ABC):
     pass
 

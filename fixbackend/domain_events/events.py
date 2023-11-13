@@ -31,7 +31,6 @@ from datetime import datetime
 from fixbackend.domain_events.converter import converter
 
 
-@frozen
 class Event(ABC):
     kind: ClassVar[str]
 
