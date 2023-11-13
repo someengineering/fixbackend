@@ -158,14 +158,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     case AwsCloudAccess(external_id, role_name):
                         pass
                     case _:
-                        log.warn(f"Account {cloud_account_id} has unknown access type {access}")
+                        log.warning(f"Account {cloud_account_id} has unknown access type {access}")
                         return None
             case _:
                 log.warning(f"Account {cloud_account_id} is not configurable, cannot setup account")
                 return None
 
         if role_name is None:
-            log.warn(f"Account {cloud_account_id} has no role name, cannot setup account")
+            log.warning(f"Account {cloud_account_id} has no role name, cannot setup account")
             return None
 
         log.info(f"Waiting for account {cloud_account_id} to be configured")
