@@ -178,10 +178,6 @@ class CollectAccountProgress:
         failed = cloud_account_state.failed(error)
         await self.redis.hset(hash_key, key=str(failed.cloud_account_id), value=failed.to_json_str())  # type: ignore
 
-    async def all_jobs_finished(self, workspace_id: WorkspaceId) -> bool:
-        collect_state = await self.get_tenant_collect_state(workspace_id)
-        return all(job.is_done() for job in collect_state.values())
-
     async def delete_tenant_collect_state(self, workspace_id: WorkspaceId) -> None:
         await self.redis.delete(self._collect_progress_hash_key(workspace_id))
         all_job_ids = await self.redis.hgetall(self._jobs_hash_key(workspace_id))  # type: ignore

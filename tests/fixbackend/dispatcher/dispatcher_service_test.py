@@ -179,7 +179,7 @@ async def test_receive_collect_done_message(
 
     current_events_length = len(domain_event_sender.events)
     job_id = uuid.uuid4()
-    cloud_account_id_1 = FixCloudAccountId(uuid.uuid4())
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
     aws_account_id = CloudAccountId("123")
     k8s_account_id = CloudAccountId("456")
     message = {
@@ -211,7 +211,7 @@ async def test_receive_collect_done_message(
     external_id = ExternalId(uuid.uuid4())
     await dispatcher.collect_progress.track_account_collection_progress(
         workspace.id,
-        cloud_account_id_1,
+        cloud_account_id,
         AwsAccountInformation(
             aws_account_id=aws_account_id,
             aws_account_name=CloudAccountName("test"),
@@ -224,13 +224,13 @@ async def test_receive_collect_done_message(
     assert await in_progress_hash_len() == 1
     assert await jobs_mapping_hash_len() == 1
     assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 1
-    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is False
+    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
 
     await dispatcher.process_collect_done_message(message, context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
     assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 0
-    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is True
+    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
 
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 2
@@ -260,7 +260,7 @@ async def test_receive_collect_done_message(
     assert domain_event_sender.events[-1] == TenantAccountsCollected(
         workspace.id,
         {
-            cloud_account_id_1: CloudAccountCollectInfo(
+            cloud_account_id: CloudAccountCollectInfo(
                 mr_1.account_id,
                 mr_1.nr_of_resources_collected + mr_2.nr_of_resources_collected,
                 mr_1.duration,
@@ -319,13 +319,12 @@ async def test_receive_collect_error_message(
     assert await in_progress_hash_len() == 1
     assert await jobs_mapping_hash_len() == 1
     assert await redis.get(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == str(workspace.id)
-    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is False
+    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
 
     await dispatcher.process_collect_done_message(message, context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
-    assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 0
-    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is True
+    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
 
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 0
