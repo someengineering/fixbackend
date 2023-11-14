@@ -22,16 +22,13 @@
 
 
 import logging
-from datetime import timedelta
-from typing import Any
 
-from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
 from httpx import AsyncClient, BasicAuth, Request
-from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events.events import UserRegistered
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 log = logging.getLogger(__name__)
 
@@ -41,37 +38,13 @@ class CustomerIoEventConsumer(Service):
         self,
         http_client: AsyncClient,
         config: Config,
-        readwrite_redis: Redis,
-        stream_name: str,
+        subscriber: DomainEventSubscriber,
     ) -> None:
         self.http_client = http_client
         self.site_id = config.customerio_site_id
         self.api_key = config.customerio_api_key
         self.customerio_baseurl = config.customerio_baseurl
-        self.listener = RedisStreamListener(
-            readwrite_redis,
-            stream_name,
-            group="domainevent-customerio",
-            listener=config.instance_id,
-            message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(seconds=30),
-            batch_size=1,
-        )
-
-    async def start(self) -> Any:
-        await self.listener.start()
-
-    async def stop(self) -> None:
-        await self.listener.stop()
-
-    async def process_domain_event(self, message: Json, context: MessageContext) -> None:
-        match context.kind:
-            case UserRegistered.kind:
-                event = UserRegistered.from_json(message)
-                await self.process_user_registered_event(event)
-
-            case _:
-                pass  # skip unknown events
+        subscriber.subscribe(UserRegistered, self.process_user_registered_event)
 
     async def process_user_registered_event(self, event: UserRegistered) -> None:
         if self.site_id is None or self.api_key is None:

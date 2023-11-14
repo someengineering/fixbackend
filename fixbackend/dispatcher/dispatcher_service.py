@@ -43,6 +43,8 @@ from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_i
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
+
 log = logging.getLogger(__name__)
 
 
@@ -197,7 +199,7 @@ class DispatcherService(Service):
         access_manager: GraphDatabaseAccessManager,
         domain_event_sender: DomainEventPublisher,
         temp_store_redis: Redis,
-        domain_events_stream_name: str,
+        domain_event_subscriber: DomainEventSubscriber,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.next_run_repo = next_run_repo
@@ -205,15 +207,6 @@ class DispatcherService(Service):
         self.collect_queue = collect_queue
         self.access_manager = access_manager
         self.periodic = Periodic("schedule_next_runs", self.schedule_next_runs, timedelta(minutes=1))
-        self.domain_event_listener = RedisStreamListener(
-            readwrite_redis,
-            domain_events_stream_name,
-            group="dispatching",
-            listener="dispatching",
-            message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(minutes=5),
-            batch_size=1,
-        )
         self.collect_result_listener = RedisStreamListener(
             readwrite_redis,
             "collect-events",
@@ -226,32 +219,16 @@ class DispatcherService(Service):
         self.domain_event_sender = domain_event_sender
         self.collect_progress = CollectAccountProgress(temp_store_redis)
 
+        domain_event_subscriber.subscribe(WorkspaceCreated, self.process_workspace_created)
+        domain_event_subscriber.subscribe(AwsAccountConfigured, self.process_aws_account_configured)
+
     async def start(self) -> Any:
         await self.collect_result_listener.start()
-        await self.domain_event_listener.start()
         await self.periodic.start()
 
     async def stop(self) -> None:
         await self.periodic.stop()
-        await self.domain_event_listener.stop()
         await self.collect_result_listener.stop()
-
-    async def process_domain_event(self, message: Json, context: MessageContext) -> None:
-        match context.kind:
-            case WorkspaceCreated.kind:
-                wc_event = WorkspaceCreated.from_json(message)
-                set_workspace_id(str(wc_event.workspace_id))
-                await self.workspace_created(wc_event.workspace_id)
-
-            case AwsAccountConfigured.kind:
-                awd_event = AwsAccountConfigured.from_json(message)
-                set_fix_cloud_account_id(str(awd_event.cloud_account_id))
-                set_workspace_id(str(awd_event.tenant_id))
-                set_cloud_account_id(str(awd_event.aws_account_id))
-                await self.cloud_account_configured(awd_event.cloud_account_id)
-
-            case _:
-                pass  # ignore other domain events
 
     async def process_collect_done_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
@@ -352,12 +329,18 @@ class DispatcherService(Service):
         await self.complete_collect_job(workspace_id)
         log.info("Successfully processed collect job finished message")
 
-    async def workspace_created(self, workspace_id: WorkspaceId) -> None:
+    async def process_workspace_created(self, event: WorkspaceCreated) -> None:
+        workspace_id = event.workspace_id
+        set_workspace_id(workspace_id)
         # store an entry in the next_run table
         next_run_at = await self.compute_next_run(workspace_id)
         await self.next_run_repo.create(workspace_id, next_run_at)
 
-    async def cloud_account_configured(self, cloud_account_id: FixCloudAccountId) -> None:
+    async def process_aws_account_configured(self, event: AwsAccountConfigured) -> None:
+        set_fix_cloud_account_id(event.cloud_account_id)
+        set_workspace_id(event.tenant_id)
+        set_cloud_account_id(event.aws_account_id)
+        cloud_account_id = event.cloud_account_id
         if account := await self.cloud_account_repo.get(cloud_account_id):
             await self.trigger_collect(account)
         else:

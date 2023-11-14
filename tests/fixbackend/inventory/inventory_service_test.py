@@ -20,24 +20,29 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import uuid
-from typing import List
+from types import SimpleNamespace
+from typing import List, cast
+from uuid import uuid4
 
 import pytest
 from fixcloudutils.types import Json
-from httpx import AsyncClient, Response, Request, MockTransport
+from httpx import AsyncClient, MockTransport, Request, Response
 
+from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId, NodeId
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, NodeId, WorkspaceId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import (
-    ReportSummary,
-    NoVulnerabilitiesChanged,
     BenchmarkAccountSummary,
     CheckSummary,
+    NoVulnerabilitiesChanged,
+    ReportSummary,
     SearchCloudResource,
 )
-from tests.fixbackend.conftest import InventoryMock, nd_json_response, json_response
+from tests.fixbackend.conftest import InventoryMock, json_response, nd_json_response
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -150,13 +155,15 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Inve
     assert len(summary.top_checks) == 1
 
 
-async def test_no_graph_db_access() -> None:
+async def test_no_graph_db_access(
+    domain_event_subscriber: DomainEventSubscriber, graph_database_access_manager: GraphDatabaseAccessManager
+) -> None:
     async def app(_: Request) -> Response:
         return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
 
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
-        async with InventoryService(client) as service:
+        async with InventoryService(client, graph_database_access_manager, domain_event_subscriber) as service:
             assert await service.summary(db) == ReportSummary(
                 check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
                 overall_score=0,
@@ -209,3 +216,32 @@ async def test_resource(
     res = await inventory_service.resource(db, NodeId("some_node_id"))
     assert res["neighborhood"] == neighborhood
     assert res["resource"] == azure_virtual_machine_resource_json
+
+
+@pytest.mark.asyncio
+async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber) -> None:
+    cloud_account_id = CloudAccountId("123")
+
+    async def delete_account(
+        access: GraphDatabaseAccess,
+        cloud: str,
+        account_id: CloudAccountId,
+        graph: str = "resoto",
+    ) -> None:
+        assert access == db
+        assert cloud == "aws"
+        assert account_id == cloud_account_id
+        assert graph == "resoto"
+
+    async def get_db_access(workspace_id: WorkspaceId) -> GraphDatabaseAccess:
+        return db
+
+    inventory_client = cast(InventoryClient, SimpleNamespace(delete_account=delete_account))
+    db_manager = cast(GraphDatabaseAccessManager, SimpleNamespace(get_database_access=get_db_access))
+    inventory_service = InventoryService(
+        inventory_client,
+        db_manager,
+        domain_event_subscriber,
+    )
+    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), WorkspaceId(uuid4()), CloudAccountId("123"))
+    await inventory_service.process_account_deleted(message)

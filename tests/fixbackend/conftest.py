@@ -14,10 +14,11 @@
 
 import asyncio
 import json
+import os
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
-from typing import AsyncIterator, Iterator, List, Any, Dict, Tuple, Callable, Awaitable, Sequence
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple
 from unittest.mock import patch
 
 import pytest
@@ -45,6 +46,7 @@ from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -55,10 +57,9 @@ from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import uid, start_of_next_month
+from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-import os
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -265,6 +266,11 @@ async def redis() -> AsyncIterator[Redis]:
 
 
 @pytest.fixture
+async def domain_event_subscriber(redis: Redis, default_config: Config) -> DomainEventSubscriber:
+    return DomainEventSubscriber(redis, default_config)
+
+
+@pytest.fixture
 async def collect_queue(arq_redis: ArqRedis) -> RedisCollectQueue:
     return RedisCollectQueue(arq_redis)
 
@@ -352,8 +358,12 @@ async def inventory_client(inventory_mock: InventoryMock) -> AsyncIterator[Inven
 
 
 @pytest.fixture
-async def inventory_service(inventory_client: InventoryClient) -> AsyncIterator[InventoryService]:
-    async with InventoryService(inventory_client) as service:
+async def inventory_service(
+    inventory_client: InventoryClient,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    domain_event_subscriber: DomainEventSubscriber,
+) -> AsyncIterator[InventoryService]:
+    async with InventoryService(inventory_client, graph_database_access_manager, domain_event_subscriber) as service:
         yield service
 
 
@@ -418,6 +428,7 @@ async def dispatcher(
     collect_queue: RedisCollectQueue,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
+    domain_event_subscriber: DomainEventSubscriber,
     redis: Redis,
 ) -> DispatcherService:
     return DispatcherService(
@@ -429,7 +440,7 @@ async def dispatcher(
         graph_database_access_manager,
         domain_event_sender,
         redis,
-        "foobar",
+        domain_event_subscriber,
     )
 
 
