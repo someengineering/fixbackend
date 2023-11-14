@@ -73,6 +73,7 @@ from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -110,6 +111,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg))
         engine = deps.add(
             SN.async_engine,
             create_async_engine(
@@ -127,7 +129,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
-        deps.add(SN.inventory, InventoryService(inventory_client))
+        deps.add(SN.inventory, InventoryService(inventory_client, graph_db_access, domain_event_subscriber))
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
@@ -154,7 +156,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(
             SN.customerio_consumer,
-            CustomerIoEventConsumer(http_client, cfg, readwrite_redis, DomainEventsStreamName),
+            CustomerIoEventConsumer(http_client, cfg, domain_event_subscriber),
         )
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=readwrite_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
@@ -195,6 +197,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg))
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
             SN.async_engine,
@@ -233,7 +236,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 db_access,
                 domain_event_sender,
                 temp_store_redis,
-                DomainEventsStreamName,
+                domain_event_subscriber,
             ),
         )
 

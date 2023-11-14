@@ -52,6 +52,7 @@ class ServiceNames:
     subscription_repo = "subscription_repo"
     billing = "billing"
     cloud_account_service = "cloud_account_service"
+    domain_event_subscriber = "domain_event_subscriber"
 
 
 class FixDependencies(Dependencies):
