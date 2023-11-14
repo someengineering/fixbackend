@@ -20,18 +20,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import uuid
-from datetime import datetime
 from types import SimpleNamespace
 from typing import List, cast
 from uuid import uuid4
 
 import pytest
-from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
-from redis.asyncio import Redis
 
-from fixbackend.config import Config
 from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -46,6 +42,7 @@ from fixbackend.inventory.schemas import (
     SearchCloudResource,
 )
 from tests.fixbackend.conftest import InventoryMock, json_response, nd_json_response
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -159,14 +156,14 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Inve
 
 
 async def test_no_graph_db_access(
-    default_config: Config, redis: Redis, graph_database_access_manager: GraphDatabaseAccessManager
+    domain_event_subscriber: DomainEventSubscriber, graph_database_access_manager: GraphDatabaseAccessManager
 ) -> None:
     async def app(_: Request) -> Response:
         return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
 
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
-        async with InventoryService(client, default_config, redis, graph_database_access_manager) as service:
+        async with InventoryService(client, graph_database_access_manager, domain_event_subscriber) as service:
             assert await service.summary(db) == ReportSummary(
                 check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
                 overall_score=0,
@@ -222,7 +219,7 @@ async def test_resource(
 
 
 @pytest.mark.asyncio
-async def test_account_deleted(default_config: Config, redis: Redis) -> None:
+async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber) -> None:
     cloud_account_id = CloudAccountId("123")
 
     async def delete_account(
@@ -241,15 +238,10 @@ async def test_account_deleted(default_config: Config, redis: Redis) -> None:
 
     inventory_client = cast(InventoryClient, SimpleNamespace(delete_account=delete_account))
     db_manager = cast(GraphDatabaseAccessManager, SimpleNamespace(get_database_access=get_db_access))
-    inventory_service = InventoryService(inventory_client, default_config, redis, db_manager)
-    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), WorkspaceId(uuid4()), CloudAccountId("123"))
-    await inventory_service.process_domain_event(
-        message.to_json(),
-        MessageContext(
-            id="123",
-            kind=AwsAccountDeleted.kind,
-            publisher="foobar",
-            sent_at=datetime.utcnow(),
-            received_at=datetime.utcnow(),
-        ),
+    inventory_service = InventoryService(
+        inventory_client,
+        db_manager,
+        domain_event_subscriber,
     )
+    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), WorkspaceId(uuid4()), CloudAccountId("123"))
+    await inventory_service.process_account_deleted(message)

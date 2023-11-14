@@ -44,14 +44,11 @@ from fixbackend.inventory.schemas import (
     SearchStartData,
     SearchCloudResource,
 )
-from fixbackend.config import Config
-from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener
-from redis.asyncio import Redis
-from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudNames
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 log = logging.getLogger(__name__)
 
@@ -83,38 +80,22 @@ class InventoryService(Service):
     def __init__(
         self,
         client: InventoryClient,
-        config: Config,
-        readwrite_redis: Redis,
         db_access_manager: GraphDatabaseAccessManager,
+        domain_event_subscriber: DomainEventSubscriber,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
-        self.domain_event_listener = RedisStreamListener(
-            redis=readwrite_redis,
-            stream=DomainEventsStreamName,
-            group="fixbackend-inventory_service-domain",
-            listener=config.instance_id,
-            message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(minutes=5),
-        )
 
-    async def start(self) -> None:
-        await self.domain_event_listener.start()
+        domain_event_subscriber.subscribe(AwsAccountDeleted, self.process_account_deleted)
 
-    async def stop(self) -> None:
-        await self.domain_event_listener.stop()
-
-    async def process_domain_event(self, message: Json, context: MessageContext) -> None:
-        match context.kind:
-            case AwsAccountDeleted.kind:
-                event = AwsAccountDeleted.from_json(message)
-                set_workspace_id(str(event.tenant_id))
-                set_cloud_account_id(event.aws_account_id)
-                set_fix_cloud_account_id(event.cloud_account_id)
-                access = await self.db_access_manager.get_database_access(event.tenant_id)
-                if access:
-                    await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
+    async def process_account_deleted(self, event: AwsAccountDeleted) -> None:
+        set_workspace_id(str(event.tenant_id))
+        set_cloud_account_id(event.aws_account_id)
+        set_fix_cloud_account_id(event.cloud_account_id)
+        access = await self.db_access_manager.get_database_access(event.tenant_id)
+        if access:
+            await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
 
     async def benchmark(
         self,
