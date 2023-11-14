@@ -128,9 +128,10 @@ async def test_receive_aws_account_configured(
     next_run = await session.get(NextTenantRun, workspace.id)
     assert next_run is None
 
-    # check that 4 new entries are created in the redis: two job queues, one progress hash, one jobs mapping
+    # check two job queues were created
     assert len(await arq_redis.keys()) == 2
-    assert len(await redis.keys()) == 2
+    # check that 2 new entries are created in the redis: one progress hash, one jobs mapping, one job -> workspace key
+    assert len(await redis.keys()) == 3
     in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
@@ -147,7 +148,7 @@ async def test_receive_aws_account_configured(
         MessageContext("test", AwsAccountConfigured.kind, "test", utc(), utc()),
     )
     assert len(await arq_redis.keys()) == 2
-    assert len(await redis.keys()) == 2
+    assert len(await redis.keys()) == 3
     new_in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
         dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
     )  # type: ignore # noqa
@@ -262,6 +263,70 @@ async def test_receive_collect_done_message(
                 now,
             )
         },
+        None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_receive_collect_error_message(
+    dispatcher: DispatcherService,
+    metering_repository: MeteringRepository,
+    workspace: Workspace,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    arq_redis: Redis,
+    redis: Redis,
+) -> None:
+    async def in_progress_hash_len() -> int:
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
+            dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
+        )  # type: ignore # noqa
+        return len(in_progress_hash)
+
+    async def jobs_mapping_hash_len() -> int:
+        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
+            dispatcher.collect_progress._jobs_hash_key(workspace.id)
+        )  # type: ignore # noqa
+        return len(in_progress_hash)
+
+    current_events_length = len(domain_event_sender.events)
+    job_id = uuid.uuid4()
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    aws_account_id = CloudAccountId("123")
+    error = "some error"
+    message = {
+        "job_id": str(job_id),
+        "error": error,
+    }
+    context = MessageContext("test", "collect-done", "test", utc(), utc())
+    now = utc()
+    external_id = ExternalId(uuid.uuid4())
+    await dispatcher.collect_progress.track_account_collection_progress(
+        workspace.id,
+        cloud_account_id,
+        AwsAccountInformation(
+            aws_account_id=aws_account_id,
+            aws_account_name=CloudAccountName("test"),
+            aws_role_arn=AwsARN("arn"),
+            external_id=external_id,
+        ),
+        job_id,
+        now,
+    )
+    assert await in_progress_hash_len() == 1
+    assert await jobs_mapping_hash_len() == 1
+    assert await redis.get(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == str(workspace.id)
+
+    await dispatcher.process_collect_done_message(message, context)
+    assert await in_progress_hash_len() == 0
+    assert await jobs_mapping_hash_len() == 0
+
+    result = [n async for n in metering_repository.list(workspace.id)]
+    assert len(result) == 0
+
+    assert len(domain_event_sender.events) == current_events_length + 1
+    assert domain_event_sender.events[-1] == TenantAccountsCollected(
+        workspace.id,
+        {},
         None,
     )
 

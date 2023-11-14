@@ -32,7 +32,6 @@ from fixbackend.ids import (
 )
 
 
-@frozen
 class CloudAccess(ABC):
     cloud: ClassVar[CloudName]
 
