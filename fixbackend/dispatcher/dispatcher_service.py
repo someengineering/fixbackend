@@ -128,7 +128,7 @@ class CollectAccountProgress:
         collect_state = await self.get_account_collect_state(workspace_id, cloud_account_id)
         if collect_state is None:
             return False
-        return not collect_state.is_done()
+        return True
 
     async def mark_account_as_collected(
         self,
@@ -184,6 +184,9 @@ class CollectAccountProgress:
 
     async def delete_tenant_collect_state(self, workspace_id: WorkspaceId) -> None:
         await self.redis.delete(self._collect_progress_hash_key(workspace_id))
+        all_job_ids = await self.redis.hgetall(self._jobs_hash_key(workspace_id))  # type: ignore
+        for job_id in all_job_ids.keys():
+            await self.redis.delete(self._jobs_to_workspace_key(job_id))
         await self.redis.delete(self._jobs_hash_key(workspace_id))
 
 

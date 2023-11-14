@@ -223,10 +223,14 @@ async def test_receive_collect_done_message(
     )
     assert await in_progress_hash_len() == 1
     assert await jobs_mapping_hash_len() == 1
+    assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 1
+    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is False
 
     await dispatcher.process_collect_done_message(message, context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
+    assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 0
+    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is True
 
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 2
@@ -315,10 +319,13 @@ async def test_receive_collect_error_message(
     assert await in_progress_hash_len() == 1
     assert await jobs_mapping_hash_len() == 1
     assert await redis.get(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == str(workspace.id)
+    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is False
 
     await dispatcher.process_collect_done_message(message, context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
+    assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 0
+    assert await dispatcher.collect_progress.all_jobs_finished(workspace.id) is True
 
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 0
