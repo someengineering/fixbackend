@@ -351,8 +351,13 @@ async def inventory_client(inventory_mock: InventoryMock) -> AsyncIterator[Inven
 
 
 @pytest.fixture
-async def inventory_service(inventory_client: InventoryClient) -> AsyncIterator[InventoryService]:
-    async with InventoryService(inventory_client) as service:
+async def inventory_service(
+    inventory_client: InventoryClient,
+    default_config: Config,
+    redis: Redis,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+) -> AsyncIterator[InventoryService]:
+    async with InventoryService(inventory_client, default_config, redis, graph_database_access_manager) as service:
         yield service
 
 

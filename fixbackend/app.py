@@ -127,7 +127,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
-        deps.add(SN.inventory, InventoryService(inventory_client))
+        deps.add(SN.inventory, InventoryService(inventory_client, cfg, readwrite_redis, graph_db_access))
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
