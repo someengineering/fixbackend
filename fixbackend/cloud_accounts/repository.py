@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
 from fixbackend.db import AsyncSessionMakerDependency
@@ -45,6 +45,10 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def delete(self, id: FixCloudAccountId) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def number_of_accounts(self, workspace_id: WorkspaceId) -> int:
         raise NotImplementedError
 
 
@@ -161,6 +165,13 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             cloud_account = results.unique().scalar_one()
             await session.delete(cloud_account)
             await session.commit()
+
+    async def number_of_accounts(self, workspace_id: WorkspaceId) -> int:
+        """Get the number of cloud accounts for a workspace."""
+        async with self.session_maker() as session:
+            statement = select(func.count(orm.CloudAccount.id)).where(orm.CloudAccount.tenant_id == workspace_id)
+            result = await session.execute(statement)
+            return result.scalar_one()
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:

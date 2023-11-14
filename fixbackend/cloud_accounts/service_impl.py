@@ -80,8 +80,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
-
         self.last_scan_repo = last_scan_repo
+        self.max_accounts_per_worspace = config.max_accounts_per_worspace
 
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
@@ -275,6 +275,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 new_state = CloudAccountStates.Detected()
             else:
                 new_state = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+
+            nr_of_created_accounts = await self.cloud_account_repository.number_of_accounts(workspace_id)
+            if nr_of_created_accounts >= self.max_accounts_per_worspace:
+                raise ValueError("Maximum number of accounts reached")
 
             account = CloudAccount(
                 id=FixCloudAccountId(uuid.uuid4()),

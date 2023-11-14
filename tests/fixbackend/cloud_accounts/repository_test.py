@@ -41,6 +41,7 @@ async def test_create_cloud_account(
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
+    foobar_org = await workspace_repository.create_workspace("foobar", "foobar", user)
     workspace_id = org.id
 
     cloud_access = AwsCloudAccess(
@@ -56,6 +57,21 @@ async def test_create_cloud_account(
     ]
 
     configured_account_id: FixCloudAccountId | None = None
+
+    # only to test the number of accounts
+    await cloud_account_repository.create(
+        CloudAccount(
+            id=FixCloudAccountId(uuid.uuid4()),
+            account_id=CloudAccountId("foobar"),
+            workspace_id=foobar_org.id,
+            cloud=CloudNames.AWS,
+            state=account_states[1],
+            account_name=CloudAccountName("foo"),
+            account_alias=CloudAccountAlias("foo_alias"),
+            user_account_name=UserCloudAccountName("foo_user_provided_name"),
+            privileged=False,
+        )
+    )
 
     for idx, account_state in enumerate(account_states):
         account = CloudAccount(
@@ -114,6 +130,10 @@ async def test_create_cloud_account(
             assert role_name == new_cloud_access.role_name
         case _:
             raise ValueError("Invalid state")
+
+    # count accounts
+    assert await cloud_account_repository.number_of_accounts(workspace_id=workspace_id) == len(account_states)
+    assert await cloud_account_repository.number_of_accounts(workspace_id=foobar_org.id) == 1
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)

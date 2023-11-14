@@ -116,6 +116,7 @@ def default_config() -> Config:
         customerio_site_id=None,
         customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
+        max_accounts_per_worspace=10,
     )
 
 

@@ -61,6 +61,7 @@ class Config(BaseSettings):
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
+    max_accounts_per_worspace: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -140,6 +141,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--cloud-account-service-event-parallelism",
         type=int,
         default=int(os.environ.get("CLOUD_ACCOUNT_SERVICE_EVENT_PARALLELISM", "100")),
+    )
+    parser.add_argument(
+        "--max_accounts_per_worspace", type=int, default=int(os.environ.get("MAX_ACCOUNTS_PER_WORKSPACE", "200_000"))
     )
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]

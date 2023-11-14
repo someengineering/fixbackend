@@ -84,6 +84,9 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
     async def delete(self, id: FixCloudAccountId) -> None:
         self.accounts.pop(id)
 
+    async def number_of_accounts(self, workspace_id: WorkspaceId) -> int:
+        return len(self.accounts)
+
 
 test_workspace_id = WorkspaceId(uuid.uuid4())
 
@@ -193,6 +196,7 @@ async def test_create_aws_account(
         default_config,
         account_setup_helper,
     )
+    service.max_accounts_per_worspace = 2
 
     # happy case
     acc = await service.create_aws_account(
@@ -293,6 +297,16 @@ async def test_create_aws_account(
         await service.create_aws_account(
             workspace_id=WorkspaceId(uuid.uuid4()),
             account_id=account_id,
+            role_name=role_name,
+            external_id=external_id,
+            account_name=None,
+        )
+
+    # too many accounts
+    with pytest.raises(Exception):
+        await service.create_aws_account(
+            workspace_id=test_workspace_id,
+            account_id=CloudAccountId("foobar3"),
             role_name=role_name,
             external_id=external_id,
             account_name=None,
