@@ -71,6 +71,7 @@ class AwsAccountDiscovered(Event):
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
+    at: Optional[datetime]
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
@@ -114,6 +115,28 @@ class AwsAccountDeleted(Event):
     @staticmethod
     def from_json(json: Json) -> "AwsAccountDeleted":
         return converter.structure(json, AwsAccountDeleted)
+
+
+@frozen
+class AwsAccountDegraded(Event):
+    """
+    This event is emitted when AWS account is ready to be collected.
+    """
+
+    kind: ClassVar[str] = "aws_account_degraded"
+
+    cloud_account_id: FixCloudAccountId
+    tenant_id: WorkspaceId
+    aws_account_id: CloudAccountId
+    error: str
+    at: datetime
+
+    def to_json(self) -> Json:
+        return converter.unstructure(self)  # type: ignore
+
+    @staticmethod
+    def from_json(json: Json) -> "AwsAccountConfigured":
+        return converter.structure(json, AwsAccountConfigured)
 
 
 @frozen

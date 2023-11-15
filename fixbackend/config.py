@@ -61,6 +61,7 @@ class Config(BaseSettings):
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
+    account_setup_assume_role_timeout: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -140,6 +141,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--cloud-account-service-event-parallelism",
         type=int,
         default=int(os.environ.get("CLOUD_ACCOUNT_SERVICE_EVENT_PARALLELISM", "100")),
+    )
+    parser.add_argument(
+        "--account-setup-assume-role-timeout",
+        type=int,
+        default=int(os.environ.get("ACCOUNT_SETUP_ASSUME_ROLE_TIMEOUT", "900")),
     )
 
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]

@@ -15,6 +15,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
+from datetime import datetime
 
 from fixbackend.cloud_accounts.models import CloudAccount, LastScanInfo
 from fixbackend.ids import (
@@ -42,6 +43,7 @@ class CloudAccountService(ABC):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName],
+        created_at: datetime,
     ) -> CloudAccount:
         """Create a cloud account."""
         raise NotImplementedError

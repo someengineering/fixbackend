@@ -63,6 +63,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName] = None,
+        created_at: datetime,
     ) -> CloudAccount:
         assert role_name is not None
         account = CloudAccount(

@@ -14,7 +14,7 @@
 
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
@@ -36,6 +36,7 @@ from fixbackend.domain_events.events import (
     CloudAccountCollectInfo,
     Event,
     TenantAccountsCollected,
+    AwsAccountDegraded,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
@@ -172,6 +173,9 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
         return self.account_alias
 
 
+now = datetime.utcnow()
+
+
 @pytest.mark.asyncio
 async def test_create_aws_account(
     arq_redis: Redis,
@@ -201,6 +205,7 @@ async def test_create_aws_account(
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
     account = repository.accounts.get(acc.id)
@@ -230,6 +235,7 @@ async def test_create_aws_account(
     assert event.cloud_account_id == acc.id
     assert event.aws_account_id == account_id
     assert event.tenant_id == acc.workspace_id
+    assert event.at == now
 
     # account already exists, account_name should be updated, but nothing else
     idempotent_account = await service.create_aws_account(
@@ -238,6 +244,7 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=account_name,
+        created_at=now,
     )
     # no extra account should be created
     assert len(repository.accounts) == 1
@@ -252,6 +259,7 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=CloudAccountName("foobar"),
+        created_at=now,
     )
     assert len(repository.accounts) == 1
     # domain event should not be published
@@ -271,6 +279,7 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=account_name,
+        created_at=now,
     )
     assert detected_account.state == CloudAccountStates.Detected()
     # a new account should be created
@@ -286,6 +295,7 @@ async def test_create_aws_account(
             role_name=role_name,
             external_id=ExternalId(uuid.uuid4()),
             account_name=None,
+            created_at=now,
         )
 
     # wrong tenant id
@@ -296,6 +306,7 @@ async def test_create_aws_account(
             role_name=role_name,
             external_id=external_id,
             account_name=None,
+            created_at=now,
         )
 
 
@@ -324,6 +335,7 @@ async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> N
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -401,6 +413,7 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -451,6 +464,7 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -492,6 +506,7 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -546,6 +561,7 @@ async def test_handle_account_discovered_success(arq_redis: Redis, default_confi
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -594,6 +610,7 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -632,6 +649,67 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
 
 
 @pytest.mark.asyncio
+async def test_handle_account_discovered_to_degraded(arq_redis: Redis, default_config: Config) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+    last_scan_repo = LastScanRepositoryMock()
+    account_setup_helper = AwsAccountSetupHelperMock()
+    service = CloudAccountServiceImpl(
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        last_scan_repo,
+        arq_redis,
+        default_config,
+        account_setup_helper,
+    )
+
+    # boto3 cannot assume right away
+    account_id = CloudAccountId("foobar")
+    role_name = AwsRoleName("FooBarRole")
+    account = await service.create_aws_account(
+        workspace_id=test_workspace_id,
+        account_id=account_id,
+        role_name=role_name,
+        external_id=external_id,
+        account_name=None,
+        created_at=now - timedelta(days=1),
+    )
+    assert len(repository.accounts) == 1
+    assert len(domain_sender.events) == 1
+    event = domain_sender.events[0]
+
+    account_setup_helper.can_assume = False
+
+    await service.process_domain_event(
+        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
+    )
+    # account degraded should be published
+    assert len(domain_sender.events) == 2
+    event = domain_sender.events[1]
+    assert isinstance(event, AwsAccountDegraded)
+    assert event.cloud_account_id == account.id
+    assert event.aws_account_id == account_id
+    assert event.tenant_id == account.workspace_id
+    assert event.error == "Cannot assume role"
+
+    after_degraded = await service.get_cloud_account(account.id, test_workspace_id)
+
+    assert after_degraded is not None
+    assert after_degraded.privileged is False
+    assert after_degraded.state == CloudAccountStates.Degraded(
+        AwsCloudAccess(external_id, role_name), error="Cannot assume role"
+    )
+    assert after_degraded.workspace_id == account.workspace_id
+    assert after_degraded.account_name == account.account_name
+    assert after_degraded.id == account.id
+    assert after_degraded.account_id == account.account_id
+
+
+@pytest.mark.asyncio
 async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
@@ -658,6 +736,7 @@ async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis,
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -713,6 +792,7 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -766,6 +846,7 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
         role_name=role_name,
         external_id=external_id,
         account_name=None,
+        created_at=now,
     )
     assert len(repository.accounts) == 1
 

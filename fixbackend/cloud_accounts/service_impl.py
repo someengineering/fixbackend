@@ -15,7 +15,7 @@
 
 import uuid
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from hmac import compare_digest
 from logging import getLogger
 from typing import Any, Dict, List, Optional
@@ -42,6 +42,7 @@ from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
+    AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
     TenantAccountsCollected,
@@ -83,12 +84,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         self.last_scan_repo = last_scan_repo
 
+        self.assume_role_timeout = config.account_setup_assume_role_timeout
+
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
+        backoff_delay = 30
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
-            # 15 retries * 30s = roughly 7 minutes
-            maximum_delay=30,
-            retries=15,
+            maximum_delay=backoff_delay,
+            retries=self.assume_role_timeout // backoff_delay,  # do not make more retries than the timeout allows
         )
 
         self.domain_event_listener = RedisStreamListener(
@@ -97,7 +100,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             group="fixbackend-cloudaccountservice-domain",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(minutes=15),
+            consider_failed_after=timedelta(seconds=self.assume_role_timeout)
+            + timedelta(seconds=backoff_delay * 2),  # we need this a bit longer that the timeout itself
             batch_size=config.cloud_account_service_event_parallelism,
             parallelism=config.cloud_account_service_event_parallelism,
             backoff=backoff_config,
@@ -137,12 +141,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 set_cloud_account_id(discovered_event.aws_account_id)
                 set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
                 set_workspace_id(str(discovered_event.tenant_id))
-                await self.try_configure_account(discovered_event.cloud_account_id)
+                await self.try_configure_account(discovered_event)
 
             case _:
                 pass  # ignore other domain events
 
-    async def try_configure_account(self, cloud_account_id: FixCloudAccountId) -> None:
+    async def try_configure_account(self, discovered: AwsAccountDiscovered) -> None:
+        cloud_account_id = discovered.cloud_account_id
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             log.warning(f"Account {cloud_account_id} not found, cannot setup account")
@@ -175,9 +180,27 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         privileged = False
         match assume_role_result:
             case AssumeRoleResults.Failure(reason):
-                msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
-                log.info(msg)
-                raise RuntimeError(msg)
+                account_discovered_at = discovered.at or datetime.utcnow()
+                if (datetime.utcnow() - account_discovered_at) < timedelta(seconds=self.assume_role_timeout):
+                    msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
+                    log.info(msg)
+                    raise RuntimeError(msg)
+                else:
+                    log.info("failed to assume role, but timeout is reached, moving account to degraded state")
+                    error = "Cannot assume role"
+                    await self.cloud_account_repository.update(
+                        account.id, lambda account: evolve(account, state=CloudAccountStates.Degraded(access, error))
+                    )
+                    await self.domain_events.publish(
+                        AwsAccountDegraded(
+                            cloud_account_id=account.id,
+                            tenant_id=account.workspace_id,
+                            aws_account_id=account.account_id,
+                            error=error,
+                            at=datetime.utcnow(),
+                        )
+                    )
+                    return None
 
             case AssumeRoleResults.Success() as assume_role_result:
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
@@ -192,6 +215,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             role_name=None,
                             external_id=external_id,
                             account_name=name,
+                            created_at=datetime.utcnow(),
                         )
                 else:
                     alias = await self.account_setup_helper.list_account_aliases(assume_role_result)
@@ -222,6 +246,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName],
+        created_at: datetime,
     ) -> CloudAccount:
         """Create a cloud account."""
 
@@ -304,7 +329,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             kind="cloud_account_created", message=message, channel=f"tenant-events::{workspace_id}"
         )
         await self.domain_events.publish(
-            AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
+            AwsAccountDiscovered(
+                cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id, at=created_at
+            )
         )
         return result
 

@@ -117,6 +117,7 @@ def default_config() -> Config:
         customerio_site_id=None,
         customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
+        account_setup_assume_role_timeout=900,  # 15 minutes
     )
 
 
