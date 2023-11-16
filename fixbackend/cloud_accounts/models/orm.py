@@ -17,8 +17,10 @@ import uuid
 from typing import Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import ForeignKey, String, UniqueConstraint, Boolean
+from fixbackend.sqlalechemy_extensions import UTCDateTime
+from sqlalchemy import ForeignKey, String, UniqueConstraint, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
 
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
@@ -53,6 +55,11 @@ class CloudAccount(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     state: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     error: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    next_scan: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_scan_duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_scan_started_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_scan_resources_scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
 
     def to_model(self) -> models.CloudAccount:
@@ -98,4 +105,8 @@ class CloudAccount(Base):
             account_alias=self.api_account_alias,
             user_account_name=self.user_account_name,
             privileged=self.privileged,
+            next_scan=self.next_scan,
+            last_scan_duration_seconds=self.last_scan_duration_seconds,
+            last_scan_started_at=self.last_scan_started_at,
+            last_scan_resources_scanned=self.last_scan_resources_scanned,
         )

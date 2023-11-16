@@ -266,7 +266,7 @@ async def redis() -> AsyncIterator[Redis]:
 
 @pytest.fixture
 async def domain_event_subscriber(redis: Redis, default_config: Config) -> DomainEventSubscriber:
-    return DomainEventSubscriber(redis, default_config)
+    return DomainEventSubscriber(redis, default_config, "test-subscriber")
 
 
 @pytest.fixture

@@ -68,6 +68,10 @@ async def test_create_cloud_account(
             account_alias=CloudAccountAlias("foo_alias"),
             user_account_name=UserCloudAccountName("foo_user_provided_name"),
             privileged=False,
+            last_scan_started_at=None,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            next_scan=None,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):

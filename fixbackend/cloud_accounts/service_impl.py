@@ -27,14 +27,11 @@ from fixcloudutils.service import Service
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
     CloudAccountState,
     CloudAccountStates,
-    LastScanAccountInfo,
-    LastScanInfo,
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
@@ -71,7 +68,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         cloud_account_repository: CloudAccountRepository,
         pubsub_publisher: RedisPubSubPublisher,
         domain_event_publisher: DomainEventPublisher,
-        last_scan_repo: LastScanRepository,
         readwrite_redis: Redis,
         config: Config,
         account_setup_helper: AwsAccountSetupHelper,
@@ -80,8 +76,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
-
-        self.last_scan_repo = last_scan_repo
 
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
@@ -116,21 +110,19 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
                 set_workspace_id(str(event.tenant_id))
-                await self.last_scan_repo.set_last_scan(
-                    event.tenant_id,
-                    LastScanInfo(
-                        {
-                            account_id: LastScanAccountInfo(
-                                account.account_id,
-                                account.duration_seconds,
-                                account.scanned_resources,
-                                account.started_at,
-                            )
-                            for account_id, account in event.cloud_accounts.items()
-                        },
-                        event.next_run,
-                    ),
-                )
+                for account_id, account in event.cloud_accounts.items():
+                    set_fix_cloud_account_id(account_id)
+                    set_cloud_account_id(account.account_id)
+                    await self.cloud_account_repository.update(
+                        account_id,
+                        lambda acc: evolve(
+                            acc,
+                            last_scan_duration_seconds=account.duration_seconds,
+                            last_scan_resources_scanned=account.scanned_resources,
+                            last_scan_started_at=account.started_at,
+                            next_scan=event.next_run,
+                        ),
+                    )
 
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
@@ -286,6 +278,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 account_name=account_name,
                 user_account_name=None,
                 privileged=False,
+                next_scan=None,
+                last_scan_duration_seconds=0,
+                last_scan_resources_scanned=0,
+                last_scan_started_at=None,
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
@@ -317,9 +313,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         await self.cloud_account_repository.delete(cloud_account_id)
         await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
-
-    async def last_scan(self, workspace_id: WorkspaceId) -> Optional[LastScanInfo]:
-        return await self.last_scan_repo.get_last_scan(workspace_id)
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)

@@ -31,7 +31,7 @@ from fixbackend.ids import UserId, WorkspaceId, CloudAccountId, FixCloudAccountI
 
 @pytest.mark.asyncio
 async def test_subscribe(redis: Redis, default_config: Config) -> None:
-    subscriber = DomainEventSubscriber(redis, default_config)
+    subscriber = DomainEventSubscriber(redis, default_config, "test-subscriber")
     publisher = DomainEventPublisherImpl(
         RedisStreamPublisher(
             redis,

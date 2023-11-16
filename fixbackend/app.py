@@ -45,7 +45,6 @@ from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
@@ -170,7 +169,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 CloudAccountRepositoryImpl(session_maker),
                 cloud_accounts_redis_publisher,
                 domain_event_publisher,
-                LastScanRepository(session_maker),
                 readwrite_redis,
                 cfg,
                 AwsAccountSetupHelper(boto_session),
