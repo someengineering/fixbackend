@@ -153,6 +153,38 @@ class InventoryClient(Service):
             response = await self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
             self.__raise_on_error(response)
 
+    async def complete_property_path(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        path: Optional[str] = None,
+        prop: Optional[str] = None,
+        allowed_kinds: Optional[List[str]] = None,
+        fuzzy: bool = False,
+        limit: int = 20,
+        skip: int = 0,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> Tuple[int, Dict[str, str]]:
+        headers = self.__headers(access)
+        params = {"section": section}
+        response = await self.client.post(
+            self.inventory_url + f"/graph/{graph}/property/path/complete",
+            json={
+                "path": path,
+                "prop": prop,
+                "kinds": allowed_kinds,
+                "fuzzy": fuzzy,
+                "limit": limit,
+                "skip": skip,
+            },
+            headers=headers,
+            params=params,
+        )
+        self.__raise_on_error(response, expected_media_types=("application/json",))
+        count = int(response.headers.get("Total-Count", "0"))
+        return count, cast(Dict[str, str], response.json())
+
     async def possible_values(
         self,
         access: GraphDatabaseAccess,
