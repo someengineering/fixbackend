@@ -168,16 +168,16 @@ class InventoryClient(Service):
     ) -> Tuple[int, Dict[str, str]]:
         headers = self.__headers(access)
         params = {"section": section}
+        body: Json = {"fuzzy": fuzzy, "limit": limit, "skip": skip}
+        if path:
+            body["path"] = path
+        if prop:
+            body["prop"] = prop
+        if allowed_kinds:
+            body["kinds"] = allowed_kinds
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/property/path/complete",
-            json={
-                "path": path,
-                "prop": prop,
-                "kinds": allowed_kinds,
-                "fuzzy": fuzzy,
-                "limit": limit,
-                "skip": skip,
-            },
+            json=body,
             headers=headers,
             params=params,
         )
