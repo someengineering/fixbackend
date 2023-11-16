@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import getLogger
 from typing import Any, Awaitable, Callable, Dict, Generic, Tuple, Type, TypeVar
 
@@ -26,6 +26,7 @@ from redis.asyncio import Redis
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import Event
+import asyncio
 
 Kind = str
 
@@ -42,6 +43,9 @@ class HandlerDescriptor(Generic[Evt]):
 
     def with_callback(self, callback: Callable[[Evt], Awaitable[None]]) -> "HandlerDescriptor[Evt]":
         return HandlerDescriptor(callbacks=self.callbacks + (callback,), event_cls=self.event_cls)
+
+
+T = TypeVar("T")
 
 
 class DomainEventSubscriber(Service):
@@ -72,6 +76,13 @@ class DomainEventSubscriber(Service):
         self.subscribers[event_cls.kind] = new_descriptor
         log.info(f"Added domain event handler for {event_cls.kind}")
 
+    async def timed(self, callback: Callable[[Evt], Awaitable[None]], event: Evt) -> None:
+        before = datetime.utcnow()
+        await callback(event)
+        after = datetime.utcnow()
+        elapsed = after - before
+        log.info(f"Processed domain event {event} in {elapsed}")
+
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         log.info(f"Processing domain event: {message} {context}")
         handler = self.subscribers.get(context.kind)
@@ -79,5 +90,4 @@ class DomainEventSubscriber(Service):
             return
         event = handler.event_cls.from_json(message)
         for callback in handler.callbacks:
-            await callback(event)
-        log.info(f"Processed domain event: {event} {context}")
+            asyncio.create_task(self.timed(callback, event))
