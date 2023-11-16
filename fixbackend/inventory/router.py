@@ -123,9 +123,9 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.post("/{workspace_id}/inventory/property/path/complete")
     async def complete_property_path(
         graph_db: CurrentGraphDbDependency,
-        prop: Optional[str] = Form(None),
-        path: Optional[str] = Form(None),
-        allowed_kinds: Optional[List[str]] = Form(None),
+        prop: Optional[str] = Form(None, description="Current property part."),
+        path: Optional[str] = Form(None, description="Existing property path."),
+        allowed_kinds: Optional[List[str]] = Form(None, description="List of all allowed kinds."),
         skip: int = Query(default=0, ge=0),
         limit: int = Query(default=10, ge=0, le=50),
     ) -> JSONResponse:
