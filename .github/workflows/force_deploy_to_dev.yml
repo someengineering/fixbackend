@@ -1,8 +1,5 @@
 name: Push the current commit to dev
 on:
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
