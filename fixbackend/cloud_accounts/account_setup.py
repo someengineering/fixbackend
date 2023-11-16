@@ -89,7 +89,7 @@ class AwsAccountSetupHelper:
                     kwargs["NextToken"] = next_token
                 response = await run_async(
                     orgnizations_client.list_accounts,
-                    kwargs=kwargs,
+                    **kwargs,
                 )
                 next_token = response.get("NextToken")
                 accounts.extend(response["Accounts"])
