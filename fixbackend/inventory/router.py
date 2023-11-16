@@ -22,14 +22,14 @@
 import logging
 from typing import List, Optional, Annotated
 
-from fastapi import APIRouter, Query, Request, Depends, Form, Path
+from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
 from fastapi.responses import StreamingResponse, JSONResponse
 from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
-from fixbackend.inventory.schemas import ReportSummary, SearchStartData
+from fixbackend.inventory.schemas import ReportSummary, SearchStartData, CompletePathRequest
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -123,15 +123,9 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.post("/{workspace_id}/inventory/property/path/complete")
     async def complete_property_path(
         graph_db: CurrentGraphDbDependency,
-        prop: Optional[str] = Form(None, description="Current property part."),
-        path: Optional[str] = Form(None, description="Existing property path."),
-        allowed_kinds: Optional[List[str]] = Form(None, description="List of all allowed kinds."),
-        skip: int = Query(default=0, ge=0),
-        limit: int = Query(default=10, ge=0, le=50),
+        body: CompletePathRequest = Body(...),
     ) -> JSONResponse:
-        count, result = await fix.inventory.client.complete_property_path(
-            access=graph_db, path=path, prop=prop, allowed_kinds=allowed_kinds, skip=skip, limit=limit
-        )
+        count, result = await fix.inventory.client.complete_property_path(access=graph_db, request=body)
         return JSONResponse(result, headers={"Total-Count": str(count)})
 
     @router.post("/{workspace_id}/inventory/search/table")
