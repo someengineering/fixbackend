@@ -14,9 +14,11 @@
 
 
 from datetime import timedelta
-from typing import Awaitable, Callable, Dict, Type, Tuple, TypeVar, Generic, Any
+from logging import getLogger
+from typing import Any, Awaitable, Callable, Dict, Generic, Tuple, Type, TypeVar
 
-from fixcloudutils.redis.event_stream import RedisStreamListener, MessageContext
+from attrs import frozen
+from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from redis.asyncio import Redis
@@ -24,11 +26,13 @@ from redis.asyncio import Redis
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import Event
-from attrs import frozen
 
 Kind = str
 
 Evt = TypeVar("Evt", bound=Event)
+
+
+log = getLogger(__name__)
 
 
 @frozen
@@ -54,9 +58,11 @@ class DomainEventSubscriber(Service):
         )
 
     async def start(self) -> None:
+        log.info("Starting domain event subscriber")
         await self.listener.start()
 
     async def stop(self) -> None:
+        log.info("Stopping domain event subscriber")
         await self.listener.stop()
 
     def subscribe(self, event_cls: Type[Evt], handler: Callable[[Evt], Awaitable[None]]) -> None:
@@ -64,6 +70,7 @@ class DomainEventSubscriber(Service):
         existing = self.subscribers.get(event_cls.kind, default_descriptor)
         new_descriptor = existing.with_callback(handler)
         self.subscribers[event_cls.kind] = new_descriptor
+        log.info(f"Added domain event handler for {event_cls.kind}")
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         handler = self.subscribers.get(context.kind)
