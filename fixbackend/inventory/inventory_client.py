@@ -28,6 +28,7 @@ from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
+from fixbackend.inventory.schemas import CompletePathRequest
 
 
 class GraphDatabaseException(Exception):
@@ -157,27 +158,15 @@ class InventoryClient(Service):
         self,
         access: GraphDatabaseAccess,
         *,
-        path: Optional[str] = None,
-        prop: Optional[str] = None,
-        allowed_kinds: Optional[List[str]] = None,
-        fuzzy: bool = False,
-        limit: int = 20,
-        skip: int = 0,
+        request: CompletePathRequest,
         graph: str = "resoto",
         section: str = "reported",
     ) -> Tuple[int, Dict[str, str]]:
         headers = self.__headers(access)
         params = {"section": section}
-        body: Json = {"fuzzy": fuzzy, "limit": limit, "skip": skip}
-        if path:
-            body["path"] = path
-        if prop:
-            body["prop"] = prop
-        if allowed_kinds:
-            body["kinds"] = allowed_kinds
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/property/path/complete",
-            json=body,
+            json=request.model_dump_json(),
             headers=headers,
             params=params,
         )
