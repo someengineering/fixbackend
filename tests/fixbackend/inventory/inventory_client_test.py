@@ -29,7 +29,7 @@ from httpx import Request, Response
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
-from tests.fixbackend.conftest import InventoryMock, nd_json_response
+from tests.fixbackend.conftest import InventoryMock, nd_json_response, json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -62,6 +62,8 @@ def mocked_inventory_client(
             return nd_json_response(["prop_a", "prop_b", "prop_c"])
         elif request.url.path == "/graph/resoto/property/values":
             return nd_json_response(["val_a", "val_b", "val_c"])
+        elif request.url.path == "/graph/resoto/property/path/complete":
+            return json_response({"a": "string", "b": "int32", "c": "boolean"}, {"Total-Count": "12"})
         elif request.url.path == "/graph/resoto/model":
             return Response(
                 200,
@@ -114,3 +116,9 @@ async def test_model(mocked_inventory_client: InventoryClient, aws_ec2_model_jso
 async def test_resource(mocked_inventory_client: InventoryClient, azure_virtual_machine_resource_json: Json) -> None:
     result = await mocked_inventory_client.resource(db_access, id=NodeId("some_node_id"))
     assert result == azure_virtual_machine_resource_json
+
+
+async def test_complete(mocked_inventory_client: InventoryClient, azure_virtual_machine_resource_json: Json) -> None:
+    count, result = await mocked_inventory_client.complete_property_path(db_access)
+    assert count == 12
+    assert result == {"a": "string", "b": "int32", "c": "boolean"}
