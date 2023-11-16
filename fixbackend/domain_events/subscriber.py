@@ -93,7 +93,7 @@ class DomainEventSubscriber(Service):
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         log.info(f"Processing domain event: {message} {context}")
         handler = self.subscribers.get(context.kind)
-        log.info(f"Handler: {handler}")
+        log.info(f"subscribers: {self.subscribers} Handler: {handler}")
         if not handler:
             return
         event = handler.event_cls.from_json(message)

@@ -16,7 +16,7 @@ import boto3
 
 from abc import ABC
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from fixcloudutils.asyncio.async_extensions import run_async
 from fixbackend.ids import ExternalId, CloudAccountAlias, CloudAccountName
 from attrs import frozen
@@ -84,7 +84,7 @@ class AwsAccountSetupHelper:
         next_token = None
         try:
             while True:
-                kwargs = {}
+                kwargs: Dict[str, Any] = {}
                 if next_token:
                     kwargs["NextToken"] = next_token
                 response = await run_async(
