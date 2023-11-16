@@ -111,7 +111,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
-        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg))
+        domain_event_subscriber = deps.add(
+            SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg, "fixbackend")
+        )
         engine = deps.add(
             SN.async_engine,
             create_async_engine(
@@ -197,7 +199,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
-        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg))
+        domain_event_subscriber = deps.add(
+            SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg, "dispatching")
+        )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
             SN.async_engine,

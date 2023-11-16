@@ -55,13 +55,13 @@ T = TypeVar("T")
 
 
 class DomainEventSubscriber(Service):
-    def __init__(self, redis: Redis, config: Config) -> None:
+    def __init__(self, redis: Redis, config: Config, component: str) -> None:
         self.redis = redis
         self.subscribers: Dict[Kind, HandlerDescriptor[Any]] = {}
         self.listener = RedisStreamListener(
             redis,
             DomainEventsStreamName,
-            group="fixbackend-domain-events-subscriber",
+            group=f"fixbackend-domain-events-subscriber-{component}",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
             consider_failed_after=timedelta(minutes=5),
