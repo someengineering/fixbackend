@@ -83,21 +83,18 @@ class DomainEventSubscriber(Service):
         log.info(f"Added domain event handler {name} for {event_cls.kind}")
 
     async def timed(self, callback: Callback[Evt], event: Evt) -> None:
-        log.info(f"Processing domain event: {event} with {callback.name}")
         before = datetime.utcnow()
         await callback.callback(event)
         after = datetime.utcnow()
         elapsed = after - before
-        log.info(f"{callback.name} processed domain event {event} in {elapsed}")
+
+        log.debug(f"{callback.name} processed domain event {event} in {elapsed}")
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
-        log.info(f"Processing domain event: {message} {context}")
         handler = self.subscribers.get(context.kind)
-        log.info(f"subscribers: {self.subscribers} Handler: {handler}")
         if not handler:
             return
         event = handler.event_cls.from_json(message)
         async with asyncio.TaskGroup() as g:
             for callback in handler.callbacks:
                 g.create_task(self.timed(callback, event))
-        log.info(f"Processed domain event {event}")
