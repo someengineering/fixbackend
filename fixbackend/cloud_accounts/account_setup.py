@@ -84,9 +84,12 @@ class AwsAccountSetupHelper:
         next_token = None
         try:
             while True:
+                kwargs = {}
+                if next_token:
+                    kwargs["NextToken"] = next_token
                 response = await run_async(
                     orgnizations_client.list_accounts,
-                    NextToken=next_token or "",  # boto3 doesn't like None
+                    kwargs=kwargs,
                 )
                 next_token = response.get("NextToken")
                 accounts.extend(response["Accounts"])
