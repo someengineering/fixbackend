@@ -68,6 +68,7 @@ class CloudAccountRead(BaseModel):
         description="Name of the cloud account, as provided by the cloud", max_length=64
     )
     state: str = Field(description="State of the cloud account")
+    priviledged: bool = Field(description="If priviledged, the account can do some administative tasks")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -90,6 +91,7 @@ class CloudAccountRead(BaseModel):
             api_account_alias=model.account_alias,
             api_account_name=model.account_name,
             state=model.state.state_name,
+            priviledged=model.privileged,
         )
 
 

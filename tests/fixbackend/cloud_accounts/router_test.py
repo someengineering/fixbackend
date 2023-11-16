@@ -269,6 +269,8 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["enabled"] is True
     assert data["resources"] == 100
     assert data["next_scan"] == next_scan.isoformat()
+    assert data["state"] == "configured"
+    assert data["priviledged"] is True
 
 
 @pytest.mark.asyncio
