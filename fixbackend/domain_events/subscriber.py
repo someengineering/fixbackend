@@ -83,6 +83,7 @@ class DomainEventSubscriber(Service):
         log.info(f"Added domain event handler {name} for {event_cls.kind}")
 
     async def timed(self, callback: Callback[Evt], event: Evt) -> None:
+        log.info(f"Processing domain event: {event} with {callback.name}")
         before = datetime.utcnow()
         await callback.callback(event)
         after = datetime.utcnow()
