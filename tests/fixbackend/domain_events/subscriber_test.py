@@ -69,9 +69,9 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
         nonlocal account_configured_event
         account_configured_event = event
 
-    subscriber.subscribe(UserRegistered, handler)
-    subscriber.subscribe(UserRegistered, handler2)
-    subscriber.subscribe(AwsAccountConfigured, handler3)
+    subscriber.subscribe(UserRegistered, handler, "handler1")
+    subscriber.subscribe(UserRegistered, handler2, "handler2")
+    subscriber.subscribe(AwsAccountConfigured, handler3, "handler3")
     await subscriber.start()
 
     await publisher.publish(event)
