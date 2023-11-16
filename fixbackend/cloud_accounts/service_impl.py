@@ -109,12 +109,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         match context.kind:
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
-                log.info(f"Received {TenantAccountsCollected.kind} event: {event}")
                 set_workspace_id(str(event.tenant_id))
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
                     set_cloud_account_id(account.account_id)
-                    log.info(f"Updating account {account_id}")
                     await self.cloud_account_repository.update(
                         account_id,
                         lambda acc: evolve(
