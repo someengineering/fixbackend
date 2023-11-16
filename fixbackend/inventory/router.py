@@ -23,7 +23,7 @@ import logging
 from typing import List, Optional, Annotated
 
 from fastapi import APIRouter, Query, Request, Depends, Form, Path
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
@@ -119,6 +119,20 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             graph_db, query=query, prop_or_predicate=prop, detail="values", skip=skip, limit=limit, count=count
         )
         return streaming_response(request.headers.get("accept", "application/json"), result)
+
+    @router.post("/{workspace_id}/inventory/property/path/complete")
+    async def complete_property_path(
+        graph_db: CurrentGraphDbDependency,
+        prop: Optional[str] = Form(None),
+        path: Optional[str] = Form(None),
+        allowed_kinds: Optional[List[str]] = Form(None),
+        skip: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=0, le=50),
+    ) -> JSONResponse:
+        count, result = await fix.inventory.client.complete_property_path(
+            access=graph_db, path=path, prop=prop, allowed_kinds=allowed_kinds, skip=skip, limit=limit
+        )
+        return JSONResponse(result, headers={"Total-Count": str(count)})
 
     @router.post("/{workspace_id}/inventory/search/table")
     async def search_list(
