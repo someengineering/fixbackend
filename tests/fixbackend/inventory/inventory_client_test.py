@@ -29,6 +29,7 @@ from httpx import Request, Response
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.schemas import CompletePathRequest
 from tests.fixbackend.conftest import InventoryMock, nd_json_response, json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
@@ -119,6 +120,7 @@ async def test_resource(mocked_inventory_client: InventoryClient, azure_virtual_
 
 
 async def test_complete(mocked_inventory_client: InventoryClient, azure_virtual_machine_resource_json: Json) -> None:
-    count, result = await mocked_inventory_client.complete_property_path(db_access)
+    request = CompletePathRequest()  # type: ignore
+    count, result = await mocked_inventory_client.complete_property_path(db_access, request=request)
     assert count == 12
     assert result == {"a": "string", "b": "int32", "c": "boolean"}
