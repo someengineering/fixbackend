@@ -168,7 +168,7 @@ class InventoryClient(Service):
     ) -> Tuple[int, Dict[str, str]]:
         headers = self.__headers(access)
         params = {"section": section}
-        body = {"fuzzy": fuzzy, "limit": limit, "skip": skip}
+        body: Json = {"fuzzy": fuzzy, "limit": limit, "skip": skip}
         if path:
             body["path"] = path
         if prop:
