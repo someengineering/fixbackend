@@ -13,10 +13,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from datetime import timedelta
-from typing import Awaitable, Callable, Dict, Type, Tuple, TypeVar, Generic, Any
+from datetime import datetime, timedelta
+from logging import getLogger
+from typing import Any, Awaitable, Callable, Dict, Generic, Tuple, Type, TypeVar
 
-from fixcloudutils.redis.event_stream import RedisStreamListener, MessageContext
+from attrs import frozen
+from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from redis.asyncio import Redis
@@ -24,51 +26,75 @@ from redis.asyncio import Redis
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import Event
-from attrs import frozen
+import asyncio
 
 Kind = str
 
 Evt = TypeVar("Evt", bound=Event)
 
 
+log = getLogger(__name__)
+
+
+@frozen
+class Callback(Generic[Evt]):
+    callback: Callable[[Evt], Awaitable[None]]
+    name: str
+
+
 @frozen
 class HandlerDescriptor(Generic[Evt]):
-    callbacks: Tuple[Callable[[Evt], Awaitable[None]], ...]
+    callbacks: Tuple[Callback[Evt], ...]
     event_cls: Type[Evt]
 
-    def with_callback(self, callback: Callable[[Evt], Awaitable[None]]) -> "HandlerDescriptor[Evt]":
-        return HandlerDescriptor(callbacks=self.callbacks + (callback,), event_cls=self.event_cls)
+    def with_callback(self, callback: Callable[[Evt], Awaitable[None]], name: str) -> "HandlerDescriptor[Evt]":
+        return HandlerDescriptor(callbacks=self.callbacks + (Callback(callback, name),), event_cls=self.event_cls)
+
+
+T = TypeVar("T")
 
 
 class DomainEventSubscriber(Service):
-    def __init__(self, redis: Redis, config: Config) -> None:
+    def __init__(self, redis: Redis, config: Config, component: str) -> None:
         self.redis = redis
         self.subscribers: Dict[Kind, HandlerDescriptor[Any]] = {}
         self.listener = RedisStreamListener(
             redis,
             DomainEventsStreamName,
-            group="fixbackend-domain-events-subscriber",
+            group=f"fixbackend-domain-events-subscriber-{component}",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
             consider_failed_after=timedelta(minutes=5),
         )
 
     async def start(self) -> None:
+        log.info("Starting domain event subscriber")
         await self.listener.start()
 
     async def stop(self) -> None:
+        log.info("Stopping domain event subscriber")
         await self.listener.stop()
 
-    def subscribe(self, event_cls: Type[Evt], handler: Callable[[Evt], Awaitable[None]]) -> None:
+    def subscribe(self, event_cls: Type[Evt], handler: Callable[[Evt], Awaitable[None]], name: str) -> None:
         default_descriptor = HandlerDescriptor(event_cls=event_cls, callbacks=())
         existing = self.subscribers.get(event_cls.kind, default_descriptor)
-        new_descriptor = existing.with_callback(handler)
+        new_descriptor = existing.with_callback(handler, name)
         self.subscribers[event_cls.kind] = new_descriptor
+        log.info(f"Added domain event handler {name} for {event_cls.kind}")
+
+    async def timed(self, callback: Callback[Evt], event: Evt) -> None:
+        before = datetime.utcnow()
+        await callback.callback(event)
+        after = datetime.utcnow()
+        elapsed = after - before
+
+        log.debug(f"{callback.name} processed domain event {event} in {elapsed}")
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         handler = self.subscribers.get(context.kind)
         if not handler:
             return
         event = handler.event_cls.from_json(message)
-        for callback in handler.callbacks:
-            await callback(event)
+        async with asyncio.TaskGroup() as g:
+            for callback in handler.callbacks:
+                g.create_task(self.timed(callback, event))

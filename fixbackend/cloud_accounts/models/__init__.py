@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import ClassVar, Dict, Optional
+from typing import ClassVar, Optional
 from abc import ABC
 
 from attrs import frozen
@@ -117,17 +117,7 @@ class CloudAccount:
     account_alias: Optional[CloudAccountAlias]
     user_account_name: Optional[UserCloudAccountName]
     privileged: bool  # can do administrative tasks
-
-
-@frozen
-class LastScanAccountInfo:
-    account_id: CloudAccountId
-    duration_seconds: int
-    resources_scanned: int
-    started_at: datetime
-
-
-@frozen
-class LastScanInfo:
-    accounts: Dict[FixCloudAccountId, LastScanAccountInfo]
     next_scan: Optional[datetime]
+    last_scan_duration_seconds: int
+    last_scan_started_at: Optional[datetime]
+    last_scan_resources_scanned: int

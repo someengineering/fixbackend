@@ -70,9 +70,7 @@ class CloudAccountRead(BaseModel):
     state: str = Field(description="State of the cloud account")
 
     @staticmethod
-    def from_model(
-        model: CloudAccount, resources_scanned: Optional[int] = None, next_scan: Optional[datetime] = None
-    ) -> "CloudAccountRead":
+    def from_model(model: CloudAccount) -> "CloudAccountRead":
         enabled = False
         is_configured = False
         match model.state:
@@ -87,8 +85,8 @@ class CloudAccountRead(BaseModel):
             user_account_name=model.user_account_name,
             enabled=enabled,
             is_configured=is_configured,
-            resources=resources_scanned,
-            next_scan=next_scan,
+            resources=model.last_scan_resources_scanned,
+            next_scan=model.next_scan,
             api_account_alias=model.account_alias,
             api_account_name=model.account_name,
             state=model.state.state_name,

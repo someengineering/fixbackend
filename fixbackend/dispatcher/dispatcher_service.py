@@ -219,8 +219,8 @@ class DispatcherService(Service):
         self.domain_event_sender = domain_event_sender
         self.collect_progress = CollectAccountProgress(temp_store_redis)
 
-        domain_event_subscriber.subscribe(WorkspaceCreated, self.process_workspace_created)
-        domain_event_subscriber.subscribe(AwsAccountConfigured, self.process_aws_account_configured)
+        domain_event_subscriber.subscribe(WorkspaceCreated, self.process_workspace_created, "dispatcher")
+        domain_event_subscriber.subscribe(AwsAccountConfigured, self.process_aws_account_configured, "dispatcher")
 
     async def start(self) -> Any:
         await self.collect_result_listener.start()

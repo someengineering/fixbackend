@@ -44,7 +44,7 @@ class CustomerIoEventConsumer(Service):
         self.site_id = config.customerio_site_id
         self.api_key = config.customerio_api_key
         self.customerio_baseurl = config.customerio_baseurl
-        subscriber.subscribe(UserRegistered, self.process_user_registered_event)
+        subscriber.subscribe(UserRegistered, self.process_user_registered_event, "customerio")
 
     async def process_user_registered_event(self, event: UserRegistered) -> None:
         if self.site_id is None or self.api_key is None:

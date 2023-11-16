@@ -87,7 +87,7 @@ class InventoryService(Service):
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
 
-        domain_event_subscriber.subscribe(AwsAccountDeleted, self.process_account_deleted)
+        domain_event_subscriber.subscribe(AwsAccountDeleted, self.process_account_deleted, "inventory-service")
 
     async def process_account_deleted(self, event: AwsAccountDeleted) -> None:
         set_workspace_id(str(event.tenant_id))

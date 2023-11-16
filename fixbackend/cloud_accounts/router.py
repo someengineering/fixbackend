@@ -13,8 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import List, Tuple, Optional
-import asyncio
+from typing import List
 
 from fastapi import APIRouter
 
@@ -26,10 +25,9 @@ from fixbackend.cloud_accounts.schemas import (
     LastScanInfo,
     ScannedAccount,
 )
-from fixbackend.ids import FixCloudAccountId, WorkspaceId
+from fixbackend.ids import FixCloudAccountId
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
-from datetime import datetime
 
 
 log = logging.getLogger(__name__)
@@ -38,18 +36,6 @@ log = logging.getLogger(__name__)
 def cloud_accounts_router() -> APIRouter:
     router = APIRouter()
 
-    async def scan_account_data(
-        cloud_account_id: FixCloudAccountId,
-        workspace_id: WorkspaceId,
-        service: CloudAccountServiceDependency,
-    ) -> Tuple[Optional[int], Optional[datetime]]:
-        last_scan = await service.last_scan(workspace_id)
-        accounts = last_scan.accounts if last_scan else {}
-        next_scan = last_scan.next_scan if last_scan else None
-        last_scan_account_data = accounts.get(cloud_account_id)
-        resources_scanned = last_scan_account_data.resources_scanned if last_scan_account_data else None
-        return resources_scanned, next_scan
-
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def get_cloud_account(
         workspace: UserWorkspaceDependency,
@@ -57,25 +43,14 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
         cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
-        resources_scanned, next_scan = await scan_account_data(cloud_account_id, workspace.id, service)
-        return CloudAccountRead.from_model(cloud_account, resources_scanned, next_scan)
+        return CloudAccountRead.from_model(cloud_account)
 
     @router.get("/{workspace_id}/cloud_accounts")
     async def list_cloud_accounts(
         workspace: UserWorkspaceDependency, service: CloudAccountServiceDependency
     ) -> List[CloudAccountRead]:
-        async with asyncio.TaskGroup() as tg:
-            cloud_accounts_task = tg.create_task(service.list_accounts(workspace.id))
-            last_scan_task = tg.create_task(service.last_scan(workspace.id))
-        cloud_accounts = await cloud_accounts_task
-        last_scan = await last_scan_task
-        accounts = last_scan.accounts if last_scan else {}
-        resources_scanned = {account_id: value.resources_scanned for account_id, value in accounts.items()}
-        next_scan = last_scan.next_scan if last_scan else None
-        return [
-            CloudAccountRead.from_model(cloud_account, resources_scanned.get(cloud_account.id), next_scan)
-            for cloud_account in cloud_accounts
-        ]
+        cloud_accounts = await service.list_accounts(workspace.id)
+        return [CloudAccountRead.from_model(cloud_account) for cloud_account in cloud_accounts]
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def update_cloud_account(
@@ -85,8 +60,7 @@ def cloud_accounts_router() -> APIRouter:
         update: AwsCloudAccountUpdate,
     ) -> CloudAccountRead:
         updated = await service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
-        resources_scanned, next_scan = await scan_account_data(cloud_account_id, workspace.id, service)
-        return CloudAccountRead.from_model(updated, resources_scanned, next_scan)
+        return CloudAccountRead.from_model(updated)
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def delete_cloud_account(
@@ -103,8 +77,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
         updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
-        resources_scanned, next_scan = await scan_account_data(cloud_account_id, workspace.id, service)
-        return CloudAccountRead.from_model(updated, resources_scanned, next_scan)
+        return CloudAccountRead.from_model(updated)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/disable")
     async def disable_cloud_account(
@@ -113,29 +86,29 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
     ) -> CloudAccountRead:
         updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
-        resources_scanned, next_scan = await scan_account_data(cloud_account_id, workspace.id, service)
-        return CloudAccountRead.from_model(updated, resources_scanned, next_scan)
+        return CloudAccountRead.from_model(updated)
 
     @router.get("/{workspace_id}/cloud_accounts/last_scan")
     async def last_scan(
         workspace: UserWorkspaceDependency,
         service: CloudAccountServiceDependency,
     ) -> LastScanInfo:
-        last_scan = await service.last_scan(workspace.id)
-        if last_scan is None:
+        accounts = await service.list_accounts(workspace.id)
+        if not accounts:
             return LastScanInfo.empty(workspace.id)
         return LastScanInfo(
             workspace_id=workspace.id,
             accounts=[
                 ScannedAccount(
                     account_id=account.account_id,
-                    resource_scanned=account.resources_scanned,
-                    duration=account.duration_seconds,
-                    started_at=account.started_at,
+                    resource_scanned=account.last_scan_resources_scanned,
+                    duration=account.last_scan_duration_seconds,
+                    started_at=account.last_scan_started_at,
                 )
-                for account in last_scan.accounts.values()
+                for account in accounts
+                if account.last_scan_started_at
             ],
-            next_scan=last_scan.next_scan,
+            next_scan=accounts[0].next_scan,
         )
 
     return router
