@@ -79,3 +79,4 @@ class DomainEventSubscriber(Service):
         event = handler.event_cls.from_json(message)
         for callback in handler.callbacks:
             await callback(event)
+        log.info(f"Processed domain event: {event} {context}")
