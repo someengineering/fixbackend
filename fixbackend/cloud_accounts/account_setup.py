@@ -92,7 +92,8 @@ class AwsAccountSetupHelper:
                 accounts.extend(response["Accounts"])
                 if next_token is None:
                     break
-        except Exception:
+        except Exception as ex:
+            log.info("Failed to list accounts: %s", ex)
             return {}
 
         return {CloudAccountId(account["Id"]): CloudAccountName(account["Name"]) for account in accounts}
