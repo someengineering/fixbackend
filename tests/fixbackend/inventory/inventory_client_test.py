@@ -64,6 +64,8 @@ def mocked_inventory_client(
         elif request.url.path == "/graph/resoto/property/values":
             return nd_json_response(["val_a", "val_b", "val_c"])
         elif request.url.path == "/graph/resoto/property/path/complete":
+            cpl = CompletePathRequest.model_validate_json(request.content)
+            assert cpl == CompletePathRequest(path="test", prop="bla", fuzzy=True, limit=1, skip=2, kinds=["a"])
             return json_response({"a": "string", "b": "int32", "c": "boolean"}, {"Total-Count": "12"})
         elif request.url.path == "/graph/resoto/model":
             return Response(
@@ -120,7 +122,7 @@ async def test_resource(mocked_inventory_client: InventoryClient, azure_virtual_
 
 
 async def test_complete(mocked_inventory_client: InventoryClient, azure_virtual_machine_resource_json: Json) -> None:
-    request = CompletePathRequest()  # type: ignore
+    request = CompletePathRequest(path="test", prop="bla", fuzzy=True, limit=1, skip=2, kinds=["a"])
     count, result = await mocked_inventory_client.complete_property_path(db_access, request=request)
     assert count == 12
     assert result == {"a": "string", "b": "int32", "c": "boolean"}
