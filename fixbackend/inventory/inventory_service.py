@@ -321,7 +321,7 @@ class InventoryService(Service):
                     failed_checks_by_severity=severity_counter,
                 ),
                 overall_score=overall_score(accounts),
-                accounts=list(accounts.values()),
+                accounts=sorted(list(accounts.values()), key=lambda x: x.score),
                 benchmarks=list(benchmarks.values()),
                 changed_vulnerable=vulnerable_changed,
                 changed_compliant=compliant_changed,
