@@ -166,7 +166,7 @@ class InventoryClient(Service):
         params = {"section": section}
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/property/path/complete",
-            json=request.model_dump_json(),
+            json=request.model_dump(),
             headers=headers,
             params=params,
         )
