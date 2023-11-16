@@ -13,27 +13,28 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-
-import pytest
+from datetime import timedelta
 from typing import List
 
+import pytest
+from attrs import evolve
+from fixcloudutils.util import utc
+
+from fixbackend.auth.models import User
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
+from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.ids import (
-    FixCloudAccountId,
-    ExternalId,
-    CloudAccountId,
     AwsRoleName,
-    CloudNames,
-    CloudAccountName,
     CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
     UserCloudAccountName,
 )
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess, CloudAccountState, CloudAccountStates
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.auth.models import User
-from attrs import evolve
-from datetime import datetime, timedelta
 
 
 @pytest.mark.asyncio
@@ -121,7 +122,7 @@ async def test_create_cloud_account(
             raise ValueError("Invalid state")
 
     # update 2
-    timestamp = datetime.utcnow()
+    timestamp = utc()
     await cloud_account_repository.update(
         configured_account_id,
         lambda acc: evolve(
@@ -136,8 +137,8 @@ async def test_create_cloud_account(
     assert with_last_scan
     assert with_last_scan.last_scan_duration_seconds == 123
     assert with_last_scan.last_scan_resources_scanned == 456
-    assert with_last_scan.last_scan_started_at == timestamp
-    assert with_last_scan.next_scan == timestamp + timedelta(hours=1)
+    assert with_last_scan.last_scan_started_at == timestamp.replace(microsecond=0)
+    assert with_last_scan.next_scan == (timestamp + timedelta(hours=1)).replace(microsecond=0)
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)
