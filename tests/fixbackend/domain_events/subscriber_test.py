@@ -50,6 +50,7 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
 
     received_event: Optional[UserRegistered] = None
     received_event2: Optional[UserRegistered] = None
+    handler2_failed = False
     account_configured_event: Optional[AwsAccountConfigured] = None
 
     async def handler(event: UserRegistered) -> None:
@@ -58,6 +59,10 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
 
     async def handler2(event: UserRegistered) -> None:
         nonlocal received_event2
+        nonlocal handler2_failed
+        if not handler2_failed:
+            handler2_failed = True
+            raise Exception("foo")
         received_event2 = event
 
     async def handler3(event: AwsAccountConfigured) -> None:

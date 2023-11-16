@@ -340,9 +340,11 @@ class DispatcherService(Service):
         set_fix_cloud_account_id(event.cloud_account_id)
         set_workspace_id(event.tenant_id)
         set_cloud_account_id(event.aws_account_id)
+        log.info("Received aws account configured event")
         cloud_account_id = event.cloud_account_id
         if account := await self.cloud_account_repo.get(cloud_account_id):
             await self.trigger_collect(account)
+            log.info("processing aws account configured event")
         else:
             log.error(
                 f"Received cloud account {cloud_account_id} configured message, but it does not exist in the database"
