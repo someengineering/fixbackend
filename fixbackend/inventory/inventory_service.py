@@ -28,7 +28,7 @@ from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal, Typ
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
-from fixcloudutils.util import value_in_path
+from fixcloudutils.util import value_in_path, utc_str
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
@@ -43,6 +43,7 @@ from fixbackend.inventory.schemas import (
     CheckSummary,
     SearchStartData,
     SearchCloudResource,
+    SearchRequest,
 )
 from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
@@ -116,10 +117,20 @@ class InventoryService(Service):
 
         return self.client.execute_single(db, report + " | dump")  # type: ignore
 
-    async def search_table(self, db: GraphDatabaseAccess, query: str) -> AsyncIterator[JsonElement]:
-        if not query.startswith("search"):
-            query = "search " + query
-        return self.client.execute_single(db, query + " | list --json-table")
+    async def search_table(self, db: GraphDatabaseAccess, request: SearchRequest) -> AsyncIterator[JsonElement]:
+        if history := request.history:
+            cmd = "history"
+            if history.change:
+                cmd += f" --change {history.change.value}"
+            if history.before:
+                cmd += f" --before {utc_str(history.before)}"
+            if history.after:
+                cmd += f" --after {utc_str(history.after)}"
+            cmd += " " + request.query
+        else:
+            cmd = "search " + request.query
+        cmd += f" | limit {request.skip}, {request.limit} | list --json-table"
+        return self.client.execute_single(db, cmd)
 
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
