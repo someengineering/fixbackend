@@ -106,10 +106,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.become_degraded_timeout = timedelta(minutes=15)
 
     async def start(self) -> Any:
-        return await self.domain_event_listener.start()
+        await self.domain_event_listener.start()
+        await self.periodic.start()
 
     async def stop(self) -> Any:
-        return await self.domain_event_listener.stop()
+        await self.domain_event_listener.stop()
+        await self.periodic.stop()
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         match context.kind:
