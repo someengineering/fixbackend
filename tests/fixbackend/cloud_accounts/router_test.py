@@ -46,6 +46,7 @@ from fixbackend.ids import (
 )
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
+from fixcloudutils.util import utc, utc_str
 
 
 class InMemoryCloudAccountService(CloudAccountService):
@@ -76,6 +77,9 @@ class InMemoryCloudAccountService(CloudAccountService):
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
             next_scan=None,
+            created_at=utc(),
+            updated_at=utc(),
+            state_updated_at=utc(),
         )
         self.accounts[account.id] = account
         return account
@@ -194,6 +198,9 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         last_scan_duration_seconds=0,
         last_scan_resources_scanned=0,
         next_scan=None,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -221,6 +228,9 @@ async def test_last_scan(client: AsyncClient) -> None:
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts/last_scan")
@@ -239,7 +249,7 @@ async def test_last_scan(client: AsyncClient) -> None:
 async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
-    next_scan = datetime.utcnow()
+    next_scan = utc().replace(microsecond=0)
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
@@ -254,6 +264,9 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         last_scan_resources_scanned=100,
         last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -268,7 +281,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["is_configured"] is True
     assert data["enabled"] is True
     assert data["resources"] == 100
-    assert data["next_scan"] == next_scan.isoformat()
+    assert data["next_scan"] == utc_str(next_scan)
     assert data["state"] == "configured"
     assert data["priviledged"] is True
 
@@ -292,6 +305,9 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         last_scan_resources_scanned=100,
         last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
@@ -330,6 +346,9 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         last_scan_resources_scanned=100,
         last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
 
     payload: Dict[str, Optional[str]] = {
@@ -374,6 +393,9 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         last_scan_resources_scanned=100,
         last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
     )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")

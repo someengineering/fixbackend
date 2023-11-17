@@ -74,6 +74,9 @@ async def test_create_cloud_account(
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
             next_scan=None,
+            created_at=utc().replace(microsecond=0),
+            updated_at=utc().replace(microsecond=0),
+            state_updated_at=utc().replace(microsecond=0),
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -101,6 +104,11 @@ async def test_create_cloud_account(
         role_name=AwsRoleName("bar"),
         external_id=ExternalId(uuid.uuid4()),
     )
+
+    # list all discovered
+    discovered_accounts = await cloud_account_repository.list_all_discovered_accounts()
+    assert len(discovered_accounts) == 1
+    assert discovered_accounts[0].state.state_name == CloudAccountStates.Discovered.state_name
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:

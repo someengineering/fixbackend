@@ -14,7 +14,7 @@
 
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
@@ -35,6 +35,7 @@ from fixbackend.domain_events.events import (
     CloudAccountCollectInfo,
     Event,
     TenantAccountsCollected,
+    AwsAccountDegraded,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
@@ -51,6 +52,7 @@ from fixbackend.ids import (
 )
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixcloudutils.util import utc
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -82,6 +84,11 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
 
     async def delete(self, id: FixCloudAccountId) -> None:
         self.accounts.pop(id)
+
+    async def list_all_discovered_accounts(self) -> List[CloudAccount]:
+        return [
+            account for account in self.accounts.values() if isinstance(account.state, CloudAccountStates.Discovered)
+        ]
 
 
 test_workspace_id = WorkspaceId(uuid.uuid4())
@@ -181,6 +188,7 @@ async def test_create_aws_account(
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     # happy case
@@ -303,6 +311,7 @@ async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> N
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -339,6 +348,7 @@ async def test_store_last_run_info(arq_redis: Redis, default_config: Config) -> 
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -383,6 +393,7 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -432,6 +443,7 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -472,6 +484,7 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -525,6 +538,7 @@ async def test_handle_account_discovered_success(arq_redis: Redis, default_confi
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -569,6 +583,7 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     # boto3 cannot assume right away
@@ -633,6 +648,7 @@ async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis,
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account_id = CloudAccountId("foobar")
@@ -686,6 +702,7 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     # boto3 cannot assume right away
@@ -741,6 +758,7 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
         arq_redis,
         default_config,
         account_setup_helper,
+        dispatching=False,
     )
 
     account = await service.create_aws_account(
@@ -802,3 +820,82 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
     # wrong account id
     with pytest.raises(Exception):
         await service.update_cloud_account_name(test_workspace_id, FixCloudAccountId(uuid.uuid4()), user_account_name)
+
+
+@pytest.mark.asyncio
+async def test_configure_account(arq_redis: Redis, default_config: Config) -> None:
+    repository = CloudAccountRepositoryMock()
+    organization_repository = OrganizationServiceMock()
+    pubsub_publisher = RedisPubSubPublisherMock()
+    domain_sender = DomainEventSenderMock()
+
+    account_setup_helper = AwsAccountSetupHelperMock()
+    service = CloudAccountServiceImpl(
+        organization_repository,
+        repository,
+        pubsub_publisher,
+        domain_sender,
+        arq_redis,
+        default_config,
+        account_setup_helper,
+        dispatching=False,
+    )
+    account_setup_helper.can_assume = False
+
+    def get_account(state_updated_at: datetime) -> CloudAccount:
+        return CloudAccount(
+            id=FixCloudAccountId(uuid.uuid4()),
+            account_id=account_id,
+            workspace_id=WorkspaceId(uuid.uuid4()),
+            cloud=CloudNames.AWS,
+            state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)),
+            account_name=CloudAccountName("foo"),
+            account_alias=CloudAccountAlias("foo_alias"),
+            user_account_name=UserCloudAccountName("foo_user"),
+            privileged=True,
+            last_scan_duration_seconds=10,
+            last_scan_resources_scanned=100,
+            last_scan_started_at=datetime.utcnow(),
+            next_scan=utc(),
+            created_at=utc(),
+            updated_at=utc(),
+            state_updated_at=state_updated_at,
+        )
+
+    # fresh account should be retried
+    with pytest.raises(Exception):
+        await service.configure_account(get_account(state_updated_at=utc()), called_from_event=True)
+
+    with pytest.raises(Exception):
+        await service.configure_account(get_account(state_updated_at=utc()), called_from_event=False)
+
+    # more than 1 minute old account should go off fast_lane in case this was an event
+    await service.configure_account(
+        get_account(state_updated_at=utc() - (service.fast_lane_timeout + timedelta(minutes=1))), called_from_event=True
+    )
+    await service.configure_account(
+        get_account(state_updated_at=utc() - (service.become_degraded_timeout + timedelta(minutes=1))),
+        called_from_event=True,
+    )
+    assert len(domain_sender.events) == 0
+    # but not if called from the periodic task
+    with pytest.raises(Exception):
+        await service.configure_account(
+            get_account(state_updated_at=utc() - timedelta(minutes=2)), called_from_event=False
+        )
+
+    # more than 15 minutes old should become degraded in case of the periodic task
+    account = get_account(state_updated_at=utc() - timedelta(minutes=16))
+    await repository.create(account)
+    await service.configure_discovered_accounts()
+
+    updated_account = await repository.get(account.id)
+    assert updated_account
+    assert isinstance(updated_account.state, CloudAccountStates.Degraded)
+
+    assert len(domain_sender.events) == 1
+    event = domain_sender.events[0]
+    assert isinstance(event, AwsAccountDegraded)
+    assert event.cloud_account_id == account.id
+    assert event.aws_account_id == account_id
+    assert event.tenant_id == account.workspace_id

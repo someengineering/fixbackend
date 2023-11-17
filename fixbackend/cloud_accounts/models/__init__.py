@@ -121,3 +121,6 @@ class CloudAccount:
     last_scan_duration_seconds: int
     last_scan_started_at: Optional[datetime]
     last_scan_resources_scanned: int
+    created_at: datetime
+    updated_at: datetime
+    state_updated_at: datetime
