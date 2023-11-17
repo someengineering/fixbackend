@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -69,6 +69,7 @@ class CloudAccountRead(BaseModel):
     )
     state: str = Field(description="State of the cloud account")
     priviledged: bool = Field(description="If priviledged, the account can do some administative tasks")
+    last_collected: Optional[datetime] = Field(description="The time when the account was last collected")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -78,6 +79,10 @@ class CloudAccountRead(BaseModel):
             case CloudAccountStates.Configured():
                 enabled = model.state.enabled
                 is_configured = True
+
+        last_collected = None
+        if model.last_scan_started_at:
+            last_collected = model.last_scan_started_at + timedelta(seconds=model.last_scan_duration_seconds)
 
         return CloudAccountRead(
             id=model.id,
@@ -92,6 +97,7 @@ class CloudAccountRead(BaseModel):
             api_account_name=model.account_name,
             state=model.state.state_name,
             priviledged=model.privileged,
+            last_collected=last_collected,
         )
 
 

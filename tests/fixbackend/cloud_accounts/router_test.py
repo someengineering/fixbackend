@@ -14,7 +14,7 @@
 
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
@@ -240,6 +240,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     next_scan = datetime.utcnow()
+    started_at = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
@@ -252,7 +253,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         privileged=True,
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
-        last_scan_started_at=datetime.utcnow(),
+        last_scan_started_at=started_at,
         next_scan=next_scan,
     )
 
@@ -271,6 +272,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["next_scan"] == next_scan.isoformat()
     assert data["state"] == "configured"
     assert data["priviledged"] is True
+    assert data["last_collected"] == (started_at + timedelta(seconds=10)).isoformat()
 
 
 @pytest.mark.asyncio
