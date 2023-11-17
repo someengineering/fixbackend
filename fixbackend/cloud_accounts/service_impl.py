@@ -83,6 +83,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             retries=8,
             log_failed_attempts=False,
         )
+        self.periodic: Optional[Periodic] = None
         if dispatching:
             self.periodic = Periodic(
                 "conifugure_discovered_accounts", self.configure_discovered_accounts, timedelta(minutes=1)
@@ -107,11 +108,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
     async def start(self) -> Any:
         await self.domain_event_listener.start()
-        await self.periodic.start()
+        if self.periodic:
+            await self.periodic.start()
 
     async def stop(self) -> Any:
         await self.domain_event_listener.stop()
-        await self.periodic.stop()
+        if self.periodic:
+            await self.periodic.stop()
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         match context.kind:
