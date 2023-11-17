@@ -84,3 +84,20 @@ class SearchStartData(BaseModel):
     regions: List[SearchCloudResource] = Field(description="The available regions.")
     kinds: List[SearchCloudResource] = Field(description="The available resource kinds.")
     severity: List[str] = Field(description="Severity values.")
+
+
+class CompletePathRequest(BaseModel):
+    path: Optional[str] = Field(None, description="The path to complete")
+    prop: Optional[str] = Field(
+        None, description="The property to complete. If path is given, this is the last property in the path."
+    )
+    kinds: Optional[List[str]] = Field(
+        None, description="The kinds to consider. If not given, all kinds are considered."
+    )
+    fuzzy: bool = Field(
+        False, description="If true, fuzzy matching is used. If false, only exact matches are returned."
+    )
+    limit: int = Field(
+        20, description="The maximum number of results to return. If not given, all results are returned."
+    )
+    skip: int = Field(0, description="The number of results to skip. If not given, no results are skipped.")

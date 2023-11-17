@@ -15,9 +15,8 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from datetime import datetime
 
-from fixbackend.cloud_accounts.models import CloudAccount, LastScanInfo
+from fixbackend.cloud_accounts.models import CloudAccount
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountId,
@@ -43,7 +42,6 @@ class CloudAccountService(ABC):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName],
-        created_at: datetime,
     ) -> CloudAccount:
         """Create a cloud account."""
         raise NotImplementedError
@@ -51,11 +49,6 @@ class CloudAccountService(ABC):
     @abstractmethod
     async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
         """Delete a cloud account."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def last_scan(self, workspace_id: WorkspaceId) -> Optional[LastScanInfo]:
-        """Get the last scan statistics for workspace."""
         raise NotImplementedError
 
     @abstractmethod

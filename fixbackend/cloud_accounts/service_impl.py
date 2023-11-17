@@ -15,7 +15,7 @@
 
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from hmac import compare_digest
 from logging import getLogger
 from typing import Any, Dict, List, Optional
@@ -27,14 +27,11 @@ from fixcloudutils.service import Service
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
     CloudAccountState,
     CloudAccountStates,
-    LastScanAccountInfo,
-    LastScanInfo,
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
@@ -42,7 +39,6 @@ from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
-    AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
     TenantAccountsCollected,
@@ -72,7 +68,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         cloud_account_repository: CloudAccountRepository,
         pubsub_publisher: RedisPubSubPublisher,
         domain_event_publisher: DomainEventPublisher,
-        last_scan_repo: LastScanRepository,
         readwrite_redis: Redis,
         config: Config,
         account_setup_helper: AwsAccountSetupHelper,
@@ -82,16 +77,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
 
-        self.last_scan_repo = last_scan_repo
-
-        self.assume_role_timeout = config.account_setup_assume_role_timeout
-
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
-        backoff_delay = 30
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
-            maximum_delay=backoff_delay,
-            retries=self.assume_role_timeout // backoff_delay,  # do not make more retries than the timeout allows
+            maximum_delay=30,
+            retries=7,  # 5 base seconds + 1/2/4/8/16/30/30 on each try,  less than 3 minutes in total
         )
 
         self.domain_event_listener = RedisStreamListener(
@@ -100,8 +90,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             group="fixbackend-cloudaccountservice-domain",
             listener=config.instance_id,
             message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(seconds=self.assume_role_timeout)
-            + timedelta(seconds=backoff_delay * 2),  # we need this a bit longer that the timeout itself
+            consider_failed_after=timedelta(minutes=5),
             batch_size=config.cloud_account_service_event_parallelism,
             parallelism=config.cloud_account_service_event_parallelism,
             backoff=backoff_config,
@@ -120,21 +109,19 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
                 set_workspace_id(str(event.tenant_id))
-                await self.last_scan_repo.set_last_scan(
-                    event.tenant_id,
-                    LastScanInfo(
-                        {
-                            account_id: LastScanAccountInfo(
-                                account.account_id,
-                                account.duration_seconds,
-                                account.scanned_resources,
-                                account.started_at,
-                            )
-                            for account_id, account in event.cloud_accounts.items()
-                        },
-                        event.next_run,
-                    ),
-                )
+                for account_id, account in event.cloud_accounts.items():
+                    set_fix_cloud_account_id(account_id)
+                    set_cloud_account_id(account.account_id)
+                    await self.cloud_account_repository.update(
+                        account_id,
+                        lambda acc: evolve(
+                            acc,
+                            last_scan_duration_seconds=account.duration_seconds,
+                            last_scan_resources_scanned=account.scanned_resources,
+                            last_scan_started_at=account.started_at,
+                            next_scan=event.next_run,
+                        ),
+                    )
 
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
@@ -180,27 +167,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         privileged = False
         match assume_role_result:
             case AssumeRoleResults.Failure(reason):
-                account_discovered_at = discovered.at or datetime.utcnow()
-                if (datetime.utcnow() - account_discovered_at) < timedelta(seconds=self.assume_role_timeout):
-                    msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
-                    log.info(msg)
-                    raise RuntimeError(msg)
-                else:
-                    log.info("failed to assume role, but timeout is reached, moving account to degraded state")
-                    error = "Cannot assume role"
-                    await self.cloud_account_repository.update(
-                        account.id, lambda account: evolve(account, state=CloudAccountStates.Degraded(access, error))
-                    )
-                    await self.domain_events.publish(
-                        AwsAccountDegraded(
-                            cloud_account_id=account.id,
-                            tenant_id=account.workspace_id,
-                            aws_account_id=account.account_id,
-                            error=error,
-                            at=datetime.utcnow(),
-                        )
-                    )
-                    return None
+                msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
+                log.info(msg)
+                raise RuntimeError(msg)
 
             case AssumeRoleResults.Success() as assume_role_result:
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
@@ -215,7 +184,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             role_name=None,
                             external_id=external_id,
                             account_name=name,
-                            created_at=datetime.utcnow(),
                         )
                 else:
                     alias = await self.account_setup_helper.list_account_aliases(assume_role_result)
@@ -246,7 +214,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName],
-        created_at: datetime,
     ) -> CloudAccount:
         """Create a cloud account."""
 
@@ -311,6 +278,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 account_name=account_name,
                 user_account_name=None,
                 privileged=False,
+                next_scan=None,
+                last_scan_duration_seconds=0,
+                last_scan_resources_scanned=0,
+                last_scan_started_at=None,
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
@@ -329,9 +300,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             kind="cloud_account_created", message=message, channel=f"tenant-events::{workspace_id}"
         )
         await self.domain_events.publish(
-            AwsAccountDiscovered(
-                cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id, at=created_at
-            )
+            AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
         )
         return result
 
@@ -344,9 +313,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         await self.cloud_account_repository.delete(cloud_account_id)
         await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
-
-    async def last_scan(self, workspace_id: WorkspaceId) -> Optional[LastScanInfo]:
-        return await self.last_scan_repo.get_last_scan(workspace_id)
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)

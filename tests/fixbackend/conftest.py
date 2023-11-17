@@ -18,7 +18,7 @@ import os
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
 
 import pytest
@@ -117,7 +117,6 @@ def default_config() -> Config:
         customerio_site_id=None,
         customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
-        account_setup_assume_role_timeout=900,  # 15 minutes
     )
 
 
@@ -267,7 +266,7 @@ async def redis() -> AsyncIterator[Redis]:
 
 @pytest.fixture
 async def domain_event_subscriber(redis: Redis, default_config: Config) -> DomainEventSubscriber:
-    return DomainEventSubscriber(redis, default_config)
+    return DomainEventSubscriber(redis, default_config, "test-subscriber")
 
 
 @pytest.fixture
@@ -326,8 +325,12 @@ def azure_virtual_machine_resource_json() -> Json:
     }
 
 
-def json_response(content: JsonElement) -> Response:
-    return Response(200, content=json.dumps(content).encode("utf-8"), headers={"content-type": "application/json"})
+def json_response(content: JsonElement, additional_headers: Optional[Dict[str, str]] = None) -> Response:
+    return Response(
+        200,
+        content=json.dumps(content).encode("utf-8"),
+        headers={"content-type": "application/json", **(additional_headers or {})},
+    )
 
 
 def nd_json_response(content: Sequence[JsonElement]) -> Response:

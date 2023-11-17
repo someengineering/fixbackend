@@ -14,7 +14,7 @@
 
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
@@ -25,8 +25,7 @@ from fixcloudutils.types import Json
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, LastScanInfo
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.config import Config
@@ -36,7 +35,6 @@ from fixbackend.domain_events.events import (
     CloudAccountCollectInfo,
     Event,
     TenantAccountsCollected,
-    AwsAccountDegraded,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
@@ -140,17 +138,6 @@ class DomainEventSenderMock(DomainEventPublisher):
         return self.events.append(event)
 
 
-class LastScanRepositoryMock(LastScanRepository):
-    def __init__(self) -> None:
-        self.data: Dict[WorkspaceId, LastScanInfo] = {}
-
-    async def set_last_scan(self, workspace_id: WorkspaceId, last_scan_statistics: LastScanInfo) -> None:
-        self.data[workspace_id] = last_scan_statistics
-
-    async def get_last_scan(self, workspace_id: WorkspaceId) -> LastScanInfo | None:
-        return self.data.get(workspace_id)
-
-
 class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
     def __init__(self) -> None:
         self.can_assume = True
@@ -185,14 +172,12 @@ async def test_create_aws_account(
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -205,7 +190,6 @@ async def test_create_aws_account(
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
     account = repository.accounts.get(acc.id)
@@ -235,7 +219,6 @@ async def test_create_aws_account(
     assert event.cloud_account_id == acc.id
     assert event.aws_account_id == account_id
     assert event.tenant_id == acc.workspace_id
-    assert event.at == now
 
     # account already exists, account_name should be updated, but nothing else
     idempotent_account = await service.create_aws_account(
@@ -244,7 +227,6 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=account_name,
-        created_at=now,
     )
     # no extra account should be created
     assert len(repository.accounts) == 1
@@ -259,7 +241,6 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=CloudAccountName("foobar"),
-        created_at=now,
     )
     assert len(repository.accounts) == 1
     # domain event should not be published
@@ -279,7 +260,6 @@ async def test_create_aws_account(
         role_name=None,
         external_id=external_id,
         account_name=account_name,
-        created_at=now,
     )
     assert detected_account.state == CloudAccountStates.Detected()
     # a new account should be created
@@ -295,7 +275,6 @@ async def test_create_aws_account(
             role_name=role_name,
             external_id=ExternalId(uuid.uuid4()),
             account_name=None,
-            created_at=now,
         )
 
     # wrong tenant id
@@ -306,7 +285,6 @@ async def test_create_aws_account(
             role_name=role_name,
             external_id=external_id,
             account_name=None,
-            created_at=now,
         )
 
 
@@ -316,14 +294,12 @@ async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> N
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -335,7 +311,6 @@ async def test_delete_aws_account(arq_redis: Redis, default_config: Config) -> N
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -355,20 +330,26 @@ async def test_store_last_run_info(arq_redis: Redis, default_config: Config) -> 
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
     )
 
-    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    account = await service.create_aws_account(
+        workspace_id=test_workspace_id,
+        account_id=account_id,
+        role_name=role_name,
+        external_id=external_id,
+        account_name=None,
+    )
+
+    cloud_account_id = account.id
     now = datetime.utcnow()
     event = TenantAccountsCollected(
         test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now)}, now
@@ -378,14 +359,13 @@ async def test_store_last_run_info(arq_redis: Redis, default_config: Config) -> 
         MessageContext(id="test", kind=TenantAccountsCollected.kind, publisher="test", sent_at=now, received_at=now),
     )
 
-    last_scan = await service.last_scan(test_workspace_id)
-    assert last_scan is not None
-    assert last_scan.next_scan == now
-    account = last_scan.accounts[cloud_account_id]
+    account = await service.get_cloud_account(cloud_account_id, test_workspace_id)
+
+    assert account.next_scan == now
     assert account.account_id == account_id
-    assert account.duration_seconds == 10
-    assert account.resources_scanned == 100
-    assert account.started_at == now
+    assert account.last_scan_duration_seconds == 10
+    assert account.last_scan_resources_scanned == 100
+    assert account.last_scan_started_at == now
 
 
 @pytest.mark.asyncio
@@ -394,14 +374,12 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -413,7 +391,6 @@ async def test_get_cloud_account(arq_redis: Redis, default_config: Config) -> No
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -445,14 +422,13 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -464,7 +440,6 @@ async def test_list_cloud_accounts(arq_redis: Redis, default_config: Config) -> 
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -487,14 +462,13 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -506,7 +480,6 @@ async def test_update_cloud_account_name(arq_redis: Redis, default_config: Confi
         role_name=role_name,
         external_id=external_id,
         account_name=account_name,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -542,14 +515,13 @@ async def test_handle_account_discovered_success(arq_redis: Redis, default_confi
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -561,7 +533,6 @@ async def test_handle_account_discovered_success(arq_redis: Redis, default_confi
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 
@@ -588,14 +559,13 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -610,7 +580,6 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -649,80 +618,18 @@ async def test_handle_account_discovered_assume_role_failure(arq_redis: Redis, d
 
 
 @pytest.mark.asyncio
-async def test_handle_account_discovered_to_degraded(arq_redis: Redis, default_config: Config) -> None:
-    repository = CloudAccountRepositoryMock()
-    organization_repository = OrganizationServiceMock()
-    pubsub_publisher = RedisPubSubPublisherMock()
-    domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
-    account_setup_helper = AwsAccountSetupHelperMock()
-    service = CloudAccountServiceImpl(
-        organization_repository,
-        repository,
-        pubsub_publisher,
-        domain_sender,
-        last_scan_repo,
-        arq_redis,
-        default_config,
-        account_setup_helper,
-    )
-
-    # boto3 cannot assume right away
-    account_id = CloudAccountId("foobar")
-    role_name = AwsRoleName("FooBarRole")
-    account = await service.create_aws_account(
-        workspace_id=test_workspace_id,
-        account_id=account_id,
-        role_name=role_name,
-        external_id=external_id,
-        account_name=None,
-        created_at=now - timedelta(days=1),
-    )
-    assert len(repository.accounts) == 1
-    assert len(domain_sender.events) == 1
-    event = domain_sender.events[0]
-
-    account_setup_helper.can_assume = False
-
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
-    # account degraded should be published
-    assert len(domain_sender.events) == 2
-    event = domain_sender.events[1]
-    assert isinstance(event, AwsAccountDegraded)
-    assert event.cloud_account_id == account.id
-    assert event.aws_account_id == account_id
-    assert event.tenant_id == account.workspace_id
-    assert event.error == "Cannot assume role"
-
-    after_degraded = await service.get_cloud_account(account.id, test_workspace_id)
-
-    assert after_degraded is not None
-    assert after_degraded.privileged is False
-    assert after_degraded.state == CloudAccountStates.Degraded(
-        AwsCloudAccess(external_id, role_name), error="Cannot assume role"
-    )
-    assert after_degraded.workspace_id == account.workspace_id
-    assert after_degraded.account_name == account.account_name
-    assert after_degraded.id == account.id
-    assert after_degraded.account_id == account.account_id
-
-
-@pytest.mark.asyncio
 async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis, default_config: Config) -> None:
     repository = CloudAccountRepositoryMock()
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -736,7 +643,6 @@ async def test_handle_account_discovered_list_accounts_success(arq_redis: Redis,
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -770,14 +676,13 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -792,7 +697,6 @@ async def test_handle_account_discovered_list_aliases_success(arq_redis: Redis, 
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
     assert len(domain_sender.events) == 1
@@ -827,14 +731,13 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
     organization_repository = OrganizationServiceMock()
     pubsub_publisher = RedisPubSubPublisherMock()
     domain_sender = DomainEventSenderMock()
-    last_scan_repo = LastScanRepositoryMock()
+
     account_setup_helper = AwsAccountSetupHelperMock()
     service = CloudAccountServiceImpl(
         organization_repository,
         repository,
         pubsub_publisher,
         domain_sender,
-        last_scan_repo,
         arq_redis,
         default_config,
         account_setup_helper,
@@ -846,7 +749,6 @@ async def test_enable_disable_cloud_account(arq_redis: Redis, default_config: Co
         role_name=role_name,
         external_id=external_id,
         account_name=None,
-        created_at=now,
     )
     assert len(repository.accounts) == 1
 

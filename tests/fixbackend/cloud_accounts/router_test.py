@@ -28,8 +28,6 @@ from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
     CloudAccountStates,
-    LastScanAccountInfo,
-    LastScanInfo,
 )
 from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.config import Config
@@ -53,7 +51,6 @@ from fixbackend.workspaces.models import Workspace
 class InMemoryCloudAccountService(CloudAccountService):
     def __init__(self) -> None:
         self.accounts: Dict[FixCloudAccountId, CloudAccount] = {}
-        self.last_scan_dict: Dict[WorkspaceId, LastScanInfo] = {}
 
     async def create_aws_account(
         self,
@@ -63,7 +60,6 @@ class InMemoryCloudAccountService(CloudAccountService):
         role_name: Optional[AwsRoleName],
         external_id: ExternalId,
         account_name: Optional[CloudAccountName] = None,
-        created_at: datetime,
     ) -> CloudAccount:
         assert role_name is not None
         account = CloudAccount(
@@ -76,15 +72,16 @@ class InMemoryCloudAccountService(CloudAccountService):
             account_alias=None,
             user_account_name=None,
             privileged=False,
+            last_scan_started_at=None,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            next_scan=None,
         )
         self.accounts[account.id] = account
         return account
 
     async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
         del self.accounts[cloud_account_id]
-
-    async def last_scan(self, workspace_id: WorkspaceId) -> LastScanInfo | None:
-        return self.last_scan_dict.get(workspace_id, None)
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         return self.accounts[cloud_account_id]
@@ -193,6 +190,10 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         account_alias=None,
         user_account_name=None,
         privileged=False,
+        last_scan_started_at=None,
+        last_scan_duration_seconds=0,
+        last_scan_resources_scanned=0,
+        next_scan=None,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -203,15 +204,22 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
 async def test_last_scan(client: AsyncClient) -> None:
     next_scan = datetime.utcnow()
     started_at = datetime.utcnow()
-    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
-        accounts={
-            FixCloudAccountId(uuid.uuid4()): LastScanAccountInfo(
-                account_id=CloudAccountId("123456789012"),
-                duration_seconds=10,
-                resources_scanned=100,
-                started_at=started_at,
-            )
-        },
+
+    cloud_account_service.accounts = {}
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    cloud_account_service.accounts[cloud_account_id] = CloudAccount(
+        id=cloud_account_id,
+        account_id=CloudAccountId("123456789012"),
+        cloud=CloudNames.AWS,
+        workspace_id=workspace_id,
+        state=CloudAccountStates.Detected(),
+        account_name=CloudAccountName("foo"),
+        account_alias=None,
+        user_account_name=None,
+        privileged=False,
+        last_scan_started_at=started_at,
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
         next_scan=next_scan,
     )
 
@@ -231,6 +239,7 @@ async def test_last_scan(client: AsyncClient) -> None:
 async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
@@ -241,17 +250,9 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
-    )
-    next_scan = datetime.utcnow()
-    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
-        accounts={
-            cloud_account_id: LastScanAccountInfo(
-                account_id=CloudAccountId("123456789012"),
-                duration_seconds=10,
-                resources_scanned=100,
-                started_at=datetime.utcnow(),
-            )
-        },
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
     )
 
@@ -268,13 +269,15 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["enabled"] is True
     assert data["resources"] == 100
     assert data["next_scan"] == next_scan.isoformat()
+    assert data["state"] == "configured"
+    assert data["priviledged"] is True
 
 
 @pytest.mark.asyncio
 async def test_list_cloud_accounts(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
-    cloud_account_service.last_scan_dict = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
@@ -285,17 +288,9 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
-    )
-    next_scan = datetime.utcnow()
-    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
-        accounts={
-            cloud_account_id: LastScanAccountInfo(
-                account_id=CloudAccountId("123456789012"),
-                duration_seconds=10,
-                resources_scanned=100,
-                started_at=datetime.utcnow(),
-            )
-        },
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
     )
 
@@ -320,6 +315,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
 async def test_update_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         workspace_id=workspace_id,
@@ -330,17 +326,9 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=False,
-    )
-    next_scan = datetime.utcnow()
-    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
-        accounts={
-            cloud_account_id: LastScanAccountInfo(
-                account_id=CloudAccountId("123456789012"),
-                duration_seconds=10,
-                resources_scanned=100,
-                started_at=datetime.utcnow(),
-            )
-        },
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
     )
 
@@ -371,6 +359,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
 async def test_enable_disable_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         workspace_id=workspace_id,
@@ -381,17 +370,9 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=True,
-    )
-    next_scan = datetime.utcnow()
-    cloud_account_service.last_scan_dict[workspace_id] = LastScanInfo(
-        accounts={
-            cloud_account_id: LastScanAccountInfo(
-                account_id=CloudAccountId("123456789012"),
-                duration_seconds=10,
-                resources_scanned=100,
-                started_at=datetime.utcnow(),
-            )
-        },
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=datetime.utcnow(),
         next_scan=next_scan,
     )
 

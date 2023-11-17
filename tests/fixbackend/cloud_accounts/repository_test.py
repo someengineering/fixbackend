@@ -13,26 +13,28 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-
-import pytest
+from datetime import timedelta
 from typing import List
 
+import pytest
+from attrs import evolve
+from fixcloudutils.util import utc
+
+from fixbackend.auth.models import User
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
+from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.ids import (
-    FixCloudAccountId,
-    ExternalId,
-    CloudAccountId,
     AwsRoleName,
-    CloudNames,
-    CloudAccountName,
     CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
     UserCloudAccountName,
 )
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.cloud_accounts.models import CloudAccount, AwsCloudAccess, CloudAccountState, CloudAccountStates
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.auth.models import User
-from attrs import evolve
 
 
 @pytest.mark.asyncio
@@ -68,6 +70,10 @@ async def test_create_cloud_account(
             account_alias=CloudAccountAlias("foo_alias"),
             user_account_name=UserCloudAccountName("foo_user_provided_name"),
             privileged=False,
+            last_scan_started_at=None,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            next_scan=None,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -114,6 +120,25 @@ async def test_create_cloud_account(
             assert role_name == new_cloud_access.role_name
         case _:
             raise ValueError("Invalid state")
+
+    # update 2
+    timestamp = utc().replace(microsecond=0)
+    await cloud_account_repository.update(
+        configured_account_id,
+        lambda acc: evolve(
+            acc,
+            last_scan_duration_seconds=123,
+            last_scan_resources_scanned=456,
+            last_scan_started_at=timestamp,
+            next_scan=timestamp + timedelta(hours=1),
+        ),
+    )
+    with_last_scan = await cloud_account_repository.get(id=configured_account_id)
+    assert with_last_scan
+    assert with_last_scan.last_scan_duration_seconds == 123
+    assert with_last_scan.last_scan_resources_scanned == 456
+    assert with_last_scan.last_scan_started_at == timestamp
+    assert with_last_scan.next_scan == (timestamp + timedelta(hours=1))
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)

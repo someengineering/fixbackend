@@ -45,7 +45,6 @@ from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
-from fixbackend.cloud_accounts.last_scan_repository import LastScanRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
@@ -111,7 +110,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
-        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg))
+        domain_event_subscriber = deps.add(
+            SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg, "fixbackend")
+        )
         engine = deps.add(
             SN.async_engine,
             create_async_engine(
@@ -168,7 +169,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 CloudAccountRepositoryImpl(session_maker),
                 cloud_accounts_redis_publisher,
                 domain_event_publisher,
-                LastScanRepository(session_maker),
                 readwrite_redis,
                 cfg,
                 AwsAccountSetupHelper(boto_session),
@@ -197,7 +197,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
-        domain_event_subscriber = deps.add(SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg))
+        domain_event_subscriber = deps.add(
+            SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg, "dispatching")
+        )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
             SN.async_engine,

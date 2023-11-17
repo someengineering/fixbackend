@@ -71,7 +71,6 @@ class AwsAccountDiscovered(Event):
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
-    at: Optional[datetime]
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
@@ -129,7 +128,6 @@ class AwsAccountDegraded(Event):
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
     error: str
-    at: datetime
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore

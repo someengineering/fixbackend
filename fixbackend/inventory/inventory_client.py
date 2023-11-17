@@ -28,6 +28,7 @@ from httpx import AsyncClient, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
+from fixbackend.inventory.schemas import CompletePathRequest
 
 
 class GraphDatabaseException(Exception):
@@ -152,6 +153,26 @@ class InventoryClient(Service):
             node_id = node["id"]
             response = await self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
             self.__raise_on_error(response)
+
+    async def complete_property_path(
+        self,
+        access: GraphDatabaseAccess,
+        *,
+        request: CompletePathRequest,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> Tuple[int, Dict[str, str]]:
+        headers = self.__headers(access)
+        params = {"section": section}
+        response = await self.client.post(
+            self.inventory_url + f"/graph/{graph}/property/path/complete",
+            json=request.model_dump(),
+            headers=headers,
+            params=params,
+        )
+        self.__raise_on_error(response, expected_media_types=("application/json",))
+        count = int(response.headers.get("Total-Count", "0"))
+        return count, cast(Dict[str, str], response.json())
 
     async def possible_values(
         self,

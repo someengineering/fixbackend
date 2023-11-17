@@ -133,6 +133,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             stored_account.api_account_alias = cloud_account.account_alias
             stored_account.user_account_name = cloud_account.user_account_name
             stored_account.privileged = cloud_account.privileged
+            stored_account.next_scan = cloud_account.next_scan
+            stored_account.last_scan_duration_seconds = cloud_account.last_scan_duration_seconds
+            stored_account.last_scan_started_at = cloud_account.last_scan_started_at
+            stored_account.last_scan_resources_scanned = cloud_account.last_scan_resources_scanned
             self._update_state_dependent_fields(stored_account, cloud_account.state)
 
             await session.commit()

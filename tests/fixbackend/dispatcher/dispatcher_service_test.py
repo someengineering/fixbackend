@@ -79,6 +79,10 @@ async def test_receive_workspace_created(
             account_alias=CloudAccountAlias("foo_alias"),
             user_account_name=UserCloudAccountName("foo_user"),
             privileged=False,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            last_scan_started_at=None,
+            next_scan=None,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -114,6 +118,10 @@ async def test_receive_aws_account_configured(
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=False,
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=datetime.utcnow(),
+        next_scan=datetime.utcnow(),
     )
     await cloud_account_repository.create(account)
 
