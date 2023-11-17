@@ -11,7 +11,8 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import timedelta
+from datetime import timedelta, datetime
+from enum import Enum
 from typing import List, Dict, Optional
 
 from fixcloudutils.types import Json
@@ -89,15 +90,36 @@ class SearchStartData(BaseModel):
 class CompletePathRequest(BaseModel):
     path: Optional[str] = Field(None, description="The path to complete")
     prop: Optional[str] = Field(
-        None, description="The property to complete. If path is given, this is the last property in the path."
+        default=None, description="The property to complete. If path is given, this is the last property in the path."
     )
     kinds: Optional[List[str]] = Field(
-        None, description="The kinds to consider. If not given, all kinds are considered."
+        default=None, description="The kinds to consider. If not given, all kinds are considered."
     )
     fuzzy: bool = Field(
-        False, description="If true, fuzzy matching is used. If false, only exact matches are returned."
+        default=False, description="If true, fuzzy matching is used. If false, only exact matches are returned."
     )
     limit: int = Field(
-        20, description="The maximum number of results to return. If not given, all results are returned."
+        default=20, description="The maximum number of results to return. If not given, all results are returned."
     )
-    skip: int = Field(0, description="The number of results to skip. If not given, no results are skipped.")
+    skip: int = Field(default=0, description="The number of results to skip. If not given, no results are skipped.")
+
+
+class HistoryChange(Enum):
+    node_created = "node_created"  # when the resource is created
+    node_updated = "node_updated"  # when the resource is updated
+    node_deleted = "node_deleted"  # when the resource is deleted
+    node_vulnerable = "node_vulnerable"  # when the resource fails one or more security checks (after being compliant)
+    node_compliant = "node_compliant"  # when the resource passes all security checks (after being vulnerable)
+
+
+class HistorySearch(BaseModel):
+    before: Optional[datetime] = Field(default=None, description="The time before which to search.")
+    after: Optional[datetime] = Field(default=None, description="The time after which to search.")
+    change: Optional[HistoryChange] = Field(default=None, description="The change to search for.")
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(description="The query to execute.")
+    history: Optional[HistorySearch] = Field(default=None, description="If the history should be searched.")
+    skip: int = Field(default=0, description="The number of results to skip.", gt=0)
+    limit: int = Field(default=50, description="The number of results to return.", gt=0, lt=100)

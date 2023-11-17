@@ -40,6 +40,9 @@ from fixbackend.inventory.schemas import (
     NoVulnerabilitiesChanged,
     ReportSummary,
     SearchCloudResource,
+    SearchRequest,
+    HistorySearch,
+    HistoryChange,
 )
 from tests.fixbackend.conftest import InventoryMock, json_response, nd_json_response
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
@@ -68,7 +71,7 @@ def mocked_answers(
                 [{"id": "123", "name": "foo", "cloud": "aws"},  # fmt: skip
                  {"id": "234", "name": "bla", "cloud": "gcp"}]  # fmt: skip
             )
-        elif request.url.path == "/cli/execute" and content == "search is(account) and name==foo | list --json-table":
+        elif request.url.path == "/cli/execute" and content.endswith("list --json-table"):
             return nd_json_response(
                 [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
                  {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
@@ -186,8 +189,7 @@ async def test_dict_values_by() -> None:
 
 
 async def test_search_list(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
-    result = [e async for e in await inventory_service.search_table(db, "is(account) and name==foo")]
-    assert result == [
+    expected = [
         {
             "columns": [
                 {"name": "name", "kind": "string", "display": "Name"},
@@ -196,6 +198,14 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
         },
         {"id": "123", "row": {"name": "a", "some_int": 1}},
     ]
+    # simple search against the default graph
+    request = SearchRequest(query="is(account) and name==foo")
+    result = [e async for e in await inventory_service.search_table(db, request)]
+    assert result == expected
+    # search in history data
+    request = SearchRequest(query="is(account) and name==foo", history=HistorySearch(change=HistoryChange.node_created))
+    result = [e async for e in await inventory_service.search_table(db, request)]
+    assert result == expected
 
 
 async def test_search_start_data(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
