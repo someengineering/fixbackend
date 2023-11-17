@@ -301,11 +301,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         case "billing":
             lifespan = setup_teardown_billing
         case _:
-            # TODO: remove this option once rolled out
-            if cfg.args.dispatcher:
-                lifespan = setup_teardown_dispatcher
-            else:
-                lifespan = setup_teardown_application
+            lifespan = setup_teardown_application
 
     app = FastAPI(title="Fix Backend", summary="Backend for the FIX project", lifespan=lifespan)
     app.dependency_overrides[config.config] = lambda: cfg
@@ -448,7 +444,7 @@ def setup_process() -> FastAPI:
     """
     current_config = config.get_config()
     level = logging.DEBUG if current_config.args.debug else logging.INFO
-    setup_logger("fixbackend", level=level, get_logging_context=get_logging_context)
+    setup_logger(f"fixbackend_{current_config.args.mode}", level=level, get_logging_context=get_logging_context)
 
     # Replace all special uvicorn handlers
     for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
