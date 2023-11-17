@@ -53,14 +53,19 @@ class CloudAccount(Base):
     api_account_alias: Mapped[Optional[CloudAccountAlias]] = mapped_column(String(length=64), nullable=True)
     is_configured: Mapped[bool] = mapped_column(Boolean, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    state: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True, index=True)
     error: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     next_scan: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     last_scan_duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_scan_started_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     last_scan_resources_scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    state_updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
+    __mapper_args__ = {"version_id_col": version_id}  # for optimistic locking
 
     def to_model(self) -> models.CloudAccount:
         def access() -> models.CloudAccess:
@@ -109,4 +114,7 @@ class CloudAccount(Base):
             last_scan_duration_seconds=self.last_scan_duration_seconds,
             last_scan_started_at=self.last_scan_started_at,
             last_scan_resources_scanned=self.last_scan_resources_scanned,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            state_updated_at=self.state_updated_at,
         )

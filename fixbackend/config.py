@@ -141,7 +141,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         type=int,
         default=int(os.environ.get("CLOUD_ACCOUNT_SERVICE_EVENT_PARALLELISM", "100")),
     )
-
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

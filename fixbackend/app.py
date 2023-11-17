@@ -172,6 +172,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 readwrite_redis,
                 cfg,
                 AwsAccountSetupHelper(boto_session),
+                dispatching=False,
             ),
         )
 
@@ -227,6 +228,27 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         domain_event_sender = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+
+        domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+        workspace_repo = deps.add(
+            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher)
+        )
+        cloud_accounts_redis_publisher = RedisPubSubPublisher(
+            redis=rw_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
+        )
+        deps.add(
+            SN.cloud_account_service,
+            CloudAccountServiceImpl(
+                workspace_repo,
+                CloudAccountRepositoryImpl(session_maker),
+                cloud_accounts_redis_publisher,
+                domain_event_publisher,
+                rw_redis,
+                cfg,
+                AwsAccountSetupHelper(boto_session),
+                dispatching=True,
+            ),
+        )
         deps.add(
             SN.dispatching,
             DispatcherService(

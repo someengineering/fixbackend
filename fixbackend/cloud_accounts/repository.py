@@ -16,6 +16,8 @@ from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
+from sqlalchemy.orm.exc import StaleDataError
+from fixcloudutils.util import utc
 
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
 from fixbackend.db import AsyncSessionMakerDependency
@@ -41,6 +43,10 @@ class CloudAccountRepository(ABC):
     async def list_by_workspace_id(
         self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
     ) -> List[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_all_discovered_accounts(self) -> List[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
@@ -105,6 +111,9 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 api_account_alias=cloud_account.account_alias,
                 is_configured=False,  # to keep backwards compatibility, remove in the next release
                 privileged=cloud_account.privileged,
+                created_at=cloud_account.created_at,
+                updated_at=cloud_account.updated_at,
+                state_updated_at=cloud_account.state_updated_at,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
@@ -119,29 +128,43 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             return cloud_account.to_model() if cloud_account else None
 
     async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
-        async with self.session_maker() as session:
-            stored_account = await session.get(orm.CloudAccount, id)
-            if stored_account is None:
-                raise ResourceNotFound(f"Cloud account {id} not found")
+        async def do_updade() -> CloudAccount:
+            async with self.session_maker() as session:
+                stored_account = await session.get(orm.CloudAccount, id)
+                if stored_account is None:
+                    raise ResourceNotFound(f"Cloud account {id} not found")
 
-            cloud_account = update_fn(stored_account.to_model())
+                cloud_account = update_fn(stored_account.to_model())
 
-            stored_account.tenant_id = cloud_account.workspace_id
-            stored_account.cloud = cloud_account.cloud
-            stored_account.account_id = cloud_account.account_id
-            stored_account.api_account_name = cloud_account.account_name
-            stored_account.api_account_alias = cloud_account.account_alias
-            stored_account.user_account_name = cloud_account.user_account_name
-            stored_account.privileged = cloud_account.privileged
-            stored_account.next_scan = cloud_account.next_scan
-            stored_account.last_scan_duration_seconds = cloud_account.last_scan_duration_seconds
-            stored_account.last_scan_started_at = cloud_account.last_scan_started_at
-            stored_account.last_scan_resources_scanned = cloud_account.last_scan_resources_scanned
-            self._update_state_dependent_fields(stored_account, cloud_account.state)
+                if stored_account.to_model() == cloud_account:
+                    # nothing to update
+                    return cloud_account
 
-            await session.commit()
-            await session.refresh(stored_account)
-            return stored_account.to_model()
+                stored_account.tenant_id = cloud_account.workspace_id
+                stored_account.cloud = cloud_account.cloud
+                stored_account.account_id = cloud_account.account_id
+                stored_account.api_account_name = cloud_account.account_name
+                stored_account.api_account_alias = cloud_account.account_alias
+                stored_account.user_account_name = cloud_account.user_account_name
+                stored_account.privileged = cloud_account.privileged
+                stored_account.next_scan = cloud_account.next_scan
+                stored_account.last_scan_duration_seconds = cloud_account.last_scan_duration_seconds
+                stored_account.last_scan_started_at = cloud_account.last_scan_started_at
+                stored_account.last_scan_resources_scanned = cloud_account.last_scan_resources_scanned
+                stored_account.created_at = cloud_account.created_at
+                stored_account.updated_at = utc()
+                stored_account.state_updated_at = cloud_account.state_updated_at
+                self._update_state_dependent_fields(stored_account, cloud_account.state)
+
+                await session.commit()
+                await session.refresh(stored_account)
+                return stored_account.to_model()
+
+        while True:
+            try:
+                return await do_updade()
+            except StaleDataError:  # in case of concurrent update
+                pass
 
     async def list_by_workspace_id(
         self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
@@ -153,6 +176,16 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 statement = statement.where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name).where(
                     orm.CloudAccount.enabled.is_(True)
                 )
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model() for acc in accounts]
+
+    async def list_all_discovered_accounts(self) -> List[CloudAccount]:
+        """Get a list of all discovered cloud accounts."""
+        async with self.session_maker() as session:
+            statement = select(orm.CloudAccount).where(
+                orm.CloudAccount.state == CloudAccountStates.Discovered.state_name
+            )
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]
