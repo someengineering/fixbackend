@@ -57,6 +57,7 @@ from fixbackend.ids import (
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixcloudutils.util import utc
 
 log = getLogger(__name__)
 
@@ -80,8 +81,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
-            maximum_delay=30,
-            retries=7,  # 5 base seconds + 1/2/4/8/16/30/30 on each try,  less than 3 minutes in total
+            maximum_delay=10,
+            retries=8,
+            log_failed_attempts=False,
         )
 
         self.domain_event_listener = RedisStreamListener(
@@ -128,12 +130,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 set_cloud_account_id(discovered_event.aws_account_id)
                 set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
                 set_workspace_id(str(discovered_event.tenant_id))
-                await self.try_configure_account(discovered_event)
+                await self.try_configure_account(discovered_event, context)
 
             case _:
                 pass  # ignore other domain events
 
-    async def try_configure_account(self, discovered: AwsAccountDiscovered) -> None:
+    async def try_configure_account(self, discovered: AwsAccountDiscovered, context: MessageContext) -> None:
         cloud_account_id = discovered.cloud_account_id
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
@@ -167,9 +169,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         privileged = False
         match assume_role_result:
             case AssumeRoleResults.Failure(reason):
-                msg = f"Cannot assume role for account {cloud_account_id}: {reason}"
-                log.info(msg)
-                raise RuntimeError(msg)
+                if (utc() - context.sent_at) > timedelta(minutes=1):
+                    log.info("Can't assume role, leaving account in discovered state")
+                    return None
+                else:
+                    msg = f"Cannot assume role for account {cloud_account_id}: {reason}, retrying again later"
+                    log.info(msg)
+                    raise RuntimeError(msg)
 
             case AssumeRoleResults.Success() as assume_role_result:
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
