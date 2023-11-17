@@ -69,7 +69,8 @@ class CloudAccountRead(BaseModel):
     )
     state: str = Field(description="State of the cloud account")
     priviledged: bool = Field(description="If priviledged, the account can do some administative tasks")
-    last_collected: Optional[datetime] = Field(description="The time when the account was last collected")
+    last_scan_started_at: Optional[datetime] = Field(description="The time when the last scah started")
+    last_scan_finished_at: Optional[datetime] = Field(description="The time when the last scan finished")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -80,9 +81,9 @@ class CloudAccountRead(BaseModel):
                 enabled = model.state.enabled
                 is_configured = True
 
-        last_collected = None
+        last_scan_finished = None
         if model.last_scan_started_at:
-            last_collected = model.last_scan_started_at + timedelta(seconds=model.last_scan_duration_seconds)
+            last_scan_finished = model.last_scan_started_at + timedelta(seconds=model.last_scan_duration_seconds)
 
         return CloudAccountRead(
             id=model.id,
@@ -97,7 +98,8 @@ class CloudAccountRead(BaseModel):
             api_account_name=model.account_name,
             state=model.state.state_name,
             priviledged=model.privileged,
-            last_collected=last_collected,
+            last_scan_started_at=model.last_scan_started_at,
+            last_scan_finished_at=last_scan_finished,
         )
 
 
