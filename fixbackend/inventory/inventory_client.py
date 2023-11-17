@@ -102,6 +102,8 @@ class InventoryClient(Service):
         with_checks: Optional[bool] = None,
     ) -> List[Json]:
         params: Dict[str, Union[str, bool]] = {}
+        if benchmarks is not None and len(benchmarks) == 0:
+            return []
         if benchmarks:
             params["benchmarks"] = ",".join(benchmarks)
         if short is not None:
@@ -123,6 +125,8 @@ class InventoryClient(Service):
         kind: Optional[str] = None,
         check_ids: Optional[List[str]] = None,
     ) -> List[Json]:
+        if check_ids is not None and len(check_ids) == 0:
+            return []
         params: Dict[str, Union[str, bool]] = {}
         if provider is not None:
             params["provider"] = provider
