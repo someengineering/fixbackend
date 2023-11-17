@@ -14,7 +14,7 @@
 
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
@@ -46,7 +46,7 @@ from fixbackend.ids import (
 )
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixcloudutils.util import utc, utc_str
+from fixcloudutils.util import utc
 
 
 class InMemoryCloudAccountService(CloudAccountService):
@@ -249,7 +249,8 @@ async def test_last_scan(client: AsyncClient) -> None:
 async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
-    next_scan = utc().replace(microsecond=0)
+    next_scan = datetime.utcnow()
+    started_at = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
@@ -262,7 +263,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         privileged=True,
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
-        last_scan_started_at=datetime.utcnow(),
+        last_scan_started_at=started_at,
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -281,9 +282,11 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["is_configured"] is True
     assert data["enabled"] is True
     assert data["resources"] == 100
-    assert data["next_scan"] == utc_str(next_scan)
+    assert data["next_scan"] == next_scan.isoformat()
     assert data["state"] == "configured"
     assert data["priviledged"] is True
+    assert data["last_scan_started_at"] == started_at.isoformat()
+    assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
 
 
 @pytest.mark.asyncio
