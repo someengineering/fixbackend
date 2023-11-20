@@ -68,8 +68,8 @@ class CloudAccountRead(BaseModel):
         description="Name of the cloud account, as provided by the cloud", max_length=64
     )
     state: str = Field(description="State of the cloud account")
-    priviledged: bool = Field(description="If priviledged, the account can do some administative tasks")
-    last_scan_started_at: Optional[datetime] = Field(description="The time when the last scah started")
+    privileged: bool = Field(description="If privileged, the account can do some administrative tasks")
+    last_scan_started_at: Optional[datetime] = Field(description="The time when the last scan started")
     last_scan_finished_at: Optional[datetime] = Field(description="The time when the last scan finished")
 
     @staticmethod
