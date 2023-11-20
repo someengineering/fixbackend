@@ -97,7 +97,7 @@ class CloudAccountRead(BaseModel):
             api_account_alias=model.account_alias,
             api_account_name=model.account_name,
             state=model.state.state_name,
-            priviledged=model.privileged,
+            privileged=model.privileged,
             last_scan_started_at=model.last_scan_started_at,
             last_scan_finished_at=last_scan_finished,
         )
