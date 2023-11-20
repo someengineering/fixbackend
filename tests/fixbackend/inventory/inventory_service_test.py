@@ -210,13 +210,13 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
 
 async def test_search_start_data(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
     result = [
-        SearchCloudResource(id="123", name="foo", cloud="aws"),
         SearchCloudResource(id="234", name="bla", cloud="gcp"),
+        SearchCloudResource(id="123", name="foo", cloud="aws"),
     ]
     start_data = await inventory_service.search_start_data(db)
     assert start_data.accounts == result
     assert start_data.regions == result
-    result[0].name = "Some name"  # kind name is looked up and changed
+    result[1].name = "Some name"  # kind name is looked up and changed
     assert start_data.kinds == result
 
 

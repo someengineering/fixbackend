@@ -139,11 +139,14 @@ class InventoryService(Service):
                 f"aggregate {id_prop} as id, {name_prop} as name, /ancestors.cloud.reported.name as cloud: "
                 f"sum(1) as count | jq --no-rewrite .group"
             )
-            return [
-                SearchCloudResource.model_validate(n)
-                async for n in self.client.execute_single(db, f"{cmd}")
-                if isinstance(n, dict) and n.get("cloud") is not None
-            ]
+            return sorted(
+                [
+                    SearchCloudResource.model_validate(n)
+                    async for n in self.client.execute_single(db, f"{cmd}")
+                    if isinstance(n, dict) and n.get("cloud") is not None
+                ],
+                key=lambda x: x.name,
+            )
 
         (accounts, regions, kinds, roots) = await asyncio.gather(
             cloud_resource("is(account)", "id", "name"),
