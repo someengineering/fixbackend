@@ -128,15 +128,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         count, result = await fix.inventory.client.complete_property_path(access=graph_db, request=body)
         return JSONResponse(result, headers={"Total-Count": str(count)})
 
-    # TODO: Replace this endpoint once agreed with the frontend
     @router.post("/{workspace_id}/inventory/search/table")
-    async def search_list_deprecated(
-        graph_db: CurrentGraphDbDependency, request: Request, query: str = Form()
-    ) -> StreamingResponse:
-        search_result = await fix.inventory.search_table(graph_db, SearchRequest(query=query))
-        return streaming_response(request.headers.get("accept", "application/json"), search_result)
-
-    @router.post("/{workspace_id}/inventory/search/table2")
     async def search_list(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
     ) -> StreamingResponse:
