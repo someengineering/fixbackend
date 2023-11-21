@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional, Dict
 
 from fastapi.responses import StreamingResponse
 from fixcloudutils.types import JsonElement
@@ -41,10 +41,12 @@ async def ndjson_serializer(input_iterator: AsyncIterator[JsonElement]) -> Async
         yield json.dumps(item) + "\n"
 
 
-def streaming_response(accept: str, gen: AsyncIterator[JsonElement]) -> StreamingResponse:
+def streaming_response(
+    accept: str, gen: AsyncIterator[JsonElement], headers: Optional[Dict[str, str]] = None
+) -> StreamingResponse:
     if accept in ["application/x-ndjson", "application/ndjson"]:
-        return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson")
+        return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson", headers=headers)
     elif accept == "application/json":
-        return StreamingResponse(json_serializer(gen), media_type="application/json")
+        return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)
     else:
-        return StreamingResponse(json_serializer(gen), media_type="application/json")
+        return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)

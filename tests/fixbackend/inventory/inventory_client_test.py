@@ -87,7 +87,7 @@ def mocked_inventory_client(
 
 
 async def test_execute_single(mocked_inventory_client: InventoryClient) -> None:
-    assert [a async for a in mocked_inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
+    assert [a async for a in await mocked_inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
 
 
 async def test_report_benchmarks(mocked_inventory_client: InventoryClient) -> None:
@@ -103,11 +103,11 @@ async def test_deletion(mocked_inventory_client: InventoryClient) -> None:
 
 
 async def test_possible_values(mocked_inventory_client: InventoryClient) -> None:
-    keys = mocked_inventory_client.possible_values(
+    keys = await mocked_inventory_client.possible_values(
         db_access, query="is(account)", prop_or_predicate="tags", detail="attributes"
     )
     assert [e async for e in keys] == ["prop_a", "prop_b", "prop_c"]
-    vals = mocked_inventory_client.possible_values(db_access, query="is(account)", prop_or_predicate="id")
+    vals = await mocked_inventory_client.possible_values(db_access, query="is(account)", prop_or_predicate="id")
     assert [e async for e in vals] == ["val_a", "val_b", "val_c"]
 
 
