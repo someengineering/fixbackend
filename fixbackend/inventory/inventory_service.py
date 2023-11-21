@@ -24,15 +24,19 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 from itertools import islice
-from typing import AsyncIterator, List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
+from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str
 
+from fixbackend.domain_events.events import AwsAccountDeleted
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import CloudNames
 from fixbackend.ids import NodeId
-from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable
+from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable, AsyncIteratorWithContext
 from fixbackend.inventory.schemas import (
     AccountSummary,
     ReportSummary,
@@ -45,11 +49,7 @@ from fixbackend.inventory.schemas import (
     SearchCloudResource,
     SearchRequest,
 )
-from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
-from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudNames
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class InventoryService(Service):
         accounts: Optional[List[str]] = None,
         severity: Optional[str] = None,
         only_failing: bool = False,
-    ) -> AsyncIterator[Json]:
+    ) -> AsyncIteratorWithContext[Json]:
         report = f"report benchmark load {benchmark_name}"
         if accounts:
             report += f" --accounts {' '.join(accounts)}"
@@ -115,9 +115,11 @@ class InventoryService(Service):
         if only_failing:
             report += " --only-failing"
 
-        return self.client.execute_single(db, report + " | dump")  # type: ignore
+        return await self.client.execute_single(db, report + " | dump")  # type: ignore
 
-    async def search_table(self, db: GraphDatabaseAccess, request: SearchRequest) -> AsyncIterator[JsonElement]:
+    async def search_table(
+        self, db: GraphDatabaseAccess, request: SearchRequest
+    ) -> AsyncIteratorWithContext[JsonElement]:
         if history := request.history:
             cmd = "history"
             if history.change:
@@ -130,7 +132,7 @@ class InventoryService(Service):
         else:
             cmd = "search " + request.query
         cmd += f" | limit {request.skip}, {request.limit} | list --json-table"
-        return self.client.execute_single(db, cmd)
+        return await self.client.execute_single(db, cmd)
 
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
@@ -142,7 +144,7 @@ class InventoryService(Service):
             return sorted(
                 [
                     SearchCloudResource.model_validate(n)
-                    async for n in self.client.execute_single(db, f"{cmd}")
+                    async for n in await self.client.execute_single(db, f"{cmd}")
                     if isinstance(n, dict) and n.get("cloud") is not None
                 ],
                 key=lambda x: x.name,
@@ -164,7 +166,7 @@ class InventoryService(Service):
 
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
         async def neighborhood(cmd: str) -> List[JsonElement]:
-            return [n async for n in self.client.execute_single(db, cmd, env={"with-kind": "true"})]
+            return [n async for n in await self.client.execute_single(db, cmd, env={"with-kind": "true"})]
 
         jq_reported = "{id: .reported.id, name: .reported.name, kind: .reported.kind}"
         jq_arg = (
@@ -186,7 +188,7 @@ class InventoryService(Service):
             accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
             resource_count_by_severity: Dict[str, int] = defaultdict(int)
             resource_count_by_kind: Dict[str, int] = defaultdict(int)
-            async for elem in self.client.execute_single(
+            async for elem in await self.client.execute_single(
                 db,
                 f"history --change {change} --after {duration.total_seconds()}s | aggregate "
                 f"/ancestors.account.reported.id as account_id, "
@@ -218,14 +220,14 @@ class InventoryService(Service):
                     name=entry["reported"]["name"],
                     cloud=entry["ancestors"]["cloud"]["reported"]["name"],
                 )
-                async for entry in self.client.search_list(db, "is (account)")
+                async for entry in await self.client.search_list(db, "is (account)")
             }
 
         async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
             check_accounts: ChecksByAccountId = defaultdict(set)
             check_severity: Dict[str, str] = {}
 
-            async for entry in self.client.aggregate(
+            async for entry in await self.client.aggregate(
                 db,
                 "search /security.has_issues==true | aggregate "
                 "/security.issues[].check as check_id,"

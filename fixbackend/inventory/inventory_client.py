@@ -20,7 +20,21 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import Optional, Dict, AsyncIterator, List, cast, Union, Literal, Tuple, Set
+import logging
+from typing import (
+    Optional,
+    Dict,
+    AsyncIterator,
+    List,
+    cast,
+    Union,
+    Literal,
+    Tuple,
+    Set,
+    TypeVar,
+    Generic,
+    Callable,
+)
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
@@ -29,6 +43,10 @@ from httpx import AsyncClient, Response
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
 from fixbackend.inventory.schemas import CompletePathRequest
+
+T = TypeVar("T")
+ContextHeaders = {"Total-Count", "Result-Count"}
+log = logging.getLogger(__name__)
 
 
 class GraphDatabaseException(Exception):
@@ -43,6 +61,22 @@ class GraphDatabaseForbidden(GraphDatabaseException):
     pass
 
 
+class AsyncIteratorWithContext(Generic[T]):
+    def __init__(self, response: Response, fn: Optional[Callable[[str], T]] = None) -> None:
+        self.response = response
+        self.fn = fn or json.loads
+        self.it = response.aiter_lines()
+        self.context: Dict[str, str] = {k: response.headers[k] for k in ContextHeaders if k in response.headers}
+        raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
+
+    def __aiter__(self) -> AsyncIterator[T]:
+        return self
+
+    async def __anext__(self) -> T:
+        line = await self.it.__anext__()
+        return self.fn(line)
+
+
 class InventoryClient(Service):
     def __init__(self, inventory_url: str, client: AsyncClient) -> None:
         self.inventory_url = inventory_url
@@ -50,14 +84,13 @@ class InventoryClient(Service):
 
     async def execute_single(
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
-    ) -> AsyncIterator[JsonElement]:
+    ) -> AsyncIteratorWithContext[JsonElement]:
+        log.info(f"Execute command: {command}")
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         response = await self.client.post(
             self.inventory_url + "/cli/execute", content=command, params=env, headers=headers
         )
-        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
-        async for line in response.aiter_lines():
-            yield json.loads(line)
+        return AsyncIteratorWithContext(response)
 
     async def search_list(
         self,
@@ -66,15 +99,14 @@ class InventoryClient(Service):
         *,
         graph: str = "resoto",
         section: str = "reported",
-    ) -> AsyncIterator[Json]:
+    ) -> AsyncIteratorWithContext[Json]:
+        log.info(f"Search list with query: {query}")
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         params = {"section": section}
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
         )
-        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
-        async for line in response.aiter_lines():
-            yield json.loads(line)
+        return AsyncIteratorWithContext(response)
 
     async def aggregate(
         self,
@@ -83,15 +115,14 @@ class InventoryClient(Service):
         *,
         graph: str = "resoto",
         section: str = "reported",
-    ) -> AsyncIterator[Json]:
+    ) -> AsyncIteratorWithContext[Json]:
+        log.info(f"Aggregate with query: {query}")
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         params = {"section": section}
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/search/aggregate", content=query, params=params, headers=headers
         )
-        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
-        async for line in response.aiter_lines():
-            yield json.loads(line)
+        return AsyncIteratorWithContext(response)
 
     async def benchmarks(
         self,
@@ -101,6 +132,7 @@ class InventoryClient(Service):
         short: Optional[bool] = None,
         with_checks: Optional[bool] = None,
     ) -> List[Json]:
+        log.info(f"Get benchmarks with params: {benchmarks}, {short}, {with_checks}")
         params: Dict[str, Union[str, bool]] = {}
         if benchmarks is not None and len(benchmarks) == 0:
             return []
@@ -112,7 +144,7 @@ class InventoryClient(Service):
             params["with_checks"] = with_checks
         headers = self.__headers(access)
         response = await self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers)
-        self.__raise_on_error(response, ("application/json",))
+        raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
     async def issues(
@@ -125,6 +157,9 @@ class InventoryClient(Service):
         kind: Optional[str] = None,
         check_ids: Optional[List[str]] = None,
     ) -> List[Json]:
+        log.info(
+            f"Get issues with provider={provider}, service={service}, category={category}, kind={kind}, ids={check_ids}"
+        )
         if check_ids is not None and len(check_ids) == 0:
             return []
         params: Dict[str, Union[str, bool]] = {}
@@ -140,7 +175,7 @@ class InventoryClient(Service):
             params["id"] = ",".join(check_ids)
         headers = self.__headers(access)
         response = await self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers)
-        self.__raise_on_error(response, ("application/json",))
+        raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
     async def delete_account(
@@ -151,12 +186,13 @@ class InventoryClient(Service):
         account_id: CloudAccountId,
         graph: str = "resoto",
     ) -> None:
+        log.info(f"Delete account {account_id} from cloud {cloud}")
         query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
         headers = self.__headers(access)
-        async for node in self.search_list(access, query):
+        async for node in await self.search_list(access, query):
             node_id = node["id"]
             response = await self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
-            self.__raise_on_error(response)
+            raise_on_error(response)
 
     async def complete_property_path(
         self,
@@ -166,6 +202,7 @@ class InventoryClient(Service):
         graph: str = "resoto",
         section: str = "reported",
     ) -> Tuple[int, Dict[str, str]]:
+        log.info(f"Complete property path with: {request}")
         headers = self.__headers(access)
         params = {"section": section}
         response = await self.client.post(
@@ -174,7 +211,7 @@ class InventoryClient(Service):
             headers=headers,
             params=params,
         )
-        self.__raise_on_error(response, expected_media_types=("application/json",))
+        raise_on_error(response, expected_media_types=("application/json",))
         count = int(response.headers.get("Total-Count", "0"))
         return count, cast(Dict[str, str], response.json())
 
@@ -190,7 +227,8 @@ class InventoryClient(Service):
         count: bool = False,
         graph: str = "resoto",
         section: str = "reported",
-    ) -> AsyncIterator[JsonElement]:
+    ) -> AsyncIteratorWithContext[JsonElement]:
+        log.info(f"Get possible values with query: {query}, prop_or_predicate: {prop_or_predicate} on detail: {detail}")
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         params = {
             "section": section,
@@ -202,14 +240,13 @@ class InventoryClient(Service):
         response = await self.client.post(
             self.inventory_url + f"/graph/{graph}/property/{detail}", content=query, params=params, headers=headers
         )
-        self.__raise_on_error(response, ("application/x-ndjson", "application/ndjson"))
-        async for line in response.aiter_lines():
-            yield json.loads(line)
+        return AsyncIteratorWithContext(response)
 
     async def resource(self, access: GraphDatabaseAccess, *, id: NodeId, graph: str = "resoto") -> Optional[Json]:
+        log.info(f"Get resource with id: {id}")
         headers = self.__headers(access, accept="application/json", content_type="text/plain")
         response = await self.client.get(self.inventory_url + f"/graph/{graph}/node/{id}", headers=headers)
-        self.__raise_on_error(response, ("application/json",), allowed_error_codes={404})
+        raise_on_error(response, ("application/json",), allowed_error_codes={404})
         return None if response.status_code == 404 else response.json()
 
     async def model(
@@ -230,6 +267,7 @@ class InventoryClient(Service):
         with_metadata: bool = True,
         graph: str = "resoto",
     ) -> List[Json]:
+        log.info(f"Get model with flat={flat}, with_bases={with_bases}, with_property_kinds={with_property_kinds}")
         headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
         params = {
             "format": result_format,
@@ -244,7 +282,7 @@ class InventoryClient(Service):
             "with_metadata": json.dumps(with_metadata),
         }
         response = await self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers)
-        self.__raise_on_error(response, ("application/json",))
+        raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
     def __headers(
@@ -265,22 +303,20 @@ class InventoryClient(Service):
             result["Content-Type"] = content_type
         return result
 
-    def __raise_on_error(
-        self,
-        response: Response,
-        expected_media_types: Optional[Tuple[str, ...]] = None,
-        allowed_error_codes: Optional[Set[int]] = None,
-    ) -> None:
-        if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
-            msg = f"Inventory error: {response.status_code} {response.text}"
-            if response.status_code == 401:
-                raise GraphDatabaseForbidden(msg)
-            elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
-                raise GraphDatabaseNotAvailable(msg)
-            else:
-                raise GraphDatabaseException(msg)
-        if expected_media_types is not None:
-            media_type, *params = response.headers.get("content-type", "").split(";")
-            assert (
-                media_type in expected_media_types
-            ), f"Expected content type {expected_media_types}, but got {media_type}"
+
+def raise_on_error(
+    response: Response,
+    expected_media_types: Optional[Tuple[str, ...]] = None,
+    allowed_error_codes: Optional[Set[int]] = None,
+) -> None:
+    if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
+        msg = f"Inventory error: {response.status_code} {response.text}"
+        if response.status_code == 401:
+            raise GraphDatabaseForbidden(msg)
+        elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
+            raise GraphDatabaseNotAvailable(msg)
+        else:
+            raise GraphDatabaseException(msg)
+    if expected_media_types is not None:
+        media_type, *params = response.headers.get("content-type", "").split(";")
+        assert media_type in expected_media_types, f"Expected content type {expected_media_types}, but got {media_type}"

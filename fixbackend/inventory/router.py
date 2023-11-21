@@ -100,10 +100,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         limit: int = Query(default=10, ge=0, le=50),
         count: bool = Query(default=False),
     ) -> StreamingResponse:
-        result = fix.inventory.client.possible_values(
+        result = await fix.inventory.client.possible_values(
             graph_db, query=query, prop_or_predicate=prop, detail="attributes", skip=skip, limit=limit, count=count
         )
-        return streaming_response(request.headers.get("accept", "application/json"), result)
+        return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
 
     @router.post("/{workspace_id}/inventory/property/values")
     async def property_values(
@@ -115,10 +115,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         limit: int = Query(default=10, ge=0, le=50),
         count: bool = Query(default=False),
     ) -> StreamingResponse:
-        result = fix.inventory.client.possible_values(
+        result = await fix.inventory.client.possible_values(
             graph_db, query=query, prop_or_predicate=prop, detail="values", skip=skip, limit=limit, count=count
         )
-        return streaming_response(request.headers.get("accept", "application/json"), result)
+        return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
 
     @router.post("/{workspace_id}/inventory/property/path/complete")
     async def complete_property_path(
@@ -129,11 +129,13 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return JSONResponse(result, headers={"Total-Count": str(count)})
 
     @router.post("/{workspace_id}/inventory/search/table")
-    async def search_list(
+    async def search_table(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
     ) -> StreamingResponse:
         search_result = await fix.inventory.search_table(graph_db, query)
-        return streaming_response(request.headers.get("accept", "application/json"), search_result)
+        return streaming_response(
+            request.headers.get("accept", "application/json"), search_result, search_result.context
+        )
 
     @router.post("/{workspace_id}/inventory/node/{node_id}")
     async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
