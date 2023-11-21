@@ -20,6 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from datetime import timedelta
@@ -132,7 +133,7 @@ class InventoryService(Service):
         else:
             cmd = "search " + request.query
         cmd += f" | limit {request.skip}, {request.limit} | list --json-table"
-        return await self.client.execute_single(db, cmd)
+        return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:

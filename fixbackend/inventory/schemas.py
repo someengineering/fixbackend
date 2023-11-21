@@ -123,3 +123,4 @@ class SearchRequest(BaseModel):
     history: Optional[HistorySearch] = Field(default=None, description="If the history should be searched.")
     skip: int = Field(default=0, description="The number of results to skip.", ge=0)
     limit: int = Field(default=50, description="The number of results to return.", gt=0, le=100)
+    count: bool = Field(default=False, description="Also compute the total number of results.")
