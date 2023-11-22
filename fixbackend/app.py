@@ -17,7 +17,17 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from ssl import Purpose, create_default_context
-from typing import Any, AsyncIterator, Awaitable, Callable, ClassVar, Optional, Set, Tuple, cast
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    ClassVar,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
 
 import boto3
 import httpx
@@ -46,7 +56,10 @@ from fixbackend.auth.router import auth_router, users_router
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
+from fixbackend.cloud_accounts.router import (
+    cloud_accounts_callback_router,
+    cloud_accounts_router,
+)
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
@@ -63,7 +76,11 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
-from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
+from fixbackend.logging_context import (
+    get_logging_context,
+    set_fix_cloud_account_id,
+    set_workspace_id,
+)
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
@@ -88,6 +105,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
+    http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
 
     def create_redis(url: str) -> Redis:
         kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
@@ -97,7 +115,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_application(_: FastAPI) -> AsyncIterator[None]:
-        http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
         arq_redis = deps.add(
             SN.arq_redis,
             await create_pool(
@@ -111,7 +128,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         domain_event_subscriber = deps.add(
-            SN.domain_event_subscriber, DomainEventSubscriber(readwrite_redis, cfg, "fixbackend")
+            SN.domain_event_subscriber,
+            DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
         )
         engine = deps.add(
             SN.async_engine,
@@ -130,7 +148,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
-        deps.add(SN.inventory, InventoryService(inventory_client, graph_db_access, domain_event_subscriber))
+        deps.add(
+            SN.inventory,
+            InventoryService(inventory_client, graph_db_access, domain_event_subscriber),
+        )
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
@@ -142,7 +163,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
-            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher)
+            SN.workspace_repo,
+            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
         )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         deps.add(
@@ -160,7 +182,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
             CustomerIoEventConsumer(http_client, cfg, domain_event_subscriber),
         )
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
-            redis=readwrite_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
+            redis=readwrite_redis,
+            channel="cloud_accounts",
+            publisher_name="cloud_account_service",
         )
         deps.add(
             SN.cloud_account_service,
@@ -173,6 +197,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg,
                 AwsAccountSetupHelper(boto_session),
                 dispatching=False,
+                http_client=http_client,
+                boto_session=boto_session,
+                cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
             ),
         )
 
@@ -199,7 +226,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         domain_event_subscriber = deps.add(
-            SN.domain_event_subscriber, DomainEventSubscriber(rw_redis, cfg, "dispatching")
+            SN.domain_event_subscriber,
+            DomainEventSubscriber(rw_redis, cfg, "dispatching"),
         )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         engine = deps.add(
@@ -231,10 +259,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
-            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher)
+            SN.workspace_repo,
+            WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher),
         )
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
-            redis=rw_redis, channel="cloud_accounts", publisher_name="cloud_account_service"
+            redis=rw_redis,
+            channel="cloud_accounts",
+            publisher_name="cloud_account_service",
         )
         deps.add(
             SN.cloud_account_service,
@@ -247,6 +278,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg,
                 AwsAccountSetupHelper(boto_session),
                 dispatching=True,
+                http_client=http_client,
+                boto_session=boto_session,
+                cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
             ),
         )
         deps.add(
@@ -297,7 +331,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         workspace_repo = deps.add(
-            SN.workspace_repo, WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher)
+            SN.workspace_repo,
+            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
         )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         aws_marketplace = deps.add(
@@ -434,7 +469,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
             return response
 
         if cfg.static_assets:
-            app.mount("/", StaticFiles(directory=cfg.static_assets, html=True), name="static_assets")
+            app.mount(
+                "/",
+                StaticFiles(directory=cfg.static_assets, html=True),
+                name="static_assets",
+            )
 
         @app.get("/")
         async def root(request: Request) -> Response:
@@ -466,7 +505,11 @@ def setup_process() -> FastAPI:
     """
     current_config = config.get_config()
     level = logging.DEBUG if current_config.args.debug else logging.INFO
-    setup_logger(f"fixbackend_{current_config.args.mode}", level=level, get_logging_context=get_logging_context)
+    setup_logger(
+        f"fixbackend_{current_config.args.mode}",
+        level=level,
+        get_logging_context=get_logging_context,
+    )
 
     # Replace all special uvicorn handlers
     for logger in ["uvicorn", "uvicorn.error", "uvicorn.access"]:

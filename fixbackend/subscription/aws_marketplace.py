@@ -65,7 +65,7 @@ class AwsMarketplaceHandler(Service):
                 self.handle_message,
                 consider_failed_after=timedelta(minutes=5),
                 max_nr_of_messages_in_one_batch=1,
-                wait_for_new_messages_to_arrive=timedelta(seconds=5),
+                wait_for_new_messages_to_arrive=timedelta(seconds=10),
             )
             if sqs_queue_url is not None
             else None

@@ -61,6 +61,7 @@ class Config(BaseSettings):
     customerio_site_id: Optional[str]
     customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
+    aws_cf_stack_notification_sqs_url: Optional[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -122,6 +123,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "us-east-1"))
     parser.add_argument(
         "--aws-marketplace-metering-sqs-url", default=os.environ.get("AWS_MARKETPLACE_METERING_SQS_URL")
+    )
+    parser.add_argument(
+        "--aws-cf-stack-notification-sqs-url", default=os.environ.get("AWS_CF_STACK_NOTIFICATION_SQS_URL")
     )
     parser.add_argument("--ca-cert", type=Path, default=os.environ.get("CA_CERT"))
     parser.add_argument("--host-cert", type=Path, default=os.environ.get("HOST_CERT"))

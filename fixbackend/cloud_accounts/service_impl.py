@@ -11,8 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
+import json
 import uuid
 from collections import defaultdict
 from datetime import timedelta
@@ -20,12 +19,14 @@ from hmac import compare_digest
 from logging import getLogger
 from typing import Any, Dict, List, Optional
 
+import boto3
 from attrs import evolve
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff, Json, MessageContext, RedisStreamListener
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
+from httpx import AsyncClient
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
@@ -54,6 +55,7 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
+from fixbackend.sqs import SQSRawListener
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -70,12 +72,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         config: Config,
         account_setup_helper: AwsAccountSetupHelper,
         dispatching: bool,
+        http_client: AsyncClient,
+        boto_session: boto3.Session,
+        cf_stack_queue_url: Optional[str] = None,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
-
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
@@ -105,16 +109,92 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.dispatching = dispatching
         self.fast_lane_timeout = timedelta(minutes=1)
         self.become_degraded_timeout = timedelta(minutes=15)
+        self.cf_listener = (
+            SQSRawListener(
+                session=boto_session,
+                queue_url=cf_stack_queue_url,
+                message_processor=self.process_cf_stack_event,
+                consider_failed_after=timedelta(minutes=5),
+                max_nr_of_messages_in_one_batch=1,
+                wait_for_new_messages_to_arrive=timedelta(seconds=10),
+            )
+            if cf_stack_queue_url
+            else None
+        )
+        self.http_client = http_client
 
     async def start(self) -> Any:
         await self.domain_event_listener.start()
         if self.periodic:
             await self.periodic.start()
+        if self.cf_listener:
+            await self.cf_listener.start()
 
     async def stop(self) -> Any:
+        if self.cf_listener:
+            await self.cf_listener.stop()
         await self.domain_event_listener.stop()
         if self.periodic:
             await self.periodic.stop()
+
+    async def process_cf_stack_event(self, message: Json) -> Optional[CloudAccount]:
+        log.info(f"Received CF stack event: {message}")
+
+        async def handle_create_stack(msg: Json) -> Optional[CloudAccount]:
+            try:
+                request_id = msg["RequestId"]
+                logical_resource_id = msg["LogicalResourceId"]
+                response_url = msg["ResponseURL"]
+                resource_properties = msg["ResourceProperties"]
+                workspace_id = resource_properties["WorkspaceId"]
+                external_id = resource_properties["ExternalId"]
+                role_name = resource_properties["RoleName"]
+                stack_id = resource_properties["StackId"]
+                assert stack_id.startswith("arn:aws:cloudformation:")
+                assert stack_id.count(":") == 5
+                account_id = stack_id.split(":")[4]
+            except Exception as e:
+                log.warning(f"Received invalid CF stack create event: {msg}. Error: {e}")
+                return None
+            # Create/Update the account on our side
+            account = await self.create_aws_account(
+                workspace_id=WorkspaceId(uuid.UUID(workspace_id)),
+                account_id=CloudAccountId(account_id),
+                role_name=AwsRoleName(role_name),
+                external_id=ExternalId(uuid.UUID(external_id)),
+                account_name=None,
+            )
+            # Signal CF that we're done
+            response = await self.http_client.put(
+                response_url,
+                json={
+                    "Status": "SUCCESS",
+                    "LogicalResourceId": logical_resource_id,
+                    "PhysicalResourceId": str(account.id),
+                    "StackId": stack_id,
+                    "RequestId": request_id,
+                    "Data": {"RoleName": role_name},
+                },
+            )
+            # Make sure we got a successful response
+            if response.is_error:
+                raise RuntimeError(f"Failed to signal CF that we're done: {response}")
+            return account
+
+        try:
+            body = json.loads(message["Body"])
+            assert body["Type"] == "Notification"
+            content = json.loads(body["Message"])
+            kind = content["RequestType"]
+            match kind:
+                case "Create":
+                    return await handle_create_stack(content)
+                case _:
+                    log.info(f"Received a CF stack event that is currently not handled. Ignore. {kind}")
+                    return None
+        except Exception as e:
+            log.warning(f"Received invalid CF stack event: {message}. Error: {e}")
+            return None
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         match context.kind:

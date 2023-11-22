@@ -64,7 +64,7 @@ from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepos
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
-InventoryMock = List[Callable[[Request], Awaitable[Response]]]
+RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
 
 
@@ -117,6 +117,7 @@ def default_config() -> Config:
         customerio_site_id=None,
         customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
+        aws_cf_stack_notification_sqs_url=None,
     )
 
 
@@ -341,22 +342,28 @@ def nd_json_response(content: Sequence[JsonElement]) -> Response:
 
 
 @pytest.fixture
-async def inventory_mock() -> InventoryMock:
+async def request_handler_mock() -> RequestHandlerMock:
     return []
 
 
 @pytest.fixture
-async def inventory_client(inventory_mock: InventoryMock) -> AsyncIterator[InventoryClient]:
+async def http_client(request_handler_mock: RequestHandlerMock) -> AsyncClient:
     async def app(request: Request) -> Response:
-        for mock in inventory_mock:
+        for mock in request_handler_mock:
             try:
                 return await mock(request)
             except AttributeError:
                 pass
         raise AttributeError(f'Unexpected request: {request.url.path} with content {request.content.decode("utf-8")}')
 
-    async_client = AsyncClient(transport=MockTransport(app))
-    async with InventoryClient("http://localhost:8980", client=async_client) as client:
+    return AsyncClient(transport=MockTransport(app))
+
+
+@pytest.fixture
+async def inventory_client(
+    http_client: AsyncClient, request_handler_mock: RequestHandlerMock
+) -> AsyncIterator[InventoryClient]:
+    async with InventoryClient("http://localhost:8980", client=http_client) as client:
         yield client
 
 
