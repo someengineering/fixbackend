@@ -67,6 +67,7 @@ NoVulnerabilitiesChanged = VulnerabilitiesChanged(
 class ReportSummary(BaseModel):
     overall_score: int
     check_summary: CheckSummary = Field(description="Overall summary of all available checks.")
+    account_check_summary: CheckSummary = Field(description="Sum of all summaries of all accounts.")
     accounts: List[AccountSummary] = Field(description="The accounts in the inventory.")
     benchmarks: List[BenchmarkSummary] = Field(description="The performed benchmarks.")
     changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
