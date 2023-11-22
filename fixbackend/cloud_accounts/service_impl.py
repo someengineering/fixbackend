@@ -157,6 +157,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 log.warning(f"Received invalid CF stack create event: {msg}. Error: {e}")
                 return None
             # Create/Update the account on our side
+            set_workspace_id(workspace_id)
+            set_cloud_account_id(account_id)
             account = await self.create_aws_account(
                 workspace_id=WorkspaceId(uuid.UUID(workspace_id)),
                 account_id=CloudAccountId(account_id),
