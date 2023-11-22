@@ -44,7 +44,7 @@ from fixbackend.inventory.schemas import (
     HistorySearch,
     HistoryChange,
 )
-from tests.fixbackend.conftest import InventoryMock, json_response, nd_json_response
+from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
@@ -60,10 +60,10 @@ neighborhood: List[Json] = [
 
 @pytest.fixture
 def mocked_answers(
-    inventory_mock: InventoryMock,
+    request_handler_mock: RequestHandlerMock,
     benchmark_json: List[Json],
     azure_virtual_machine_resource_json: Json,
-) -> InventoryMock:
+) -> RequestHandlerMock:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content.endswith("jq --no-rewrite .group"):
@@ -109,18 +109,18 @@ def mocked_answers(
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
 
-    inventory_mock.append(mock)
-    return inventory_mock
+    request_handler_mock.append(mock)
+    return request_handler_mock
 
 
 async def test_benchmark_command(
-    inventory_service: InventoryService, benchmark_json: List[Json], mocked_answers: InventoryMock
+    inventory_service: InventoryService, benchmark_json: List[Json], mocked_answers: RequestHandlerMock
 ) -> None:
     response = [a async for a in await inventory_service.benchmark(db, "benchmark_name")]
     assert response == benchmark_json
 
 
-async def test_summary(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
+async def test_summary(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
     summary = await inventory_service.summary(db)
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 42
@@ -188,7 +188,7 @@ async def test_dict_values_by() -> None:
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
 
 
-async def test_search_list(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
+async def test_search_list(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
     expected = [
         {
             "columns": [
@@ -208,7 +208,7 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
     assert result == expected
 
 
-async def test_search_start_data(inventory_service: InventoryService, mocked_answers: InventoryMock) -> None:
+async def test_search_start_data(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
     result = [
         SearchCloudResource(id="234", name="bla", cloud="gcp"),
         SearchCloudResource(id="123", name="foo", cloud="aws"),
@@ -221,7 +221,7 @@ async def test_search_start_data(inventory_service: InventoryService, mocked_ans
 
 
 async def test_resource(
-    inventory_service: InventoryService, mocked_answers: InventoryMock, azure_virtual_machine_resource_json: Json
+    inventory_service: InventoryService, mocked_answers: RequestHandlerMock, azure_virtual_machine_resource_json: Json
 ) -> None:
     res = await inventory_service.resource(db, NodeId("some_node_id"))
     assert res["neighborhood"] == neighborhood

@@ -30,7 +30,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.schemas import CompletePathRequest
-from tests.fixbackend.conftest import InventoryMock, nd_json_response, json_response
+from tests.fixbackend.conftest import RequestHandlerMock, nd_json_response, json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -38,7 +38,7 @@ db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database",
 @pytest.fixture
 def mocked_inventory_client(
     inventory_client: InventoryClient,
-    inventory_mock: InventoryMock,
+    request_handler_mock: RequestHandlerMock,
     azure_virtual_machine_resource_json: Json,
     aws_ec2_model_json: Json,
 ) -> InventoryClient:
@@ -82,7 +82,7 @@ def mocked_inventory_client(
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
 
-    inventory_mock.append(mock)
+    request_handler_mock.append(mock)
     return inventory_client
 
 
