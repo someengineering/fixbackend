@@ -799,40 +799,51 @@ async def test_handle_cf_sqs_message(
     async def handle_request(_: Request) -> Response:
         return Response(200, content=b"ok")
 
-    cf_notification = {
-        "RequestType": "Create",
-        "ServiceToken": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
-        "ResponseURL": "https://cloudformation-custom.test.com/",
-        "StackId": "arn:aws:cloudformation:us-east-1:12345:stack/name/some-id",
-        "RequestId": "855e25d5-3b80-4aed-b9f4-af8682deaf79",
-        "LogicalResourceId": "FixAccessFunction",
-        "ResourceType": "Custom::Function",
-        "ResourceProperties": {
+    def notification(kind: str, physical_resource_id: Optional[str] = None) -> Json:
+        base = {
+            "RequestType": kind,
             "ServiceToken": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
-            "RoleName": role_name,
-            "ExternalId": str(external_id),
-            "WorkspaceId": str(test_workspace_id),
+            "ResponseURL": "https://cloudformation-custom.test.com/",
             "StackId": "arn:aws:cloudformation:us-east-1:12345:stack/name/some-id",
-        },
-    }
-    cf_message = {
-        "Type": "Notification",
-        "MessageId": "38ccbec9-9999-5871-9383-e31e58450b68",
-        "TopicArn": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
-        "Subject": "AWS CloudFormation custom resource request",
-        "Message": json.dumps(cf_notification),
-        "Timestamp": "2023-11-22T08:45:16.159Z",
-        "SignatureVersion": "1",
-        "Signature": "sig",
-        "SigningCertURL": "https://cert/pem",
-        "UnsubscribeURL": "https://unsubscribe",
-    }
-    sqs_message = {
-        "Body": json.dumps(cf_message),
-    }
+            "RequestId": "855e25d5-3b80-4aed-b9f4-af8682deaf79",
+            "LogicalResourceId": "FixAccessFunction",
+            "ResourceType": "Custom::Function",
+            "ResourceProperties": {
+                "ServiceToken": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
+                "RoleName": role_name,
+                "ExternalId": str(external_id),
+                "WorkspaceId": str(test_workspace_id),
+                "StackId": "arn:aws:cloudformation:us-east-1:12345:stack/name/some-id",
+            },
+        }
+        if physical_resource_id:
+            base["PhysicalResourceId"] = physical_resource_id
+        cf_message = {
+            "Type": "Notification",
+            "MessageId": "38ccbec9-9999-5871-9383-e31e58450b68",
+            "TopicArn": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
+            "Subject": "AWS CloudFormation custom resource request",
+            "Message": json.dumps(base),
+            "Timestamp": "2023-11-22T08:45:16.159Z",
+            "SignatureVersion": "1",
+            "Signature": "sig",
+            "SigningCertURL": "https://cert/pem",
+            "UnsubscribeURL": "https://unsubscribe",
+        }
+        return {"Body": json.dumps(cf_message)}
+
+    # Handle Create Message
     request_handler_mock.append(handle_request)
     assert len(repository.accounts) == 0
-    account = await service.process_cf_stack_event(sqs_message)
+    account = await service.process_cf_stack_event(notification("Create"))
     assert account is not None
     assert len(repository.accounts) == 1
     assert repository.accounts[account.id] == account
+
+    # Handle Delete Message
+    repository.accounts[account.id] = evolve(
+        account, state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+    )
+    account = await service.process_cf_stack_event(notification("Delete", str(account.id)))
+    assert account is not None
+    assert isinstance(account.state, CloudAccountStates.Degraded)

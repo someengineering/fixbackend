@@ -53,6 +53,9 @@ class GcpCloudAccess(CloudAccess):
 class CloudAccountState(ABC):
     state_name: ClassVar[str]
 
+    def cloud_access(self) -> Optional[CloudAccess]:
+        return None
+
 
 class CloudAccountStates:
     """
@@ -85,6 +88,9 @@ class CloudAccountStates:
         state_name: ClassVar[str] = "discovered"
         access: CloudAccess
 
+        def cloud_access(self) -> Optional[CloudAccess]:
+            return self.access
+
     @frozen
     class Configured(CloudAccountState):
         """
@@ -95,6 +101,9 @@ class CloudAccountStates:
         access: CloudAccess
         enabled: bool  # is enabled for collection
 
+        def cloud_access(self) -> Optional[CloudAccess]:
+            return self.access
+
     @frozen
     class Degraded(CloudAccountState):
         """
@@ -104,6 +113,9 @@ class CloudAccountStates:
         state_name: ClassVar[str] = "degraded"
         access: CloudAccess
         error: str
+
+        def cloud_access(self) -> Optional[CloudAccess]:
+            return self.access
 
 
 @frozen(kw_only=True)
