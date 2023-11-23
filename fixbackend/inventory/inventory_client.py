@@ -40,6 +40,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, Response
 
+from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
 from fixbackend.inventory.schemas import CompletePathRequest
@@ -49,7 +50,7 @@ ContextHeaders = {"Total-Count", "Result-Count"}
 log = logging.getLogger(__name__)
 
 
-class GraphDatabaseException(Exception):
+class GraphDatabaseException(ClientError):
     pass
 
 
