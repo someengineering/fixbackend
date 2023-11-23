@@ -299,6 +299,7 @@ class InventoryService(Service):
             # combine benchmark and account data
             account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
             severity_counter: Dict[str, int] = defaultdict(int)
+            account_sum_count: Dict[str, int] = defaultdict(int)
             failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
             available_checks = 0
             for bid, bench in benchmarks.items():
@@ -313,6 +314,7 @@ class InventoryService(Service):
                         for account_id in failed_accounts_by_check_id.get(check_id, []):
                             benchmark_counter[account_id][severity] += 1
                             account_counter[account_id][severity] += 1
+                            account_sum_count[severity] += 1
                             failed_checks_by_severity[severity].add(check_id)
                 for account_id, account in accounts.items():
                     if account.cloud in bench.clouds:
@@ -337,6 +339,11 @@ class InventoryService(Service):
                     failed_checks=sum(v for v in severity_counter.values()),
                     failed_checks_by_severity=severity_counter,
                 ),
+                account_check_summary=CheckSummary(
+                    available_checks=available_checks * len(accounts),
+                    failed_checks=sum(v for v in account_sum_count.values()),
+                    failed_checks_by_severity=account_sum_count,
+                ),
                 overall_score=overall_score(accounts),
                 accounts=sorted(list(accounts.values()), key=lambda x: x.score),
                 benchmarks=list(benchmarks.values()),
@@ -347,8 +354,10 @@ class InventoryService(Service):
 
         except GraphDatabaseNotAvailable:
             log.warning("Graph database not available yet. Returning empty summary.")
+            empty = CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={})
             return ReportSummary(
-                check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
+                check_summary=empty,
+                account_check_summary=empty,
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],
