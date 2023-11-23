@@ -127,6 +127,7 @@ class SQSRawListener(Service):
                 log.error(f"Error while polling SQS: {ex}")
                 await asyncio.sleep(1)
             except Exception as ex:
+                MessageProcessingFailed.labels(queue=self.queue_url, last_attempt="no").inc()
                 log.exception(f"Unexpected error: {ex}")
 
 
