@@ -35,8 +35,12 @@ from fixcloudutils.redis.event_stream import Backoff, NoBackoff, MessageContext
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str, parse_utc_str
+from prometheus_client import Counter
 
 log = logging.getLogger(__name__)
+
+MessageProcessingFailed = Counter("sqs_processing_failed", "Messages failed to process", ["queue", "last_attempt"])
+MessagesProcessed = Counter("sqs_messages_processed", "Messages processed", ["queue"])
 
 
 class SQSRawListener(Service):
@@ -107,14 +111,24 @@ class SQSRawListener(Service):
                     attributes = message.get("Attributes", {})
                     receive_count = int(attributes.get("ApproximateReceiveCount", "0"))
                     if receive_count <= self.do_not_retry_message_more_than:
-                        await self.backoff.with_backoff(partial(self.message_processor, message))
+                        try:
+                            await self.backoff.with_backoff(partial(self.message_processor, message))
+                            MessagesProcessed.labels(queue=self.queue_url).inc()
+                        except Exception as ex:
+                            log.exception(f"Error handling message: {ex}")
+                            MessageProcessingFailed.labels(queue=self.queue_url, last_attempt="no").inc()
+                            continue  # do not delete the message, but continue with the remaining messages
+                    else:
+                        log.warning(f"Message was received too often. Will not process: {message}")
+                        MessageProcessingFailed.labels(queue=self.queue_url, last_attempt="yes").inc()
                     # Delete the message from the queue
                     await run_async(self.sqs.delete_message, QueueUrl=self.queue_url, ReceiptHandle=receipt_handle)
             except ClientError as ex:
                 log.error(f"Error while polling SQS: {ex}")
-                await asyncio.sleep(10)
+                await asyncio.sleep(1)
             except Exception as ex:
-                log.exception(f"Error handling message: {ex}")
+                MessageProcessingFailed.labels(queue=self.queue_url, last_attempt="no").inc()
+                log.exception(f"Unexpected error: {ex}")
 
 
 class SQSListener(SQSRawListener):
