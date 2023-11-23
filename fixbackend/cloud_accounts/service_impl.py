@@ -413,39 +413,25 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             )
             return maybe_account
 
-        # if existing, only update name and aliases, no need for events
         if existing := await account_already_exists(workspace_id, account_id):
             new_name = account_name or existing.account_name
-            match existing.state:
-                # detected and degraded can transition to Discovered or stay where they are
-                case CloudAccountStates.Detected() | CloudAccountStates.Degraded() | CloudAccountStates.Discovered():
-                    match role_name:
-                        case None:
-                            # no new role name provided, update the account name if possible
-                            # and stay in the same state. Return to not trigger any events
-                            result = await self.cloud_account_repository.update(
-                                existing.id,
-                                lambda acc: evolve(acc, account_name=account_name or new_name),
-                            )
-                            return result
-                        case role_name:
-                            # we have a role name, hence we transition to discovered
-                            new_state: CloudAccountState = CloudAccountStates.Discovered(
-                                AwsCloudAccess(external_id, role_name)
-                            )
-                            result = await self.cloud_account_repository.update(
-                                existing.id,
-                                lambda acc: evolve(
-                                    acc, state=new_state, account_name=account_name or new_name, state_updated_at=utc()
-                                ),
-                            )
+            if role_name is None or (  # no change in role name / external id?
+                (access := existing.aws_access())
+                and access.role_name == role_name
+                and access.external_id == external_id
+            ):
+                result = await self.cloud_account_repository.update(
+                    existing.id, lambda acc: evolve(acc, account_name=new_name)
+                )
+                return result  # Do not trigger any events.
+            else:
+                # we have a role name: transition to discovered state
+                new_state: CloudAccountState = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+                result = await self.cloud_account_repository.update(
+                    existing.id,
+                    lambda acc: evolve(acc, state=new_state, account_name=new_name, state_updated_at=utc()),
+                )
 
-                # in case of configured, update the name and return immediately
-                case _:
-                    result = await self.cloud_account_repository.update(
-                        existing.id, lambda acc: evolve(acc, account_name=account_name)
-                    )
-                    return result
         else:
             if role_name is None:
                 new_state = CloudAccountStates.Detected()
