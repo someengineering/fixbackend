@@ -13,13 +13,13 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-class ResourceNotFound(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+class ClientError(Exception):
+    pass
 
 
-class AccessDenied(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+class ResourceNotFound(ClientError):
+    pass
+
+
+class AccessDenied(ClientError):
+    pass

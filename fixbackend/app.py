@@ -71,7 +71,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.errors import AccessDenied, ResourceNotFound, ClientError
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -369,6 +369,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @app.exception_handler(ResourceNotFound)
     async def resource_not_found_handler(_: Request, exception: ResourceNotFound) -> Response:
         return JSONResponse(status_code=404, content={"message": str(exception)})
+
+    @app.exception_handler(ClientError)
+    async def client_error_handler(_: Request, exception: ClientError) -> Response:
+        return JSONResponse(status_code=400, content={"message": str(exception)})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
