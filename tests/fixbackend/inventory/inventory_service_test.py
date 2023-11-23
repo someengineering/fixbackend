@@ -128,6 +128,10 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.check_summary.available_checks == 4
     assert summary.check_summary.failed_checks == 2
     assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
+    # account checks summary
+    assert summary.account_check_summary.available_checks == 8
+    assert summary.account_check_summary.failed_checks == 2
+    assert summary.account_check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
@@ -169,6 +173,7 @@ async def test_no_graph_db_access(
         async with InventoryService(client, graph_database_access_manager, domain_event_subscriber) as service:
             assert await service.summary(db) == ReportSummary(
                 check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
+                account_check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],
