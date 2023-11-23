@@ -60,11 +60,12 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_callback_router,
     cloud_accounts_router,
 )
+from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies
-from fixbackend.dependencies import ServiceNames as SN
+from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
@@ -106,6 +107,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
     http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
+    engine = deps.add(
+        SN.async_engine,
+        create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
+    )
+    EngineMetrics.register(engine)
+    session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
 
     def create_redis(url: str) -> Redis:
         kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
@@ -131,17 +138,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_subscriber,
             DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
         )
-        engine = deps.add(
-            SN.async_engine,
-            create_async_engine(
-                cfg.database_url,
-                pool_size=10,
-                pool_recycle=3600,
-                pool_pre_ping=True,
-                # connect_args=dict(ssl=client_context)
-            ),
-        )
-        session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
@@ -230,17 +226,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             DomainEventSubscriber(rw_redis, cfg, "dispatching"),
         )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
-        engine = deps.add(
-            SN.async_engine,
-            create_async_engine(
-                cfg.database_url,
-                pool_size=10,
-                pool_recycle=3600,
-                pool_pre_ping=True,
-                # connect_args=dict(ssl=client_context)
-            ),
-        )
-        session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
@@ -306,17 +291,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @asynccontextmanager
     async def setup_teardown_billing(_: FastAPI) -> AsyncIterator[None]:
-        engine = deps.add(
-            SN.async_engine,
-            create_async_engine(
-                cfg.database_url,
-                pool_size=10,
-                pool_recycle=3600,
-                pool_pre_ping=True,
-                # connect_args=dict(ssl=client_context)
-            ),
-        )
-        session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         fixbackend_events = deps.add(
@@ -372,16 +346,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def add_logging_context(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         path = request.url.path
         if path.startswith(workspaces_prefix):
-            splitted = iter(path.split("/"))
-            for part in splitted:
+            parts = iter(path.split("/"))
+            for part in parts:
                 match part:
                     case "api" | "":
                         continue
                     case "workspaces":
-                        if workspace_id := next(splitted, None):
+                        if workspace_id := next(parts, None):
                             set_workspace_id(workspace_id)
                     case "cloud_account":
-                        if cloud_account_id := next(splitted, None):
+                        if cloud_account_id := next(parts, None):
                             set_fix_cloud_account_id(cloud_account_id)
 
         response = await call_next(request)
@@ -389,11 +363,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
         return response
 
     @app.exception_handler(AccessDenied)
-    async def access_denied_handler(request: Request, exception: AccessDenied) -> Response:
+    async def access_denied_handler(_: Request, exception: AccessDenied) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
 
     @app.exception_handler(ResourceNotFound)
-    async def resource_not_found_handler(request: Request, exception: ResourceNotFound) -> Response:
+    async def resource_not_found_handler(_: Request, exception: ResourceNotFound) -> Response:
         return JSONResponse(status_code=404, content={"message": str(exception)})
 
     @app.exception_handler(ClientError)
@@ -449,7 +423,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
 
-        # organizations path is deprecated, use /workspaces instead
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
@@ -468,7 +441,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             response = await call_next(request)
             if refresh_session_token := request.scope.get(refreshed_session_scope):
                 # refresh the session token on every request
-                cookie._set_login_cookie(response, refresh_session_token)
+                cookie._set_login_cookie(response, refresh_session_token)  # noqa
 
             return response
 
@@ -480,7 +453,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             )
 
         @app.get("/")
-        async def root(request: Request) -> Response:
+        async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
             return Response(content=body, media_type="text/html")
 
@@ -496,7 +469,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.exception_handler(401)
         async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
             response = await http_exception_handler(request, exception)
-            logout_cookie._set_logout_cookie(response)
+            logout_cookie._set_logout_cookie(response)  # noqa
             return response
 
     return app
