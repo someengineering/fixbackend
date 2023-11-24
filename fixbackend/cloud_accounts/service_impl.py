@@ -248,6 +248,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     return None
         except Exception as e:
             log.warning(f"Received invalid CF stack event: {message}. Error: {e}")
+            mark_failed()
             return None
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
