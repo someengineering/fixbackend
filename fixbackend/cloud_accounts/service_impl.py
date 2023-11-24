@@ -141,6 +141,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     async def process_cf_stack_event(self, message: Json) -> Optional[CloudAccount]:
         log.info(f"Received CF stack event: {message}")
 
+        def mark_failed() -> None:
+            if listener := self.cf_listener:
+                listener.mark_failed()
+
         async def send_response(
             msg: Json, physical_resource_id: Optional[str] = None, error_message: Optional[str] = None
         ) -> None:
@@ -154,6 +158,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 stack_id = resource_properties["StackId"]
             except Exception as e:
                 log.warning(f"Not enough data to inform CF: {msg}. Error: {e}")
+                mark_failed()
                 return None
 
             # Signal CF that we're done
@@ -184,6 +189,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 account_id = CloudAccountId(stack_id.split(":")[4])
             except Exception as e:
                 log.warning(f"Received invalid CF stack create event: {msg}. Error: {e}")
+                mark_failed()
                 await send_response(msg, str(uid()), "Invalid format for CF stack create/update event")
                 return None
             # Create/Update the account on our side
@@ -208,6 +214,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 cloud_account_id = FixCloudAccountId(uuid.UUID(msg["PhysicalResourceId"]))
             except Exception as e:
                 log.warning(f"Received invalid CF stack delete event: {msg}. Error: {e}")
+                mark_failed()
                 await send_response(msg, str(uid()), "Invalid format for CF stack delete event")
                 return None
             if (
