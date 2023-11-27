@@ -148,7 +148,7 @@ class InventoryClient(Service):
         raise_on_error(response, ("application/json",))
         return cast(List[Json], response.json())
 
-    async def issues(
+    async def checks(
         self,
         access: GraphDatabaseAccess,
         *,

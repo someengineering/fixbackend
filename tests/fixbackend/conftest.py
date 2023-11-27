@@ -323,6 +323,22 @@ def azure_virtual_machine_resource_json() -> Json:
             "account": {"reported": {"name": "/subscriptions/test", "id": "/subscriptions/test"}},
             "region": {"reported": {"name": "westeurope", "id": "/subscriptions/test/locations/westeurope"}},
         },
+        "security": {
+            "issues": [
+                {
+                    "benchmark": "azure_cis_1_1_1",
+                    "check": "aws_c1",
+                    "severity": "medium",
+                    "opened_at": "2023-11-15T15:44:41Z",
+                    "run_id": "foo",
+                }
+            ],
+            "opened_at": "2023-11-15T15:44:41Z",
+            "reopen_counter": 1,
+            "run_id": "foo",
+            "has_issues": True,
+            "severity": "medium",
+        },
     }
 
 
