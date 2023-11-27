@@ -263,10 +263,10 @@ class InventoryService(Service):
             return summaries, benchmark_checks
 
         async def top_issues(checks_by_severity: Dict[str, Set[str]], num: int) -> List[Json]:
-            checks = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
-            top = list(islice(checks, num))
-            issues = await self.client.checks(db, check_ids=top)
-            return sorted(issues, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
+            check_ids = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
+            top = list(islice(check_ids, num))
+            checks = await self.client.checks(db, check_ids=top)
+            return sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
 
         def bench_account_score(failing_checks: Dict[str, int], benchmark_checks: Dict[str, int]) -> int:
             # Compute the score of an account with respect to a benchmark
