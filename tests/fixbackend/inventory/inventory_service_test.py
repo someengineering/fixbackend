@@ -92,15 +92,15 @@ def mocked_answers(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
                  {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/search/list" and content == "is (account)":
+        elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
             return nd_json_response(
-                [{"id": "n1", "type": "node", "reported": {"id": "234", "name": "account 1"}, "ancestors": {"cloud": {"reported": {"name": "gcp", "id": "gcp"}}}},  # fmt: skip
-                 {"id": "n2", "type": "node", "reported": {"id": "123", "name": "account 2"}, "ancestors": {"cloud": {"reported": {"name": "aws", "id": "aws"}}}}]  # fmt: skip
+                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws"}, "count": 54321},  # fmt: skip
+                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp"}, "count": 12345}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/search/aggregate":
+        elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
             return nd_json_response(
-                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "sum_of_1": 8},  # fmt: skip
-                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "sum_of_1": 2}]  # fmt: skip
+                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "count": 8},  # fmt: skip
+                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "count": 2}]  # fmt: skip
             )
         elif request.url.path == "/graph/resoto/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
@@ -128,18 +128,26 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.check_summary.available_checks == 4
     assert summary.check_summary.failed_checks == 2
     assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
+    assert summary.check_summary.failed_resources == 10
+    assert summary.check_summary.failed_resources_by_severity == {"critical": 2, "low": 8}
     # account checks summary
     assert summary.account_check_summary.available_checks == 8
     assert summary.account_check_summary.failed_checks == 2
     assert summary.account_check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
+    assert summary.account_check_summary.failed_resources == 10
+    assert summary.account_check_summary.failed_resources_by_severity == {"critical": 2, "low": 8}
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
     assert b1.clouds == ["aws"]
-    assert b1.account_summary == {"123": BenchmarkAccountSummary(score=85, failed_checks={"low": 1})}
+    assert b1.account_summary == {
+        "123": BenchmarkAccountSummary(score=85, failed_checks={"low": 1}, failed_resources={"low": 8})
+    }
     assert b2.id == "gcp_test"
     assert b2.clouds == ["gcp"]
-    assert b2.account_summary == {"234": BenchmarkAccountSummary(score=0, failed_checks={"critical": 1})}
+    assert b2.account_summary == {
+        "234": BenchmarkAccountSummary(score=0, failed_checks={"critical": 1}, failed_resources={"critical": 2})
+    }
     assert len(summary.accounts) == 2
     # check accounts
     gcp, aws = summary.accounts
@@ -152,10 +160,10 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert aws.cloud == "aws"
     assert aws.score == 85
     # check becoming vulnerable
-    assert summary.changed_vulnerable.accounts_selection == ["123", "234"]
+    assert summary.changed_vulnerable.accounts_selection == ["234", "123"]
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_vulnerable.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
-    assert summary.changed_compliant.accounts_selection == ["123", "234"]
+    assert summary.changed_compliant.accounts_selection == ["234", "123"]
     assert summary.changed_compliant.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
@@ -171,9 +179,17 @@ async def test_no_graph_db_access(
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
         async with InventoryService(client, graph_database_access_manager, domain_event_subscriber) as service:
+            empty = CheckSummary(
+                available_checks=0,
+                failed_checks=0,
+                failed_checks_by_severity={},
+                available_resources=0,
+                failed_resources=0,
+                failed_resources_by_severity={},
+            )
             assert await service.summary(db) == ReportSummary(
-                check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
-                account_check_summary=CheckSummary(available_checks=0, failed_checks=0, failed_checks_by_severity={}),
+                check_summary=empty,
+                account_check_summary=empty,
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],

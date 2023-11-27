@@ -23,12 +23,14 @@ class AccountSummary(BaseModel):
     id: str = Field(description="The account id")
     name: str = Field(description="The account name")
     cloud: str = Field(description="The name of the cloud provider")
+    resource_count: int = Field(description="The number of resources in the account")
     score: int = Field(description="The score of the account", default=100)
 
 
 class BenchmarkAccountSummary(BaseModel):
     score: int = Field(description="The score of the account", default=0)
     failed_checks: Optional[Dict[str, int]] = Field(description="The number of failed checks by severity.")
+    failed_resources: Optional[Dict[str, int]] = Field(description="The number of failed resources by severity.")
 
 
 class BenchmarkSummary(BaseModel):
@@ -48,6 +50,9 @@ class CheckSummary(BaseModel):
     available_checks: int = Field(description="The number of all available checks.")
     failed_checks: int = Field(description="The number of failed checks.")
     failed_checks_by_severity: Dict[str, int] = Field(description="The number of failed checks by severity.")
+    available_resources: int = Field("The number of all available resources.")
+    failed_resources: int = Field(description="The number of failed resources.")
+    failed_resources_by_severity: Dict[str, int] = Field(description="The number of failed resources by severity.")
 
 
 class VulnerabilitiesChanged(BaseModel):
