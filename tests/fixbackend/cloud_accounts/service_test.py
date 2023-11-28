@@ -818,19 +818,7 @@ async def test_handle_cf_sqs_message(
         }
         if physical_resource_id:
             base["PhysicalResourceId"] = physical_resource_id
-        cf_message = {
-            "Type": "Notification",
-            "MessageId": "38ccbec9-9999-5871-9383-e31e58450b68",
-            "TopicArn": "arn:aws:sns:us-east-1:12345:SomeCallbacks",
-            "Subject": "AWS CloudFormation custom resource request",
-            "Message": json.dumps(base),
-            "Timestamp": "2023-11-22T08:45:16.159Z",
-            "SignatureVersion": "1",
-            "Signature": "sig",
-            "SigningCertURL": "https://cert/pem",
-            "UnsubscribeURL": "https://unsubscribe",
-        }
-        return {"Body": json.dumps(cf_message)}
+        return {"Body": json.dumps(base)}
 
     # Handle Create Message
     request_handler_mock.append(handle_request)
