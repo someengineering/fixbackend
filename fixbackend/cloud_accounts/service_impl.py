@@ -563,7 +563,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     ) -> CloudAccount:
         def set_degraded(cloud_account: CloudAccount) -> CloudAccount:
             if access := cloud_account.state.cloud_access():
-                return evolve(cloud_account, state=CloudAccountStates.Degraded(access, error), state_updated_at=utc())
+                return evolve(
+                    cloud_account,
+                    next_scan=None,
+                    state=CloudAccountStates.Degraded(access, error),
+                    state_updated_at=utc(),
+                )
             else:
                 return cloud_account
 

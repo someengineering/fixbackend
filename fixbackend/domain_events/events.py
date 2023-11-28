@@ -21,27 +21,28 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import ClassVar, Dict, Optional
-from attrs import frozen
-from abc import ABC, abstractmethod
-from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId
-from fixcloudutils.types import Json
+from abc import ABC
 from datetime import datetime
+from typing import ClassVar, Dict, Optional, TypeVar, Type
+
+from attrs import frozen
+from fixcloudutils.types import Json
 
 from fixbackend.domain_events.converter import converter
+from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId
+
+T = TypeVar("T")
 
 
 class Event(ABC):
     kind: ClassVar[str]
 
-    @abstractmethod
     def to_json(self) -> Json:
-        ...
+        return converter.unstructure(self)  # type: ignore
 
-    @staticmethod
-    @abstractmethod
-    def from_json(json: Json) -> "Event":
-        ...
+    @classmethod
+    def from_json(cls: Type[T], json: Json) -> T:
+        return converter.structure(json, cls)
 
 
 @frozen
@@ -51,13 +52,6 @@ class UserRegistered(Event):
     user_id: UserId
     email: str
     tenant_id: WorkspaceId
-
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "UserRegistered":
-        return converter.structure(json, UserRegistered)
 
 
 @frozen
@@ -72,13 +66,6 @@ class AwsAccountDiscovered(Event):
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
 
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "AwsAccountDiscovered":
-        return converter.structure(json, AwsAccountDiscovered)
-
 
 @frozen
 class AwsAccountConfigured(Event):
@@ -92,13 +79,6 @@ class AwsAccountConfigured(Event):
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
 
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "AwsAccountConfigured":
-        return converter.structure(json, AwsAccountConfigured)
-
 
 @frozen
 class AwsAccountDeleted(Event):
@@ -107,13 +87,6 @@ class AwsAccountDeleted(Event):
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
-
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "AwsAccountDeleted":
-        return converter.structure(json, AwsAccountDeleted)
 
 
 @frozen
@@ -128,13 +101,6 @@ class AwsAccountDegraded(Event):
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
     error: str
-
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "AwsAccountConfigured":
-        return converter.structure(json, AwsAccountConfigured)
 
 
 @frozen
@@ -153,23 +119,9 @@ class TenantAccountsCollected(Event):
     cloud_accounts: Dict[FixCloudAccountId, CloudAccountCollectInfo]
     next_run: Optional[datetime]
 
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "TenantAccountsCollected":
-        return converter.structure(json, TenantAccountsCollected)
-
 
 @frozen
 class WorkspaceCreated(Event):
     kind: ClassVar[str] = "workspace_created"
 
     workspace_id: WorkspaceId
-
-    def to_json(self) -> Json:
-        return converter.unstructure(self)  # type: ignore
-
-    @staticmethod
-    def from_json(json: Json) -> "WorkspaceCreated":
-        return converter.structure(json, WorkspaceCreated)
