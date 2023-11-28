@@ -232,16 +232,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         try:
             body = json.loads(message["Body"])
-            assert body["Type"] == "Notification"
-            content = json.loads(body["Message"])
-            kind = content["RequestType"]
+            kind = body["RequestType"]
             match kind:
                 case "Create":
-                    return await handle_stack_created(content)
+                    return await handle_stack_created(body)
                 case "Delete":
-                    return await handle_stack_deleted(content)
+                    return await handle_stack_deleted(body)
                 case "Update":
-                    return await handle_stack_created(content)
+                    return await handle_stack_created(body)
                 case _:
                     log.info(f"Received a CF stack event that is currently not handled. Ignore. {kind}")
                     await send_response(message)  # still try to acknowledge the message
