@@ -182,6 +182,7 @@ class InventoryService(Service):
         resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
+        checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
         return dict(resource=resource, failing_checks=checks, neighborhood=nb)
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
