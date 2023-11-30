@@ -48,7 +48,7 @@ class OAuth2AuthorizeResponse(BaseModel):
     authorization_url: str
 
 
-def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seconds: int = 3600) -> str:
+def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seconds: int) -> str:
     data["aud"] = STATE_TOKEN_AUDIENCE
     return generate_jwt(data, secret, lifetime_seconds)
 
@@ -62,6 +62,7 @@ def get_oauth_router(
     redirect_url: Optional[str] = None,
     associate_by_email: bool = False,
     is_verified_by_default: bool = False,
+    state_token_ttl: int = 3600,
 ) -> APIRouter:
     """Generate a router with the OAuth routes."""
     router = APIRouter()
@@ -90,7 +91,7 @@ def get_oauth_router(
             authorize_redirect_url = str(request.url_for(callback_route_name))
 
         state_data: Dict[str, str] = {}
-        state = generate_state_token(state_data, state_secret)
+        state = generate_state_token(state_data, state_secret, state_token_ttl)
         authorization_url = await oauth_client.get_authorization_url(
             authorize_redirect_url,
             state,
