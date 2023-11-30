@@ -62,6 +62,7 @@ class Config(BaseSettings):
     customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
     aws_cf_stack_notification_sqs_url: Optional[str]
+    oauth_state_token_ttl: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -144,6 +145,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--cloud-account-service-event-parallelism",
         type=int,
         default=int(os.environ.get("CLOUD_ACCOUNT_SERVICE_EVENT_PARALLELISM", "100")),
+    )
+    parser.add_argument(
+        "--oauth-state-token-ttl", type=int, default=int(os.environ.get("OAUTH_STATE_TOKEN_TTL", "3600"))
     )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

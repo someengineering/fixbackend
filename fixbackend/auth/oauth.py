@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
@@ -31,6 +31,9 @@ from pydantic import BaseModel
 
 from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import Config
+from logging import getLogger
+
+log = getLogger(__name__)
 
 
 def google_client(config: Config) -> GoogleOAuth2:
@@ -48,7 +51,7 @@ class OAuth2AuthorizeResponse(BaseModel):
     authorization_url: str
 
 
-def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seconds: int = 3600) -> str:
+def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seconds: int) -> str:
     data["aud"] = STATE_TOKEN_AUDIENCE
     return generate_jwt(data, secret, lifetime_seconds)
 
@@ -62,6 +65,7 @@ def get_oauth_router(
     redirect_url: Optional[str] = None,
     associate_by_email: bool = False,
     is_verified_by_default: bool = False,
+    state_token_ttl: int = 3600,
 ) -> APIRouter:
     """Generate a router with the OAuth routes."""
     router = APIRouter()
@@ -90,7 +94,7 @@ def get_oauth_router(
             authorize_redirect_url = str(request.url_for(callback_route_name))
 
         state_data: Dict[str, str] = {}
-        state = generate_state_token(state_data, state_secret)
+        state = generate_state_token(state_data, state_secret, state_token_ttl)
         authorization_url = await oauth_client.get_authorization_url(
             authorize_redirect_url,
             state,
@@ -132,16 +136,21 @@ def get_oauth_router(
         token, state = access_token_state
         account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
+        def redirect_to_root() -> Response:
+            response = Response()
+            response.headers["location"] = "/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
+
         if account_email is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
-            )
+            log.info("OAuth callback: no email address returned by OAuth provider")
+            return redirect_to_root()
 
         try:
             decoded_state = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
-        except jwt.DecodeError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
+            log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
 
         try:
             user = await user_manager.oauth_callback(
@@ -156,16 +165,12 @@ def get_oauth_router(
                 is_verified_by_default=is_verified_by_default,
             )
         except UserAlreadyExists:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
-            )
+            log.info(f"OAuth callback: user already exists: {account_email}, {state}")
+            return redirect_to_root()
 
         if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
-            )
+            log.info(f"OAuth callback: user is inactive: {account_email}, {state}")
+            return redirect_to_root()
 
         # Authenticate
         response = await backend.login(strategy, user)

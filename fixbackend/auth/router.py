@@ -52,6 +52,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
             config.secret,
             is_verified_by_default=True,
             associate_by_email=True,
+            state_token_ttl=config.oauth_state_token_ttl,
         ),
         prefix="/google",
         tags=["auth"],
@@ -66,6 +67,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
             config.secret,
             is_verified_by_default=True,
             associate_by_email=True,
+            state_token_ttl=config.oauth_state_token_ttl,
         ),
         prefix="/github",
         tags=["auth"],
@@ -98,7 +100,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     async def list_all_oauth_providers(request: Request, redirect_url: str = "/") -> List[OAuthProviderAuthUrl]:
         state_data: Dict[str, str] = {}
         state_data["redirect_url"] = redirect_url
-        state = generate_state_token(state_data, config.secret)
+        state = generate_state_token(state_data, config.secret, config.oauth_state_token_ttl)
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
