@@ -31,6 +31,9 @@ from pydantic import BaseModel
 
 from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import Config
+from logging import getLogger
+
+log = getLogger(__name__)
 
 
 def google_client(config: Config) -> GoogleOAuth2:
@@ -133,16 +136,21 @@ def get_oauth_router(
         token, state = access_token_state
         account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
+        def redirect_to_root():
+            response = Response()
+            response.headers["location"] = "/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
+
         if account_email is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
-            )
+            log.info("OAuth callback: no email address returned by OAuth provider")
+            return redirect_to_root()
 
         try:
             decoded_state = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
-        except jwt.DecodeError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
+            log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
 
         try:
             user = await user_manager.oauth_callback(
@@ -157,16 +165,12 @@ def get_oauth_router(
                 is_verified_by_default=is_verified_by_default,
             )
         except UserAlreadyExists:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
-            )
+            log.info(f"OAuth callback: user already exists: {account_email}, {state}")
+            return redirect_to_root()
 
         if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
-            )
+            log.info(f"OAuth callback: user is inactive: {account_email}, {state}")
+            return redirect_to_root()
 
         # Authenticate
         response = await backend.login(strategy, user)
