@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
@@ -136,7 +136,7 @@ def get_oauth_router(
         token, state = access_token_state
         account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
-        def redirect_to_root():
+        def redirect_to_root() -> Response:
             response = Response()
             response.headers["location"] = "/"
             response.status_code = status.HTTP_303_SEE_OTHER
