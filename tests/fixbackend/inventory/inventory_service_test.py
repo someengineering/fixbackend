@@ -129,8 +129,8 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.check_summary.available_checks == 4
     assert summary.check_summary.failed_checks == 2
     assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
-    assert summary.check_summary.failed_resources == 10
-    assert summary.check_summary.failed_resources_by_severity == {"critical": 2, "low": 8}
+    assert summary.check_summary.failed_resources == 66666
+    assert summary.check_summary.failed_resources_by_severity == {"high": 4321, "medium": 62345}
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
