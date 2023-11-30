@@ -94,8 +94,9 @@ def mocked_answers(
             )
         elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
             return nd_json_response(
-                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws"}, "count": 54321},  # fmt: skip
-                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp"}, "count": 12345}]  # fmt: skip
+                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "medium"}, "count": 50000},  # fmt: skip
+                 {"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "high"}, "count": 4321},  # fmt: skip
+                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp", "severity": "medium"}, "count": 12345}]  # fmt: skip
             )
         elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
             return nd_json_response(
@@ -130,23 +131,17 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
     assert summary.check_summary.failed_resources == 10
     assert summary.check_summary.failed_resources_by_severity == {"critical": 2, "low": 8}
-    # account checks summary
-    assert summary.account_check_summary.available_checks == 8
-    assert summary.account_check_summary.failed_checks == 2
-    assert summary.account_check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
-    assert summary.account_check_summary.failed_resources == 10
-    assert summary.account_check_summary.failed_resources_by_severity == {"critical": 2, "low": 8}
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
     assert b1.clouds == ["aws"]
     assert b1.account_summary == {
-        "123": BenchmarkAccountSummary(score=85, failed_checks={"low": 1}, failed_resources={"low": 8})
+        "123": BenchmarkAccountSummary(score=85, failed_checks={"low": 1}, failed_resource_checks={"low": 8})
     }
     assert b2.id == "gcp_test"
     assert b2.clouds == ["gcp"]
     assert b2.account_summary == {
-        "234": BenchmarkAccountSummary(score=0, failed_checks={"critical": 1}, failed_resources={"critical": 2})
+        "234": BenchmarkAccountSummary(score=0, failed_checks={"critical": 1}, failed_resource_checks={"critical": 2})
     }
     assert len(summary.accounts) == 2
     # check accounts
@@ -155,10 +150,12 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert gcp.name == "account 1"
     assert gcp.cloud == "gcp"
     assert gcp.score == 0
+    assert gcp.failed_resources_by_severity == {"medium": 12345}
     assert aws.id == "123"
     assert aws.name == "account 2"
     assert aws.cloud == "aws"
     assert aws.score == 85
+    assert aws.failed_resources_by_severity == {"medium": 50000, "high": 4321}
     # check becoming vulnerable
     assert summary.changed_vulnerable.accounts_selection == ["234", "123"]
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
@@ -189,7 +186,6 @@ async def test_no_graph_db_access(
             )
             assert await service.summary(db) == ReportSummary(
                 check_summary=empty,
-                account_check_summary=empty,
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],
