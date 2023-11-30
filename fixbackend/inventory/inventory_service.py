@@ -216,10 +216,11 @@ class InventoryService(Service):
                 resource_count_by_kind_selection=reduced,
             )
 
-        async def account_summary() -> Dict[str, AccountSummary]:
+        async def account_summary() -> Tuple[Dict[str, int], Dict[str, AccountSummary]]:
             account_by_id: Dict[str, AccountSummary] = {}
             resources_by_account: Dict[str, int] = defaultdict(int)
             resources_by_account_by_severity: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            resources_by_severity: Dict[str, int] = defaultdict(int)
             async for entry in await self.client.aggregate(
                 db,
                 "search /ancestors.account.reported.id!=null | aggregate "
@@ -242,10 +243,11 @@ class InventoryService(Service):
                 resources_by_account[account_id] += count
                 if severity is not None:
                     resources_by_account_by_severity[account_id][severity] = count
+                    resources_by_severity[severity] += count
             for account_id, account in account_by_id.items():
                 account.resource_count = resources_by_account.get(account_id, 0)
                 account.failed_resources_by_severity = resources_by_account_by_severity[account_id]
-            return account_by_id
+            return resources_by_severity, account_by_id
 
         async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
             check_accounts: ChecksByAccountId = defaultdict(dict)
@@ -307,7 +309,7 @@ class InventoryService(Service):
 
         try:
             (
-                accounts,
+                (severity_resource_counter, accounts),
                 (benchmarks, checks),
                 (failed_accounts_by_check_id, severity_by_check_id),
                 vulnerable_changed,
@@ -323,7 +325,6 @@ class InventoryService(Service):
             # combine benchmark and account data
             account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
             severity_check_counter: Dict[str, int] = defaultdict(int)
-            severity_resource_counter: Dict[str, int] = defaultdict(int)
             account_check_sum_count: Dict[str, int] = defaultdict(int)
             failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
             available_checks = 0
@@ -340,7 +341,6 @@ class InventoryService(Service):
                         for account_id, failed_resource_count in failed_accounts_by_check_id[check_id].items():
                             benchmark_account_issue_counter[account_id][severity] += 1
                             benchmark_account_resource_counter[account_id][severity] += failed_resource_count
-                            severity_resource_counter[severity] += failed_resource_count
                             account_counter[account_id][severity] += 1
                             account_check_sum_count[severity] += 1
                             failed_checks_by_severity[severity].add(check_id)
