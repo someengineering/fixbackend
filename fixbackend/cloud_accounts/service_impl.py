@@ -349,6 +349,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     raise RuntimeError(msg)
 
             case AssumeRoleResults.Success() as assume_role_result:
+                # We are allowed to assume the role.
+                # Make sure we also have the permissions to describe regions
+                # This additional test makes sure that also the custom permissions are already deployed
+                await self.account_setup_helper.allowed_to_describe_regions(assume_role_result)
+                # If we come here, we did our best to make sure the role with all permissions is deployed
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
                     log.info(f"Found accounts {organization_accounts}")
                     privileged = True
