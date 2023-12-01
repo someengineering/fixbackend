@@ -23,6 +23,7 @@ from functools import lru_cache
 
 
 class Config(BaseSettings):
+    environment: str
     instance_id: str
     database_name: str
     database_user: str
@@ -80,6 +81,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--instance-id", default=os.environ.get("FIX_INSTANCE_ID", "single"))
+    parser.add_argument("--environment", default=os.environ.get("FIX_ENVIRONMENT", "dev"))
     parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
     parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
     parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))

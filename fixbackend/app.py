@@ -459,7 +459,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.get("/")
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
-            return Response(content=body, media_type="text/html")
+            return Response(content=body, media_type="text/html", headers={"fix-environment": cfg.environment})
 
         @app.exception_handler(404)
         async def not_found_handler(request: Request, exception: HTTPException) -> Response:

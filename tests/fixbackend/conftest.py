@@ -79,7 +79,8 @@ def event_loop() -> Iterator[AbstractEventLoop]:
 @pytest.fixture
 def default_config() -> Config:
     return Config(
-        instance_id="",
+        environment="test",
+        instance_id="test",
         database_name="fixbackend-testdb",
         database_user="root",
         database_password=None,
