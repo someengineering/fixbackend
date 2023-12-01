@@ -11,6 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from functools import cached_property
 
 import boto3
 
@@ -37,6 +38,14 @@ class AssumeRoleResults:
         secret_access_key: str
         session_token: str
         expiration: datetime
+
+        @cached_property
+        def boto_session(self) -> boto3.Session:
+            return boto3.Session(
+                aws_access_key_id=self.access_key_id,
+                aws_secret_access_key=self.secret_access_key,
+                aws_session_token=self.session_token,
+            )
 
     @frozen
     class Failure(AssumeRoleResult):
@@ -71,15 +80,15 @@ class AwsAccountSetupHelper:
         except Exception as ex:
             return AssumeRoleResults.Failure(str(ex))
 
+    async def allowed_to_describe_regions(self, result: AssumeRoleResults.Success) -> None:
+        # we are not interested in the result, just if we are allowed to perform this action
+        # in case it does not work, an exception is thrown
+        await run_async(result.boto_session.client("ec2").describe_regions)
+
     async def list_accounts(
         self, assume_role_result: AssumeRoleResults.Success
     ) -> Dict[CloudAccountId, CloudAccountName]:
-        session = boto3.Session(
-            aws_access_key_id=assume_role_result.access_key_id,
-            aws_secret_access_key=assume_role_result.secret_access_key,
-            aws_session_token=assume_role_result.session_token,
-        )
-        orgnizations_client = session.client("organizations")
+        orgnizations_client = assume_role_result.boto_session.client("organizations")
         accounts = []
         next_token = None
         try:
@@ -102,12 +111,7 @@ class AwsAccountSetupHelper:
         return {CloudAccountId(account["Id"]): CloudAccountName(account["Name"]) for account in accounts}
 
     async def list_account_aliases(self, assume_role_result: AssumeRoleResults.Success) -> Optional[CloudAccountAlias]:
-        session = boto3.Session(
-            aws_access_key_id=assume_role_result.access_key_id,
-            aws_secret_access_key=assume_role_result.secret_access_key,
-            aws_session_token=assume_role_result.session_token,
-        )
-        iam_client = session.client("iam")
+        iam_client = assume_role_result.boto_session.client("iam")
         try:
             response = await run_async(iam_client.list_account_aliases)
             aliases = response.get("AccountAliases", [])
