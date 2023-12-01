@@ -83,7 +83,7 @@ class AwsAccountSetupHelper:
     async def allowed_to_describe_regions(self, result: AssumeRoleResults.Success) -> None:
         # we are not interested in the result, just if we are allowed to perform this action
         # in case it does not work, an exception is thrown
-        await run_async(result.boto_session.client("ec2").describe_regions, RegionNames=["us-east-1"])
+        await run_async(result.boto_session.client("ec2").describe_regions)
 
     async def list_accounts(
         self, assume_role_result: AssumeRoleResults.Success
