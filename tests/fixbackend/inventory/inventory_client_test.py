@@ -19,7 +19,6 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import json
 import uuid
 
 import pytest
@@ -47,14 +46,10 @@ def mocked_inventory_client(
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
         elif request.url.path == "/report/benchmarks":
-            benchmarks = [
-                {"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
-                {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"},  # fmt: skip
-            ]
-            return Response(
-                200, content=json.dumps(benchmarks).encode("utf-8"), headers={"content-type": "application/json"}
+            return json_response(
+                [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
+                 {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
-
         elif request.url.path == "/graph/resoto/search/list":
             return nd_json_response([dict(id="123", reported={})])
         elif request.method == "DELETE" and request.url.path == "/graph/resoto/node/123":
@@ -68,17 +63,9 @@ def mocked_inventory_client(
             assert cpl == CompletePathRequest(path="test", prop="bla", fuzzy=True, limit=1, skip=2, kinds=["a"])
             return json_response({"a": "string", "b": "int32", "c": "boolean"}, {"Total-Count": "12"})
         elif request.url.path == "/graph/resoto/model":
-            return Response(
-                200,
-                content=json.dumps([aws_ec2_model_json]).encode("utf-8"),
-                headers={"content-type": "application/json"},
-            )
+            return json_response([aws_ec2_model_json])
         elif request.url.path == "/graph/resoto/node/some_node_id":
-            return Response(
-                200,
-                content=json.dumps(azure_virtual_machine_resource_json).encode("utf-8"),
-                headers={"content-type": "application/json"},
-            )
+            return json_response(azure_virtual_machine_resource_json)
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
 
