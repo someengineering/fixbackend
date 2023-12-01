@@ -14,7 +14,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional, Tuple, Any
+from typing import Callable, Dict, List, Optional, Tuple
 
 import boto3
 import pytest
@@ -155,6 +155,7 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
     # noinspection PyMissingConstructor
     def __init__(self) -> None:
         self.can_assume = True
+        self.can_describe_regions = True
         self.org_accounts: Dict[CloudAccountId, CloudAccountName] = {}
         self.account_alias: CloudAccountAlias | None = None
 
@@ -172,6 +173,10 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
 
     async def list_account_aliases(self, assume_role_result: AssumeRoleResults.Success) -> CloudAccountAlias | None:
         return self.account_alias
+
+    async def allowed_to_describe_regions(self, result: AssumeRoleResults.Success) -> None:
+        if not self.can_describe_regions:
+            raise Exception("Not allowed to describe regions")
 
 
 now = datetime.utcnow()
@@ -495,10 +500,8 @@ async def test_handle_account_discovered_success(
     repository: CloudAccountRepositoryMock,
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
-    boto_answers: Dict[str, Any],
 ) -> None:
     # allowed to perform describe regions
-    boto_answers["DescribeRegions"] = {"Regions": [{"RegionName": "us-east-1"}]}
     account = await service.create_aws_account(
         workspace_id=test_workspace_id,
         account_id=account_id,
@@ -541,6 +544,7 @@ async def test_handle_account_discovered_assume_role_success(
     )
     event = domain_sender.events[0]
     account_setup_helper.can_assume = True
+    account_setup_helper.can_describe_regions = False
     # boto3 can not describe regions -> fail
     with pytest.raises(Exception):
         await service.process_domain_event(
@@ -554,10 +558,7 @@ async def test_handle_account_discovered_assume_role_failure(
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
     account_setup_helper: AwsAccountSetupHelperMock,
-    boto_answers: Dict[str, Any],
 ) -> None:
-    # allowed to perform describe regions
-    boto_answers["DescribeRegions"] = {"Regions": [{"RegionName": "us-east-1"}]}
     # boto3 cannot assume right away
     account_id = CloudAccountId("foobar")
     role_name = AwsRoleName("FooBarRole")
@@ -610,10 +611,7 @@ async def test_handle_account_discovered_list_accounts_success(
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
     account_setup_helper: AwsAccountSetupHelperMock,
-    boto_answers: Dict[str, Any],
 ) -> None:
-    # allowed to perform describe regions
-    boto_answers["DescribeRegions"] = {"Regions": [{"RegionName": "us-east-1"}]}
     account_id = CloudAccountId("foobar")
     role_name = AwsRoleName("FooBarRole")
     account = await service.create_aws_account(
@@ -655,10 +653,7 @@ async def test_handle_account_discovered_list_aliases_success(
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
     account_setup_helper: AwsAccountSetupHelperMock,
-    boto_answers: Dict[str, Any],
 ) -> None:
-    # allowed to perform describe regions
-    boto_answers["DescribeRegions"] = {"Regions": [{"RegionName": "us-east-1"}]}
     # boto3 cannot assume right away
     account_id = CloudAccountId("foobar")
     role_name = AwsRoleName("FooBarRole")
