@@ -18,18 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and run dev container task
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/someengineering/fixbackend-devcontainer
-          cacheFrom: ghcr.io/someengineering/fixbackend-devcontainer
-          push: always
           # Change this to be your CI task/script
           runCmd: nox --envdir /tmp/.nox
