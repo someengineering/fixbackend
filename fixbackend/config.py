@@ -87,7 +87,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
     parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
     parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
-    parser.add_argument("--secret", default="secret")
+    parser.add_argument("--secret", default=os.environ.get("FIX_OAUTH_SECRET", "secret"))
     parser.add_argument("--google-oauth-client-id", default=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
