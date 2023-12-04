@@ -389,6 +389,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         try:
             await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
+            message = {
+                "cloud_account_id": str(account.id),
+                "workspace_id": str(account.workspace_id),
+                "aws_account_id": account.account_id,
+            }
+            await self.pubsub_publisher.publish(
+                kind="cloud_account_configured", message=message, channel=f"tenant-events::{account.workspace_id}"
+            )
             await self.domain_events.publish(
                 AwsAccountConfigured(
                     cloud_account_id=account.id,
