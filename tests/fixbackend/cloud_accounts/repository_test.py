@@ -95,7 +95,7 @@ async def test_create_cloud_account(
 
     # list
     accounts = await cloud_account_repository.list_by_workspace_id(workspace_id=workspace_id)
-    assert len(accounts) == len(account_states) - 1  # we don't list deleted accounts
+    assert len(accounts) == len(account_states)
     collectable_accounts = await cloud_account_repository.list_by_workspace_id(
         workspace_id=workspace_id, ready_for_collection=True
     )

@@ -514,7 +514,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return account
 
     async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
-        return await self.cloud_account_repository.list_by_workspace_id(workspace_id)
+        return await self.cloud_account_repository.list_by_workspace_id(
+            workspace_id,
+            non_deleted=True,
+        )
 
     async def update_cloud_account_name(
         self,
