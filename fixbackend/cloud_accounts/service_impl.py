@@ -497,7 +497,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if account.workspace_id != workspace_id:
             raise AccessDenied("Deletion of cloud accounts is only allowed by the owning organization.")
 
-        await self.cloud_account_repository.delete(cloud_account_id)
+        await self.cloud_account_repository.update(
+            cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
+        )
         await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:

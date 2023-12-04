@@ -86,6 +86,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 error = error
                 state = CloudAccountStates.Degraded.state_name
 
+            case CloudAccountStates.Deleted():
+                external_id = None
+                role_name = None
+                state = CloudAccountStates.Deleted.state_name
+
             case _:
                 raise ValueError(f"Unknown state {account_state}")
 
@@ -171,7 +176,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     ) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
-            statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
+            statement = (
+                select(orm.CloudAccount)
+                .where(orm.CloudAccount.tenant_id == workspace_id)
+                .where(orm.CloudAccount.state != CloudAccountStates.Deleted.state_name)
+            )
             if ready_for_collection is not None:
                 statement = statement.where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name).where(
                     orm.CloudAccount.enabled.is_(True)

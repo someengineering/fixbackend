@@ -55,6 +55,7 @@ async def test_create_cloud_account(
         CloudAccountStates.Discovered(cloud_access),
         CloudAccountStates.Configured(cloud_access, enabled=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
+        CloudAccountStates.Deleted(),
     ]
 
     configured_account_id: FixCloudAccountId | None = None
@@ -94,7 +95,7 @@ async def test_create_cloud_account(
 
     # list
     accounts = await cloud_account_repository.list_by_workspace_id(workspace_id=workspace_id)
-    assert len(accounts) == len(account_states)
+    assert len(accounts) == len(account_states) - 1  # we don't list deleted accounts
     collectable_accounts = await cloud_account_repository.list_by_workspace_id(
         workspace_id=workspace_id, ready_for_collection=True
     )

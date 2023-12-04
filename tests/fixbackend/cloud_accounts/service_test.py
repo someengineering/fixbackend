@@ -76,7 +76,11 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
     async def list_by_workspace_id(
         self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
     ) -> List[CloudAccount]:
-        accounts = [account for account in self.accounts.values() if account.workspace_id == workspace_id]
+        accounts = [
+            account
+            for account in self.accounts.values()
+            if account.workspace_id == workspace_id and account.state != CloudAccountStates.Deleted()
+        ]
         if ready_for_collection is not None:
             accounts = [
                 account
@@ -367,7 +371,8 @@ async def test_delete_aws_account(
 
     # success
     await service.delete_cloud_account(account.id, test_workspace_id)
-    assert len(repository.accounts) == 0
+    assert len(repository.accounts) == 1
+    assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Deleted)
 
 
 @pytest.mark.asyncio
