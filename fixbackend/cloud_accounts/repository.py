@@ -41,7 +41,7 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None, non_deleted: Optional[bool] = None
     ) -> List[CloudAccount]:
         raise NotImplementedError
 
@@ -85,6 +85,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 role_name = role_name
                 error = error
                 state = CloudAccountStates.Degraded.state_name
+
+            case CloudAccountStates.Deleted():
+                external_id = None
+                role_name = None
+                state = CloudAccountStates.Deleted.state_name
 
             case _:
                 raise ValueError(f"Unknown state {account_state}")
@@ -167,15 +172,17 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 pass
 
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None, non_deleted: Optional[bool] = None
     ) -> List[CloudAccount]:
         """Get a list of cloud accounts by tenant id."""
         async with self.session_maker() as session:
             statement = select(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id)
-            if ready_for_collection is not None:
+            if ready_for_collection is not None and ready_for_collection:
                 statement = statement.where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name).where(
                     orm.CloudAccount.enabled.is_(True)
                 )
+            if non_deleted is not None and non_deleted:
+                statement = statement.where(orm.CloudAccount.state != CloudAccountStates.Deleted.state_name)
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]

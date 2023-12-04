@@ -74,15 +74,21 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
         return self.accounts[id]
 
     async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None
+        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None, non_deleted: Optional[bool] = None
     ) -> List[CloudAccount]:
-        accounts = [account for account in self.accounts.values() if account.workspace_id == workspace_id]
+        accounts = [
+            account
+            for account in self.accounts.values()
+            if account.workspace_id == workspace_id and account.state != CloudAccountStates.Deleted()
+        ]
         if ready_for_collection is not None:
             accounts = [
                 account
                 for account in accounts
                 if isinstance(account.state, (CloudAccountStates.Configured, CloudAccountStates.Degraded))
             ]
+        if non_deleted is not None:
+            accounts = [account for account in accounts if not isinstance(account.state, CloudAccountStates.Deleted)]
         return accounts
 
     async def delete(self, id: FixCloudAccountId) -> None:
@@ -325,6 +331,25 @@ async def test_create_aws_account(
     # domain event should not be published
     assert len(domain_sender.events) == 1
 
+    # deleted account can be moved to discovered when re-created
+    domain_sender.events = []
+    deleted_account_id = CloudAccountId("foobar3")
+    deleted_account = await service.create_aws_account(
+        workspace_id=test_workspace_id,
+        account_id=deleted_account_id,
+        role_name=role_name,
+        external_id=external_id,
+        account_name=account_name,
+    )
+    assert len(domain_sender.events) == 1
+    await service.delete_cloud_account(deleted_account.id, test_workspace_id)
+    deleted_account = await service.get_cloud_account(deleted_account.id, test_workspace_id)
+    assert deleted_account.state == CloudAccountStates.Deleted()
+    # a new account should be created
+    assert len(repository.accounts) == 3
+    # domain event should be published
+    assert len(domain_sender.events) == 2
+
     # wrong external id
     with pytest.raises(Exception):
         await service.create_aws_account(
@@ -367,7 +392,8 @@ async def test_delete_aws_account(
 
     # success
     await service.delete_cloud_account(account.id, test_workspace_id)
-    assert len(repository.accounts) == 0
+    assert len(repository.accounts) == 1
+    assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Deleted)
 
 
 @pytest.mark.asyncio
