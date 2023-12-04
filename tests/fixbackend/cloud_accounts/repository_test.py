@@ -55,6 +55,7 @@ async def test_create_cloud_account(
         CloudAccountStates.Discovered(cloud_access),
         CloudAccountStates.Configured(cloud_access, enabled=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
+        CloudAccountStates.Deleted(),
     ]
 
     configured_account_id: FixCloudAccountId | None = None

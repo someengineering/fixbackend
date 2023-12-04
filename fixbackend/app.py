@@ -74,7 +74,7 @@ from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.errors import AccessDenied, ResourceNotFound, ClientError
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_client import InventoryClient, InventoryException
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.logging_context import (
@@ -106,7 +106,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
-    http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True))
+    http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True, timeout=60))
     engine = deps.add(
         SN.async_engine,
         create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
@@ -370,6 +370,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def resource_not_found_handler(_: Request, exception: ResourceNotFound) -> Response:
         return JSONResponse(status_code=404, content={"message": str(exception)})
 
+    @app.exception_handler(InventoryException)
+    async def inventory_exception_handler(_: Request, exception: InventoryException) -> Response:
+        return JSONResponse(status_code=exception.status, content={"message": str(exception)})
+
     @app.exception_handler(ClientError)
     async def client_error_handler(_: Request, exception: ClientError) -> Response:
         return JSONResponse(status_code=400, content={"message": str(exception)})
@@ -455,7 +459,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.get("/")
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
-            return Response(content=body, media_type="text/html")
+            return Response(content=body, media_type="text/html", headers={"fix-environment": cfg.environment})
 
         @app.exception_handler(404)
         async def not_found_handler(request: Request, exception: HTTPException) -> Response:

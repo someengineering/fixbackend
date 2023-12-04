@@ -349,6 +349,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     raise RuntimeError(msg)
 
             case AssumeRoleResults.Success() as assume_role_result:
+                # We are allowed to assume the role.
+                # Make sure we also have the permissions to describe regions
+                # This additional test makes sure that also the custom permissions are already deployed
+                await self.account_setup_helper.allowed_to_describe_regions(assume_role_result)
+                # If we come here, we did our best to make sure the role with all permissions is deployed
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
                     log.info(f"Found accounts {organization_accounts}")
                     privileged = True
@@ -492,7 +497,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if account.workspace_id != workspace_id:
             raise AccessDenied("Deletion of cloud accounts is only allowed by the owning organization.")
 
-        await self.cloud_account_repository.delete(cloud_account_id)
+        await self.cloud_account_repository.update(
+            cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
+        )
         await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
@@ -507,7 +514,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return account
 
     async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
-        return await self.cloud_account_repository.list_by_workspace_id(workspace_id)
+        return await self.cloud_account_repository.list_by_workspace_id(
+            workspace_id,
+            non_deleted=True,
+        )
 
     async def update_cloud_account_name(
         self,

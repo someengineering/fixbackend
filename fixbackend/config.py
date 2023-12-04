@@ -23,6 +23,7 @@ from functools import lru_cache
 
 
 class Config(BaseSettings):
+    environment: str
     instance_id: str
     database_name: str
     database_user: str
@@ -62,6 +63,7 @@ class Config(BaseSettings):
     customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
     aws_cf_stack_notification_sqs_url: Optional[str]
+    oauth_state_token_ttl: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -79,12 +81,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser = ArgumentParser(prog="FIX Backend")
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--instance-id", default=os.environ.get("FIX_INSTANCE_ID", "single"))
+    parser.add_argument("--environment", default=os.environ.get("FIX_ENVIRONMENT", "dev"))
     parser.add_argument("--database-name", default=os.environ.get("FIX_DATABASE_NAME", "fix"))
     parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
     parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
     parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
     parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
-    parser.add_argument("--secret", default="secret")
+    parser.add_argument("--secret", default=os.environ.get("FIX_OAUTH_SECRET", "secret"))
     parser.add_argument("--google-oauth-client-id", default=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
@@ -144,6 +147,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--cloud-account-service-event-parallelism",
         type=int,
         default=int(os.environ.get("CLOUD_ACCOUNT_SERVICE_EVENT_PARALLELISM", "100")),
+    )
+    parser.add_argument(
+        "--oauth-state-token-ttl", type=int, default=int(os.environ.get("OAUTH_STATE_TOKEN_TTL", "3600"))
     )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

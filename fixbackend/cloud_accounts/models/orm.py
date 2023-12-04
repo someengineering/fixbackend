@@ -97,6 +97,8 @@ class CloudAccount(Base):
                     if self.error is None:
                         raise ValueError("Degraded account must have an error")
                     return models.CloudAccountStates.Degraded(access=access(), error=self.error)
+                case models.CloudAccountStates.Deleted.state_name:
+                    return models.CloudAccountStates.Deleted()
                 case _:
                     raise ValueError(f"Unknown state {self.state}")
 

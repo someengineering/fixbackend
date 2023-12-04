@@ -49,7 +49,6 @@ class GcpCloudAccess(CloudAccess):
     cloud: ClassVar[CloudName] = CloudNames.GCP
 
 
-@frozen
 class CloudAccountState(ABC):
     state_name: ClassVar[str]
 
@@ -116,6 +115,14 @@ class CloudAccountStates:
 
         def cloud_access(self) -> Optional[CloudAccess]:
             return self.access
+
+    @frozen
+    class Deleted(CloudAccountState):
+        """
+        The account has been deleted.
+        """
+
+        state_name: ClassVar[str] = "deleted"
 
 
 @frozen(kw_only=True)

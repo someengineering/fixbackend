@@ -79,7 +79,8 @@ def event_loop() -> Iterator[AbstractEventLoop]:
 @pytest.fixture
 def default_config() -> Config:
     return Config(
-        instance_id="",
+        environment="test",
+        instance_id="test",
         database_name="fixbackend-testdb",
         database_user="root",
         database_password=None,
@@ -118,6 +119,7 @@ def default_config() -> Config:
         customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
         aws_cf_stack_notification_sqs_url=None,
+        oauth_state_token_ttl=3600,
     )
 
 

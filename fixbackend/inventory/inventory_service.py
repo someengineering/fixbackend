@@ -182,6 +182,7 @@ class InventoryService(Service):
         resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
+        checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
         return dict(resource=resource, failing_checks=checks, neighborhood=nb)
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
@@ -216,22 +217,38 @@ class InventoryService(Service):
                 resource_count_by_kind_selection=reduced,
             )
 
-        async def account_summary() -> Dict[str, AccountSummary]:
-            return {
-                entry["group"]["account_id"]: AccountSummary(
-                    id=entry["group"]["account_id"],
-                    name=entry["group"]["account_name"],
-                    cloud=entry["group"]["cloud_name"],
-                    resource_count=entry["count"],
-                )
-                async for entry in await self.client.aggregate(
-                    db,
-                    "search /ancestors.account.reported.id!=null | aggregate "
-                    "/ancestors.account.reported.id as account_id, "
-                    "/ancestors.account.reported.name as account_name, "
-                    "/ancestors.cloud.reported.name as cloud_name: sum(1) as count",
-                )
-            }
+        async def account_summary() -> Tuple[Dict[str, int], Dict[str, AccountSummary]]:
+            account_by_id: Dict[str, AccountSummary] = {}
+            resources_by_account: Dict[str, int] = defaultdict(int)
+            resources_by_account_by_severity: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            resources_by_severity: Dict[str, int] = defaultdict(int)
+            async for entry in await self.client.aggregate(
+                db,
+                "search /ancestors.account.reported.id!=null | aggregate "
+                "/ancestors.account.reported.id as account_id, "
+                "/ancestors.account.reported.name as account_name, "
+                "/ancestors.cloud.reported.name as cloud_name, "
+                "/security.severity as severity: sum(1) as count",
+            ):
+                account_id = entry["group"]["account_id"]
+                count = entry["count"]
+                severity = entry["group"]["severity"]
+                if account_id not in account_by_id:
+                    account_by_id[account_id] = AccountSummary(
+                        id=account_id,
+                        name=entry["group"]["account_name"],
+                        cloud=entry["group"]["cloud_name"],
+                        failed_resources_by_severity={},
+                        resource_count=0,
+                    )
+                resources_by_account[account_id] += count
+                if severity is not None:
+                    resources_by_account_by_severity[account_id][severity] = count
+                    resources_by_severity[severity] += count
+            for account_id, account in account_by_id.items():
+                account.resource_count = resources_by_account.get(account_id, 0)
+                account.failed_resources_by_severity = resources_by_account_by_severity[account_id]
+            return resources_by_severity, account_by_id
 
         async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
             check_accounts: ChecksByAccountId = defaultdict(dict)
@@ -293,7 +310,7 @@ class InventoryService(Service):
 
         try:
             (
-                accounts,
+                (severity_resource_counter, accounts),
                 (benchmarks, checks),
                 (failed_accounts_by_check_id, severity_by_check_id),
                 vulnerable_changed,
@@ -309,7 +326,6 @@ class InventoryService(Service):
             # combine benchmark and account data
             account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
             severity_check_counter: Dict[str, int] = defaultdict(int)
-            severity_resource_counter: Dict[str, int] = defaultdict(int)
             account_check_sum_count: Dict[str, int] = defaultdict(int)
             failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
             available_checks = 0
@@ -326,18 +342,17 @@ class InventoryService(Service):
                         for account_id, failed_resource_count in failed_accounts_by_check_id[check_id].items():
                             benchmark_account_issue_counter[account_id][severity] += 1
                             benchmark_account_resource_counter[account_id][severity] += failed_resource_count
-                            severity_resource_counter[severity] += failed_resource_count
                             account_counter[account_id][severity] += 1
                             account_check_sum_count[severity] += 1
                             failed_checks_by_severity[severity].add(check_id)
                 for account_id, account in accounts.items():
                     if account.cloud in bench.clouds:
                         failing = benchmark_account_issue_counter.get(account_id)
-                        failed_resources = benchmark_account_resource_counter.get(account_id)
+                        failed_resource_checks = benchmark_account_resource_counter.get(account_id)
                         bench.account_summary[account_id] = BenchmarkAccountSummary(
                             score=bench_account_score(failing or {}, benchmark_severity_count),
                             failed_checks=failing,
-                            failed_resources=failed_resources,
+                            failed_resource_checks=failed_resource_checks,
                         )
 
             # compute a score for every account by averaging the scores of all benchmark results
@@ -363,14 +378,6 @@ class InventoryService(Service):
                     failed_resources=sum(v for v in severity_resource_counter.values()),
                     failed_resources_by_severity=severity_resource_counter,
                 ),
-                account_check_summary=CheckSummary(
-                    available_checks=available_checks * len(accounts),
-                    failed_checks=sum(v for v in account_check_sum_count.values()),
-                    failed_checks_by_severity=account_check_sum_count,
-                    available_resources=sum(v.resource_count for v in accounts.values()),
-                    failed_resources=sum(v for v in severity_resource_counter.values()),
-                    failed_resources_by_severity=severity_resource_counter,
-                ),
                 overall_score=overall_score(accounts),
                 accounts=sorted(list(accounts.values()), key=lambda x: x.score),
                 benchmarks=list(benchmarks.values()),
@@ -391,7 +398,6 @@ class InventoryService(Service):
             )
             return ReportSummary(
                 check_summary=empty,
-                account_check_summary=empty,
                 overall_score=0,
                 accounts=[],
                 benchmarks=[],
