@@ -14,7 +14,6 @@
 
 from typing import List
 from uuid import UUID
-from cattrs import gen
 
 from fastapi import APIRouter, HTTPException
 from pydantic import EmailStr

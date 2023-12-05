@@ -14,7 +14,6 @@
 
 from datetime import datetime
 from typing import List
-from uuid import UUID
 from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, Field
