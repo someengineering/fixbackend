@@ -37,7 +37,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudNames
 from fixbackend.ids import NodeId
-from fixbackend.inventory.inventory_client import InventoryClient, GraphDatabaseNotAvailable, AsyncIteratorWithContext
+from fixbackend.inventory.inventory_client import InventoryClient, AsyncIteratorWithContext, InventoryException
 from fixbackend.inventory.schemas import (
     AccountSummary,
     ReportSummary,
@@ -386,8 +386,8 @@ class InventoryService(Service):
                 top_checks=tops,
             )
 
-        except GraphDatabaseNotAvailable:
-            log.warning("Graph database not available yet. Returning empty summary.")
+        except InventoryException as ex:
+            log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
             empty = CheckSummary(
                 available_checks=0,
                 failed_checks=0,
