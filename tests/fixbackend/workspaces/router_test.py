@@ -16,6 +16,7 @@
 import uuid
 from typing import AsyncIterator, Sequence
 from uuid import UUID
+from attrs import evolve
 
 import pytest
 from httpx import AsyncClient
@@ -64,6 +65,13 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     async def list_workspaces(self, owner_id: UUID) -> Sequence[Workspace]:
         return [workspace]
 
+    async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
+        if generate_external_id:
+            new_external_id = ExternalId(uuid.uuid4())
+        else:
+            new_external_id = workspace.external_id
+        return evolve(workspace, name=name, external_id=new_external_id)
+
 
 @pytest.fixture
 async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
@@ -105,3 +113,22 @@ async def test_external_id(client: AsyncClient) -> None:
 async def test_cloudformation_template_url(client: AsyncClient, default_config: Config) -> None:
     response = await client.get(f"/api/workspaces/{org_id}/cf_template")
     assert response.json() == str(default_config.cf_template_url)
+
+
+@pytest.mark.asyncio
+async def test_get_workspace_settings(client: AsyncClient, default_config: Config) -> None:
+    response = await client.get(f"/api/workspaces/{org_id}/settings")
+    assert response.json().get("id") == str(org_id)
+    assert response.json().get("slug") == workspace.slug
+    assert response.json().get("name") == workspace.name
+    assert response.json().get("external_id") == str(external_id)
+
+
+@pytest.mark.asyncio
+async def test_update_workspace_settings(client: AsyncClient, default_config: Config) -> None:
+    payload = {"name": "new name", "generate_new_external_id": True}
+    response = await client.patch(f"/api/workspaces/{org_id}/settings", json=payload)
+    assert response.json().get("id") == str(org_id)
+    assert response.json().get("slug") == workspace.slug
+    assert response.json().get("name") == "new name"
+    assert response.json().get("external_id") != str(external_id)
