@@ -37,11 +37,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudNames
 from fixbackend.ids import NodeId
-from fixbackend.inventory.inventory_client import (
-    InventoryClient,
-    AsyncIteratorWithContext,
-    InventoryException,
-)
+from fixbackend.inventory.inventory_client import InventoryClient, AsyncIteratorWithContext, InventoryException
 from fixbackend.inventory.schemas import (
     AccountSummary,
     ReportSummary,
