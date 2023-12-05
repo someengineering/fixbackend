@@ -537,12 +537,11 @@ async def test_handle_account_discovered_success(
 
     message = {
         "cloud_account_id": str(account.id),
-        "workspace_id": str(account.workspace_id),
         "aws_account_id": account_id,
     }
 
     assert pubsub_publisher.last_message is not None
-    assert pubsub_publisher.last_message[0] == "cloud_account_created"
+    assert pubsub_publisher.last_message[0] == "aws_account_discovered"
     assert pubsub_publisher.last_message[1] == message
     assert pubsub_publisher.last_message[2] == f"tenant-events::{test_workspace_id}"
 

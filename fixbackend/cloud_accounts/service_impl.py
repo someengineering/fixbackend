@@ -17,7 +17,7 @@ from collections import defaultdict
 from datetime import timedelta
 from hmac import compare_digest
 from logging import getLogger
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import boto3
 from attrs import evolve
@@ -250,6 +250,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             return None
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
+        async def send_pub_sub_message(
+            e: Union[AwsAccountDegraded, AwsAccountDiscovered, AwsAccountDeleted, AwsAccountConfigured]
+        ) -> None:
+            msg = e.to_json()
+            msg.pop("tenant_id", None)
+            await self.pubsub_publisher.publish(kind=e.kind, message=msg, channel=f"tenant-events::{e.tenant_id}")
+
         match context.kind:
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
@@ -274,55 +281,19 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
                 set_workspace_id(str(discovered_event.tenant_id))
                 await self.process_discovered_event(discovered_event)
-                message = {
-                    "cloud_account_id": str(discovered_event.cloud_account_id),
-                    "workspace_id": str(discovered_event.tenant_id),
-                    "aws_account_id": discovered_event.aws_account_id,
-                }
-                await self.pubsub_publisher.publish(
-                    kind="cloud_account_created",
-                    message=message,
-                    channel=f"tenant-events::{discovered_event.tenant_id}",
-                )
+                await send_pub_sub_message(discovered_event)
 
             case AwsAccountConfigured.kind:
                 configured_event = AwsAccountConfigured.from_json(message)
-                message = {
-                    "cloud_account_id": str(configured_event.cloud_account_id),
-                    "workspace_id": str(configured_event.tenant_id),
-                    "aws_account_id": configured_event.aws_account_id,
-                }
-                await self.pubsub_publisher.publish(
-                    kind="cloud_account_configured",
-                    message=message,
-                    channel=f"tenant-events::{configured_event.tenant_id}",
-                )
+                await send_pub_sub_message(configured_event)
 
             case AwsAccountDeleted.kind:
                 deleted_event = AwsAccountDeleted.from_json(message)
-                message = {
-                    "cloud_account_id": str(deleted_event.cloud_account_id),
-                    "workspace_id": str(deleted_event.tenant_id),
-                    "aws_account_id": deleted_event.aws_account_id,
-                }
-                await self.pubsub_publisher.publish(
-                    kind="cloud_account_deleted",
-                    message=message,
-                    channel=f"tenant-events::{deleted_event.tenant_id}",
-                )
+                await send_pub_sub_message(deleted_event)
 
             case AwsAccountDegraded.kind:
                 degraded_event = AwsAccountDegraded.from_json(message)
-                message = {
-                    "cloud_account_id": str(degraded_event.cloud_account_id),
-                    "workspace_id": str(degraded_event.tenant_id),
-                    "aws_account_id": degraded_event.aws_account_id,
-                }
-                await self.pubsub_publisher.publish(
-                    kind="cloud_account_degraded",
-                    message=message,
-                    channel=f"tenant-events::{degraded_event.tenant_id}",
-                )
+                await send_pub_sub_message(degraded_event)
 
             case _:
                 pass  # ignore other domain events
