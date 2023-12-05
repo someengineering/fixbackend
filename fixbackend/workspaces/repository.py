@@ -26,7 +26,7 @@ from fixbackend.auth.models import User
 from fixbackend.auth.models import orm as auth_orm
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, UserId
+from fixbackend.ids import ExternalId, WorkspaceId, UserId
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -47,6 +47,11 @@ class WorkspaceRepository(ABC):
     @abstractmethod
     async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         """List all workspaces where the user is a member."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
+        """Update a workspace."""
         raise NotImplementedError
 
     @abstractmethod
@@ -124,6 +129,21 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             return org.to_model() if org else None
+
+    async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
+        """Update a workspace."""
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            org = results.unique().scalar_one_or_none()
+            if org is None:
+                raise ValueError(f"Organization {workspace_id} does not exist.")
+            org.name = name
+            if generate_external_id:
+                org.external_id = ExternalId(uuid.uuid4())
+            await session.commit()
+            await session.refresh(org)
+            return org.to_model()
 
     async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         async with self.session_maker() as session:
