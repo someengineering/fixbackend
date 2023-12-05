@@ -57,7 +57,7 @@ class UserRegistered(Event):
 @frozen
 class AwsAccountDiscovered(Event):
     """
-    This event is emitted when the cloud account callback is hit, and .
+    This event is emitted when the cloud account callback is hit.
     """
 
     kind: ClassVar[str] = "aws_account_discovered"

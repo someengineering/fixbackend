@@ -274,6 +274,55 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
                 set_workspace_id(str(discovered_event.tenant_id))
                 await self.process_discovered_event(discovered_event)
+                message = {
+                    "cloud_account_id": str(discovered_event.cloud_account_id),
+                    "workspace_id": str(discovered_event.tenant_id),
+                    "aws_account_id": discovered_event.aws_account_id,
+                }
+                await self.pubsub_publisher.publish(
+                    kind="cloud_account_created",
+                    message=message,
+                    channel=f"tenant-events::{discovered_event.tenant_id}",
+                )
+
+            case AwsAccountConfigured.kind:
+                configured_event = AwsAccountConfigured.from_json(message)
+                message = {
+                    "cloud_account_id": str(configured_event.cloud_account_id),
+                    "workspace_id": str(configured_event.tenant_id),
+                    "aws_account_id": configured_event.aws_account_id,
+                }
+                await self.pubsub_publisher.publish(
+                    kind="cloud_account_configured",
+                    message=message,
+                    channel=f"tenant-events::{configured_event.tenant_id}",
+                )
+
+            case AwsAccountDeleted.kind:
+                deleted_event = AwsAccountDeleted.from_json(message)
+                message = {
+                    "cloud_account_id": str(deleted_event.cloud_account_id),
+                    "workspace_id": str(deleted_event.tenant_id),
+                    "aws_account_id": deleted_event.aws_account_id,
+                }
+                await self.pubsub_publisher.publish(
+                    kind="cloud_account_deleted",
+                    message=message,
+                    channel=f"tenant-events::{deleted_event.tenant_id}",
+                )
+
+            case AwsAccountDegraded.kind:
+                degraded_event = AwsAccountDegraded.from_json(message)
+                message = {
+                    "cloud_account_id": str(degraded_event.cloud_account_id),
+                    "workspace_id": str(degraded_event.tenant_id),
+                    "aws_account_id": degraded_event.aws_account_id,
+                }
+                await self.pubsub_publisher.publish(
+                    kind="cloud_account_degraded",
+                    message=message,
+                    channel=f"tenant-events::{degraded_event.tenant_id}",
+                )
 
             case _:
                 pass  # ignore other domain events
@@ -389,14 +438,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         try:
             await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
-            message = {
-                "cloud_account_id": str(account.id),
-                "workspace_id": str(account.workspace_id),
-                "aws_account_id": account.account_id,
-            }
-            await self.pubsub_publisher.publish(
-                kind="cloud_account_configured", message=message, channel=f"tenant-events::{account.workspace_id}"
-            )
             await self.domain_events.publish(
                 AwsAccountConfigured(
                     cloud_account_id=account.id,
@@ -485,14 +526,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if isinstance(result.state, CloudAccountStates.Detected):
             return result
 
-        message = {
-            "cloud_account_id": str(result.id),
-            "workspace_id": str(result.workspace_id),
-            "aws_account_id": account_id,
-        }
-        await self.pubsub_publisher.publish(
-            kind="cloud_account_created", message=message, channel=f"tenant-events::{workspace_id}"
-        )
         await self.domain_events.publish(
             AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
         )

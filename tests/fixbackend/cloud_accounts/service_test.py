@@ -243,7 +243,6 @@ def service(
 @pytest.mark.asyncio
 async def test_create_aws_account(
     repository: CloudAccountRepositoryMock,
-    pubsub_publisher: RedisPubSubPublisherMock,
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
 ) -> None:
@@ -265,17 +264,6 @@ async def test_create_aws_account(
     assert isinstance(account.state.access, AwsCloudAccess)
     assert account.state.access.role_name == role_name
     assert account.state.access.external_id == external_id
-
-    message = {
-        "cloud_account_id": str(account.id),
-        "workspace_id": str(account.workspace_id),
-        "aws_account_id": account_id,
-    }
-
-    assert pubsub_publisher.last_message is not None
-    assert pubsub_publisher.last_message[0] == "cloud_account_created"
-    assert pubsub_publisher.last_message[1] == message
-    assert pubsub_publisher.last_message[2] == f"tenant-events::{test_workspace_id}"
 
     assert len(domain_sender.events) == 1
     event = domain_sender.events[0]
@@ -526,6 +514,7 @@ async def test_handle_account_discovered_success(
     repository: CloudAccountRepositoryMock,
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
+    pubsub_publisher: RedisPubSubPublisherMock,
 ) -> None:
     # allowed to perform describe regions
     account = await service.create_aws_account(
@@ -545,6 +534,17 @@ async def test_handle_account_discovered_success(
     await service.process_domain_event(
         event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
     )
+
+    message = {
+        "cloud_account_id": str(account.id),
+        "workspace_id": str(account.workspace_id),
+        "aws_account_id": account_id,
+    }
+
+    assert pubsub_publisher.last_message is not None
+    assert pubsub_publisher.last_message[0] == "cloud_account_created"
+    assert pubsub_publisher.last_message[1] == message
+    assert pubsub_publisher.last_message[2] == f"tenant-events::{test_workspace_id}"
 
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
