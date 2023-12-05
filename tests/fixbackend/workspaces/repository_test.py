@@ -37,7 +37,7 @@ async def user(session: AsyncSession) -> User:
 
 
 @pytest.mark.asyncio
-async def test_create_organization(workspace_repository: WorkspaceRepository, user: User) -> None:
+async def test_create_workspace(workspace_repository: WorkspaceRepository, user: User) -> None:
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -55,7 +55,7 @@ async def test_create_organization(workspace_repository: WorkspaceRepository, us
 
 
 @pytest.mark.asyncio
-async def test_get_organization(workspace_repository: WorkspaceRepository, user: User) -> None:
+async def test_get_workspace(workspace_repository: WorkspaceRepository, user: User) -> None:
     # we can get an existing organization by id
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
@@ -67,6 +67,20 @@ async def test_get_organization(workspace_repository: WorkspaceRepository, user:
     # if the organization does not exist, None should be returned
     retrieved_organization = await workspace_repository.get_workspace(WorkspaceId(uuid.uuid4()))
     assert retrieved_organization is None
+
+
+@pytest.mark.asyncio
+async def test_update_workspace(workspace_repository: WorkspaceRepository, user: User) -> None:
+    # we can get an existing organization by id
+    workspace = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+
+    await workspace_repository.update_workspace(workspace.id, "foobar", True)
+    new_workspace = await workspace_repository.get_workspace(workspace.id)
+    assert new_workspace is not None
+    assert new_workspace.name == "foobar"
+    assert new_workspace.external_id != workspace.external_id
 
 
 @pytest.mark.asyncio

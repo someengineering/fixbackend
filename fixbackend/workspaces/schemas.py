@@ -14,8 +14,7 @@
 
 from datetime import datetime
 from typing import List
-from uuid import UUID
-from fixbackend.ids import WorkspaceId, UserId
+from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, Field
 
@@ -54,6 +53,40 @@ class WorkspaceRead(BaseModel):
         )
 
 
+class WorkspaceSettingsRead(BaseModel):
+    id: WorkspaceId = Field(description="The workspace's unique identifier")
+    slug: str = Field(description="The workspace's unique slug, used in URLs")
+    name: str = Field(description="The workspace's name, a human-readable string")
+    external_id: ExternalId = Field(description="The workspace's external identifier")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "slug": "my-org",
+                    "name": "My Organization",
+                    "external_id": "00000000-0000-0000-0000-000000000000",
+                }
+            ]
+        }
+    }
+
+    @classmethod
+    def from_model(cls, model: Workspace) -> "WorkspaceSettingsRead":
+        return WorkspaceSettingsRead(
+            id=model.id,
+            slug=model.slug,
+            name=model.name,
+            external_id=model.external_id,
+        )
+
+
+class WorkspaceSettingsUpdate(BaseModel):
+    name: str = Field(description="The workspace's name, a human-readable string")
+    generate_new_external_id: bool = Field(description="Whether to generate a new external identifier")
+
+
 class WorkspaceCreate(BaseModel):
     name: str = Field(description="Workspace name, a human-readable string")
     slug: str = Field(description="Workspace unique slug, used in URLs", pattern="^[a-z0-9-]+$")
@@ -88,8 +121,8 @@ class WorkspaceInviteRead(BaseModel):
     }
 
 
-class ExternalId(BaseModel):
-    external_id: UUID = Field(description="The organization's external identifier")
+class ExternalIdRead(BaseModel):
+    external_id: ExternalId = Field(description="The organization's external identifier")
 
     model_config = {
         "json_schema_extra": {

@@ -25,7 +25,14 @@ from fixbackend.config import ConfigDependency
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
-from fixbackend.workspaces.schemas import ExternalId, WorkspaceCreate, WorkspaceInviteRead, WorkspaceRead
+from fixbackend.workspaces.schemas import (
+    ExternalIdRead,
+    WorkspaceCreate,
+    WorkspaceInviteRead,
+    WorkspaceRead,
+    WorkspaceSettingsRead,
+    WorkspaceSettingsUpdate,
+)
 
 
 def workspaces_router() -> APIRouter:
@@ -55,6 +62,27 @@ def workspaces_router() -> APIRouter:
             raise HTTPException(status_code=403, detail="You are not an owner of this organization")
 
         return WorkspaceRead.from_model(org)
+
+    @router.get("/{workspace_id}/settings")
+    async def get_workspace_settings(
+        workspace: UserWorkspaceDependency,
+    ) -> WorkspaceSettingsRead:
+        """Get a workspace."""
+        return WorkspaceSettingsRead.from_model(workspace)
+
+    @router.patch("/{workspace_id}/settings")
+    async def update_workspace_settings(
+        workspace: UserWorkspaceDependency,
+        settings: WorkspaceSettingsUpdate,
+        workspace_repository: WorkspaceRepositoryDependency,
+    ) -> WorkspaceSettingsRead:
+        """Update a workspace."""
+        org = await workspace_repository.update_workspace(
+            workspace_id=workspace.id,
+            name=settings.name,
+            generate_external_id=settings.generate_new_external_id,
+        )
+        return WorkspaceSettingsRead.from_model(org)
 
     @router.post("/")
     async def create_workspace(
@@ -163,8 +191,8 @@ def workspaces_router() -> APIRouter:
     @router.get("/{workspace_id}/external_id")
     async def get_external_id(
         workspace: UserWorkspaceDependency,
-    ) -> ExternalId:
+    ) -> ExternalIdRead:
         """Get a workspaces external id."""
-        return ExternalId(external_id=workspace.external_id)
+        return ExternalIdRead(external_id=workspace.external_id)
 
     return router
