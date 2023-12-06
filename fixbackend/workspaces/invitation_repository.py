@@ -9,7 +9,7 @@ from fixbackend.dependencies import FixDependency, ServiceNames
 
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.workspaces.models import WorkspaceInvite
+from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.models import orm
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixcloudutils.util import utc
@@ -17,17 +17,17 @@ from fixcloudutils.util import utc
 
 class InvitationRepository(ABC):
     @abstractmethod
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvite:
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
         """Create an invite for a workspace."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvite]:
+    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvitation]:
         """Get an invitation by ID."""
         raise NotImplementedError
 
     @abstractmethod
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
+    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
         """List all invitations for a workspace."""
         raise NotImplementedError
 
@@ -46,7 +46,7 @@ class InvitationRepositoryImpl(InvitationRepository):
         self.session_maker = session_maker
         self.workspace_repository = workspace_repository
 
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvite:
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
         async with self.session_maker() as session:
             user_repository = UserRepository(session)
 
@@ -71,14 +71,14 @@ class InvitationRepositoryImpl(InvitationRepository):
             await session.refresh(invite)
             return invite.to_model()
 
-    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvite]:
+    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvitation]:
         async with self.session_maker() as session:
             statement = select(orm.OrganizationInvite).where(orm.OrganizationInvite.id == invitation_id)
             results = await session.execute(statement)
             invite = results.unique().scalar_one_or_none()
             return invite.to_model() if invite else None
 
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
+    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
         async with self.session_maker() as session:
             statement = select(orm.OrganizationInvite).where(orm.OrganizationInvite.organization_id == workspace_id)
             results = await session.execute(statement)

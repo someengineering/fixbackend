@@ -56,8 +56,8 @@ class OrganizationInvite(Base):
     user_email: Mapped[str] = mapped_column(String(length=320), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    def to_model(self) -> models.WorkspaceInvite:
-        return models.WorkspaceInvite(
+    def to_model(self) -> models.WorkspaceInvitation:
+        return models.WorkspaceInvitation(
             id=self.id,
             workspace_id=self.organization_id,
             user_id=self.user_id,

@@ -34,7 +34,7 @@ class Workspace:
 
 
 @frozen
-class WorkspaceInvite:
+class WorkspaceInvitation:
     id: InvitationId
     workspace_id: WorkspaceId
     email: str
