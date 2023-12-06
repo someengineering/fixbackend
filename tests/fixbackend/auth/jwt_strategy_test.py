@@ -17,7 +17,7 @@ from fastapi import Request
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.db import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.auth_backend import FixJWTStrategy

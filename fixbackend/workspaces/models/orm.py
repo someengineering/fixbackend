@@ -14,7 +14,7 @@
 
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import ForeignKey, String, DateTime
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
-from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 from fixbackend.workspaces import models
 
 
@@ -50,18 +50,18 @@ class Organization(Base):
 class OrganizationInvite(Base):
     __tablename__ = "organization_invite"
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
-    organization: Mapped[Organization] = relationship()
-    user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), nullable=False)
-    user: Mapped[orm.User] = relationship()
+    id: Mapped[InvitationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
+    user_id: Mapped[Optional[UserId]] = mapped_column(GUID, ForeignKey("user.id"), nullable=True)
+    user_email: Mapped[str] = mapped_column(String(length=320), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     def to_model(self) -> models.WorkspaceInvite:
         return models.WorkspaceInvite(
             id=self.id,
-            workspace_id=WorkspaceId(self.organization_id),
-            user_id=UserId(self.user_id),
+            workspace_id=self.organization_id,
+            user_id=self.user_id,
+            email=self.user_email,
             expires_at=self.expires_at,
         )
 

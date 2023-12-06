@@ -17,7 +17,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.db import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -126,98 +126,3 @@ async def test_add_to_organization(
     # when adding a non-existing user to the organization, an exception should be raised
     with pytest.raises(Exception):
         await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=UserId(uuid.uuid4()))
-
-
-@pytest.mark.asyncio
-async def test_create_invitation(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
-    organization = await workspace_repository.create_workspace(
-        name="Test Organization", slug="test-organization", owner=user
-    )
-    org_id = organization.id
-
-    user_db = await anext(get_user_repository(session))
-    user_dict = {
-        "email": "123foo@bar.com",
-        "hashed_password": "notreallyhashed",
-        "is_verified": True,
-    }
-    new_user = await user_db.create(user_dict)
-    new_user_id = new_user.id
-
-    invitation = await workspace_repository.create_invitation(workspace_id=org_id, user_id=new_user.id)
-    assert invitation.workspace_id == org_id
-    assert invitation.user_id == new_user_id
-
-
-@pytest.mark.asyncio
-async def test_accept_invitation(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
-    organization = await workspace_repository.create_workspace(
-        name="Test Organization", slug="test-organization", owner=user
-    )
-    org_id = organization.id
-
-    user_db = await anext(get_user_repository(session))
-    user_dict = {
-        "email": "123foo@bar.com",
-        "hashed_password": "notreallyhashed",
-        "is_verified": True,
-    }
-    new_user = await user_db.create(user_dict)
-
-    invitation = await workspace_repository.create_invitation(workspace_id=org_id, user_id=new_user.id)
-
-    # accept the invitation
-    await workspace_repository.accept_invitation(invitation_id=invitation.id)
-
-    retrieved_organization = await workspace_repository.get_workspace(org_id)
-    assert retrieved_organization
-    assert len(retrieved_organization.members) == 1
-    assert retrieved_organization.members[0] == new_user.id
-
-
-@pytest.mark.asyncio
-async def test_list_invitations(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
-    organization = await workspace_repository.create_workspace(
-        name="Test Organization", slug="test-organization", owner=user
-    )
-    org_id = organization.id
-
-    user_db = await anext(get_user_repository(session))
-    user_dict = {
-        "email": "bar@bar.com",
-        "hashed_password": "notreallyhashed",
-        "is_verified": True,
-    }
-    new_user = await user_db.create(user_dict)
-
-    invitation = await workspace_repository.create_invitation(workspace_id=org_id, user_id=new_user.id)
-
-    # list the invitations
-    invitations = await workspace_repository.list_invitations(workspace_id=org_id)
-    assert len(invitations) == 1
-    assert invitations[0] == invitation
-
-
-@pytest.mark.asyncio
-async def test_delete_invitation(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
-    organization = await workspace_repository.create_workspace(
-        name="Test Organization", slug="test-organization", owner=user
-    )
-    org_id = organization.id
-
-    user_db = await anext(get_user_repository(session))
-    user_dict = {
-        "email": "bar@bar.com",
-        "hashed_password": "notreallyhashed",
-        "is_verified": True,
-    }
-    new_user = await user_db.create(user_dict)
-
-    invitation = await workspace_repository.create_invitation(workspace_id=org_id, user_id=new_user.id)
-
-    # delete the invitation
-    await workspace_repository.delete_invitation(invitation_id=invitation.id)
-
-    # the invitation should not exist anymore
-    invitations = await workspace_repository.list_invitations(workspace_id=org_id)
-    assert len(invitations) == 0

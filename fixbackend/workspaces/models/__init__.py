@@ -13,12 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List
-from uuid import UUID
+from typing import List, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 
 
 @frozen
@@ -36,7 +35,8 @@ class Workspace:
 
 @frozen
 class WorkspaceInvite:
-    id: UUID
+    id: InvitationId
     workspace_id: WorkspaceId
-    user_id: UserId
+    email: str
+    user_id: Optional[UserId]
     expires_at: datetime

@@ -105,7 +105,7 @@ class WorkspaceCreate(BaseModel):
 
 class WorkspaceInviteRead(BaseModel):
     organization_slug: str = Field(description="The slug of the workspace to invite the user to")
-    user_id: UserId = Field(description="The id of the user to invite")
+    user_email: str = Field(description="The email of the user to invite")
     expires_at: datetime = Field(description="The time at which the invitation expires")
 
     model_config = {
@@ -113,7 +113,7 @@ class WorkspaceInviteRead(BaseModel):
             "examples": [
                 {
                     "organization_slug": "my-org",
-                    "user_id": "00000000-0000-0000-0000-000000000000",
+                    "user_email": "foo@bar.com",
                     "expires_at": "2021-01-01T00:00:00Z",
                 }
             ]

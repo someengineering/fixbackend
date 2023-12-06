@@ -24,6 +24,7 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
@@ -125,7 +126,9 @@ class OrganizationServiceMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_workspace(self, workspace_id: WorkspaceId, with_users: bool = False) -> Workspace | None:
+    async def get_workspace(
+        self, workspace_id: WorkspaceId, with_users: bool = False, *, session: Optional[AsyncSession] = None
+    ) -> Workspace | None:
         if workspace_id != test_workspace_id:
             return None
         return organization

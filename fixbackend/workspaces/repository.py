@@ -14,21 +14,20 @@
 
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
 from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from fixbackend.auth.models import User
-from fixbackend.auth.models import orm as auth_orm
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import ExternalId, WorkspaceId, UserId
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.workspaces.models import Workspace, WorkspaceInvite, orm
+from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import WorkspaceCreated
 
@@ -40,7 +39,9 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_workspace(self, workspace_id: WorkspaceId) -> Optional[Workspace]:
+    async def get_workspace(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> Optional[Workspace]:
         """Get a workspace."""
         raise NotImplementedError
 
@@ -62,31 +63,6 @@ class WorkspaceRepository(ABC):
     @abstractmethod
     async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
         """Remove a user from a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def create_invitation(self, workspace_id: WorkspaceId, user_id: UserId) -> WorkspaceInvite:
-        """Create an invite for a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[WorkspaceInvite]:
-        """Get an invitation by ID."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
-        """List all invitations for a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def accept_invitation(self, invitation_id: uuid.UUID) -> None:
-        """Accept an invitation to a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def delete_invitation(self, invitation_id: uuid.UUID) -> None:
-        """Delete an invitation."""
         raise NotImplementedError
 
 
@@ -123,12 +99,20 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             org = results.unique().scalar_one()
             return org.to_model()
 
-    async def get_workspace(self, workspace_id: WorkspaceId) -> Optional[Workspace]:
-        async with self.session_maker() as session:
+    async def get_workspace(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> Optional[Workspace]:
+        async def get_ws(session: AsyncSession) -> Optional[Workspace]:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             return org.to_model() if org else None
+
+        if session is not None:
+            return await get_ws(session)
+        else:
+            async with self.session_maker() as session:
+                return await get_ws(session)
 
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
         """Update a workspace."""
@@ -174,70 +158,6 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if membership is None:
                 raise ValueError(f"User {uuid} is not a member of workspace {workspace_id}")
             await session.delete(membership)
-            await session.commit()
-
-    async def create_invitation(self, workspace_id: WorkspaceId, user_id: UserId) -> WorkspaceInvite:
-        async with self.session_maker() as session:
-            user = await session.get(auth_orm.User, user_id)
-            organization = await self.get_workspace(workspace_id)
-
-            if user is None or organization is None:
-                raise ValueError(f"User {user_id} or organization {workspace_id} does not exist.")
-
-            if user.id in [owner for owner in organization.owners]:
-                raise ValueError(f"User {user_id} is already an owner of workspace {workspace_id}")
-
-            if user.id in [member for member in organization.members]:
-                raise ValueError(f"User {user_id} is already a member of workspace {workspace_id}")
-
-            invite = orm.OrganizationInvite(
-                user_id=user_id, organization_id=workspace_id, expires_at=datetime.utcnow() + timedelta(days=7)
-            )
-            session.add(invite)
-            await session.commit()
-            await session.refresh(invite)
-            return invite.to_model()
-
-    async def get_invitation(self, invitation_id: uuid.UUID) -> Optional[WorkspaceInvite]:
-        async with self.session_maker() as session:
-            statement = (
-                select(orm.OrganizationInvite)
-                .where(orm.OrganizationInvite.id == invitation_id)
-                .options(selectinload(orm.OrganizationInvite.user))
-            )
-            results = await session.execute(statement)
-            invite = results.unique().scalar_one_or_none()
-            return invite.to_model() if invite else None
-
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvite]:
-        async with self.session_maker() as session:
-            statement = (
-                select(orm.OrganizationInvite)
-                .where(orm.OrganizationInvite.organization_id == workspace_id)
-                .options(selectinload(orm.OrganizationInvite.user), selectinload(orm.OrganizationInvite.organization))
-            )
-            results = await session.execute(statement)
-            invites = results.scalars().all()
-            return [invite.to_model() for invite in invites]
-
-    async def accept_invitation(self, invitation_id: uuid.UUID) -> None:
-        async with self.session_maker() as session:
-            invite = await session.get(orm.OrganizationInvite, invitation_id)
-            if invite is None:
-                raise ValueError(f"Invitation {invitation_id} does not exist.")
-            if invite.expires_at < datetime.utcnow():
-                raise ValueError(f"Invitation {invitation_id} has expired.")
-            membership = orm.OrganizationMembers(user_id=invite.user_id, organization_id=invite.organization_id)
-            session.add(membership)
-            await session.delete(invite)
-            await session.commit()
-
-    async def delete_invitation(self, invitation_id: uuid.UUID) -> None:
-        async with self.session_maker() as session:
-            invite = await session.get(orm.OrganizationInvite, invitation_id)
-            if invite is None:
-                raise ValueError(f"Invitation {invitation_id} does not exist.")
-            await session.delete(invite)
             await session.commit()
 
 

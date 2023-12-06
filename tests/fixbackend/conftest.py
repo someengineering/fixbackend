@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.db import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -58,6 +58,7 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_month, uid
+from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 
@@ -435,6 +436,14 @@ async def workspace_repository(
     domain_event_sender: DomainEventPublisher,
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager, domain_event_sender)
+
+
+@pytest.fixture
+async def invitation_repository(
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+) -> InvitationRepository:
+    return InvitationRepositoryImpl(async_session_maker, workspace_repository)
 
 
 @pytest.fixture

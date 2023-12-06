@@ -14,8 +14,7 @@
 
 
 import uuid
-from typing import AsyncIterator, Sequence
-from uuid import UUID
+from typing import AsyncIterator, Optional, Sequence
 from attrs import evolve
 
 import pytest
@@ -59,10 +58,12 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
-    async def get_workspace(self, workspace_id: UUID) -> Workspace | None:
+    async def get_workspace(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> Workspace | None:
         return workspace
 
-    async def list_workspaces(self, owner_id: UUID) -> Sequence[Workspace]:
+    async def list_workspaces(self, owner_id: UserId) -> Sequence[Workspace]:
         return [workspace]
 
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:

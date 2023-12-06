@@ -88,6 +88,7 @@ from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
@@ -246,6 +247,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher),
+        )
+        deps.add(
+            SN.invitation_repository,
+            InvitationRepositoryImpl(session_maker, workspace_repo),
         )
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=rw_redis,

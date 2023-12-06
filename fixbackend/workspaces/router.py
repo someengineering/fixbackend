@@ -20,9 +20,9 @@ from pydantic import EmailStr
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import InvitationId, WorkspaceId
+from fixbackend.workspaces.invitation_repository import InvitationRepositoryDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import (
@@ -103,14 +103,14 @@ def workspaces_router() -> APIRouter:
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
         workspace: UserWorkspaceDependency,
-        workspace_repository: WorkspaceRepositoryDependency,
+        invitation_repository: InvitationRepositoryDependency,
     ) -> List[WorkspaceInviteRead]:
-        invites = await workspace_repository.list_invitations(workspace_id=workspace.id)
+        invites = await invitation_repository.list_invitations(workspace_id=workspace.id)
 
         return [
             WorkspaceInviteRead(
                 organization_slug=workspace.slug,
-                user_id=invite.user_id,
+                user_email=invite.email,
                 expires_at=invite.expires_at,
             )
             for invite in invites
@@ -120,31 +120,26 @@ def workspaces_router() -> APIRouter:
     async def invite_to_organization(
         workspace: UserWorkspaceDependency,
         user_email: EmailStr,
-        workspace_repository: WorkspaceRepositoryDependency,
-        user_manager: UserManagerDependency,
+        invitation_repository: InvitationRepositoryDependency,
     ) -> WorkspaceInviteRead:
         """Invite a user to the workspace."""
 
-        user = await user_manager.get_by_email(user_email)
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        invite = await workspace_repository.create_invitation(workspace_id=workspace.id, user_id=user.id)
+        invite = await invitation_repository.create_invitation(workspace_id=workspace.id, email=user_email)
 
         return WorkspaceInviteRead(
             organization_slug=workspace.slug,
-            user_id=user.id,
+            user_email=invite.email,
             expires_at=invite.expires_at,
         )
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
     async def delete_invite(
         workspace: UserWorkspaceDependency,
-        invite_id: UUID,
-        workspace_repository: WorkspaceRepositoryDependency,
+        invite_id: InvitationId,
+        invitation_repository: InvitationRepositoryDependency,
     ) -> None:
         """Delete invite."""
-        await workspace_repository.delete_invitation(invite_id)
+        await invitation_repository.delete_invitation(invite_id)
 
     @router.get("{workspace_id}/invites/{invite_id}/accept")
     async def accept_invitation(
@@ -154,20 +149,7 @@ def workspaces_router() -> APIRouter:
         workspace_repository: WorkspaceRepositoryDependency,
     ) -> None:
         """Accept an invitation to the workspace."""
-        org = await workspace_repository.get_workspace(workspace_id)
-        if org is None:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        invite = await workspace_repository.get_invitation(invite_id)
-        if invite is None:
-            raise HTTPException(status_code=404, detail="Invitation not found")
-
-        if user.id != invite.user_id:
-            raise HTTPException(status_code=403, detail="You can only accept invitations for your own account")
-
-        await workspace_repository.accept_invitation(invite_id)
-
-        return None
+        raise HTTPException(status_code=501, detail="Not implemented")
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(

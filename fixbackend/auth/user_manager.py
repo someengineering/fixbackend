@@ -20,7 +20,7 @@ from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.password import PasswordHelperProtocol
 
-from fixbackend.auth.db import UserRepository, UserRepositoryDependency
+from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
 from fixbackend.auth.user_verifier import UserVerifier, UserVerifierDependency
 from fixbackend.config import Config, ConfigDependency
