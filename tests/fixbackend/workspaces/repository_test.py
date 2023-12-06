@@ -84,7 +84,7 @@ async def test_update_workspace(workspace_repository: WorkspaceRepository, user:
 
 
 @pytest.mark.asyncio
-async def test_list_organizations(workspace_repository: WorkspaceRepository, user: User) -> None:
+async def test_list_workspaces(workspace_repository: WorkspaceRepository, user: User, session: AsyncSession) -> None:
     workspace1 = await workspace_repository.create_workspace(
         name="Test Organization 1", slug="test-organization-1", owner=user
     )
@@ -93,16 +93,22 @@ async def test_list_organizations(workspace_repository: WorkspaceRepository, use
         name="Test Organization 2", slug="test-organization-2", owner=user
     )
 
+    user_db = await anext(get_user_repository(session))
+    new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
+    new_user = await user_db.create(new_user_dict)
+    member_only_workspace = await workspace_repository.create_workspace(
+        name="Test Organization 3", slug="test-organization-3", owner=new_user
+    )
+    await workspace_repository.add_to_workspace(workspace_id=member_only_workspace.id, user_id=user.id)
+
     # the user should be the owner of the organization
     workspaces = await workspace_repository.list_workspaces(user.id)
-    assert len(workspaces) == 2
-    assert set([o.id for o in workspaces]) == {workspace1.id, workspace2.id}
+    assert len(workspaces) == 3
+    assert set([o.id for o in workspaces]) == {workspace1.id, workspace2.id, member_only_workspace.id}
 
 
 @pytest.mark.asyncio
-async def test_add_to_organization(
-    workspace_repository: WorkspaceRepository, session: AsyncSession, user: User
-) -> None:
+async def test_add_to_workspace(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
     # add an existing user to the organization
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
@@ -119,6 +125,8 @@ async def test_add_to_organization(
     assert retrieved_organization
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id
+
+    assert retrieved_organization.owners[0] == user.id
 
     # when adding a user which is already a member of the organization, nothing should happen
     await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=new_user_id)

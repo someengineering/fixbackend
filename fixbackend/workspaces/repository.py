@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -132,7 +132,16 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         async with self.session_maker() as session:
             statement = (
-                select(orm.Organization).join(orm.OrganizationOwners).where(orm.OrganizationOwners.user_id == user_id)
+                select(orm.Organization)
+                .join(
+                    orm.OrganizationOwners, orm.Organization.id == orm.OrganizationOwners.organization_id, isouter=True
+                )
+                .join(
+                    orm.OrganizationMembers,
+                    orm.Organization.id == orm.OrganizationMembers.organization_id,
+                    isouter=True,
+                )
+                .where(or_(orm.OrganizationOwners.user_id == user_id, orm.OrganizationMembers.user_id == user_id))
             )
             results = await session.execute(statement)
             orgs = results.unique().scalars().all()
