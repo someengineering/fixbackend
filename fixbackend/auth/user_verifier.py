@@ -12,15 +12,13 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from abc import ABC, abstractmethod
 from typing import Annotated, Optional
 
-import boto3
 from fastapi import Depends, Request
 
 from fixbackend.auth.models import User
-from fixbackend.config import Config, ConfigDependency
+from fixbackend.notification.service import NotificationService, NotificationServiceDependency
 
 
 class UserVerifier(ABC):
@@ -41,59 +39,24 @@ class UserVerifier(ABC):
         pass
 
 
-class ConsoleUserVerifier(UserVerifier):
+class UserVerifierImpl(UserVerifier):
+    def __init__(self, notification_service: NotificationService) -> None:
+        self.notification_service = notification_service
+
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         assert request
+        body_text = self.plaintext_email_content(request, token)
 
-        email_body = self.plaintext_email_content(request, token)
-
-        print(email_body)
-
-
-class EMailUserVerifier(UserVerifier):
-    def __init__(self, config: Config) -> None:
-        self.client = boto3.client(
-            "ses",
-            config.aws_region,
-            aws_access_key_id=config.aws_access_key_id,
-            aws_secret_access_key=config.aws_secret_access_key,
+        await self.notification_service.send_email(
+            to=user.email,
+            subject="FIX: verify your e-mail address",
+            text=body_text,
+            html=None,
         )
 
-    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
-        destination = user.email
-        assert request
 
-        def send_email(destination: str, token: str) -> None:
-            body_text = self.plaintext_email_content(request, token)
-
-            self.client.send_email(
-                Destination={
-                    "ToAddresses": [
-                        destination,
-                    ],
-                },
-                Message={
-                    "Body": {
-                        "Text": {
-                            "Charset": "UTF-8",
-                            "Data": body_text,
-                        },
-                    },
-                    "Subject": {
-                        "Charset": "UTF-8",
-                        "Data": "FIX: verify your e-mail address",
-                    },
-                },
-                Source="noreply@fix.tt",
-            )
-
-        await asyncio.to_thread(lambda: send_email(destination, token))
-
-
-def get_user_verifier(config: ConfigDependency) -> UserVerifier:
-    if config.aws_access_key_id and config.aws_secret_access_key:
-        return EMailUserVerifier(config)
-    return ConsoleUserVerifier()
+def get_user_verifier(notification_service: NotificationServiceDependency) -> UserVerifier:
+    return UserVerifierImpl(notification_service)
 
 
 UserVerifierDependency = Annotated[UserVerifier, Depends(get_user_verifier)]
