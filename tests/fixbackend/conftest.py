@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.user_repository import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -213,14 +213,20 @@ def graph_database_access_manager(
 
 
 @pytest.fixture
+async def user_repository(session: AsyncSession) -> UserRepository:
+    repo = await anext(get_user_repository(session))
+    return repo
+
+
+@pytest.fixture
 async def user(session: AsyncSession) -> User:
-    user_db = await anext(get_user_repository(session))
+    user_repository = await anext(get_user_repository(session))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
         "is_verified": True,
     }
-    return await user_db.create(user_dict)
+    return await user_repository.create(user_dict)
 
 
 @pytest.fixture
