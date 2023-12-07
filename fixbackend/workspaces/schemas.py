@@ -13,12 +13,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
 
 
 class WorkspaceRead(BaseModel):
@@ -104,9 +104,21 @@ class WorkspaceCreate(BaseModel):
 
 
 class WorkspaceInviteRead(BaseModel):
-    organization_slug: str = Field(description="The slug of the workspace to invite the user to")
+    workspace_id: WorkspaceId = Field(description="The unique identifier of the workspace to invite the user to")
+    workspace_name: str = Field(description="The name of the workspace to invite the user to")
     user_email: str = Field(description="The email of the user to invite")
     expires_at: datetime = Field(description="The time at which the invitation expires")
+    accepted_at: Optional[datetime] = Field(description="The time at which the invitation was accepted, if any")
+
+    @staticmethod
+    def from_model(invite: WorkspaceInvitation, workspace: Workspace) -> "WorkspaceInviteRead":
+        return WorkspaceInviteRead(
+            workspace_id=invite.workspace_id,
+            workspace_name=workspace.name,
+            user_email=invite.email,
+            expires_at=invite.expires_at,
+            accepted_at=invite.accepted_at,
+        )
 
     model_config = {
         "json_schema_extra": {
@@ -133,3 +145,7 @@ class ExternalIdRead(BaseModel):
             ]
         }
     }
+
+
+class InviteEmail(BaseModel):
+    email: EmailStr = Field(description="The email of the user to invite")

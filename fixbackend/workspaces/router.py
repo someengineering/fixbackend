@@ -14,8 +14,8 @@
 
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import EmailStr
+from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
@@ -26,6 +26,7 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import (
     ExternalIdRead,
+    InviteEmail,
     WorkspaceCreate,
     WorkspaceInviteRead,
     WorkspaceRead,
@@ -108,20 +109,13 @@ def workspaces_router() -> APIRouter:
     ) -> List[WorkspaceInviteRead]:
         invites = await invitation_service.list_invitations(workspace_id=workspace.id)
 
-        return [
-            WorkspaceInviteRead(
-                organization_slug=workspace.slug,
-                user_email=invite.email,
-                expires_at=invite.expires_at,
-            )
-            for invite in invites
-        ]
+        return [WorkspaceInviteRead.from_model(invite, workspace) for invite in invites]
 
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(
         workspace: UserWorkspaceDependency,
         user: AuthenticatedUser,
-        user_email: EmailStr,
+        email: InviteEmail,
         invitation_service: InvitationServiceDependency,
         request: Request,
     ) -> WorkspaceInviteRead:
@@ -130,14 +124,10 @@ def workspaces_router() -> APIRouter:
         accept_invite_url = str(request.url_for(ACCEPT_INVITE_ROUTE_NAME, workspace_id=workspace.id))
 
         invite, _ = await invitation_service.invite_user(
-            workspace_id=workspace.id, inviter=user, invitee_email=user_email, accept_invite_base_url=accept_invite_url
+            workspace_id=workspace.id, inviter=user, invitee_email=email.email, accept_invite_base_url=accept_invite_url
         )
 
-        return WorkspaceInviteRead(
-            organization_slug=workspace.slug,
-            user_email=invite.email,
-            expires_at=invite.expires_at,
-        )
+        return WorkspaceInviteRead.from_model(invite, workspace)
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
     async def delete_invite(
@@ -150,11 +140,12 @@ def workspaces_router() -> APIRouter:
 
     @router.get("{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
-        token: str,
-        invitation_service: InvitationServiceDependency,
-    ) -> None:
+        token: str, invitation_service: InvitationServiceDependency, request: Request
+    ) -> Response:
         """Accept an invitation to the workspace."""
-        await invitation_service.accept_invitation(token)
+        invitation = await invitation_service.accept_invitation(token)
+        url = request.base_url.replace_query_params(message="invitation-accepted", workspace_id=invitation.workspace_id)
+        return RedirectResponse(url)
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(

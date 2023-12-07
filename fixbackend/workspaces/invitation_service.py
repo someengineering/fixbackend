@@ -58,7 +58,7 @@ class InvitationService(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    async def accept_invitation(self, token: str) -> None:
+    async def accept_invitation(self, token: str) -> WorkspaceInvitation:
         """Accept an invitation to a workspace."""
         raise NotImplementedError()
 
@@ -111,7 +111,7 @@ class InvitationServiceImpl(InvitationService):
     async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
         return await self.invitation_repository.list_invitations(workspace_id)
 
-    async def accept_invitation(self, token: str) -> None:
+    async def accept_invitation(self, token: str) -> WorkspaceInvitation:
         try:
             decoded_state = decode_jwt(token, self.config.secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
@@ -123,7 +123,7 @@ class InvitationServiceImpl(InvitationService):
         if invitation is None:
             raise ValueError(f"Invitation {invitation_id} does not exist.")
 
-        await self.invitation_repository.update_invitation(
+        updated = await self.invitation_repository.update_invitation(
             invitation_id, lambda invite: evolve(invite, accepted_at=utc())
         )
 
@@ -131,6 +131,8 @@ class InvitationServiceImpl(InvitationService):
         if user := await self.user_repository.get_by_email(invitation.email):
             await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id)
             await self.invitation_repository.delete_invitation(invitation_id)
+
+        return updated
 
     async def revoke_invitation(self, invitation_id: InvitationId) -> None:
         await self.invitation_repository.delete_invitation(invitation_id)
