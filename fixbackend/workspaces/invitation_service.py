@@ -26,6 +26,9 @@ from fastapi_users.jwt import decode_jwt, generate_jwt
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.config import Config, ConfigDependency
+from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
+from fixbackend.domain_events.events import InvitationAccepted
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.notification.service import NotificationService, NotificationServiceDependency
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
@@ -75,12 +78,14 @@ class InvitationServiceImpl(InvitationService):
         invitation_repository: InvitationRepository,
         notification_service: NotificationService,
         user_repository: UserRepository,
+        domain_events: DomainEventPublisher,
         config: Config,
     ) -> None:
         self.invitation_repository = invitation_repository
         self.notification_service = notification_service
         self.workspace_repository = workspace_repository
         self.user_repository = user_repository
+        self.domain_events = domain_events
         self.config = config
 
     async def invite_user(
@@ -132,6 +137,9 @@ class InvitationServiceImpl(InvitationService):
             await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id)
             await self.invitation_repository.delete_invitation(invitation_id)
 
+        event = InvitationAccepted(invitation.workspace_id, invitation.email)
+        await self.domain_events.publish(event)
+
         return updated
 
     async def revoke_invitation(self, invitation_id: InvitationId) -> None:
@@ -143,6 +151,7 @@ def get_invitation_service(
     invitation_repository: InvitationRepositoryDependency,
     notification_service: NotificationServiceDependency,
     user_repository: UserRepositoryDependency,
+    domain_events: DomainEventPublisherDependency,
     config: ConfigDependency,
 ) -> InvitationService:
     return InvitationServiceImpl(
@@ -150,6 +159,7 @@ def get_invitation_service(
         invitation_repository=invitation_repository,
         notification_service=notification_service,
         user_repository=user_repository,
+        domain_events=domain_events,
         config=config,
     )
 

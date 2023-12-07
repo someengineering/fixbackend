@@ -29,7 +29,7 @@ from fixbackend.ids import ExternalId, WorkspaceId, UserId
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import WorkspaceCreated
+from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
 
 
 class WorkspaceRepository(ABC):
@@ -160,6 +160,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 await session.commit()
             except IntegrityError:
                 raise ValueError("Can't add user to workspace.")
+
+        event = UserJoinedWorkspace(workspace_id, user_id)
+        await self.domain_event_sender.publish(event)
 
     async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
         async with self.session_maker() as session:

@@ -16,6 +16,7 @@
 from typing import Optional, List
 from attrs import frozen
 import pytest
+from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 
@@ -25,6 +26,7 @@ from fixbackend.notification.service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
 @frozen
@@ -54,6 +56,7 @@ def service(
     invitation_repository: InvitationRepository,
     notification_service: NotificationService,
     user_repository: UserRepository,
+    domain_event_sender: InMemoryDomainEventPublisher,
     default_config: Config,
 ) -> InvitationService:
     return InvitationServiceImpl(
@@ -61,6 +64,7 @@ def service(
         invitation_repository=invitation_repository,
         notification_service=notification_service,
         user_repository=user_repository,
+        domain_events=domain_event_sender,
         config=default_config,
     )
 
@@ -72,6 +76,7 @@ async def test_invite_accept_user(
     invitation_repository: InvitationRepository,
     notification_service: InMemoryNotificationService,
     user_repository: UserRepository,
+    domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
 ) -> None:
     workspace = await workspace_repository.create_workspace(
@@ -113,6 +118,9 @@ async def test_invite_accept_user(
     await service.accept_invitation(token)
     assert list(map(lambda w: w.id, await workspace_repository.list_workspaces(existing_user.id))) == [workspace.id]
     assert await service.list_invitations(workspace.id) == [invite]
+    assert len(domain_event_sender.events) == 3
+    assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
+    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.email)
 
     # invite can be revoked
     await service.revoke_invitation(invite.id)
