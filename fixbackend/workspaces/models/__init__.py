@@ -40,3 +40,4 @@ class WorkspaceInvitation:
     email: str
     user_id: Optional[UserId]
     expires_at: datetime
+    accepted_at: Optional[datetime]

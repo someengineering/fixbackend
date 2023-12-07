@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import ForeignKey, String, DateTime
+from sqlalchemy import ForeignKey, String, DateTime, Integer
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
@@ -53,8 +53,12 @@ class OrganizationInvite(Base):
     id: Mapped[InvitationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
     user_id: Mapped[Optional[UserId]] = mapped_column(GUID, ForeignKey("user.id"), nullable=True)
-    user_email: Mapped[str] = mapped_column(String(length=320), nullable=False)
+    user_email: Mapped[str] = mapped_column(String(length=320), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __mapper_args__ = {"version_id_col": version_id}  # for optimistic locking
 
     def to_model(self) -> models.WorkspaceInvitation:
         return models.WorkspaceInvitation(
@@ -63,6 +67,7 @@ class OrganizationInvite(Base):
             user_id=self.user_id,
             email=self.user_email,
             expires_at=self.expires_at,
+            accepted_at=self.accepted_at,
         )
 
 
