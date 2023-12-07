@@ -52,7 +52,6 @@ async def test_create_invitation(
 
     invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
     assert invitation.workspace_id == org_id
-    assert invitation.user_id == user2.id
     assert invitation.email == user2.email
 
     # create invitation is idempotent
@@ -62,7 +61,6 @@ async def test_create_invitation(
     external_email = "i_do_not_exist@bar.com"
     non_user_invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=external_email)
     assert non_user_invitation.workspace_id == org_id
-    assert non_user_invitation.user_id is None
     assert non_user_invitation.email == external_email
 
 

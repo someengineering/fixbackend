@@ -52,7 +52,6 @@ class OrganizationInvite(Base):
 
     id: Mapped[InvitationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
-    user_id: Mapped[Optional[UserId]] = mapped_column(GUID, ForeignKey("user.id"), nullable=True)
     user_email: Mapped[str] = mapped_column(String(length=320), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -64,7 +63,6 @@ class OrganizationInvite(Base):
         return models.WorkspaceInvitation(
             id=self.id,
             workspace_id=self.organization_id,
-            user_id=self.user_id,
             email=self.user_email,
             expires_at=self.expires_at,
             accepted_at=self.accepted_at,

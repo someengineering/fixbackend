@@ -38,6 +38,5 @@ class WorkspaceInvitation:
     id: InvitationId
     workspace_id: WorkspaceId
     email: str
-    user_id: Optional[UserId]
     expires_at: datetime
     accepted_at: Optional[datetime]

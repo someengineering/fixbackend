@@ -87,7 +87,6 @@ class InvitationRepositoryImpl(InvitationRepository):
 
             invite = orm.OrganizationInvite(
                 organization_id=workspace_id,
-                user_id=user.id if user else None,
                 user_email=email,
                 expires_at=utc() + timedelta(days=7),
             )
@@ -135,7 +134,6 @@ class InvitationRepositoryImpl(InvitationRepository):
                     return invite
 
                 stored_invite.organization_id = invite.workspace_id
-                stored_invite.user_id = invite.user_id
                 stored_invite.user_email = invite.email
                 stored_invite.expires_at = invite.expires_at
                 stored_invite.accepted_at = invite.accepted_at
