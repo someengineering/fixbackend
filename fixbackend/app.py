@@ -161,7 +161,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                graph_db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=readwrite_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
         )
         deps.add(
             SN.invitation_repository,
@@ -250,7 +259,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=rw_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
         )
 
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
@@ -312,7 +330,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                graph_db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=readwrite_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
         )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         aws_marketplace = deps.add(

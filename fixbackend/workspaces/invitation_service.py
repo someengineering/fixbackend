@@ -106,8 +106,8 @@ class InvitationServiceImpl(InvitationService):
         subject = f"FIX Cloud {inviter.email} has invited you to FIX workspace"
         invite_link = f"{accept_invite_base_url}?token={token}"
         text = (
-            f"{inviter.email} has invited you to join the workspace {workspace.name}."
-            "Please click on the link below to accept the invitation."
+            f"{inviter.email} has invited you to join the workspace {workspace.name}. "
+            "Please click on the link below to accept the invitation. \n\n"
             f"{invite_link}"
         )
         await self.notification_service.send_email(to=invitee_email, subject=subject, text=text, html=None)

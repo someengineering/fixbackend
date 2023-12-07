@@ -121,7 +121,7 @@ organization = Workspace(
 )
 
 
-class OrganizationServiceMock(WorkspaceRepositoryImpl):
+class WorkspaceServiceMock(WorkspaceRepositoryImpl):
     # noinspection PyMissingConstructor
     def __init__(self) -> None:
         pass
@@ -197,8 +197,8 @@ def repository() -> CloudAccountRepositoryMock:
 
 
 @pytest.fixture
-def organization_repository() -> OrganizationServiceMock:
-    return OrganizationServiceMock()
+def organization_repository() -> WorkspaceServiceMock:
+    return WorkspaceServiceMock()
 
 
 @pytest.fixture
@@ -218,7 +218,7 @@ def account_setup_helper() -> AwsAccountSetupHelperMock:
 
 @pytest.fixture
 def service(
-    organization_repository: OrganizationServiceMock,
+    organization_repository: WorkspaceServiceMock,
     repository: CloudAccountRepositoryMock,
     pubsub_publisher: RedisPubSubPublisherMock,
     domain_sender: DomainEventSenderMock,

@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,10 +73,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         session_maker: AsyncSessionMaker,
         graph_db_access_manager: GraphDatabaseAccessManager,
         domain_event_sender: DomainEventPublisher,
+        pubsub_publisher: RedisPubSubPublisher,
     ) -> None:
         self.session_maker = session_maker
         self.graph_db_access_manager = graph_db_access_manager
         self.domain_event_sender = domain_event_sender
+        self.pubsub_publisher = pubsub_publisher
 
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
@@ -163,6 +166,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
         event = UserJoinedWorkspace(workspace_id, user_id)
         await self.domain_event_sender.publish(event)
+        await self.pubsub_publisher.publish(event.kind, event.to_json(), f"tenant-events::{event.workspace_id}")
 
     async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
         async with self.session_maker() as session:

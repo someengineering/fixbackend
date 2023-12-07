@@ -20,6 +20,7 @@ from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
+from attrs import frozen
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
@@ -61,6 +62,7 @@ from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -435,13 +437,36 @@ async def domain_event_sender() -> InMemoryDomainEventPublisher:
     return InMemoryDomainEventPublisher()
 
 
+@frozen
+class PubSubMessage:
+    kind: str
+    message: Json
+    channel: Optional[str]
+
+
+class InMemoryRedisPubSubPublisher(RedisPubSubPublisher):
+    def __init__(self) -> None:
+        self.events: List[PubSubMessage] = []
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.events.append(PubSubMessage(kind, message, channel))
+
+
+@pytest.fixture
+def pubsub_publisher() -> InMemoryRedisPubSubPublisher:
+    return InMemoryRedisPubSubPublisher()
+
+
 @pytest.fixture
 async def workspace_repository(
     async_session_maker: AsyncSessionMaker,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
+    pubsub_publisher: InMemoryRedisPubSubPublisher,
 ) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager, domain_event_sender)
+    return WorkspaceRepositoryImpl(
+        async_session_maker, graph_database_access_manager, domain_event_sender, pubsub_publisher
+    )
 
 
 @pytest.fixture
