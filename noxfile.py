@@ -36,7 +36,7 @@ def flake8(session: Session) -> None:
 @session(python=["3.11"])  # type: ignore
 def test(session: Session) -> None:
     args = session.posargs or ["--cov"]
-    session.run_always("poetry", "install", external=True)
+    session.run_always("poetry", "install", "--quiet", external=True)
     session.run("pytest", *args)
 
 
@@ -44,7 +44,7 @@ def test(session: Session) -> None:
 def mypy(session: Session) -> None:
     opts = ["--strict"]
     args = session.posargs or [] + opts + locations
-    session.run_always("poetry", "install", external=True)
+    session.run_always("poetry", "install", "--quiet", external=True)
     session.install("mypy", ".")
     print(args)
     session.run("mypy", *args)

@@ -88,6 +88,7 @@ from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
@@ -160,7 +161,20 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                graph_db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=readwrite_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
+        )
+        deps.add(
+            SN.invitation_repository,
+            InvitationRepositoryImpl(session_maker, workspace_repo),
         )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         deps.add(
@@ -245,8 +259,18 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=rw_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
         )
+
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=rw_redis,
             channel="cloud_accounts",
@@ -306,7 +330,16 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
-            WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
+            WorkspaceRepositoryImpl(
+                session_maker,
+                graph_db_access,
+                domain_event_publisher,
+                RedisPubSubPublisher(
+                    redis=readwrite_redis,
+                    channel="workspaces",
+                    publisher_name="workspace_service",
+                ),
+            ),
         )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         aws_marketplace = deps.add(

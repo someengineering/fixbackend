@@ -20,6 +20,7 @@ from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
+from attrs import frozen
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade
@@ -35,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from fixbackend.app import fast_api_app
-from fixbackend.auth.db import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -58,8 +59,10 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_month, uid
+from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -212,14 +215,20 @@ def graph_database_access_manager(
 
 
 @pytest.fixture
+async def user_repository(session: AsyncSession) -> UserRepository:
+    repo = await anext(get_user_repository(session))
+    return repo
+
+
+@pytest.fixture
 async def user(session: AsyncSession) -> User:
-    user_db = await anext(get_user_repository(session))
+    user_repository = await anext(get_user_repository(session))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
         "is_verified": True,
     }
-    return await user_db.create(user_dict)
+    return await user_repository.create(user_dict)
 
 
 @pytest.fixture
@@ -428,13 +437,44 @@ async def domain_event_sender() -> InMemoryDomainEventPublisher:
     return InMemoryDomainEventPublisher()
 
 
+@frozen
+class PubSubMessage:
+    kind: str
+    message: Json
+    channel: Optional[str]
+
+
+class InMemoryRedisPubSubPublisher(RedisPubSubPublisher):
+    def __init__(self) -> None:
+        self.events: List[PubSubMessage] = []
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.events.append(PubSubMessage(kind, message, channel))
+
+
+@pytest.fixture
+def pubsub_publisher() -> InMemoryRedisPubSubPublisher:
+    return InMemoryRedisPubSubPublisher()
+
+
 @pytest.fixture
 async def workspace_repository(
     async_session_maker: AsyncSessionMaker,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
+    pubsub_publisher: InMemoryRedisPubSubPublisher,
 ) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(async_session_maker, graph_database_access_manager, domain_event_sender)
+    return WorkspaceRepositoryImpl(
+        async_session_maker, graph_database_access_manager, domain_event_sender, pubsub_publisher
+    )
+
+
+@pytest.fixture
+async def invitation_repository(
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+) -> InvitationRepository:
+    return InvitationRepositoryImpl(async_session_maker, workspace_repository)
 
 
 @pytest.fixture

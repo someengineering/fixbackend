@@ -125,3 +125,19 @@ class WorkspaceCreated(Event):
     kind: ClassVar[str] = "workspace_created"
 
     workspace_id: WorkspaceId
+
+
+@frozen
+class InvitationAccepted(Event):
+    kind: ClassVar[str] = "workspace_invitation_accepted"
+
+    workspace_id: WorkspaceId
+    user_email: str
+
+
+@frozen
+class UserJoinedWorkspace(Event):
+    kind: ClassVar[str] = "user_joined_workspace"
+
+    workspace_id: WorkspaceId
+    user_id: UserId

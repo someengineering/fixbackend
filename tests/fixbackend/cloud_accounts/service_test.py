@@ -24,6 +24,7 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
@@ -120,12 +121,14 @@ organization = Workspace(
 )
 
 
-class OrganizationServiceMock(WorkspaceRepositoryImpl):
+class WorkspaceServiceMock(WorkspaceRepositoryImpl):
     # noinspection PyMissingConstructor
     def __init__(self) -> None:
         pass
 
-    async def get_workspace(self, workspace_id: WorkspaceId, with_users: bool = False) -> Workspace | None:
+    async def get_workspace(
+        self, workspace_id: WorkspaceId, with_users: bool = False, *, session: Optional[AsyncSession] = None
+    ) -> Workspace | None:
         if workspace_id != test_workspace_id:
             return None
         return organization
@@ -194,8 +197,8 @@ def repository() -> CloudAccountRepositoryMock:
 
 
 @pytest.fixture
-def organization_repository() -> OrganizationServiceMock:
-    return OrganizationServiceMock()
+def organization_repository() -> WorkspaceServiceMock:
+    return WorkspaceServiceMock()
 
 
 @pytest.fixture
@@ -215,7 +218,7 @@ def account_setup_helper() -> AwsAccountSetupHelperMock:
 
 @pytest.fixture
 def service(
-    organization_repository: OrganizationServiceMock,
+    organization_repository: WorkspaceServiceMock,
     repository: CloudAccountRepositoryMock,
     pubsub_publisher: RedisPubSubPublisherMock,
     domain_sender: DomainEventSenderMock,
