@@ -163,6 +163,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.workspace_repo,
             WorkspaceRepositoryImpl(session_maker, graph_db_access, domain_event_publisher),
         )
+        deps.add(
+            SN.invitation_repository,
+            InvitationRepositoryImpl(session_maker, workspace_repo),
+        )
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         deps.add(
             SN.aws_marketplace_handler,
@@ -248,10 +252,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.workspace_repo,
             WorkspaceRepositoryImpl(session_maker, db_access, domain_event_publisher),
         )
-        deps.add(
-            SN.invitation_repository,
-            InvitationRepositoryImpl(session_maker, workspace_repo),
-        )
+
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=rw_redis,
             channel="cloud_accounts",

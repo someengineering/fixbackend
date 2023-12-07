@@ -47,7 +47,7 @@ def generate_state_token(data: Dict[str, str], secret: str) -> str:
 class InvitationService(ABC):
     @abstractmethod
     async def invite_user(
-        self, workspace_id: WorkspaceId, inviter: User, invitee: str, accept_invite_base_url: str
+        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str
     ) -> Tuple[WorkspaceInvitation, str]:
         """Create an invitation to a workspace."""
         raise NotImplementedError()

@@ -21,7 +21,6 @@ from sqlalchemy.exc import IntegrityError
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.workspaces.invitation_repository import InvitationRepositoryDependency
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -105,9 +104,9 @@ def workspaces_router() -> APIRouter:
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
         workspace: UserWorkspaceDependency,
-        invitation_repository: InvitationRepositoryDependency,
+        invitation_service: InvitationServiceDependency,
     ) -> List[WorkspaceInviteRead]:
-        invites = await invitation_repository.list_invitations(workspace_id=workspace.id)
+        invites = await invitation_service.list_invitations(workspace_id=workspace.id)
 
         return [
             WorkspaceInviteRead(
@@ -131,7 +130,7 @@ def workspaces_router() -> APIRouter:
         accept_invite_url = str(request.url_for(ACCEPT_INVITE_ROUTE_NAME, workspace_id=workspace.id))
 
         invite, _ = await invitation_service.invite_user(
-            workspace_id=workspace.id, inviter=user, invitee=user_email, accept_invite_base_url=accept_invite_url
+            workspace_id=workspace.id, inviter=user, invitee_email=user_email, accept_invite_base_url=accept_invite_url
         )
 
         return WorkspaceInviteRead(
@@ -144,10 +143,10 @@ def workspaces_router() -> APIRouter:
     async def delete_invite(
         workspace: UserWorkspaceDependency,
         invite_id: InvitationId,
-        invitation_repository: InvitationRepositoryDependency,
+        invitation_service: InvitationServiceDependency,
     ) -> None:
         """Delete invite."""
-        await invitation_repository.delete_invitation(invite_id)
+        await invitation_service.revoke_invitation(invite_id)
 
     @router.get("{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
