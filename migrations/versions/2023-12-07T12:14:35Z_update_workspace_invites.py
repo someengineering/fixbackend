@@ -26,7 +26,7 @@ def upgrade() -> None:
     op.add_column("organization_invite", sa.Column("user_email", sa.String(length=320), nullable=False))
     op.add_column("organization_invite", sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
-        "organization_invite", sa.Column("version_id", sa.Integer(), nullable=False, system_default=sa.text("0"))
+        "organization_invite", sa.Column("version_id", sa.Integer(), nullable=False, server_default=sa.text("0"))
     )
     op.create_unique_constraint(None, "organization_invite", ["user_email"])
     op.drop_constraint("organization_invite_ibfk_2", "organization_invite", type_="foreignkey")
