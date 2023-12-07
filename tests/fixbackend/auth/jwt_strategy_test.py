@@ -12,21 +12,21 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from fastapi import Request
-
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.user_repository import get_user_repository
-from fixbackend.auth.models import User
-from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.auth.auth_backend import FixJWTStrategy
-from cryptography.hazmat.primitives.asymmetric import rsa
+from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import UserManager
-from fixbackend.config import Config
+from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.user_verifier import UserVerifier
-from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.config import Config
 from fixbackend.domain_events.events import Event
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.workspaces.invitation_repository import InvitationRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 @pytest.fixture
@@ -54,7 +54,11 @@ class DomainEventSenderMock(DomainEventPublisher):
 
 @pytest.mark.asyncio
 async def test_token_validation(
-    workspace_repository: WorkspaceRepository, user: User, default_config: Config, session: AsyncSession
+    workspace_repository: WorkspaceRepository,
+    user: User,
+    default_config: Config,
+    session: AsyncSession,
+    invitation_repository: InvitationRepository,
 ) -> None:
     private_key_1 = rsa.generate_private_key(65537, 2048)
     private_key_2 = rsa.generate_private_key(65537, 2048)
@@ -64,7 +68,13 @@ async def test_token_validation(
     user_repo = await anext(get_user_repository(session))
 
     user_manager = UserManager(
-        default_config, user_repo, None, UserVerifierMock(), workspace_repository, DomainEventSenderMock()
+        default_config,
+        user_repo,
+        None,
+        UserVerifierMock(),
+        workspace_repository,
+        DomainEventSenderMock(),
+        invitation_repository,
     )
 
     token1 = await strategy1.write_token(user)

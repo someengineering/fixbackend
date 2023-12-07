@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import pytest
 from fastapi import Request, FastAPI
@@ -24,6 +24,9 @@ from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
+from fixbackend.ids import InvitationId, WorkspaceId
+from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
+from fixbackend.workspaces.models import WorkspaceInvitation
 
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
@@ -44,13 +47,44 @@ class InMemoryDomainSender(DomainEventPublisher):
         return self.events.append(event)
 
 
+class InMemoryInvitationRepo(InvitationRepository):
+    async def get_invitation_by_email(self, email: str) -> Optional[WorkspaceInvitation]:
+        return None
+
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
+        """Create an invite for a workspace."""
+        raise NotImplementedError
+
+    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvitation]:
+        """Get an invitation by ID."""
+        raise NotImplementedError
+
+    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
+        """List all invitations for a workspace."""
+        raise NotImplementedError
+
+    async def update_invitation(
+        self,
+        invitation_id: InvitationId,
+        update_fn: Callable[[WorkspaceInvitation], WorkspaceInvitation],
+    ) -> WorkspaceInvitation:
+        """Update an invitation."""
+        raise NotImplementedError
+
+    async def delete_invitation(self, invitation_id: InvitationId) -> None:
+        """Delete an invitation."""
+        raise NotImplementedError
+
+
 @pytest.mark.asyncio
 async def test_registration_flow(
     api_client: AsyncClient, fast_api: FastAPI, domain_event_sender: InMemoryDomainEventPublisher
 ) -> None:
     verifier = InMemoryVerifier()
+    invitation_repo = InMemoryInvitationRepo()
     fast_api.dependency_overrides[get_user_verifier] = lambda: verifier
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
+    fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
 
     registration_json = {
         "email": "user@example.com",
