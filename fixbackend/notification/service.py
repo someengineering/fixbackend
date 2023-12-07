@@ -1,5 +1,5 @@
 import asyncio
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Annotated, Optional
 
 import boto3
@@ -9,6 +9,7 @@ from fixbackend.config import Config, ConfigDependency
 
 
 class NotificationService(ABC):
+    @abstractmethod
     async def send_email(
         self,
         *,
