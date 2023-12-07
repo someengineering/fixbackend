@@ -14,6 +14,7 @@
 
 from datetime import datetime
 from typing import List, Optional
+from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, EmailStr, Field
@@ -147,5 +148,52 @@ class ExternalIdRead(BaseModel):
     }
 
 
-class InviteEmail(BaseModel):
-    email: EmailStr = Field(description="The email of the user to invite")
+class UserInvite(BaseModel):
+    name: str = Field(description="The name of the user")
+    email: EmailStr = Field(description="The email of the user")
+    roles: List[str] = Field(description="The role of the user")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Foo Bar",
+                    "email": "foo@example.com",
+                    "roles": ["admin"],
+                }
+            ]
+        }
+    }
+
+
+class WorkspaceUserRead(BaseModel):
+    id: UserId = Field(description="The user's unique identifier")
+    sources: List[str] = Field(description="Where the user is found")
+    name: str = Field(description="The user's name")
+    email: str = Field(description="The user's email")
+    roles: List[str] = Field(description="The user's roles")
+    last_login: Optional[datetime] = Field(description="The user's last login time, if any")
+
+    @staticmethod
+    def from_model(user: User) -> "WorkspaceUserRead":
+        return WorkspaceUserRead(
+            id=user.id,
+            sources=[],
+            name=user.email,
+            email=user.email,
+            roles=[],
+            last_login=None,
+        )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "sources": ["organization"],
+                    "name": "Foo Bar",
+                    "email": "foo@example.com",
+                    "roles": ["admin"],
+                }
+            ]
+        }
+    }

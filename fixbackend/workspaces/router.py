@@ -12,27 +12,31 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.auth.models import User
+from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.ids import InvitationId, WorkspaceId
+from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import (
     ExternalIdRead,
-    InviteEmail,
+    UserInvite,
     WorkspaceCreate,
     WorkspaceInviteRead,
     WorkspaceRead,
     WorkspaceSettingsRead,
     WorkspaceSettingsUpdate,
+    WorkspaceUserRead,
 )
+import asyncio
 
 
 def workspaces_router() -> APIRouter:
@@ -111,11 +115,20 @@ def workspaces_router() -> APIRouter:
 
         return [WorkspaceInviteRead.from_model(invite, workspace) for invite in invites]
 
+    @router.get("/{workspace_id}/users/")
+    async def list_users(
+        workspace: UserWorkspaceDependency,
+        user_repository: UserRepositoryDependency,
+    ) -> List[WorkspaceUserRead]:
+        user_ids = workspace.all_users()
+        users: List[Optional[User]] = await asyncio.gather(*[user_repository.get(user_id) for user_id in user_ids])
+        return [WorkspaceUserRead.from_model(user) for user in users if user]
+
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(
         workspace: UserWorkspaceDependency,
         user: AuthenticatedUser,
-        email: InviteEmail,
+        user_invite: UserInvite,
         invitation_service: InvitationServiceDependency,
         request: Request,
     ) -> WorkspaceInviteRead:
@@ -124,10 +137,26 @@ def workspaces_router() -> APIRouter:
         accept_invite_url = str(request.url_for(ACCEPT_INVITE_ROUTE_NAME, workspace_id=workspace.id))
 
         invite, _ = await invitation_service.invite_user(
-            workspace_id=workspace.id, inviter=user, invitee_email=email.email, accept_invite_base_url=accept_invite_url
+            workspace_id=workspace.id,
+            inviter=user,
+            invitee_email=user_invite.email,
+            accept_invite_base_url=accept_invite_url,
         )
 
         return WorkspaceInviteRead.from_model(invite, workspace)
+
+    @router.delete("/{workspace_id}/users/{user_id}/")
+    async def remove_user(
+        workspace: UserWorkspaceDependency,
+        user_id: UserId,
+        workspace_repository: WorkspaceRepositoryDependency,
+        user_repository: UserRepositoryDependency,
+    ) -> None:
+        """Delete a user from the workspace."""
+        user = await user_repository.get(user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        await workspace_repository.remove_from_workspace(workspace_id=workspace.id, user_id=user.id)
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
     async def delete_invite(
