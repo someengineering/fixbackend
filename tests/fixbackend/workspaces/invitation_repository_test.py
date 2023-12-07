@@ -13,6 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from attrs import evolve
+from fixcloudutils.util import utc
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +55,10 @@ async def test_create_invitation(
     assert invitation.user_id == user2.id
     assert invitation.email == user2.email
 
+    # create invitation is idempotent
+    invitation2 = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
+    assert invitation2 == invitation
+
     external_email = "i_do_not_exist@bar.com"
     non_user_invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=external_email)
     assert non_user_invitation.workspace_id == org_id
@@ -67,10 +73,9 @@ async def test_list_invitations(
     session: AsyncSession,
 ) -> None:
     user = await create_user("foo@bar.com", session)
-    organization = await workspace_repository.create_workspace(
+    workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
-    org_id = organization.id
 
     user_db = await anext(get_user_repository(session))
     user_dict = {
@@ -80,12 +85,87 @@ async def test_list_invitations(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
 
     # list the invitations
-    invitations = await invitation_repository.list_invitations(workspace_id=org_id)
+    invitations = await invitation_repository.list_invitations(workspace_id=workspace.id)
     assert len(invitations) == 1
     assert invitations[0] == invitation
+
+
+@pytest.mark.asyncio
+async def test_get_invitation(
+    workspace_repository: WorkspaceRepository,
+    invitation_repository: InvitationRepository,
+    session: AsyncSession,
+) -> None:
+    user = await create_user("foo@bar.com", session)
+    workspace = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+    user_db = await anext(get_user_repository(session))
+    user_dict = {
+        "email": "bar@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    new_user = await user_db.create(user_dict)
+
+    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+
+    stored_invitation = await invitation_repository.get_invitation(invitation_id=invitation.id)
+    assert stored_invitation == invitation
+
+
+@pytest.mark.asyncio
+async def test_get_invitation_by_email(
+    workspace_repository: WorkspaceRepository,
+    invitation_repository: InvitationRepository,
+    session: AsyncSession,
+) -> None:
+    user = await create_user("foo@bar.com", session)
+    workspace = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+    user_db = await anext(get_user_repository(session))
+    user_dict = {
+        "email": "bar@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    new_user = await user_db.create(user_dict)
+
+    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+
+    stored_invitation = await invitation_repository.get_invitation_by_email(email=new_user.email)
+    assert stored_invitation == invitation
+
+
+@pytest.mark.asyncio
+async def test_update_invitation(
+    workspace_repository: WorkspaceRepository,
+    invitation_repository: InvitationRepository,
+    session: AsyncSession,
+) -> None:
+    user = await create_user("foo@bar.com", session)
+    workspace = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+    user_db = await anext(get_user_repository(session))
+    user_dict = {
+        "email": "bar@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
+    new_user = await user_db.create(user_dict)
+
+    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+    assert invitation.accepted_at is None
+
+    now = utc()
+
+    updated = await invitation_repository.update_invitation(invitation.id, lambda i: evolve(i, accepted_at=now))
+    assert updated.accepted_at is not None
 
 
 @pytest.mark.asyncio
