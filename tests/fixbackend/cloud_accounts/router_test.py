@@ -27,6 +27,7 @@ from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
     CloudAccount,
+    CloudAccountState,
     CloudAccountStates,
 )
 from fixbackend.cloud_accounts.service import CloudAccountService
@@ -292,42 +293,66 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_list_cloud_accounts(client: AsyncClient) -> None:
     cloud_account_service.accounts = {}
-    cloud_account_id = FixCloudAccountId(uuid.uuid4())
-    next_scan = datetime.utcnow()
-    cloud_account_service.accounts[cloud_account_id] = CloudAccount(
-        id=cloud_account_id,
-        account_id=account_id,
-        workspace_id=workspace_id,
-        cloud=CloudNames.AWS,
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
-        account_name=CloudAccountName("foo"),
-        account_alias=CloudAccountAlias("foo_alias"),
-        user_account_name=UserCloudAccountName("foo_user"),
-        privileged=True,
-        last_scan_duration_seconds=10,
-        last_scan_resources_scanned=100,
-        last_scan_started_at=datetime.utcnow(),
-        next_scan=next_scan,
-        created_at=utc(),
-        updated_at=utc(),
-        state_updated_at=utc(),
-    )
+
+    def add_account(created_at: datetime, state: CloudAccountState) -> CloudAccount:
+        cloud_account_id = FixCloudAccountId(uuid.uuid4())
+        next_scan = utc()
+        account = CloudAccount(
+            id=cloud_account_id,
+            account_id=account_id,
+            workspace_id=workspace_id,
+            cloud=CloudNames.AWS,
+            state=state,
+            account_name=CloudAccountName("foo"),
+            account_alias=CloudAccountAlias("foo_alias"),
+            user_account_name=UserCloudAccountName("foo_user"),
+            privileged=True,
+            last_scan_duration_seconds=10,
+            last_scan_resources_scanned=100,
+            last_scan_started_at=utc(),
+            next_scan=next_scan,
+            created_at=created_at,
+            updated_at=utc(),
+            state_updated_at=utc(),
+        )
+        cloud_account_service.accounts[cloud_account_id] = account
+        return account
+
+    def check_account(data: Dict[str, str], account: CloudAccount) -> None:
+        assert data["id"] == str(account.id)
+        assert data["cloud"] == account.cloud
+        assert data["account_id"] == account.account_id
+        assert data["state"] == account.state.state_name
+        assert int(data["resources"]) == account.last_scan_resources_scanned
+        assert data["api_account_alias"] == account.account_alias
+        assert data["api_account_name"] == account.account_name
+        assert data["user_account_name"] == account.user_account_name
+
+    configured_state = CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+
+    recent = add_account(utc(), configured_state)
+    added = add_account(utc() - timedelta(days=2), configured_state)
+    detected = add_account(utc(), CloudAccountStates.Detected())
+    add_account(utc(), CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)))
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["id"] == str(cloud_account_id)
-    assert data[0]["cloud"] == "aws"
-    assert data[0]["account_id"] == "123456789012"
-    assert data[0]["is_configured"] is True
-    assert data[0]["enabled"] is True
-    assert data[0]["state"] == "configured"
-    assert data[0]["resources"] == 100
-    assert data[0]["next_scan"] == next_scan.isoformat()
-    assert data[0]["api_account_alias"] == "foo_alias"
-    assert data[0]["api_account_name"] == "foo"
-    assert data[0]["user_account_name"] == "foo_user"
+
+    recent_accounts = data.get("recent")
+    assert recent_accounts is not None
+    assert len(recent_accounts) == 1
+    check_account(recent_accounts[0], recent)
+
+    added_accounts = data.get("added")
+    assert added_accounts is not None
+    assert len(added_accounts) == 1
+    check_account(added_accounts[0], added)
+
+    discovered_accounts = data.get("discovered")
+    assert discovered_accounts is not None
+    assert len(discovered_accounts) == 1
+    check_account(discovered_accounts[0], detected)
 
 
 @pytest.mark.asyncio

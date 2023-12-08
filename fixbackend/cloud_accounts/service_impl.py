@@ -446,13 +446,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         if existing := await account_already_exists(workspace_id, account_id):
             new_name = account_name or existing.account_name
+            new_created_at = utc() if existing.state == CloudAccountStates.Deleted() else existing.created_at
             if role_name is None or (  # no change in role name / external id?
                 (access := existing.aws_access())
                 and access.role_name == role_name
                 and access.external_id == external_id
             ):
                 result = await self.cloud_account_repository.update(
-                    existing.id, lambda acc: evolve(acc, account_name=new_name)
+                    existing.id, lambda acc: evolve(acc, account_name=new_name, created_at=new_created_at)
                 )
                 return result  # Do not trigger any events.
             else:
@@ -460,7 +461,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 new_state: CloudAccountState = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
                 result = await self.cloud_account_repository.update(
                     existing.id,
-                    lambda acc: evolve(acc, state=new_state, account_name=new_name, state_updated_at=utc()),
+                    lambda acc: evolve(
+                        acc, state=new_state, account_name=new_name, state_updated_at=utc(), created_at=new_created_at
+                    ),
                 )
 
         else:
