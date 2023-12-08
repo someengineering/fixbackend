@@ -29,6 +29,9 @@ def upgrade() -> None:
         "organization_invite", sa.Column("version_id", sa.Integer(), nullable=False, server_default=sa.text("0"))
     )
     op.create_unique_constraint(None, "organization_invite", ["user_email"])
-    op.drop_constraint("organization_invite_ibfk_2", "organization_invite", type_="foreignkey")
+    try:
+        op.drop_constraint("organization_invite_ibfk_2", "organization_invite", type_="foreignkey")
+    except Exception:
+        pass
     op.drop_column("organization_invite", "user_id")
     # ### end Alembic commands ###
