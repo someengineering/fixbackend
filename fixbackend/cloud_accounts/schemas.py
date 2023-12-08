@@ -103,6 +103,12 @@ class CloudAccountRead(BaseModel):
         )
 
 
+class CloudAccountList(BaseModel):
+    recent: List[CloudAccountRead] = Field(description="List of recently used cloud accounts")
+    added: List[CloudAccountRead] = Field(description="List of added cloud accounts")
+    discovered: List[CloudAccountRead] = Field(description="List of discovered cloud accounts")
+
+
 class AwsCloudAccountUpdate(BaseModel):
     name: Optional[UserCloudAccountName] = Field(None, description="Name of the cloud account", max_length=64)
 

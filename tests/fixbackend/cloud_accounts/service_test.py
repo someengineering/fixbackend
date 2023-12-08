@@ -386,6 +386,16 @@ async def test_delete_aws_account(
     assert len(repository.accounts) == 1
     assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Deleted)
 
+    # when created again, created_at should be updated
+    recreated_account = await service.create_aws_account(
+        workspace_id=test_workspace_id,
+        account_id=account_id,
+        role_name=role_name,
+        external_id=external_id,
+        account_name=None,
+    )
+    assert recreated_account.created_at > account.created_at
+
 
 @pytest.mark.asyncio
 async def test_store_last_run_info(service: CloudAccountServiceImpl) -> None:
