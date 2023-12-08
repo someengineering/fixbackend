@@ -64,7 +64,7 @@ def cloud_accounts_router() -> APIRouter:
             match cloud_account.state:
                 case CloudAccountStates.Detected():
                     detected.append(CloudAccountRead.from_model(cloud_account))
-                case CloudAccountStates.Configured():
+                case _:
                     if cloud_account.created_at > last24hours:
                         recent.append(CloudAccountRead.from_model(cloud_account))
                     else:

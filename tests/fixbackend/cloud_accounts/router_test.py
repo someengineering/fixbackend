@@ -333,7 +333,12 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     recent = add_account(utc(), configured_state)
     added = add_account(utc() - timedelta(days=2), configured_state)
     detected = add_account(utc(), CloudAccountStates.Detected())
-    add_account(utc(), CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)))
+    recent_discovered = add_account(
+        utc() - timedelta(minutes=1), CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+    )
+    recent_degraded = add_account(
+        utc() - timedelta(minutes=3), CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), "foo")
+    )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
     assert response.status_code == 200
@@ -341,8 +346,10 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
 
     recent_accounts = data.get("recent")
     assert recent_accounts is not None
-    assert len(recent_accounts) == 1
+    assert len(recent_accounts) == 3
     check_account(recent_accounts[0], recent)
+    check_account(recent_accounts[1], recent_discovered)
+    check_account(recent_accounts[2], recent_degraded)
 
     added_accounts = data.get("added")
     assert added_accounts is not None
