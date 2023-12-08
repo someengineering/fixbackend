@@ -27,11 +27,13 @@ from datetime import timedelta
 from itertools import islice
 from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
 
+from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str
+from redis.asyncio import Redis
 
-from fixbackend.domain_events.events import AwsAccountDeleted
+from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCollected
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -84,20 +86,32 @@ class InventoryService(Service):
         client: InventoryClient,
         db_access_manager: GraphDatabaseAccessManager,
         domain_event_subscriber: DomainEventSubscriber,
+        redis: Redis,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
+        self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
+        domain_event_subscriber.subscribe(AwsAccountDeleted, self._process_account_deleted, "inventory-service")
+        domain_event_subscriber.subscribe(TenantAccountsCollected, self._process_tenant_collected, "inventory-service")
 
-        domain_event_subscriber.subscribe(AwsAccountDeleted, self.process_account_deleted, "inventory-service")
+    async def start(self) -> Any:
+        await self.cache.start()
 
-    async def process_account_deleted(self, event: AwsAccountDeleted) -> None:
+    async def stop(self) -> Any:
+        await self.cache.stop()
+
+    async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
         set_workspace_id(str(event.tenant_id))
         set_cloud_account_id(event.aws_account_id)
         set_fix_cloud_account_id(event.cloud_account_id)
         access = await self.db_access_manager.get_database_access(event.tenant_id)
         if access:
             await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
+
+    async def _process_tenant_collected(self, event: TenantAccountsCollected) -> None:
+        # evict the cache for the tenant in the cluster
+        await self.cache.evict(str(event.tenant_id))
 
     async def benchmark(
         self,
@@ -136,6 +150,9 @@ class InventoryService(Service):
         return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
+        return await self.cache.call(self.__search_start_data, key=str(db.workspace_id))(db)
+
+    async def __search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
             cmd = (
                 f"search {search_filter} | "
@@ -186,6 +203,9 @@ class InventoryService(Service):
         return dict(resource=resource, failing_checks=checks, neighborhood=nb)
 
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
+        return await self.cache.call(self.__summary, key=str(db.workspace_id))(db)
+
+    async def __summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def issues_since(
             duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
         ) -> VulnerabilitiesChanged:

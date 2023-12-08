@@ -147,7 +147,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
         deps.add(
             SN.inventory,
-            InventoryService(inventory_client, graph_db_access, domain_event_subscriber),
+            InventoryService(inventory_client, graph_db_access, domain_event_subscriber, readwrite_redis),
         )
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,

@@ -252,7 +252,10 @@ class InventoryClient(Service):
         graph: str = "resoto",
         section: str = "reported",
     ) -> Tuple[int, Dict[str, str]]:
-        log.info(f"Complete property path with: {request}")
+        log.info(
+            f"Complete property path path={request.path}, prop={request.prop}, kinds={len(request.kinds or [])}, "
+            f"fuzzy={request.fuzzy}, skip={request.skip}, limit={request.limit}"
+        )
         headers = self.__headers(access)
         params = {"section": section}
         response = await self._perform(
