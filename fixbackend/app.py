@@ -135,6 +135,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url))
         readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         domain_event_subscriber = deps.add(
             SN.domain_event_subscriber,
             DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
@@ -147,7 +148,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
         deps.add(
             SN.inventory,
-            InventoryService(inventory_client, graph_db_access, domain_event_subscriber, readwrite_redis),
+            InventoryService(inventory_client, graph_db_access, domain_event_subscriber, temp_store_redis),
         )
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
