@@ -27,6 +27,7 @@ from uuid import uuid4
 import pytest
 from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
+from redis.asyncio import Redis
 
 from fixbackend.domain_events.events import AwsAccountDeleted
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -168,31 +169,33 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
 
 
 async def test_no_graph_db_access(
-    domain_event_subscriber: DomainEventSubscriber, graph_database_access_manager: GraphDatabaseAccessManager
+    domain_event_subscriber: DomainEventSubscriber,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    redis: Redis,
 ) -> None:
     async def app(_: Request) -> Response:
         return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
 
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
-        async with InventoryService(client, graph_database_access_manager, domain_event_subscriber) as service:
-            empty = CheckSummary(
-                available_checks=0,
-                failed_checks=0,
-                failed_checks_by_severity={},
-                available_resources=0,
-                failed_resources=0,
-                failed_resources_by_severity={},
-            )
-            assert await service.summary(db) == ReportSummary(
-                check_summary=empty,
-                overall_score=0,
-                accounts=[],
-                benchmarks=[],
-                changed_vulnerable=NoVulnerabilitiesChanged,
-                changed_compliant=NoVulnerabilitiesChanged,
-                top_checks=[],
-            )
+        service = InventoryService(client, graph_database_access_manager, domain_event_subscriber, redis)
+        empty = CheckSummary(
+            available_checks=0,
+            failed_checks=0,
+            failed_checks_by_severity={},
+            available_resources=0,
+            failed_resources=0,
+            failed_resources_by_severity={},
+        )
+        assert await service.summary(db) == ReportSummary(
+            check_summary=empty,
+            overall_score=0,
+            accounts=[],
+            benchmarks=[],
+            changed_vulnerable=NoVulnerabilitiesChanged,
+            changed_compliant=NoVulnerabilitiesChanged,
+            top_checks=[],
+        )
 
 
 async def test_dict_values_by() -> None:
@@ -249,7 +252,7 @@ async def test_resource(
 
 
 @pytest.mark.asyncio
-async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber) -> None:
+async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber, redis: Redis) -> None:
     cloud_account_id = CloudAccountId("123")
 
     async def delete_account(
@@ -268,10 +271,6 @@ async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber) -
 
     inventory_client = cast(InventoryClient, SimpleNamespace(delete_account=delete_account))
     db_manager = cast(GraphDatabaseAccessManager, SimpleNamespace(get_database_access=get_db_access))
-    inventory_service = InventoryService(
-        inventory_client,
-        db_manager,
-        domain_event_subscriber,
-    )
+    inventory_service = InventoryService(inventory_client, db_manager, domain_event_subscriber, redis)
     message = AwsAccountDeleted(FixCloudAccountId(uuid4()), WorkspaceId(uuid4()), CloudAccountId("123"))
-    await inventory_service.process_account_deleted(message)
+    await inventory_service._process_account_deleted(message)
