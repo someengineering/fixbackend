@@ -12,15 +12,18 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import timedelta
 import logging
-from typing import List
 
 from fastapi import APIRouter
+from fixcloudutils.util import utc
 
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
+from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
     AwsCloudAccountUpdate,
     AwsCloudFormationLambdaCallbackParameters,
+    CloudAccountList,
     CloudAccountRead,
     LastScanInfo,
     ScannedAccount,
@@ -48,9 +51,26 @@ def cloud_accounts_router() -> APIRouter:
     @router.get("/{workspace_id}/cloud_accounts")
     async def list_cloud_accounts(
         workspace: UserWorkspaceDependency, service: CloudAccountServiceDependency
-    ) -> List[CloudAccountRead]:
+    ) -> CloudAccountList:
         cloud_accounts = await service.list_accounts(workspace.id)
-        return [CloudAccountRead.from_model(cloud_account) for cloud_account in cloud_accounts]
+        sorted_by_created_at = sorted(cloud_accounts, key=lambda ca: ca.created_at, reverse=True)
+        now = utc()
+        last24hours = now - timedelta(days=1)
+        recent = []
+        added = []
+        detected = []
+
+        for cloud_account in sorted_by_created_at:
+            match cloud_account.state:
+                case CloudAccountStates.Detected():
+                    detected.append(CloudAccountRead.from_model(cloud_account))
+                case CloudAccountStates.Configured():
+                    if cloud_account.created_at > last24hours:
+                        recent.append(CloudAccountRead.from_model(cloud_account))
+                    else:
+                        added.append(CloudAccountRead.from_model(cloud_account))
+
+        return CloudAccountList(recent=recent, added=added, discovered=detected)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def update_cloud_account(

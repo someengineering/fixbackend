@@ -74,4 +74,4 @@ source = ["fixbackend"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 79
+fail_under = 80
