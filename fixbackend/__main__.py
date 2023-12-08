@@ -23,10 +23,10 @@ def main() -> None:
 
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
-    if not args.skip_migrations:
-        command.upgrade(alembic_cfg, "head")
-    else:
+    if args.skip_migrations:
         command.check(alembic_cfg)
+    else:
+        command.upgrade(alembic_cfg, "head")
 
     uvicorn.run(
         "fixbackend.app:setup_process",
