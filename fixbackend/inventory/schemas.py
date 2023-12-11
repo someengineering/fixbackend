@@ -73,6 +73,14 @@ NoVulnerabilitiesChanged = VulnerabilitiesChanged(
 )
 
 
+class TimeSeries(BaseModel):
+    name: str
+    start: datetime
+    end: datetime
+    granularity: timedelta
+    data: List[Json]
+
+
 class ReportSummary(BaseModel):
     overall_score: int
     check_summary: CheckSummary = Field(description="Overall summary of all available checks.")
@@ -81,6 +89,9 @@ class ReportSummary(BaseModel):
     changed_vulnerable: VulnerabilitiesChanged = Field(description="Accounts and resources became vulnerable.")
     changed_compliant: VulnerabilitiesChanged = Field(description="Accounts and resources became compliant.")
     top_checks: List[Json] = Field(description="The most relevant report check definitions.")
+    vulnerable_resources: Optional[TimeSeries] = Field(
+        default=None, description="The number of vulnerable resources over time."
+    )
 
 
 class SearchCloudResource(BaseModel):

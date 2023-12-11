@@ -23,6 +23,7 @@ import uuid
 
 import pytest
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc
 from httpx import Request, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -66,6 +67,20 @@ def mocked_inventory_client(
             return json_response([aws_ec2_model_json])
         elif request.url.path == "/graph/resoto/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
+        elif request.url.path == "/timeseries/infected_resources":
+            return nd_json_response(
+                [
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "critical"}, "v": 5},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "high"}, "v": 18.6},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "medium"}, "v": 47},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "low"}, "v": 5},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "critical"}, "v": 1},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "high"}, "v": 12},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "medium"}, "v": 26.92307692307692},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
+                ]
+            )
+
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
 
@@ -113,3 +128,9 @@ async def test_complete(mocked_inventory_client: InventoryClient, azure_virtual_
     count, result = await mocked_inventory_client.complete_property_path(db_access, request=request)
     assert count == 12
     assert result == {"a": "string", "b": "int32", "c": "boolean"}
+
+
+async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
+    result = await mocked_inventory_client.timeseries(db_access, name="infected_resources", start=utc(), end=utc())
+    result_list = [e async for e in result]
+    assert len(result_list) == 8
