@@ -24,17 +24,20 @@ from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
+from fixbackend.workspaces.models import SecurityTier, SecurityTiers
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import (
     ExternalIdRead,
     UserInvite,
+    WorkspaceBilling,
     WorkspaceCreate,
     WorkspaceInviteRead,
     WorkspaceRead,
     WorkspaceSettingsRead,
     WorkspaceSettingsUpdate,
     WorkspaceUserRead,
+    SecurityTier as SecurityTierSchema,
 )
 import asyncio
 
@@ -175,6 +178,34 @@ def workspaces_router() -> APIRouter:
         invitation = await invitation_service.accept_invitation(token)
         url = request.base_url.replace_query_params(message="invitation-accepted", workspace_id=invitation.workspace_id)
         return RedirectResponse(url)
+
+    @router.get("/{workspace_id}/billing")
+    async def get_billing(workspace: UserWorkspaceDependency) -> WorkspaceBilling:
+        """Get a workspace billing."""
+        return WorkspaceBilling.from_model(workspace)
+
+    @router.put("/{workspace_id}/billing")
+    async def update_billing(
+        workspace: UserWorkspaceDependency,
+        workspace_repository: WorkspaceRepositoryDependency,
+        billing: WorkspaceBilling,
+    ) -> WorkspaceBilling:
+        """Update a workspace billing."""
+
+        def tier(billing: WorkspaceBilling) -> SecurityTier:
+            match billing.security_tier:
+                case SecurityTierSchema.FREE:
+                    return SecurityTiers.Free()
+                case SecurityTierSchema.FOUNDATIONAL:
+                    return SecurityTiers.Foundational()
+                case SecurityTierSchema.HIGH_SECURITY:
+                    return SecurityTiers.HighSecurity()
+
+        org = await workspace_repository.update_security_tier(
+            workspace_id=workspace.id,
+            security_tier=tier(billing),
+        )
+        return WorkspaceBilling.from_model(org)
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(

@@ -128,6 +128,10 @@ class AwsMarketplaceHandler(Service):
             is_full_month = 25 < delta.days < 40
             month_factor = 1 if is_full_month else delta.days / 28
             if ws_id := subscription.workspace_id:
+                workspace = await self.workspace_repo.get_workspace(ws_id)
+                if workspace is None:
+                    log.error(f"AWS Marketplace: customer {customer} has no workspace")
+                    return None
                 # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
                 summaries = [
                     summary
@@ -146,7 +150,7 @@ class AwsMarketplaceHandler(Service):
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
-                    "FoundationalSecurityAccount",  # TODO: lookup the correct tier
+                    workspace.security_tier.name,
                     usage,
                     last_charged,
                     billing_time,

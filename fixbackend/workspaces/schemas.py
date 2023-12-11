@@ -19,7 +19,8 @@ from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, EmailStr, Field
 
-from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
+from fixbackend.workspaces.models import Workspace, WorkspaceInvitation, SecurityTiers as ST
+from enum import Enum
 
 
 class WorkspaceRead(BaseModel):
@@ -86,6 +87,50 @@ class WorkspaceSettingsRead(BaseModel):
 class WorkspaceSettingsUpdate(BaseModel):
     name: str = Field(description="The workspace's name, a human-readable string")
     generate_new_external_id: bool = Field(description="Whether to generate a new external identifier")
+
+
+class PaymentMethod(str, Enum):
+    AWS = "aws_marketplace"
+
+
+class SecurityTier(str, Enum):
+    FREE = "free"
+    FOUNDATIONAL = "foundational"
+    HIGH_SECURITY = "high_security"
+
+
+class WorkspaceBilling(BaseModel):
+    payment_method: PaymentMethod = Field(description="The payment method used for this workspace")
+    security_tier: SecurityTier = Field(description="The security tier of this workspace")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "payment_method": "aws_marketplace",
+                    "security_tier": "free",
+                }
+            ]
+        }
+    }
+
+    @staticmethod
+    def from_model(workspace: Workspace) -> "WorkspaceBilling":
+        def tier(workspace: Workspace) -> SecurityTier:
+            match workspace.security_tier:
+                case ST.Free():
+                    return SecurityTier.FREE
+                case ST.Foundational():
+                    return SecurityTier.FOUNDATIONAL
+                case ST.HighSecurity():
+                    return SecurityTier.HIGH_SECURITY
+                case _:
+                    raise Exception("Unknown security tier")
+
+        return WorkspaceBilling(
+            payment_method=PaymentMethod.AWS,
+            security_tier=tier(workspace),
+        )
 
 
 class WorkspaceCreate(BaseModel):

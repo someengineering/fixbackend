@@ -26,14 +26,21 @@ from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import SubscriptionMethod, BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
 
 
 class BillingService(Service):
-    def __init__(self, aws_marketplace: AwsMarketplaceHandler, subscription_repository: SubscriptionRepository) -> None:
+    def __init__(
+        self,
+        aws_marketplace: AwsMarketplaceHandler,
+        subscription_repository: SubscriptionRepository,
+        workspace_repository: WorkspaceRepository,
+    ) -> None:
         self.aws_marketplace = aws_marketplace
         self.subscription_repository = subscription_repository
+        self.workspace_repository = workspace_repository
         self.handler: Optional[Task[Any]] = None
 
     async def start(self) -> Any:
@@ -85,21 +92,22 @@ class BillingService(Service):
                 active=True, next_charge_timestamp_after=now
             ):
                 if workspace_id := subscription.workspace_id:
-                    # create a dummy billing entry with no usage
-                    entry = BillingEntry(
-                        id=BillingId(uid()),
-                        workspace_id=workspace_id,
-                        subscription_id=subscription.id,
-                        tier="FoundationalSecurityAccount",  # TODO: get tier from subscription
-                        nr_of_accounts_charged=0,
-                        period_start=now,
-                        period_end=now,
-                        reported=False,
-                    )
-                    chunk.append((subscription, entry))
-                    if len(chunk) >= size:
-                        yield chunk
-                        chunk = []
+                    if workspace := await self.workspace_repository.get_workspace(workspace_id):
+                        # create a dummy billing entry with no usage
+                        entry = BillingEntry(
+                            id=BillingId(uid()),
+                            workspace_id=workspace_id,
+                            subscription_id=subscription.id,
+                            tier=workspace.security_tier.name,
+                            nr_of_accounts_charged=0,
+                            period_start=now,
+                            period_end=now,
+                            reported=False,
+                        )
+                        chunk.append((subscription, entry))
+                        if len(chunk) >= size:
+                            yield chunk
+                            chunk = []
             if len(chunk) > 0:
                 yield chunk
 

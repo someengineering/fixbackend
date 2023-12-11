@@ -466,9 +466,14 @@ async def workspace_repository(
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
     pubsub_publisher: InMemoryRedisPubSubPublisher,
+    subscription_repository: SubscriptionRepository,
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(
-        async_session_maker, graph_database_access_manager, domain_event_sender, pubsub_publisher
+        async_session_maker,
+        graph_database_access_manager,
+        domain_event_sender,
+        pubsub_publisher,
+        subscription_repository,
     )
 
 
@@ -550,6 +555,8 @@ async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: 
 
 @pytest.fixture
 async def billing_service(
-    aws_marketplace_handler: AwsMarketplaceHandler, subscription_repository: SubscriptionRepository
+    aws_marketplace_handler: AwsMarketplaceHandler,
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
 ) -> BillingService:
-    return BillingService(aws_marketplace_handler, subscription_repository)
+    return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository)

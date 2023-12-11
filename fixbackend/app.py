@@ -160,6 +160,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -171,13 +172,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     channel="workspaces",
                     publisher_name="workspace_service",
                 ),
+                subscription_repo,
             ),
         )
         deps.add(
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo),
         )
-        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(
@@ -258,6 +259,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_sender = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
 
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -269,6 +272,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     channel="workspaces",
                     publisher_name="workspace_service",
                 ),
+                subscription_repo,
             ),
         )
 
@@ -329,6 +333,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
+        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -340,9 +345,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     channel="workspaces",
                     publisher_name="workspace_service",
                 ),
+                subscription_repo,
             ),
         )
-        subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         aws_marketplace = deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(
@@ -353,7 +358,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg.args.aws_marketplace_metering_sqs_url,
             ),
         )
-        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo))
+        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo, workspace_repo))
 
         async with deps:
             log.info("Application services started.")
