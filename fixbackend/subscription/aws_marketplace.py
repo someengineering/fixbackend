@@ -33,7 +33,7 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
-from fixbackend.ids import SecurityTier, SubscriptionId
+from fixbackend.ids import SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
@@ -144,8 +144,7 @@ class AwsMarketplaceHandler(Service):
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 tiers = [summary.security_tier for summary in summaries]
-                tier_order = {SecurityTier.HighSecurity: 3, SecurityTier.Foundational: 2, SecurityTier.Free: 1}
-                security_tier = SecurityTier(max(tiers, key=lambda t: tier_order[t]))
+                security_tier = max(tiers)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,

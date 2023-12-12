@@ -106,26 +106,31 @@ class MeteringRepository:
             select(
                 MeteringRecordEntity.account_id,
                 MeteringRecordEntity.account_name,
-                MeteringRecordEntity.security_tier,
                 func.count().label("num_records"),
+                func.aggregate_strings(MeteringRecordEntity.security_tier, separator=",").label("security_tiers"),
             )
             .where(
                 (MeteringRecordEntity.tenant_id == workspace_id)
                 & (MeteringRecordEntity.nr_of_resources_collected >= min_resources_collected)
             )
-            .group_by(
-                MeteringRecordEntity.account_id, MeteringRecordEntity.account_name, MeteringRecordEntity.security_tier
-            )
+            .group_by(MeteringRecordEntity.account_id, MeteringRecordEntity.account_name)
         )
         if start is not None:
             query = query.where(MeteringRecordEntity.timestamp >= start)
         if end is not None:
             query = query.where(MeteringRecordEntity.timestamp <= end)
         async with self.session_maker() as session:
-            async for (account_id, account_name, tier, count) in await session.stream(query):
+            async for (account_id, account_name, count, tiers) in await session.stream(query):
                 if count >= min_nr_of_collects:
+                    tiers = [SecurityTier(t) for t in tiers.split(",")]
+
+                    max_tier = max(tiers, default=SecurityTier.Free)
+
                     yield MeteringSummary(
-                        account_id=account_id, account_name=account_name, count=count, security_tier=SecurityTier(tier)
+                        account_id=account_id,
+                        account_name=account_name,
+                        count=count,
+                        security_tier=max_tier,
                     )
 
     async def list(
