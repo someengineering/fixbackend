@@ -51,6 +51,7 @@ from fixbackend.ids import (
     FixCloudAccountId,
     UserCloudAccountName,
     WorkspaceId,
+    SecurityTier,
 )
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -118,6 +119,7 @@ organization = Workspace(
     external_id=external_id,
     owners=[],
     members=[],
+    security_tier=SecurityTier.Free,
 )
 
 

@@ -28,7 +28,7 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import ExternalId, UserId, WorkspaceId
+from fixbackend.ids import ExternalId, UserId, WorkspaceId, SecurityTier
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
@@ -51,6 +51,7 @@ workspace = Workspace(
     external_id=external_id,
     owners=[user.id],
     members=[],
+    security_tier=SecurityTier.Free,
 )
 
 
@@ -72,6 +73,9 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
         else:
             new_external_id = workspace.external_id
         return evolve(workspace, name=name, external_id=new_external_id)
+
+    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+        return evolve(workspace, security_tier=security_tier)
 
 
 @pytest.fixture
@@ -133,3 +137,17 @@ async def test_update_workspace_settings(client: AsyncClient, default_config: Co
     assert response.json().get("slug") == workspace.slug
     assert response.json().get("name") == "new name"
     assert response.json().get("external_id") != str(external_id)
+
+
+@pytest.mark.asyncio
+async def test_billing(client: AsyncClient, default_config: Config) -> None:
+    response = await client.get(f"/api/workspaces/{org_id}/billing")
+    assert response.json().get("payment_method") == "aws_marketplace"
+    assert response.json().get("security_tier") == "free"
+
+    update_response = await client.put(
+        f"/api/workspaces/{org_id}/billing", json={"payment_method": "aws_marketplace", "security_tier": "foundational"}
+    )
+
+    assert update_response.json().get("payment_method") == "aws_marketplace"
+    assert update_response.json().get("security_tier") == "foundational"

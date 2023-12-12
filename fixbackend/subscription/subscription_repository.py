@@ -26,10 +26,11 @@ from typing import Optional, Tuple, AsyncIterator
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import String, Boolean, select, Index, update, delete, Integer
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
-from fixbackend.ids import WorkspaceId, UserId, SubscriptionId, BillingId
+from fixbackend.ids import SecurityTier, WorkspaceId, UserId, SubscriptionId, BillingId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
 from fixbackend.types import AsyncSessionMaker
@@ -150,6 +151,7 @@ class SubscriptionRepository:
         active: Optional[bool] = None,
         next_charge_timestamp_before: Optional[datetime] = None,
         next_charge_timestamp_after: Optional[datetime] = None,
+        session: Optional[AsyncSession] = None,
     ) -> AsyncIterator[AwsMarketplaceSubscription]:
         query = select(SubscriptionEntity)
         if user_id:
@@ -164,9 +166,14 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.next_charge_timestamp <= next_charge_timestamp_before)
         if next_charge_timestamp_after:
             query = query.where(SubscriptionEntity.next_charge_timestamp > next_charge_timestamp_after)
-        async with self.session_maker() as session:
+
+        if session:
             async for (subscription,) in await session.stream(query):
                 yield subscription.to_model()
+        else:
+            async with self.session_maker() as session:
+                async for (subscription,) in await session.stream(query):
+                    yield subscription.to_model()
 
     async def unreported_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
         async with self.session_maker() as session:
@@ -182,7 +189,7 @@ class SubscriptionRepository:
         self,
         sid: SubscriptionId,
         workspace_id: WorkspaceId,
-        tier: str,
+        tier: SecurityTier,
         nr_of_accounts_charged: int,
         last_charge_timestamp: datetime,
         now: datetime,
@@ -194,7 +201,7 @@ class SubscriptionRepository:
                 id=uid(),
                 workspace_id=workspace_id,
                 subscription_id=sid,
-                tier=tier,
+                tier=tier.value,
                 nr_of_accounts_charged=nr_of_accounts_charged,
                 period_start=last_charge_timestamp,
                 period_end=now,

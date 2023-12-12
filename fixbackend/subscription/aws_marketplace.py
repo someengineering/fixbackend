@@ -143,10 +143,12 @@ class AwsMarketplaceHandler(Service):
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, start_month)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
+                tiers = [summary.security_tier for summary in summaries]
+                security_tier = max(tiers)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
-                    "FoundationalSecurityAccount",  # TODO: lookup the correct tier
+                    security_tier,
                     usage,
                     last_charged,
                     billing_time,

@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Dict, Any, List, Tuple
+from fixbackend.ids import SecurityTier
 
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.billing import BillingService
@@ -21,7 +22,12 @@ async def test_report_usage(
     before_next_charge = subscription.next_charge_timestamp - timedelta(days=1)
     assert len([n async for n in subscription_repository.unreported_billing_entries()]) == 0
     await metering_repository.add(
-        [create_metering_record(workspace_id=workspace.id, account_id="acc1") for _ in range(4)]
+        [
+            create_metering_record(
+                workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
+            )
+            for _ in range(4)
+        ]
     )
     # before next charge: no billing entry is created
     await billing_service.create_overdue_billing_entries(before_next_charge, 16)

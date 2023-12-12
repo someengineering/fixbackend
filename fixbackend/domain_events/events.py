@@ -158,3 +158,11 @@ class UserJoinedWorkspace(Event):
 
     workspace_id: WorkspaceId
     user_id: UserId
+
+
+@frozen
+class SecurityTierUpdated(Event):
+    kind: ClassVar[str] = "security_tier_updated"
+
+    workspace_id: WorkspaceId
+    security_tier: str

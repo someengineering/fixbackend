@@ -19,8 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId
+from fixbackend.ids import WorkspaceId, UserId, SecurityTier
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.workspaces.models import Workspace
+from fixbackend.subscription.models import AwsMarketplaceSubscription
 
 
 @pytest.fixture
@@ -46,6 +48,8 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
     assert organization.slug == "test-organization"
     for owner in organization.owners:
         assert owner == user.id
+
+    assert organization.security_tier == SecurityTier.Free
 
     assert len(organization.members) == 0
 
@@ -134,3 +138,22 @@ async def test_add_to_workspace(workspace_repository: WorkspaceRepository, sessi
     # when adding a non-existing user to the organization, an exception should be raised
     with pytest.raises(Exception):
         await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=UserId(uuid.uuid4()))
+
+
+@pytest.mark.asyncio
+async def test_update_security_tier(
+    workspace_repository: WorkspaceRepository,
+    user: User,
+    workspace: Workspace,
+    subscription: AwsMarketplaceSubscription,
+) -> None:
+    current_tier = workspace.security_tier
+    assert current_tier == SecurityTier.Free
+
+    updated = await workspace_repository.update_security_tier(workspace.id, SecurityTier.HighSecurity)
+    assert updated.security_tier == SecurityTier.HighSecurity
+
+    # we can't update the security tier of an organization without a subscription
+    without_subscription = await workspace_repository.create_workspace("not_subscribed", "not_subscribed", user)
+    with pytest.raises(Exception):
+        await workspace_repository.update_security_tier(without_subscription.id, SecurityTier.HighSecurity)

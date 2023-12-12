@@ -26,11 +26,13 @@ from sqlalchemy.orm import selectinload
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, WorkspaceId, UserId
+from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
+from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
+from fixbackend.domain_events.events import SecurityTierUpdated, UserJoinedWorkspace, WorkspaceCreated
+from fixbackend.errors import AccessDenied
 
 
 class WorkspaceRepository(ABC):
@@ -66,6 +68,11 @@ class WorkspaceRepository(ABC):
         """Remove a user from a workspace."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+        """Update a workspace security tier."""
+        raise NotImplementedError
+
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -74,16 +81,20 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         graph_db_access_manager: GraphDatabaseAccessManager,
         domain_event_sender: DomainEventPublisher,
         pubsub_publisher: RedisPubSubPublisher,
+        subscription_repository: SubscriptionRepository,
     ) -> None:
         self.session_maker = session_maker
         self.graph_db_access_manager = graph_db_access_manager
         self.domain_event_sender = domain_event_sender
         self.pubsub_publisher = pubsub_publisher
+        self.subscription_repository = subscription_repository
 
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
-            organization = orm.Organization(id=workspace_id, name=name, slug=slug)
+            organization = orm.Organization(
+                id=workspace_id, name=name, slug=slug, security_tier=SecurityTier.Free.value
+            )
             owner_relationship = orm.OrganizationOwners(user_id=owner.id)
             organization.owners.append(owner_relationship)
             session.add(organization)
@@ -175,6 +186,29 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 raise ValueError(f"User {uuid} is not a member of workspace {workspace_id}")
             await session.delete(membership)
             await session.commit()
+
+    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            org = results.unique().scalar_one_or_none()
+            if org is None:
+                raise ValueError(f"Organization {workspace_id} does not exist.")
+
+            subcription = await anext(
+                self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
+            )
+            if subcription is None:
+                raise AccessDenied("Organization must have a subscription to change the security tier")
+
+            org.security_tier = security_tier.value
+            await session.commit()
+            await session.refresh(org)
+
+            event = SecurityTierUpdated(workspace_id, security_tier.value)
+            await self.domain_event_sender.publish(event)
+
+            return org.to_model()
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

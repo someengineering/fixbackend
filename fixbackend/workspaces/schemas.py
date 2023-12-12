@@ -15,11 +15,12 @@
 from datetime import datetime
 from typing import List, Optional
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.ids import WorkspaceId, UserId, ExternalId, SecurityTier
 
 from pydantic import BaseModel, EmailStr, Field
 
 from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
+from enum import Enum
 
 
 class WorkspaceRead(BaseModel):
@@ -86,6 +87,48 @@ class WorkspaceSettingsRead(BaseModel):
 class WorkspaceSettingsUpdate(BaseModel):
     name: str = Field(description="The workspace's name, a human-readable string")
     generate_new_external_id: bool = Field(description="Whether to generate a new external identifier")
+
+
+class PaymentMethod(str, Enum):
+    AWS = "aws_marketplace"
+
+
+class SecurityTierJson(str, Enum):
+    Free = "free"
+    Foundational = "foundational"
+    HighSecurity = "high_security"
+
+
+class WorkspaceBilling(BaseModel):
+    payment_method: PaymentMethod = Field(description="The payment method used for this workspace")
+    security_tier: SecurityTierJson = Field(description="The security tier of this workspace")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "payment_method": "aws_marketplace",
+                    "security_tier": "free",
+                }
+            ]
+        }
+    }
+
+    @staticmethod
+    def from_model(workspace: Workspace) -> "WorkspaceBilling":
+        def tier(workspace: Workspace) -> SecurityTierJson:
+            match workspace.security_tier:
+                case SecurityTier.Free:
+                    return SecurityTierJson.Free
+                case SecurityTier.Foundational:
+                    return SecurityTierJson.Foundational
+                case SecurityTier.HighSecurity:
+                    return SecurityTierJson.HighSecurity
+
+        return WorkspaceBilling(
+            payment_method=PaymentMethod.AWS,
+            security_tier=tier(workspace),
+        )
 
 
 class WorkspaceCreate(BaseModel):

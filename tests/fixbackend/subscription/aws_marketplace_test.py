@@ -26,6 +26,7 @@ from typing import Dict, Any, List, Tuple
 from attr import evolve
 
 from fixbackend.auth.models import User
+from fixbackend.ids import SecurityTier
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -67,10 +68,18 @@ async def test_create_billing_entry(
         "UnprocessedRecords": [],
     }
     # factories to create metering records
-    mr1 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc1")
-    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2")
+    mr1free = partial(
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.Free
+    )
+    mr1high = partial(
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
+    )
+
+    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", security_tier=SecurityTier.Free)
     # create 3 metering records for acc1 and acc2, each with more than 100 resource collected
-    await metering_repository.add([mr1(), mr1(), mr1(), mr2(), mr2(), mr2()])
+    await metering_repository.add(
+        [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
+    )
     # create billing entry
     billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
     assert billing is not None
@@ -78,7 +87,7 @@ async def test_create_billing_entry(
     assert billing.period_end == datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.nr_of_accounts_charged == 2
     assert billing.reported is False
-    assert billing.tier == "FoundationalSecurityAccount"
+    assert billing.tier == SecurityTier.HighSecurity
     # report all unreported billing entries to AWS
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 1
     assert len(boto_requests) == 0
@@ -87,7 +96,7 @@ async def test_create_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "FoundationalSecurityAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "HighSecurityAccount", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
