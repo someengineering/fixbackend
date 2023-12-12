@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import Dict, Optional, ClassVar
 from uuid import UUID
 
@@ -66,6 +67,8 @@ class CollectQueue(ABC):
         env: Optional[Dict[str, str]] = None,
         job_id: Optional[str] = None,
         wait_until_done: bool = False,
+        defer_by: Optional[timedelta] = None,
+        retry_failed_for: Optional[timedelta] = None,
     ) -> None:
         """
         Enqueue a collect job. This method will only put the job into the queue.
@@ -77,6 +80,8 @@ class CollectQueue(ABC):
                If provided and another job exists with the same id, the job will not be enqueued.
         :param wait_until_done: If true, this method will wait until the job is completed.
                This number is used to determine the assigned resources for this job (cpu / memory).
+        :param defer_by: defer the job start by this amount of time.
+        :param retry_failed_for: Retry failed jobs for this amount of time.
         :return: None
         """
 
@@ -93,6 +98,8 @@ class RedisCollectQueue(CollectQueue):
         env: Optional[Dict[str, str]] = None,
         job_id: Optional[str] = None,
         wait_until_done: bool = False,
+        defer_by: Optional[timedelta] = None,
+        retry_failed_for: Optional[timedelta] = None,
     ) -> None:
         collect_job = dict(
             tenant_id=str(db.workspace_id),
@@ -102,8 +109,9 @@ class RedisCollectQueue(CollectQueue):
             graphdb_password=db.password,
             account=account.to_json(),
             env=env or {},
+            retry_failed_for_seconds=retry_failed_for.total_seconds() if retry_failed_for else None,
         )
-        job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id)
+        job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id, _defer_by=defer_by)
         if job is None:
             raise JobAlreadyEnqueued(f"Failed to enqueue collect job {job_id}")
         log.info(f"Enqueuing collect job {job.job_id} for tenant={db.workspace_id}")
