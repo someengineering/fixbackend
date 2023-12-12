@@ -292,7 +292,7 @@ class DispatcherService(Service):
             if workspace := await self.workspace_repository.get_workspace(workspace_id):
                 tier = workspace.security_tier
             else:
-                log.warn(f"Could not find security tier workspace with id {workspace_id}, will use free as default")
+                log.warning(f"Could not find security tier workspace with id {workspace_id}, will use free as default")
                 tier = SecurityTier.Free
             records = [
                 MeteringRecord(
@@ -351,7 +351,7 @@ class DispatcherService(Service):
         set_cloud_account_id(event.aws_account_id)
         cloud_account_id = event.cloud_account_id
         if account := await self.cloud_account_repo.get(cloud_account_id):
-            await self.trigger_collect(account)
+            await self.trigger_collect(account, defer_by=timedelta(minutes=5))
         else:
             log.error(
                 f"Received cloud account {cloud_account_id} configured message, but it does not exist in the database"
@@ -370,7 +370,7 @@ class DispatcherService(Service):
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
-    async def trigger_collect(self, account: CloudAccount) -> None:
+    async def trigger_collect(self, account: CloudAccount, *, defer_by: Optional[timedelta] = None) -> None:
         set_cloud_account_id(account.account_id)
         set_fix_cloud_account_id(account.id)
         if await self.collect_progress.account_collection_ongoing(account.workspace_id, account.id):
@@ -405,7 +405,7 @@ class DispatcherService(Service):
             await self.collect_progress.track_account_collection_progress(
                 account.workspace_id, account.id, ai, job_id, utc()
             )
-            await self.collect_queue.enqueue(db, ai, job_id=str(job_id))
+            await self.collect_queue.enqueue(db, ai, job_id=str(job_id), defer_by=defer_by)
 
     async def schedule_next_runs(self) -> None:
         now = utc()
