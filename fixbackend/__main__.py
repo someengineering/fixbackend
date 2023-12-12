@@ -16,6 +16,7 @@ import uvicorn
 from fixbackend.config import parse_args, get_config
 from alembic.config import Config
 from alembic import command
+from fixbackend.alembic_startup_utils import database_revision, all_migration_revisions
 
 
 def main() -> None:
@@ -24,7 +25,15 @@ def main() -> None:
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
     if args.skip_migrations:
-        command.check(alembic_cfg)
+        known_revisions = all_migration_revisions(alembic_cfg)
+        last_revision = known_revisions[0]
+        db_revision = database_revision(alembic_cfg)
+
+        # valid cases:
+        # * db is at the same revision as the last migration, or
+        # * we rolled back and db revision is not in the list of known migration revisions
+        if db_revision in known_revisions and db_revision != last_revision:
+            raise RuntimeError("Database is not up to date")
     else:
         command.upgrade(alembic_cfg, "head")
 

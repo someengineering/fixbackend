@@ -23,7 +23,7 @@ from unittest.mock import patch
 from attrs import frozen
 
 import pytest
-from alembic.command import upgrade as alembic_upgrade
+from alembic.command import upgrade as alembic_upgrade, check as alembic_check
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
@@ -144,6 +144,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     alembic_config = AlembicConfig("alembic.ini")
     alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
     await asyncio.to_thread(alembic_upgrade, alembic_config, "head")  # noqa
+    await asyncio.to_thread(alembic_check, alembic_config)  # noqa
 
     yield engine
 
