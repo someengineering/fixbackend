@@ -4,18 +4,19 @@ from alembic.runtime.environment import EnvironmentContext
 from typing import Any, List
 
 
+# copied from alembic current command
 def database_revision(config: Config) -> str:  # pragma: no cover
     script = ScriptDirectory.from_config(config)
 
     current: List[str] = []
 
-    def display_version(rev: Any, context: Any) -> Any:
+    def collect_version(rev: Any, context: Any) -> Any:
         for rev in script.get_all_current(rev):
             current.append(rev.revision)
 
         return []
 
-    with EnvironmentContext(config, script, fn=display_version, dont_mutate=True):
+    with EnvironmentContext(config, script, fn=collect_version, dont_mutate=True):
         script.run_env()
 
     if len(current) != 1:
