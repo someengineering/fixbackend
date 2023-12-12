@@ -148,3 +148,6 @@ class CloudAccount:
         if isinstance(access := self.state.cloud_access(), AwsCloudAccess):
             return access
         return None
+
+    def final_name(self) -> Optional[str]:
+        return self.user_account_name or self.account_name or self.account_alias

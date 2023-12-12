@@ -33,7 +33,7 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCollected
+from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCollected, CloudAccountNameChanged
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -70,6 +70,7 @@ ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
 )
 ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
+Inventory = "inventory-service"
 
 
 def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterable[V]:
@@ -93,8 +94,9 @@ class InventoryService(Service):
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
-        domain_event_subscriber.subscribe(AwsAccountDeleted, self._process_account_deleted, "inventory-service")
-        domain_event_subscriber.subscribe(TenantAccountsCollected, self._process_tenant_collected, "inventory-service")
+        domain_event_subscriber.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
+        domain_event_subscriber.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
+        domain_event_subscriber.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()
@@ -108,11 +110,22 @@ class InventoryService(Service):
         set_fix_cloud_account_id(event.cloud_account_id)
         access = await self.db_access_manager.get_database_access(event.tenant_id)
         if access:
+            log.info(f"Aws Account deleted. Remove from inventory: {event}.")
             await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
 
     async def _process_tenant_collected(self, event: TenantAccountsCollected) -> None:
         # evict the cache for the tenant in the cluster
         await self.cache.evict(str(event.tenant_id))
+
+    async def _process_account_name_changed(self, event: CloudAccountNameChanged) -> None:
+        if (name := event.final_name) and (db := await self.db_access_manager.get_database_access(event.tenant_id)):
+            log.info(f"Cloud account name changed. Update in inventory: {event}.")
+            q = f"is(account) and id={event.account_id} and /ancestors.cloud.reported.name={event.cloud} limit 1"
+            accounts = [a async for a in await self.client.search_list(db, q)]
+            if accounts and (account := accounts[0]) and (node_id := account.get("id")):
+                await self.client.update_node(db, NodeId(node_id), {"name": name})
+            else:
+                log.info(f"Cloud account not found in inventory. Ignore. {event}.")
 
     async def benchmark(
         self,

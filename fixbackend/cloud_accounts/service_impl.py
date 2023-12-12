@@ -41,6 +41,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDiscovered,
     TenantAccountsCollected,
     AwsAccountDegraded,
+    CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
@@ -541,10 +542,25 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         name: Optional[UserCloudAccountName],
     ) -> CloudAccount:
         # make sure access is possible
-        await self.get_cloud_account(cloud_account_id, workspace_id)
-        return await self.cloud_account_repository.update(
-            cloud_account_id, lambda acc: evolve(acc, user_account_name=name)
-        )
+        existing = await self.get_cloud_account(cloud_account_id, workspace_id)
+        if existing.user_account_name == name:
+            return existing
+        else:
+            result = await self.cloud_account_repository.update(
+                cloud_account_id, lambda acc: evolve(acc, user_account_name=name)
+            )
+            await self.domain_events.publish(
+                CloudAccountNameChanged(
+                    cloud_account_id,
+                    workspace_id,
+                    result.cloud,
+                    result.account_id,
+                    result.state.state_name,
+                    name,
+                    result.final_name(),
+                )
+            )
+            return result
 
     async def enable_cloud_account(
         self,
