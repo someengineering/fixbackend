@@ -68,12 +68,18 @@ async def test_create_billing_entry(
         "UnprocessedRecords": [],
     }
     # factories to create metering records
-    mr1 = partial(
+    mr1free = partial(
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.Free
+    )
+    mr1high = partial(
         create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
     )
+
     mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", security_tier=SecurityTier.Free)
     # create 3 metering records for acc1 and acc2, each with more than 100 resource collected
-    await metering_repository.add([mr1(), mr1(), mr1(), mr2(), mr2(), mr2()])
+    await metering_repository.add(
+        [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
+    )
     # create billing entry
     billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
     assert billing is not None

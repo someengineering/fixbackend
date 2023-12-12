@@ -107,7 +107,7 @@ class MeteringRepository:
                 MeteringRecordEntity.account_id,
                 MeteringRecordEntity.account_name,
                 func.count().label("num_records"),
-                func.aggregate_strings(MeteringRecordEntity.security_tier, separator=",").label("security_tiers"),
+                func.group_concat(func.distinct(MeteringRecordEntity.security_tier)).label("security_tiers"),
             )
             .where(
                 (MeteringRecordEntity.tenant_id == workspace_id)
