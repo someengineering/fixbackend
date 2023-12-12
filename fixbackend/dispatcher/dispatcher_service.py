@@ -351,7 +351,10 @@ class DispatcherService(Service):
         set_cloud_account_id(event.aws_account_id)
         cloud_account_id = event.cloud_account_id
         if account := await self.cloud_account_repo.get(cloud_account_id):
-            await self.trigger_collect(account, defer_by=timedelta(minutes=5))
+            # The first time we collect this account with this role.
+            # Defer the collect process and retry in case of failure.
+            # This is required, since AWS needs some time to propagate the role into all regions.
+            await self.trigger_collect(account, defer_by=timedelta(minutes=3), retry_failed_for=timedelta(minutes=15))
         else:
             log.error(
                 f"Received cloud account {cloud_account_id} configured message, but it does not exist in the database"
@@ -370,7 +373,13 @@ class DispatcherService(Service):
         log.info(f"Next run for tenant: {tenant} is {result}")
         return result
 
-    async def trigger_collect(self, account: CloudAccount, *, defer_by: Optional[timedelta] = None) -> None:
+    async def trigger_collect(
+        self,
+        account: CloudAccount,
+        *,
+        defer_by: Optional[timedelta] = None,
+        retry_failed_for: Optional[timedelta] = None,
+    ) -> None:
         set_cloud_account_id(account.account_id)
         set_fix_cloud_account_id(account.id)
         if await self.collect_progress.account_collection_ongoing(account.workspace_id, account.id):
@@ -405,7 +414,9 @@ class DispatcherService(Service):
             await self.collect_progress.track_account_collection_progress(
                 account.workspace_id, account.id, ai, job_id, utc()
             )
-            await self.collect_queue.enqueue(db, ai, job_id=str(job_id), defer_by=defer_by, first_run=True)
+            await self.collect_queue.enqueue(
+                db, ai, job_id=str(job_id), defer_by=defer_by, retry_failed_for=retry_failed_for
+            )
 
     async def schedule_next_runs(self) -> None:
         now = utc()
