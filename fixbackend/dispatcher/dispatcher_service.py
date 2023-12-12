@@ -405,7 +405,7 @@ class DispatcherService(Service):
             await self.collect_progress.track_account_collection_progress(
                 account.workspace_id, account.id, ai, job_id, utc()
             )
-            await self.collect_queue.enqueue(db, ai, job_id=str(job_id), defer_by=defer_by)
+            await self.collect_queue.enqueue(db, ai, job_id=str(job_id), defer_by=defer_by, first_run=True)
 
     async def schedule_next_runs(self) -> None:
         now = utc()

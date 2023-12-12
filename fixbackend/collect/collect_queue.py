@@ -68,6 +68,7 @@ class CollectQueue(ABC):
         job_id: Optional[str] = None,
         wait_until_done: bool = False,
         defer_by: Optional[timedelta] = None,
+        first_run: bool = False,
     ) -> None:
         """
         Enqueue a collect job. This method will only put the job into the queue.
@@ -80,6 +81,8 @@ class CollectQueue(ABC):
         :param wait_until_done: If true, this method will wait until the job is completed.
                This number is used to determine the assigned resources for this job (cpu / memory).
         :param defer_by: defer the job start by this amount of time.
+        :param first_run: Signals to the collector, that this is the first run for this account.
+               The collector will retry failed jobs more often.
         :return: None
         """
 
@@ -97,6 +100,7 @@ class RedisCollectQueue(CollectQueue):
         job_id: Optional[str] = None,
         wait_until_done: bool = False,
         defer_by: Optional[timedelta] = None,
+        first_run: bool = False,
     ) -> None:
         collect_job = dict(
             tenant_id=str(db.workspace_id),
@@ -106,6 +110,7 @@ class RedisCollectQueue(CollectQueue):
             graphdb_password=db.password,
             account=account.to_json(),
             env=env or {},
+            first_run=first_run,
         )
         job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id, _defer_by=defer_by)
         if job is None:
