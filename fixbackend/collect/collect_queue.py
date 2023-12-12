@@ -14,14 +14,15 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, ClassVar
+from uuid import UUID
 
 from arq import ArqRedis
 from attrs import define
 from cattrs.preconf.json import make_converter
 from fixcloudutils.types import Json
-from fixbackend.ids import CloudAccountId, AwsARN, ExternalId, CloudAccountName
-from uuid import UUID
+
 from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import CloudAccountId, AwsARN, ExternalId
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class AccountInformation(ABC):
 class AwsAccountInformation(AccountInformation):
     kind: ClassVar[str] = "aws_account_information"
     aws_account_id: CloudAccountId
-    aws_account_name: Optional[CloudAccountName]
+    aws_account_name: Optional[str]
     aws_role_arn: AwsARN
     external_id: ExternalId
 

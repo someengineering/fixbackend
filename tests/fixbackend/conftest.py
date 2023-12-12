@@ -48,6 +48,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -237,6 +238,16 @@ async def workspace(workspace_repository: WorkspaceRepository, user: User) -> Wo
 
 
 @pytest.fixture
+async def graph_db_access(
+    workspace: Workspace, graph_database_access_manager: GraphDatabaseAccessManager
+) -> GraphDatabaseAccess:
+    if access := await graph_database_access_manager.get_database_access(workspace.id):
+        return access
+    else:
+        return await graph_database_access_manager.create_database_access(workspace.id)
+
+
+@pytest.fixture
 async def subscription(
     subscription_repository: SubscriptionRepository, user: User, workspace: Workspace
 ) -> AwsMarketplaceSubscription:
@@ -374,8 +385,14 @@ async def request_handler_mock() -> RequestHandlerMock:
 
 
 @pytest.fixture
-async def http_client(request_handler_mock: RequestHandlerMock) -> AsyncClient:
+async def inventory_requests() -> List[Request]:
+    return []
+
+
+@pytest.fixture
+async def http_client(request_handler_mock: RequestHandlerMock, inventory_requests: List[Request]) -> AsyncClient:
     async def app(request: Request) -> Response:
+        inventory_requests.append(request)
         for mock in request_handler_mock:
             try:
                 return await mock(request)
@@ -448,6 +465,7 @@ class PubSubMessage:
 
 
 class InMemoryRedisPubSubPublisher(RedisPubSubPublisher):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         self.events: List[PubSubMessage] = []
 

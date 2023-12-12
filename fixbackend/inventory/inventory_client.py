@@ -51,6 +51,11 @@ from fixbackend.inventory.schemas import CompletePathRequest
 
 T = TypeVar("T")
 ContextHeaders = {"Total-Count", "Result-Count"}
+MediaTypeText = "text/plain"
+MediaTypeJson = "application/json"
+MediaTypeNdJson = "application/ndjson"
+ExpectMediaTypeNdJson = {"application/x-ndjson", MediaTypeNdJson}
+
 log = logging.getLogger(__name__)
 
 
@@ -97,9 +102,12 @@ class InventoryClient(Service):
         request: Awaitable[Response],
         expected_media_types: Optional[Union[str, Set[str]]] = None,
         allowed_error_codes: Optional[Set[int]] = None,
+        read_content: bool = False,
     ) -> Response:
         try:
             response = await request
+            if read_content:
+                await response.aread()
         except ConnectError as e:
             log.exception(f"Can not connect to inventory: {e}")
             raise InventoryException(502, f"Can not connect to inventory: {e}") from e
@@ -126,10 +134,10 @@ class InventoryClient(Service):
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
     ) -> AsyncIteratorWithContext[JsonElement]:
         log.info(f"Execute command: {command}")
-        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         response = await self._perform(
             request=self.client.post(self.inventory_url + "/cli/execute", content=command, params=env, headers=headers),
-            expected_media_types={"application/x-ndjson", "application/ndjson"},
+            expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
 
@@ -142,13 +150,13 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Search list with query: {query}")
-        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         params = {"section": section}
         response = await self._perform(
             request=self.client.post(
                 self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
             ),
-            expected_media_types={"application/x-ndjson", "application/ndjson"},
+            expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
 
@@ -161,13 +169,13 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Aggregate with query: {query}")
-        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         params = {"section": section}
         response = await self._perform(
             request=self.client.post(
                 self.inventory_url + f"/graph/{graph}/search/aggregate", content=query, params=params, headers=headers
             ),
-            expected_media_types={"application/x-ndjson", "application/ndjson"},
+            expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
 
@@ -192,7 +200,8 @@ class InventoryClient(Service):
         headers = self.__headers(access)
         response = await self._perform(
             request=self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers),
-            expected_media_types="application/json",
+            expected_media_types=MediaTypeJson,
+            read_content=True,
         )
         return cast(List[Json], response.json())
 
@@ -225,7 +234,8 @@ class InventoryClient(Service):
         headers = self.__headers(access)
         response = await self._perform(
             request=self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers),
-            expected_media_types="application/json",
+            expected_media_types=MediaTypeJson,
+            read_content=True,
         )
         return cast(List[Json], response.json())
 
@@ -267,7 +277,8 @@ class InventoryClient(Service):
                 headers=headers,
                 params=params,
             ),
-            expected_media_types="application/json",
+            expected_media_types=MediaTypeJson,
+            read_content=True,
         )
         count = int(response.headers.get("Total-Count", "0"))
         return count, cast(Dict[str, str], response.json())
@@ -286,7 +297,7 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[JsonElement]:
         log.info(f"Get possible values with query: {query}, prop_or_predicate: {prop_or_predicate} on detail: {detail}")
-        headers = self.__headers(access, accept="application/ndjson", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         params = {
             "section": section,
             "prop": prop_or_predicate,
@@ -298,17 +309,19 @@ class InventoryClient(Service):
             request=self.client.post(
                 self.inventory_url + f"/graph/{graph}/property/{detail}", content=query, params=params, headers=headers
             ),
-            expected_media_types={"application/x-ndjson", "application/ndjson"},
+            expected_media_types=ExpectMediaTypeNdJson,
+            read_content=True,
         )
         return AsyncIteratorWithContext(response)
 
     async def resource(self, access: GraphDatabaseAccess, *, id: NodeId, graph: str = "resoto") -> Optional[Json]:
         log.info(f"Get resource with id: {id}")
-        headers = self.__headers(access, accept="application/json", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText)
         response = await self._perform(
             request=self.client.get(self.inventory_url + f"/graph/{graph}/node/{id}", headers=headers),
-            expected_media_types="application/json",
+            expected_media_types=MediaTypeJson,
             allowed_error_codes={404},
+            read_content=True,
         )
         return None if response.status_code == 404 else response.json()
 
@@ -331,7 +344,7 @@ class InventoryClient(Service):
         graph: str = "resoto",
     ) -> List[Json]:
         log.info(f"Get model with flat={flat}, with_bases={with_bases}, with_property_kinds={with_property_kinds}")
-        headers = self.__headers(access, accept="application/json", content_type="text/plain")
+        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText)
         params = {
             "format": result_format,
             "kind": ",".join(kind) if kind else None,
@@ -346,7 +359,8 @@ class InventoryClient(Service):
         }
         response = await self._perform(
             request=self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers),
-            expected_media_types="application/json",
+            expected_media_types=MediaTypeJson,
+            read_content=True,
         )
         return cast(List[Json], response.json())
 
@@ -365,7 +379,7 @@ class InventoryClient(Service):
             f"Get timeseries with name: {name}, start: {start}, end: {end}, "
             f"group: {group}, filter: {filter_group}, granularity: {granularity}"
         )
-        headers = self.__headers(access, accept="application/ndjson", content_type="application/json")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeJson)
         body: Json = {}
         if start:
             body["start"] = utc_str(start)
@@ -380,14 +394,35 @@ class InventoryClient(Service):
             body["granularity"] = value
         response = await self._perform(
             request=self.client.post(self.inventory_url + f"/timeseries/{name}", json=body, headers=headers),
-            expected_media_types="application/x-ndjson",
+            expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
+
+    async def update_node(
+        self,
+        access: GraphDatabaseAccess,
+        node_id: NodeId,
+        patch: Json,
+        *,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> Json:
+        log.info(f"Update node with id: {id}")
+        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson)
+        params = {"section": section}
+        response = await self._perform(
+            request=self.client.patch(
+                self.inventory_url + f"/graph/{graph}/node/{node_id}", json=patch, headers=headers, params=params
+            ),
+            expected_media_types=MediaTypeJson,
+            read_content=True,
+        )
+        return cast(Json, response.json())
 
     def __headers(
         self,
         access: GraphDatabaseAccess,
-        accept: Optional[str] = "application/json",
+        accept: Optional[str] = MediaTypeJson,
         content_type: Optional[str] = None,
     ) -> Dict[str, str]:
         result = {

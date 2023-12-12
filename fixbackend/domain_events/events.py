@@ -29,7 +29,7 @@ from attrs import frozen
 from fixcloudutils.types import Json
 
 from fixbackend.domain_events.converter import converter
-from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId
+from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId, CloudName, UserCloudAccountName
 
 T = TypeVar("T")
 
@@ -101,6 +101,23 @@ class AwsAccountDegraded(Event):
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
     error: str
+
+
+@frozen
+class CloudAccountNameChanged(Event):
+    """
+    This event is emitted when the name of an account has changed
+    """
+
+    kind: ClassVar[str] = "cloud_account_name_changed"
+
+    cloud_account_id: FixCloudAccountId
+    tenant_id: WorkspaceId
+    cloud: CloudName
+    account_id: CloudAccountId
+    state: str
+    name: Optional[UserCloudAccountName]
+    final_name: Optional[str]
 
 
 @frozen

@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import uuid
 
 import pytest
@@ -44,6 +45,7 @@ def mocked_inventory_client(
 ) -> InventoryClient:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
+
         if request.url.path == "/cli/execute" and content == "json [1,2,3]":
             return Response(200, content=b'"1"\n"2"\n"3"\n', headers={"content-type": "application/x-ndjson"})
         elif request.url.path == "/report/benchmarks":
@@ -65,7 +67,11 @@ def mocked_inventory_client(
             return json_response({"a": "string", "b": "int32", "c": "boolean"}, {"Total-Count": "12"})
         elif request.url.path == "/graph/resoto/model":
             return json_response([aws_ec2_model_json])
-        elif request.url.path == "/graph/resoto/node/some_node_id":
+        elif request.method == "GET" and request.url.path == "/graph/resoto/node/some_node_id":
+            return json_response(azure_virtual_machine_resource_json)
+        elif request.method == "PATCH" and request.url.path == "/graph/resoto/node/some_node_id":
+            js = json.loads(request.content)
+            azure_virtual_machine_resource_json["reported"] = azure_virtual_machine_resource_json["reported"] | js
             return json_response(azure_virtual_machine_resource_json)
         elif request.url.path == "/timeseries/infected_resources":
             return nd_json_response(
@@ -128,6 +134,13 @@ async def test_complete(mocked_inventory_client: InventoryClient, azure_virtual_
     count, result = await mocked_inventory_client.complete_property_path(db_access, request=request)
     assert count == 12
     assert result == {"a": "string", "b": "int32", "c": "boolean"}
+
+
+async def test_node_update(mocked_inventory_client: InventoryClient) -> None:
+    result = await mocked_inventory_client.update_node(db_access, NodeId("some_node_id"), {"foo": "4"})
+    assert result["reported"]["foo"] == "4"
+    result = await mocked_inventory_client.update_node(db_access, NodeId("some_node_id"), {"foo": "1234"})
+    assert result["reported"]["foo"] == "1234"
 
 
 async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
