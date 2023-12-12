@@ -24,6 +24,7 @@ import uuid
 
 import pytest
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc
 from httpx import Request, Response
 
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -72,6 +73,20 @@ def mocked_inventory_client(
             js = json.loads(request.content)
             azure_virtual_machine_resource_json["reported"] = azure_virtual_machine_resource_json["reported"] | js
             return json_response(azure_virtual_machine_resource_json)
+        elif request.url.path == "/timeseries/infected_resources":
+            return nd_json_response(
+                [
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "critical"}, "v": 5},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "high"}, "v": 18.6},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "medium"}, "v": 47},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "low"}, "v": 5},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "critical"}, "v": 1},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "high"}, "v": 12},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "medium"}, "v": 26.92307692307692},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
+                ]
+            )
+
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")
 
@@ -126,3 +141,9 @@ async def test_node_update(mocked_inventory_client: InventoryClient) -> None:
     assert result["reported"]["foo"] == "4"
     result = await mocked_inventory_client.update_node(db_access, NodeId("some_node_id"), {"foo": "1234"})
     assert result["reported"]["foo"] == "1234"
+
+
+async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
+    result = await mocked_inventory_client.timeseries(db_access, name="infected_resources", start=utc(), end=utc())
+    result_list = [e async for e in result]
+    assert len(result_list) == 8

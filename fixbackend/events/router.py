@@ -18,8 +18,9 @@ def websocket_router(config: Config) -> APIRouter:
         await websocket.accept()
         # check if the user is authorized to listen to this tenant
         if isinstance(workspace, str):
-            await websocket.send_json({"error": workspace})
-            await websocket.close()
+            # 4000 - 4999 are reserved for application errors.
+            # We use 4401 for unauthorized access.
+            await websocket.close(code=4401, reason=workspace)
             return
 
         await event_handler.handle_websocket(workspace.id, websocket)

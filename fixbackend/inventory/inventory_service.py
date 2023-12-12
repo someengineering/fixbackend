@@ -30,7 +30,7 @@ from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable,
 from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
-from fixcloudutils.util import value_in_path, utc_str
+from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
 from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCollected, CloudAccountNameChanged
@@ -51,6 +51,7 @@ from fixbackend.inventory.schemas import (
     SearchStartData,
     SearchCloudResource,
     SearchRequest,
+    TimeSeries,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 
@@ -219,6 +220,8 @@ class InventoryService(Service):
         return await self.cache.call(self.__summary, key=str(db.workspace_id))(db)
 
     async def __summary(self, db: GraphDatabaseAccess) -> ReportSummary:
+        now = utc()
+
         async def issues_since(
             duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
         ) -> VulnerabilitiesChanged:
@@ -320,6 +323,19 @@ class InventoryService(Service):
                 benchmark_checks[summary.id] = b["report_checks"]
             return summaries, benchmark_checks
 
+        async def timeseries_infected() -> TimeSeries:
+            # TODO: start should be based on tenant creation date up to some max value (e.g. 1 year)
+            start = now - timedelta(days=14)
+            granularity = timedelta(days=1)
+            groups = {"severity"}
+            data = [
+                entry
+                async for entry in await self.client.timeseries(
+                    db, "infected_resources", start=start, end=now, granularity=granularity, group=groups
+                )
+            ]
+            return TimeSeries(name="infected_resources", start=start, end=now, granularity=granularity, data=data)
+
         async def top_issues(checks_by_severity: Dict[str, Set[str]], num: int) -> List[Json]:
             check_ids = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
             top = list(islice(check_ids, num))
@@ -348,12 +364,14 @@ class InventoryService(Service):
                 (failed_accounts_by_check_id, severity_by_check_id),
                 vulnerable_changed,
                 compliant_changed,
+                infected_resources_ts,
             ) = await asyncio.gather(
                 account_summary(),
                 benchmark_summary(),
                 check_summary(),
                 issues_since(default_time_since, "node_vulnerable"),
                 issues_since(default_time_since, "node_compliant"),
+                timeseries_infected(),
             )
 
             # combine benchmark and account data
@@ -417,6 +435,7 @@ class InventoryService(Service):
                 changed_vulnerable=vulnerable_changed,
                 changed_compliant=compliant_changed,
                 top_checks=tops,
+                vulnerable_resources=infected_resources_ts,
             )
 
         except InventoryException as ex:

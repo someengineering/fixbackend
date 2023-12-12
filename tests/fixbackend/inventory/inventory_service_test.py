@@ -107,6 +107,19 @@ def mocked_answers(
             return json_response(azure_virtual_machine_resource_json)
         elif request.url.path == "/graph/resoto/model":
             return json_response([{"fqn": "123", "metadata": {"name": "Some name"}}])
+        elif request.url.path == "/timeseries/infected_resources":
+            return nd_json_response(
+                [
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "critical"}, "v": 5},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "high"}, "v": 18.6},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "medium"}, "v": 47},
+                    {"at": "2023-12-05T16:52:38Z", "group": {"severity": "low"}, "v": 5},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "critical"}, "v": 1},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "high"}, "v": 12},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "medium"}, "v": 26.92307692307692},
+                    {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
+                ]
+            )
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
 
@@ -165,6 +178,10 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
     assert len(summary.top_checks) == 1
+    # vulnerable resources timeseries
+    assert summary.vulnerable_resources is not None
+    assert summary.vulnerable_resources.name == "infected_resources"
+    assert len(summary.vulnerable_resources.data) == 8
 
 
 async def test_no_graph_db_access(
