@@ -25,9 +25,6 @@ def database_revision(config: Config) -> str:  # pragma: no cover
     return current[0]
 
 
-def last_migration_revision(config: Config) -> str:  # pragma: no cover
+def all_migration_revisions(config: Config) -> List[str]:  # pragma: no cover
     script = ScriptDirectory.from_config(config)
-    heads = script.get_heads()
-    if len(heads) != 1:
-        raise ValueError("Multiple heads detected")
-    return heads[0]
+    return [rev.revision for rev in script.iterate_revisions("head", "base")]
