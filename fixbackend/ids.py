@@ -1,5 +1,6 @@
 from typing import NewType
 from uuid import UUID
+from enum import Enum
 
 WorkspaceId = NewType("WorkspaceId", UUID)
 InvitationId = NewType("InvitationId", UUID)
@@ -15,9 +16,17 @@ AwsARN = NewType("AwsARN", str)
 CloudAccountName = NewType("CloudAccountName", str)
 CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
+
 CloudName = NewType("CloudName", str)
 
 
 class CloudNames:
     AWS: CloudName = CloudName("aws")
     GCP: CloudName = CloudName("gcp")
+
+
+class SecurityTier(str, Enum):
+    # do not change the values of these enums, or things will break
+    Free = "FreeAccount"
+    Foundational = "FoundationalSecurityAccount"
+    HighSecurity = "HighSecurityAccount"

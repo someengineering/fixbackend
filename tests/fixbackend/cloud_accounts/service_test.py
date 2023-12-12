@@ -51,8 +51,9 @@ from fixbackend.ids import (
     FixCloudAccountId,
     UserCloudAccountName,
     WorkspaceId,
+    SecurityTier,
 )
-from fixbackend.workspaces.models import SecurityTiers, Workspace
+from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixcloudutils.util import utc
 
@@ -118,7 +119,7 @@ organization = Workspace(
     external_id=external_id,
     owners=[],
     members=[],
-    security_tier=SecurityTiers.Free(),
+    security_tier=SecurityTier.Free,
 )
 
 

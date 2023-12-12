@@ -38,12 +38,13 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, WorkspaceId, AwsARN
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, SecurityTier, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
 
@@ -200,12 +201,14 @@ class DispatcherService(Service):
         domain_event_sender: DomainEventPublisher,
         temp_store_redis: Redis,
         domain_event_subscriber: DomainEventSubscriber,
+        workspace_repository: WorkspaceRepository,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.next_run_repo = next_run_repo
         self.metering_repo = metering_repo
         self.collect_queue = collect_queue
         self.access_manager = access_manager
+        self.workspace_repository = workspace_repository
         self.periodic = Periodic("schedule_next_runs", self.schedule_next_runs, timedelta(minutes=1))
         self.collect_result_listener = RedisStreamListener(
             readwrite_redis,
@@ -286,6 +289,11 @@ class DispatcherService(Service):
                 f"Collect job finished: job_id={job_id}, task_id={task_id}, workspace_id={workspace_id}. "
                 f"Took {duration}. Messages: {messages}"
             )
+            if workspace := await self.workspace_repository.get_workspace(workspace_id):
+                tier = workspace.security_tier
+            else:
+                log.warn(f"Could not find security tier workspace with id {workspace_id}, will use free as default")
+                tier = SecurityTier.Free
             records = [
                 MeteringRecord(
                     id=uuid.uuid4(),
@@ -300,6 +308,7 @@ class DispatcherService(Service):
                     nr_of_error_messages=len(messages),
                     started_at=started_at,
                     duration=duration,
+                    security_tier=tier,
                 )
                 for account_id, account_details in account_info.items()
             ]

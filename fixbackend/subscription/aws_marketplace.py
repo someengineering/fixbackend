@@ -33,7 +33,7 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
-from fixbackend.ids import SubscriptionId
+from fixbackend.ids import SecurityTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
@@ -128,10 +128,6 @@ class AwsMarketplaceHandler(Service):
             is_full_month = 25 < delta.days < 40
             month_factor = 1 if is_full_month else delta.days / 28
             if ws_id := subscription.workspace_id:
-                workspace = await self.workspace_repo.get_workspace(ws_id)
-                if workspace is None:
-                    log.error(f"AWS Marketplace: customer {customer} has no workspace")
-                    return None
                 # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
                 summaries = [
                     summary
@@ -147,10 +143,13 @@ class AwsMarketplaceHandler(Service):
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, start_month)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
+                tiers = [summary.security_tier for summary in summaries]
+                tier_order = {SecurityTier.HighSecurity: 3, SecurityTier.Foundational: 2, SecurityTier.Free: 1}
+                security_tier = SecurityTier(max(tiers, key=lambda t: tier_order[t]))
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
-                    workspace.security_tier.name,
+                    security_tier,
                     usage,
                     last_charged,
                     billing_time,

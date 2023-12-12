@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
-from fixbackend.ids import WorkspaceId, UserId, SubscriptionId, BillingId
+from fixbackend.ids import SecurityTier, WorkspaceId, UserId, SubscriptionId, BillingId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
 from fixbackend.types import AsyncSessionMaker
@@ -189,7 +189,7 @@ class SubscriptionRepository:
         self,
         sid: SubscriptionId,
         workspace_id: WorkspaceId,
-        tier: str,
+        tier: SecurityTier,
         nr_of_accounts_charged: int,
         last_charge_timestamp: datetime,
         now: datetime,
@@ -201,7 +201,7 @@ class SubscriptionRepository:
                 id=uid(),
                 workspace_id=workspace_id,
                 subscription_id=sid,
-                tier=tier,
+                tier=tier.value,
                 nr_of_accounts_charged=nr_of_accounts_charged,
                 period_start=last_charge_timestamp,
                 period_end=now,

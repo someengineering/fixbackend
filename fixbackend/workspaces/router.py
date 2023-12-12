@@ -22,9 +22,8 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.ids import InvitationId, UserId, WorkspaceId
+from fixbackend.ids import InvitationId, UserId, WorkspaceId, SecurityTier
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
-from fixbackend.workspaces.models import SecurityTier, SecurityTiers
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.schemas import (
@@ -37,7 +36,7 @@ from fixbackend.workspaces.schemas import (
     WorkspaceSettingsRead,
     WorkspaceSettingsUpdate,
     WorkspaceUserRead,
-    SecurityTier as SecurityTierSchema,
+    SecurityTierJson,
 )
 import asyncio
 
@@ -194,12 +193,12 @@ def workspaces_router() -> APIRouter:
 
         def tier(billing: WorkspaceBilling) -> SecurityTier:
             match billing.security_tier:
-                case SecurityTierSchema.FREE:
-                    return SecurityTiers.Free()
-                case SecurityTierSchema.FOUNDATIONAL:
-                    return SecurityTiers.Foundational()
-                case SecurityTierSchema.HIGH_SECURITY:
-                    return SecurityTiers.HighSecurity()
+                case SecurityTierJson.Free:
+                    return SecurityTier.Free
+                case SecurityTierJson.Foundational:
+                    return SecurityTier.Foundational
+                case SecurityTierJson.HighSecurity:
+                    return SecurityTier.HighSecurity
 
         org = await workspace_repository.update_security_tier(
             workspace_id=workspace.id,

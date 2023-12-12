@@ -12,32 +12,12 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABC
 from datetime import datetime
-from typing import ClassVar, List, Optional
+from typing import List, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
-
-
-class SecurityTier(ABC):
-    # changing the name must be done with a migration
-    name: ClassVar[str]
-
-
-class SecurityTiers:
-    @frozen
-    class Free(SecurityTier):
-        name: ClassVar[str] = "FreeAccount"
-
-    @frozen
-    class Foundational(SecurityTier):
-        name: ClassVar[str] = "FoundationalSecurityAccount"
-
-    @frozen
-    class HighSecurity(SecurityTier):
-        name: ClassVar[str] = "HighSecurityAccount"
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, SecurityTier
 
 
 @frozen

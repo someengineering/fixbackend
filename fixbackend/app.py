@@ -309,6 +309,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 domain_event_sender,
                 temp_store_redis,
                 domain_event_subscriber,
+                workspace_repo,
             ),
         )
 

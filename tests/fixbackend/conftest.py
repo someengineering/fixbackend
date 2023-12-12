@@ -505,6 +505,7 @@ async def dispatcher(
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
     domain_event_subscriber: DomainEventSubscriber,
+    workspace_repository: WorkspaceRepository,
     redis: Redis,
 ) -> DispatcherService:
     return DispatcherService(
@@ -517,6 +518,7 @@ async def dispatcher(
         domain_event_sender,
         redis,
         domain_event_subscriber,
+        workspace_repository,
     )
 
 

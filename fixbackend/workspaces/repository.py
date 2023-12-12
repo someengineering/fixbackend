@@ -26,10 +26,10 @@ from sqlalchemy.orm import selectinload
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, WorkspaceId, UserId
+from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.workspaces.models import SecurityTier, SecurityTiers, Workspace, orm
+from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import SecurityTierUpdated, UserJoinedWorkspace, WorkspaceCreated
 from fixbackend.errors import AccessDenied
@@ -93,7 +93,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
             organization = orm.Organization(
-                id=workspace_id, name=name, slug=slug, security_tier=SecurityTiers.Free.name
+                id=workspace_id, name=name, slug=slug, security_tier=SecurityTier.Free.value
             )
             owner_relationship = orm.OrganizationOwners(user_id=owner.id)
             organization.owners.append(owner_relationship)
@@ -201,11 +201,11 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if subcription is None:
                 raise AccessDenied("Organization must have a subscription to change the security tier")
 
-            org.security_tier = security_tier.name
+            org.security_tier = security_tier.value
             await session.commit()
             await session.refresh(org)
 
-            event = SecurityTierUpdated(workspace_id, security_tier.name)
+            event = SecurityTierUpdated(workspace_id, security_tier.value)
             await self.domain_event_sender.publish(event)
 
             return org.to_model()

@@ -15,11 +15,11 @@
 from datetime import datetime
 from typing import List, Optional
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.ids import WorkspaceId, UserId, ExternalId, SecurityTier
 
 from pydantic import BaseModel, EmailStr, Field
 
-from fixbackend.workspaces.models import Workspace, WorkspaceInvitation, SecurityTiers as ST
+from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
 from enum import Enum
 
 
@@ -93,15 +93,15 @@ class PaymentMethod(str, Enum):
     AWS = "aws_marketplace"
 
 
-class SecurityTier(str, Enum):
-    FREE = "free"
-    FOUNDATIONAL = "foundational"
-    HIGH_SECURITY = "high_security"
+class SecurityTierJson(str, Enum):
+    Free = "free"
+    Foundational = "foundational"
+    HighSecurity = "high_security"
 
 
 class WorkspaceBilling(BaseModel):
     payment_method: PaymentMethod = Field(description="The payment method used for this workspace")
-    security_tier: SecurityTier = Field(description="The security tier of this workspace")
+    security_tier: SecurityTierJson = Field(description="The security tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -116,16 +116,14 @@ class WorkspaceBilling(BaseModel):
 
     @staticmethod
     def from_model(workspace: Workspace) -> "WorkspaceBilling":
-        def tier(workspace: Workspace) -> SecurityTier:
+        def tier(workspace: Workspace) -> SecurityTierJson:
             match workspace.security_tier:
-                case ST.Free():
-                    return SecurityTier.FREE
-                case ST.Foundational():
-                    return SecurityTier.FOUNDATIONAL
-                case ST.HighSecurity():
-                    return SecurityTier.HIGH_SECURITY
-                case _:
-                    raise Exception("Unknown security tier")
+                case SecurityTier.Free:
+                    return SecurityTierJson.Free
+                case SecurityTier.Foundational:
+                    return SecurityTierJson.Foundational
+                case SecurityTier.HighSecurity:
+                    return SecurityTierJson.HighSecurity
 
         return WorkspaceBilling(
             payment_method=PaymentMethod.AWS,

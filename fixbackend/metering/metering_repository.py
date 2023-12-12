@@ -22,7 +22,7 @@ from sqlalchemy import select, INT, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import WorkspaceId, CloudAccountId
+from fixbackend.ids import SecurityTier, WorkspaceId, CloudAccountId
 from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
@@ -43,6 +43,7 @@ class MeteringRecordEntity(Base):
     nr_of_error_messages: Mapped[int] = mapped_column(INT, nullable=False)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     duration: Mapped[int] = mapped_column(INT, nullable=False)
+    security_tier: Mapped[str] = mapped_column(String(255), nullable=False)
 
     @staticmethod
     def from_model(model: MeteringRecord) -> MeteringRecordEntity:
@@ -59,6 +60,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=model.nr_of_error_messages,
             started_at=model.started_at,
             duration=model.duration,
+            security_tier=model.security_tier.value,
         )
 
     def to_model(self) -> MeteringRecord:
@@ -75,6 +77,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=self.nr_of_error_messages,
             started_at=self.started_at,
             duration=self.duration,
+            security_tier=SecurityTier(self.security_tier),
         )
 
 
@@ -101,22 +104,29 @@ class MeteringRepository:
     ) -> AsyncIterator[MeteringSummary]:
         query = (
             select(
-                MeteringRecordEntity.account_id, MeteringRecordEntity.account_name, func.count().label("num_records")
+                MeteringRecordEntity.account_id,
+                MeteringRecordEntity.account_name,
+                MeteringRecordEntity.security_tier,
+                func.count().label("num_records"),
             )
             .where(
                 (MeteringRecordEntity.tenant_id == workspace_id)
                 & (MeteringRecordEntity.nr_of_resources_collected >= min_resources_collected)
             )
-            .group_by(MeteringRecordEntity.account_id, MeteringRecordEntity.account_name)
+            .group_by(
+                MeteringRecordEntity.account_id, MeteringRecordEntity.account_name, MeteringRecordEntity.security_tier
+            )
         )
         if start is not None:
             query = query.where(MeteringRecordEntity.timestamp >= start)
         if end is not None:
             query = query.where(MeteringRecordEntity.timestamp <= end)
         async with self.session_maker() as session:
-            async for (account_id, account_name, count) in await session.stream(query):
+            async for (account_id, account_name, tier, count) in await session.stream(query):
                 if count >= min_nr_of_collects:
-                    yield MeteringSummary(account_id=account_id, account_name=account_name, count=count)
+                    yield MeteringSummary(
+                        account_id=account_id, account_name=account_name, count=count, security_tier=SecurityTier(tier)
+                    )
 
     async def list(
         self,
