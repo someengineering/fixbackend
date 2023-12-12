@@ -43,7 +43,7 @@ class MeteringRecordEntity(Base):
     nr_of_error_messages: Mapped[int] = mapped_column(INT, nullable=False)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     duration: Mapped[int] = mapped_column(INT, nullable=False)
-    security_tier: Mapped[str] = mapped_column(String(255), nullable=False)
+    security_tier: Mapped[str] = mapped_column(String(64), nullable=False)
 
     @staticmethod
     def from_model(model: MeteringRecord) -> MeteringRecordEntity:
