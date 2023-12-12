@@ -21,6 +21,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
+from datetime import datetime, timedelta
 from typing import (
     Optional,
     Dict,
@@ -40,6 +41,7 @@ from typing import (
 
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
+from fixcloudutils.util import utc_str
 from httpx import AsyncClient, Response, ReadTimeout, ConnectError
 
 from fixbackend.errors import ClientError
@@ -347,6 +349,40 @@ class InventoryClient(Service):
             expected_media_types="application/json",
         )
         return cast(List[Json], response.json())
+
+    async def timeseries(
+        self,
+        access: GraphDatabaseAccess,
+        name: str,
+        *,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        group: Optional[Set[str]] = None,
+        filter_group: Optional[List[str]] = None,
+        granularity: Optional[int | timedelta] = None,
+    ) -> AsyncIteratorWithContext[Json]:
+        log.info(
+            f"Get timeseries with name: {name}, start: {start}, end: {end}, "
+            f"group: {group}, filter: {filter_group}, granularity: {granularity}"
+        )
+        headers = self.__headers(access, accept="application/ndjson", content_type="application/json")
+        body: Json = {}
+        if start:
+            body["start"] = utc_str(start)
+        if end:
+            body["end"] = utc_str(end)
+        if group:
+            body["group"] = list(group)
+        if filter_group:
+            body["filter"] = filter_group
+        if granularity:
+            value = granularity if isinstance(granularity, int) else f"{granularity.total_seconds()}s"
+            body["granularity"] = value
+        response = await self._perform(
+            request=self.client.post(self.inventory_url + f"/timeseries/{name}", json=body, headers=headers),
+            expected_media_types="application/x-ndjson",
+        )
+        return AsyncIteratorWithContext(response)
 
     def __headers(
         self,
