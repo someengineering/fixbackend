@@ -156,7 +156,7 @@ class CollectAccountProgress:
     async def workspace_id_from_job_id(self, job_id: str) -> Optional[WorkspaceId]:
         workspace_id_str: Optional[str] = await self.redis.get(self._jobs_to_workspace_key(UUID(job_id)))  # type: ignore # noqa
         if workspace_id_str is None:
-            logging.warn(f"Could not find workspace id for job id {job_id}")
+            logging.warning(f"Could not find workspace id for job id {job_id}")
             return None
 
         return WorkspaceId(UUID(workspace_id_str))
@@ -375,7 +375,7 @@ class DispatcherService(Service):
                         case AwsCloudAccess(external_id, role_name):
                             return AwsAccountInformation(
                                 aws_account_id=account.account_id,
-                                aws_account_name=account.account_name,
+                                aws_account_name=account.final_name(),
                                 aws_role_arn=AwsARN(f"arn:aws:iam::{account.account_id}:role/{role_name}"),
                                 external_id=external_id,
                             )

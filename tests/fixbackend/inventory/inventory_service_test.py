@@ -20,8 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import uuid
-from types import SimpleNamespace
-from typing import List, cast
+from typing import List
 from uuid import uuid4
 
 import pytest
@@ -29,10 +28,11 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 
-from fixbackend.domain_events.events import AwsAccountDeleted
+from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, NodeId, WorkspaceId
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, NodeId, WorkspaceId, UserCloudAccountName, CloudName
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import (
@@ -46,7 +46,6 @@ from fixbackend.inventory.schemas import (
     HistoryChange,
 )
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -252,25 +251,48 @@ async def test_resource(
 
 
 @pytest.mark.asyncio
-async def test_account_deleted(domain_event_subscriber: DomainEventSubscriber, redis: Redis) -> None:
-    cloud_account_id = CloudAccountId("123")
+async def test_account_deleted(
+    inventory_service: InventoryService,
+    graph_db_access: GraphDatabaseAccess,
+    request_handler_mock: RequestHandlerMock,
+    inventory_requests: List[Request],
+) -> None:
+    async def inventory_call(request: Request) -> Response:
+        if request.url.path == "/graph/resoto/search/list":
+            return nd_json_response([{"id": "123", "reported": {}}])
+        elif request.url.path == "/graph/resoto/node/123":
+            return json_response({})
+        raise ValueError(f"Unexpected request: {request.url}")
 
-    async def delete_account(
-        access: GraphDatabaseAccess,
-        cloud: str,
-        account_id: CloudAccountId,
-        graph: str = "resoto",
-    ) -> None:
-        assert access == db
-        assert cloud == "aws"
-        assert account_id == cloud_account_id
-        assert graph == "resoto"
-
-    async def get_db_access(workspace_id: WorkspaceId) -> GraphDatabaseAccess:
-        return db
-
-    inventory_client = cast(InventoryClient, SimpleNamespace(delete_account=delete_account))
-    db_manager = cast(GraphDatabaseAccessManager, SimpleNamespace(get_database_access=get_db_access))
-    inventory_service = InventoryService(inventory_client, db_manager, domain_event_subscriber, redis)
-    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), WorkspaceId(uuid4()), CloudAccountId("123"))
+    request_handler_mock.append(inventory_call)
+    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123"))
     await inventory_service._process_account_deleted(message)
+    assert len(inventory_requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_process_account_name(
+    inventory_service: InventoryService,
+    graph_db_access: GraphDatabaseAccess,
+    request_handler_mock: RequestHandlerMock,
+    inventory_requests: List[Request],
+) -> None:
+    async def inventory_call(request: Request) -> Response:
+        if request.url.path == "/graph/resoto/search/list":
+            return nd_json_response([{"id": "123", "reported": {}}])
+        elif request.url.path == "/graph/resoto/node/123":
+            return json_response({})
+        raise ValueError(f"Unexpected request: {request.url}")
+
+    request_handler_mock.append(inventory_call)
+    message = CloudAccountNameChanged(
+        FixCloudAccountId(uuid4()),
+        graph_db_access.workspace_id,
+        CloudName("aws"),
+        CloudAccountId("123"),
+        "configured",
+        UserCloudAccountName("test"),
+        "test",
+    )
+    await inventory_service._process_account_name_changed(message)
+    assert len(inventory_requests) == 2
