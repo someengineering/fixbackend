@@ -37,7 +37,7 @@ from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCol
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudNames
+from fixbackend.ids import CloudNames, WorkspaceId
 from fixbackend.ids import NodeId
 from fixbackend.inventory.inventory_client import InventoryClient, AsyncIteratorWithContext, InventoryException
 from fixbackend.inventory.schemas import (
@@ -114,8 +114,7 @@ class InventoryService(Service):
             await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
 
     async def _process_tenant_collected(self, event: TenantAccountsCollected) -> None:
-        # evict the cache for the tenant in the cluster
-        await self.cache.evict(str(event.tenant_id))
+        await self.evict_cache(event.tenant_id)
 
     async def _process_account_name_changed(self, event: CloudAccountNameChanged) -> None:
         if (name := event.final_name) and (db := await self.db_access_manager.get_database_access(event.tenant_id)):
@@ -124,8 +123,14 @@ class InventoryService(Service):
             accounts = [a async for a in await self.client.search_list(db, q)]
             if accounts and (account := accounts[0]) and (node_id := account.get("id")):
                 await self.client.update_node(db, NodeId(node_id), {"name": name})
+                # account name has changed: invalidate the cache for the tenant
+                await self.evict_cache(event.tenant_id)
             else:
                 log.info(f"Cloud account not found in inventory. Ignore. {event}.")
+
+    async def evict_cache(self, workspace_id: WorkspaceId) -> None:
+        # evict the cache for the tenant in the cluster
+        await self.cache.evict(str(workspace_id))
 
     async def benchmark(
         self,
