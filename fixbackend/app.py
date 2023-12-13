@@ -473,7 +473,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
-        api_router.include_router(subscription_router(deps))
+        api_router.include_router(subscription_router())
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")

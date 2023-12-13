@@ -23,16 +23,18 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Optional, Tuple, List
+from typing import Annotated, Optional, Tuple, List
 from uuid import uuid4
 
 import boto3
+from fastapi import Depends
 from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.ids import SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
@@ -80,7 +82,7 @@ class AwsMarketplaceHandler(Service):
         if self.listener is not None:
             await self.listener.stop()
 
-    async def subscribed(self, user: User, token: str) -> Optional[SubscriptionMethod]:
+    async def subscribed(self, user: User, token: str) -> SubscriptionMethod:
         log.info(f"AWS Marketplace subscription for user {user.email} with token {token}")
         # Get the related data from AWS. Will throw in case of an error.
         customer_data = self.marketplace_client.resolve_customer(RegistrationToken=token)
@@ -229,3 +231,10 @@ class AwsMarketplaceHandler(Service):
                 )
             case _:
                 raise ValueError(f"Unknown action: {action}")
+
+
+def get_marketplace_handler(deps: FixDependency) -> AwsMarketplaceHandler:
+    return deps.service(ServiceNames.aws_marketplace_handler, AwsMarketplaceHandler)
+
+
+AwsMarketplaceHandlerDependency = Annotated[AwsMarketplaceHandler, Depends(get_marketplace_handler)]

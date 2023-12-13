@@ -22,7 +22,8 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
-from fixbackend.ids import InvitationId, UserId, WorkspaceId, SecurityTier
+from fixbackend.ids import InvitationId, SubscriptionId, UserId, WorkspaceId, SecurityTier
+from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -38,6 +39,7 @@ from fixbackend.workspaces.schemas import (
     WorkspaceUserRead,
     SecurityTierJson,
 )
+from fixbackend.errors import ResourceNotFound
 import asyncio
 
 
@@ -205,6 +207,19 @@ def workspaces_router() -> APIRouter:
             security_tier=tier(billing),
         )
         return WorkspaceBilling.from_model(org)
+
+    @router.put("/{workspace_id}/subscription/{subscription_id}")
+    async def assign_subscription(
+        workspace: UserWorkspaceDependency,
+        user: AuthenticatedUser,
+        subscription_repository: SubscriptionRepositoryDependency,
+        subscription_id: SubscriptionId,
+    ) -> None:
+        """Assign a subscription to a workspace."""
+        if not await subscription_repository.user_has_subscription(user.id, subscription_id):
+            raise ResourceNotFound("Subscription not found")
+
+        await subscription_repository.update_workspace(subscription_id, workspace.id)
 
     @router.get("/{workspace_id}/cf_url")
     async def get_cf_url(

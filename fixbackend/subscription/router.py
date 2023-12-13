@@ -24,18 +24,14 @@ from fastapi import APIRouter, Form, Cookie, Response, Request
 from starlette.responses import RedirectResponse
 
 from fixbackend.auth.depedencies import OptionalAuthenticatedUser
-from fixbackend.dependencies import FixDependencies, ServiceNames as SN
-from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
+from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandlerDependency
 
 AddUrlName = "aws-marketplace-subscription-add"
 MarketplaceTokenCookie = "fix-aws-marketplace-token"
 
 
-def subscription_router(deps: FixDependencies) -> APIRouter:
+def subscription_router() -> APIRouter:
     router = APIRouter()
-
-    def market_place_handler() -> AwsMarketplaceHandler:
-        return deps.service(SN.aws_marketplace_handler, AwsMarketplaceHandler)
 
     # Attention: Changing this route will break the AWS Marketplace integration!
     @router.post("/cloud/callbacks/aws/marketplace")
@@ -54,13 +50,17 @@ def subscription_router(deps: FixDependencies) -> APIRouter:
     async def aws_marketplace_fulfillment_after_login(
         request: Request,
         maybe_user: OptionalAuthenticatedUser,
+        marketplace_handler: AwsMarketplaceHandlerDependency,
         fix_aws_marketplace_token: str = Cookie(None, alias="fix-aws-marketplace-token"),
     ) -> Response:
         if maybe_user is None:  # not logged in
             add_url = request.scope["router"].url_path_for(AddUrlName)
             return RedirectResponse(f"/auth/login?returnUrl={add_url}")
         elif (user := maybe_user) and fix_aws_marketplace_token is not None:  # logged in and token present
-            await market_place_handler().subscribed(user, fix_aws_marketplace_token)
+            subscription = await marketplace_handler.subscribed(user, fix_aws_marketplace_token)
+            if subscription.workspace_id is None:  # no workspace yet
+                response = RedirectResponse(f"/assign-subscription?id={subscription.id}")
+                return response
             # load the app and show a message
             response = RedirectResponse("/?message=aws-marketplace-subscribed")
             response.set_cookie(MarketplaceTokenCookie, expires=0, secure=True, httponly=True)  # delete the cookie
