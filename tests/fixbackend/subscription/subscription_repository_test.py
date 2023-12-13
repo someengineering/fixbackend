@@ -66,3 +66,37 @@ async def test_crud_entry(subscription_repository: SubscriptionRepository, sessi
     assert await subscription_repository.delete_aws_marketplace_subscriptions(cid) == 1
     # make sure the value is gone
     assert await session.get(SubscriptionEntity, id) is None
+
+
+async def test_update_workspace_id(subscription_repository: SubscriptionRepository, session: AsyncSession) -> None:
+    id = SubscriptionId(uuid4())
+    user_id = UserId(uuid4())
+    cid = "some-customer-id"
+    workspace_id = WorkspaceId(uuid4())
+    now = datetime(2021, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    entity = AwsMarketplaceSubscription(
+        id=id,
+        user_id=user_id,
+        workspace_id=None,
+        customer_identifier=cid,
+        customer_aws_account_id="123",
+        product_code="123",
+        active=True,
+        last_charge_timestamp=now,
+        next_charge_timestamp=now,
+    )
+    # create entity
+    await subscription_repository.create(entity)
+
+    # check no workspace_id
+    subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)
+    assert subscription is not None
+    assert subscription.workspace_id is None
+
+    # update workspace_id
+    await subscription_repository.update_workspace(subscription.id, workspace_id)
+
+    # check workspace_id
+    subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)
+    assert subscription is not None
+    assert subscription.workspace_id == workspace_id
