@@ -22,7 +22,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Tuple, AsyncIterator
+from typing import Annotated, Optional, Tuple, AsyncIterator
+from fastapi import Depends
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import String, Boolean, select, Index, update, delete, Integer
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.ids import SecurityTier, WorkspaceId, UserId, SubscriptionId, BillingId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
@@ -251,3 +253,28 @@ class SubscriptionRepository:
         async with self.session_maker() as session:
             await session.execute(update(BillingEntity).where(BillingEntity.id == bid).values(reported=True))
             await session.commit()
+
+    async def user_has_subscription(self, user_id: UserId, subscription_id: SubscriptionId) -> bool:
+        async with self.session_maker() as session:
+            stmt = (
+                select(SubscriptionEntity)
+                .where(SubscriptionEntity.id == subscription_id)
+                .where(SubscriptionEntity.user_id == user_id)
+            )
+            return (await session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def update_workspace(self, subscription_id: SubscriptionId, workspace_id: WorkspaceId) -> None:
+        async with self.session_maker() as session:
+            await session.execute(
+                update(SubscriptionEntity)
+                .where(SubscriptionEntity.id == subscription_id)
+                .values(workspace_id=workspace_id)
+            )
+            await session.commit()
+
+
+def get_subscription_repository(fix: FixDependency) -> SubscriptionRepository:
+    return fix.service(ServiceNames.subscription_repo, SubscriptionRepository)
+
+
+SubscriptionRepositoryDependency = Annotated[SubscriptionRepository, Depends(get_subscription_repository)]
