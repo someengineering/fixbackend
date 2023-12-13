@@ -38,6 +38,7 @@ from fixbackend.domain_events.events import (
     Event,
     TenantAccountsCollected,
     AwsAccountDegraded,
+    CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import AccessDenied, ResourceNotFound
@@ -300,8 +301,9 @@ async def test_create_aws_account(
         account_name=CloudAccountName("foobar"),
     )
     assert len(repository.accounts) == 1
-    # domain event should not be published
-    assert len(domain_sender.events) == 1
+    # name has changed: domain event should be published
+    assert len(domain_sender.events) == 2
+    assert isinstance(domain_sender.events[1], CloudAccountNameChanged)
     assert with_updated_name.workspace_id == acc.workspace_id
     assert with_updated_name.state == acc.state
     assert with_updated_name.account_name == CloudAccountName("foobar")
@@ -322,7 +324,7 @@ async def test_create_aws_account(
     # a new account should be created
     assert len(repository.accounts) == 2
     # domain event should not be published
-    assert len(domain_sender.events) == 1
+    assert len(domain_sender.events) == 2
 
     # deleted account can be moved to discovered when re-created
     domain_sender.events = []
@@ -671,9 +673,9 @@ async def test_handle_account_discovered_list_accounts_success(
     await service.process_domain_event(
         event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
     )
-    assert len(domain_sender.events) == 2
-    event = domain_sender.events[1]
-    assert isinstance(event, AwsAccountConfigured)
+    assert len(domain_sender.events) == 3
+    assert isinstance(domain_sender.events[1], CloudAccountNameChanged)
+    assert isinstance(domain_sender.events[2], AwsAccountConfigured)
 
     after_discovered = await service.get_cloud_account(account.id, test_workspace_id)
 

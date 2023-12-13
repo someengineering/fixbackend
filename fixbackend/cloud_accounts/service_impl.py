@@ -456,7 +456,19 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 result = await self.cloud_account_repository.update(
                     existing.id, lambda acc: evolve(acc, account_name=new_name, created_at=new_created_at)
                 )
-                return result  # Do not trigger any events.
+                if existing.final_name() != result.final_name():
+                    await self.domain_events.publish(
+                        CloudAccountNameChanged(
+                            result.id,
+                            workspace_id,
+                            result.cloud,
+                            result.account_id,
+                            result.state.state_name,
+                            result.user_account_name,
+                            result.final_name(),
+                        )
+                    )
+                return result  # Do not trigger any creation events.
             else:
                 # we have a role name: transition to discovered state
                 new_state: CloudAccountState = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
