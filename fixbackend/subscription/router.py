@@ -50,16 +50,16 @@ def subscription_router() -> APIRouter:
     async def aws_marketplace_fulfillment_after_login(
         request: Request,
         maybe_user: OptionalAuthenticatedUser,
-        market_place_handler: AwsMarketplaceHandlerDependency,
+        marketplace_handler: AwsMarketplaceHandlerDependency,
         fix_aws_marketplace_token: str = Cookie(None, alias="fix-aws-marketplace-token"),
     ) -> Response:
         if maybe_user is None:  # not logged in
             add_url = request.scope["router"].url_path_for(AddUrlName)
             return RedirectResponse(f"/auth/login?returnUrl={add_url}")
         elif (user := maybe_user) and fix_aws_marketplace_token is not None:  # logged in and token present
-            subscription = await market_place_handler.subscribed(user, fix_aws_marketplace_token)
+            subscription = await marketplace_handler.subscribed(user, fix_aws_marketplace_token)
             if subscription.workspace_id is None:  # no workspace yet
-                response = RedirectResponse(f"/assigh-subscription?id={subscription.id}")
+                response = RedirectResponse(f"/assign-subscription?id={subscription.id}")
                 return response
             # load the app and show a message
             response = RedirectResponse("/?message=aws-marketplace-subscribed")
