@@ -384,11 +384,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 # We are allowed to assume the role.
                 # Make sure we also have the permissions to describe regions
                 # This additional test makes sure that also the custom permissions are already deployed
-                log.info("Checking if we can describe regions")
                 await self.account_setup_helper.allowed_to_describe_regions(assume_role_result)
                 log.info("Describe regions successful")
                 # If we come here, we did our best to make sure the role with all permissions is deployed
-                log.info("Checking if the account is priviledged")
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
                     log.info("Account is priviledged and can list accounts")
                     log.info(f"Found accounts {organization_accounts}")
@@ -405,7 +403,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         )
                 else:
                     log.info("List accounts is not allowed, account is not priviledged")
-                    log.info("Checking if we can get alias")
                     alias = await self.account_setup_helper.list_account_aliases(assume_role_result)
                     if alias:
                         log.info(f"Updating account alias {alias}")
@@ -425,7 +422,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 raise ValueError(f"Account {account.id} is not in the discovered state, skipping")
 
         try:
-            log.info(f"Updating account {account.id} to configured state")
             await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
             await self.domain_events.publish(

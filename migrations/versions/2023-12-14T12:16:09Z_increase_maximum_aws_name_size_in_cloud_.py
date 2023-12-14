@@ -24,7 +24,7 @@ def upgrade() -> None:
         "cloud_account",
         "aws_role_name",
         existing_type=mysql.VARCHAR(length=64),
-        type_=sa.String(length=4096),
+        type_=sa.String(length=2048),
         existing_nullable=True,
     )
     op.alter_column(

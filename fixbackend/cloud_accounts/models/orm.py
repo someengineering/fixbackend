@@ -46,7 +46,7 @@ class CloudAccount(Base):
     cloud: Mapped[CloudName] = mapped_column(String(length=12), nullable=False)
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
     aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
-    aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=4096), nullable=True)
+    aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=2048), nullable=True)
     privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)
     user_account_name: Mapped[Optional[UserCloudAccountName]] = mapped_column(String(length=256), nullable=True)
     api_account_name: Mapped[Optional[CloudAccountName]] = mapped_column(String(length=256), nullable=True)

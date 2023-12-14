@@ -34,7 +34,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
     workspace_id: WorkspaceId = Field(description="Your FIX-assigned Workspace ID")
     external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: CloudAccountId = Field(description="AWS account ID", pattern=r"^\d{12}$")
-    role_name: AwsRoleName = Field(description="AWS role name", max_length=64)
+    role_name: AwsRoleName = Field(description="AWS role name", max_length=2048)
 
     model_config = {
         "json_schema_extra": {
