@@ -43,8 +43,8 @@ class CloudAccount(Base):
 
     id: Mapped[FixCloudAccountId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False, index=True)
-    cloud: Mapped[CloudName] = mapped_column(String(length=12), nullable=False)
-    account_id: Mapped[CloudAccountId] = mapped_column(String(length=12), nullable=False)
+    cloud: Mapped[CloudName] = mapped_column(String(length=64), nullable=False)
+    account_id: Mapped[CloudAccountId] = mapped_column(String(length=64), nullable=False)
     aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
     aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=2048), nullable=True)
     privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)

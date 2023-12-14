@@ -33,9 +33,9 @@ class MeteringRecordEntity(Base):
 
     id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
     tenant_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, index=True)
-    cloud: Mapped[str] = mapped_column(String(10), nullable=True, default="aws")
-    account_id: Mapped[CloudAccountId] = mapped_column(String(36), nullable=True, default="")
-    account_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cloud: Mapped[str] = mapped_column(String(64), nullable=True, default="aws")
+    account_id: Mapped[CloudAccountId] = mapped_column(String(256), nullable=True, default="")
+    account_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False)
     task_id: Mapped[str] = mapped_column(String(36), nullable=False)
