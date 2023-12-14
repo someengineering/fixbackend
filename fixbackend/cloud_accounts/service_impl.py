@@ -334,6 +334,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             log.warning(f"Account {account.id} is not an AWS account, cannot setup account")
             return None
 
+        log.info("Trying to configure account {account.id}")
+
         match account.state:
             case CloudAccountStates.Discovered(access):
                 match access:
@@ -350,8 +352,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             log.warning(f"Account {account.id} has no role name, cannot setup account")
             return None
 
-        log.info(f"Waiting for account {account.id} to be configured")
-
+        log.info("Trying to assume role")
         assume_role_result = await self.account_setup_helper.can_assume_role(account.account_id, role_name, external_id)
 
         privileged = False
@@ -379,12 +380,17 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     raise RuntimeError(msg)
 
             case AssumeRoleResults.Success() as assume_role_result:
+                log.info("Assume role successful")
                 # We are allowed to assume the role.
                 # Make sure we also have the permissions to describe regions
                 # This additional test makes sure that also the custom permissions are already deployed
+                log.info("Checking if we can describe regions")
                 await self.account_setup_helper.allowed_to_describe_regions(assume_role_result)
+                log.info("Describe regions successful")
                 # If we come here, we did our best to make sure the role with all permissions is deployed
+                log.info("Checking if the account is priviledged")
                 if organization_accounts := await self.account_setup_helper.list_accounts(assume_role_result):
+                    log.info("Account is priviledged and can list accounts")
                     log.info(f"Found accounts {organization_accounts}")
                     privileged = True
 
@@ -398,9 +404,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             account_name=name,
                         )
                 else:
+                    log.info("List accounts is not allowed, account is not priviledged")
+                    log.info("Checking if we can get alias")
                     alias = await self.account_setup_helper.list_account_aliases(assume_role_result)
-                    log.info(f"Calling list_accounts is not allowed, using alias {alias} as an alternative")
                     if alias:
+                        log.info(f"Updating account alias {alias}")
                         await self.cloud_account_repository.update(
                             account.id, lambda account: evolve(account, account_alias=alias)
                         )
@@ -417,6 +425,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 raise ValueError(f"Account {account.id} is not in the discovered state, skipping")
 
         try:
+            log.info(f"Updating account {account.id} to configured state")
             await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
             await self.domain_events.publish(
@@ -439,6 +448,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account_name: Optional[CloudAccountName],
     ) -> CloudAccount:
         """Create a cloud account."""
+        set_workspace_id(workspace_id)
+        set_cloud_account_id(account_id)
+
+        log.info("create_aws_account called")
 
         organization = await self.workspace_repository.get_workspace(workspace_id)
         if organization is None:
@@ -455,6 +468,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             return maybe_account
 
         if existing := await account_already_exists(workspace_id, account_id):
+            log.info(f"Account already exists in state: {existing.state.state_name}")
             new_name = account_name or existing.account_name
             new_created_at = utc() if existing.state == CloudAccountStates.Deleted() else existing.created_at
             if role_name is None or (  # no change in role name / external id?
@@ -462,6 +476,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 and access.role_name == role_name
                 and access.external_id == external_id
             ):
+                log.info(f"Updating account name to {new_name}")
+                if new_created_at != existing.created_at:
+                    log.info(f"Updating created_at from {existing.created_at} to {new_created_at}")
+
                 result = await self.cloud_account_repository.update(
                     existing.id, lambda acc: evolve(acc, account_name=new_name, created_at=new_created_at)
                 )
@@ -480,6 +498,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 return result  # Do not trigger any creation events.
             else:
                 # we have a role name: transition to discovered state
+                log.info(f"Moving account {existing.account_id} to discovered state because of the new role name")
                 new_state: CloudAccountState = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
                 result = await self.cloud_account_repository.update(
                     existing.id,
@@ -490,8 +509,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         else:
             if role_name is None:
+                log.info("Account state: Detected")
                 new_state = CloudAccountStates.Detected()
             else:
+                log.info("Account state: Discovered")
                 new_state = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
 
             created_at = utc()
@@ -516,6 +537,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
+            log.info(f"Account {account_id} created")
 
         # if that's a detected state account,
         # we quit early since they're basically dead for us
@@ -525,6 +547,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         await self.domain_events.publish(
             AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
         )
+        log.info("AwsAccountDiscovered published")
         return result
 
     async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
