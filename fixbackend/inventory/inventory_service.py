@@ -114,6 +114,7 @@ class InventoryService(Service):
             await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
 
     async def _process_tenant_collected(self, event: TenantAccountsCollected) -> None:
+        log.info(f"Tenant: {event.tenant_id} was collected - invalidate caches.")
         await self.evict_cache(event.tenant_id)
 
     async def _process_account_name_changed(self, event: CloudAccountNameChanged) -> None:

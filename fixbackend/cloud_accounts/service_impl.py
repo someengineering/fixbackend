@@ -92,7 +92,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.periodic: Optional[Periodic] = None
         if dispatching:
             self.periodic = Periodic(
-                "conifugure_discovered_accounts", self.configure_discovered_accounts, timedelta(minutes=1)
+                "configure_discovered_accounts", self.configure_discovered_accounts, timedelta(minutes=1)
             )
 
         self.domain_event_listener = RedisStreamListener(
@@ -309,7 +309,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     async def configure_discovered_accounts(self) -> None:
         accounts = await self.cloud_account_repository.list_all_discovered_accounts()
         for account in accounts:
-            await self.configure_account(account, called_from_event=False)
+            # If the account is in discovered state for too long - mark it as degraded.
+            # The user will see the degraded state in the UI and can eventually fix the problem.
+            if (utc() - account.state_updated_at) > timedelta(minutes=30):
+                log.info(f"Account {account.id} has been in discovered state for too long, degrading account")
+                await self.__degrade_account(account.id, "Account in discovered state for too long")
+                continue
+            try:
+                await self.configure_account(account, called_from_event=False)
+            except Exception as ex:
+                log.warning(f"Failed to configure account {account}: {ex}")
 
     async def configure_account(
         self,
