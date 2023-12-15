@@ -60,7 +60,7 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_callback_router,
     cloud_accounts_router,
 )
-from fixbackend.invoices.router import invoices_router
+from fixbackend.billing_information.router import billing_info_router
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -475,7 +475,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router())
-        api_router.include_router(invoices_router(), prefix="/workspaces", tags=["invoices"])
+        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["invoices"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")

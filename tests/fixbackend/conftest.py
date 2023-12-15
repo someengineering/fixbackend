@@ -53,7 +53,6 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.invoices.billing_address_repository import BillingAddressRepository
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
@@ -582,8 +581,3 @@ async def billing_service(
     workspace_repository: WorkspaceRepository,
 ) -> BillingService:
     return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository)
-
-
-@pytest.fixture
-async def billing_address_repository(async_session_maker: AsyncSessionMaker) -> BillingAddressRepository:
-    return BillingAddressRepository(async_session_maker)

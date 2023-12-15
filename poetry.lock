@@ -1751,17 +1751,6 @@ files = [
 ]
 
 [[package]]
-name = "pycountry"
-version = "23.12.11"
-description = "ISO country, subdivision, language, currency and script definitions and their translations"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "pycountry-23.12.11-py3-none-any.whl", hash = "sha256:2ff91cff4f40ff61086e773d61e72005fe95de4a57bfc765509db05695dc50ab"},
-    {file = "pycountry-23.12.11.tar.gz", hash = "sha256:00569d82eaefbc6a490a311bfa84a9c571cff9ddbf8b0a4f4e7b4f868b4ad925"},
-]
-
-[[package]]
 name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
@@ -1907,23 +1896,6 @@ files = [
 
 [package.dependencies]
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
-
-[[package]]
-name = "pydantic-extra-types"
-version = "2.2.0"
-description = "Extra Pydantic types."
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "pydantic_extra_types-2.2.0-py3-none-any.whl", hash = "sha256:d4c6bcab0ea4b5300075ae7a664c134d923ac35496ad8caa0feae30234f14756"},
-    {file = "pydantic_extra_types-2.2.0.tar.gz", hash = "sha256:7f2fdd5251729745983cf8cdc5e431ffee2362f283fff54f68122625cef82c11"},
-]
-
-[package.dependencies]
-pydantic = ">=2.0.3"
-
-[package.extras]
-all = ["phonenumbers (>=8,<9)", "pycountry (>=22,<23)", "python-ulid (>=1,<2)"]
 
 [[package]]
 name = "pydantic-settings"
@@ -3039,4 +3011,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "90b7aae24562ee7e5c2151afdb17d1d5c15810f518f4631a03fcfdcd666e95d4"
+content-hash = "c04322f34bd77f2b95bd2ced2321f74dd7acd6570f19106aa7bd260436f79874"
