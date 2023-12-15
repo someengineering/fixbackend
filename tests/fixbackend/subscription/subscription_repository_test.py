@@ -24,7 +24,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.ids import SubscriptionId, UserId, WorkspaceId
+from fixbackend.ids import SecurityTier, SubscriptionId, UserId, WorkspaceId
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
@@ -95,6 +95,15 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
 
     # update workspace_id
     await subscription_repository.update_workspace(subscription.id, workspace_id)
+
+    # list billing entries
+    await subscription_repository.add_billing_entry(
+        subscription.id, workspace_id, SecurityTier.HighSecurity, 42, now, now, now
+    )
+    billing_entries = [b async for b in subscription_repository.list_billing_for_workspace(workspace_id)]
+    assert len(billing_entries) == 1
+    billing_entry = billing_entries[0][0]
+    assert billing_entry.subscription_id == subscription.id
 
     # check workspace_id
     subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)

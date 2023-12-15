@@ -98,7 +98,7 @@ class BillingService(Service):
                             id=BillingId(uid()),
                             workspace_id=workspace_id,
                             subscription_id=subscription.id,
-                            tier=workspace.security_tier.value,
+                            tier=workspace.security_tier,
                             nr_of_accounts_charged=0,
                             period_start=now,
                             period_end=now,

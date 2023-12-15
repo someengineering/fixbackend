@@ -173,7 +173,7 @@ class AwsMarketplaceHandler(Service):
             UsageRecords=[
                 dict(
                     CustomerIdentifier=subscription.customer_identifier,
-                    Dimension=entry.tier,
+                    Dimension=entry.tier.value,
                     Quantity=entry.nr_of_accounts_charged,
                     Timestamp=utc_str(entry.period_end),
                 )
