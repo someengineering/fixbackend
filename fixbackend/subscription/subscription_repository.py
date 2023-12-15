@@ -272,6 +272,18 @@ class SubscriptionRepository:
             )
             await session.commit()
 
+    async def list_billing_for_workspace(
+        self, workspace_id: WorkspaceId
+    ) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
+        async with self.session_maker() as session:
+            query = (
+                select(BillingEntity, SubscriptionEntity)
+                .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
+                .where(SubscriptionEntity.workspace_id == workspace_id)  # noqa
+            )
+            async for billing_entity, subscription_entity in await session.stream(query):
+                yield billing_entity.to_model(), subscription_entity.to_model()
+
 
 def get_subscription_repository(fix: FixDependency) -> SubscriptionRepository:
     return fix.service(ServiceNames.subscription_repo, SubscriptionRepository)
