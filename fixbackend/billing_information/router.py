@@ -25,11 +25,11 @@ def billing_info_router() -> APIRouter:
 
     @router.get("/{workspace_id}/billing_entries/")
     async def list_billing_enties(
-        workspace: UserWorkspaceDependency, invoice_service: BillingEntryServiceDependency
+        workspace: UserWorkspaceDependency, billing_info_service: BillingEntryServiceDependency
     ) -> List[BillingEntryRead]:
         """List all workspaces."""
-        invoices = await invoice_service.list_billing_info(workspace.id)
+        entries = await billing_info_service.list_billing_info(workspace.id)
 
-        return [BillingEntryRead.from_model(invoice) for invoice in invoices]
+        return [BillingEntryRead.from_model(entry) for entry in entries]
 
     return router

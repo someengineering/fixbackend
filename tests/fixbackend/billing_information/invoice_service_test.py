@@ -39,9 +39,9 @@ async def test_list_billing_entries(
     )
 
     # no address provided
-    invoices = await service.list_billing_info(workspace.id)
-    assert len(invoices) == 1
-    billing_entry = invoices[0]
+    billing_info = await service.list_billing_info(workspace.id)
+    assert len(billing_info) == 1
+    billing_entry = billing_info[0]
     assert billing_entry.id is not None
     assert billing_entry.period_start == now
     assert billing_entry.period_end == now
