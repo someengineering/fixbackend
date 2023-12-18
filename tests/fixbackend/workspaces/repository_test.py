@@ -15,7 +15,6 @@
 import uuid
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
@@ -23,11 +22,12 @@ from fixbackend.ids import WorkspaceId, UserId, SecurityTier
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.types import AsyncSessionMaker
 
 
 @pytest.fixture
-async def user(session: AsyncSession) -> User:
-    user_db = await anext(get_user_repository(session))
+async def user(async_session_maker: AsyncSessionMaker) -> User:
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -88,7 +88,9 @@ async def test_update_workspace(workspace_repository: WorkspaceRepository, user:
 
 
 @pytest.mark.asyncio
-async def test_list_workspaces(workspace_repository: WorkspaceRepository, user: User, session: AsyncSession) -> None:
+async def test_list_workspaces(
+    workspace_repository: WorkspaceRepository, user: User, async_session_maker: AsyncSessionMaker
+) -> None:
     workspace1 = await workspace_repository.create_workspace(
         name="Test Organization 1", slug="test-organization-1", owner=user
     )
@@ -97,7 +99,7 @@ async def test_list_workspaces(workspace_repository: WorkspaceRepository, user: 
         name="Test Organization 2", slug="test-organization-2", owner=user
     )
 
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
     new_user = await user_db.create(new_user_dict)
     member_only_workspace = await workspace_repository.create_workspace(
@@ -112,14 +114,16 @@ async def test_list_workspaces(workspace_repository: WorkspaceRepository, user: 
 
 
 @pytest.mark.asyncio
-async def test_add_to_workspace(workspace_repository: WorkspaceRepository, session: AsyncSession, user: User) -> None:
+async def test_add_to_workspace(
+    workspace_repository: WorkspaceRepository, async_session_maker: AsyncSessionMaker, user: User
+) -> None:
     # add an existing user to the organization
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
     new_user = await user_db.create(new_user_dict)
     new_user_id = new_user.id
