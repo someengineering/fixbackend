@@ -14,10 +14,16 @@
 
 
 from fastapi import APIRouter
-from fixbackend.billing_information.schemas import BillingEntryRead
+from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.billing_information.schemas import BillingEntryRead, SecurityTierJson, WorkspaceBillingSettings
 from fixbackend.billing_information.service import BillingEntryServiceDependency
+from fixbackend.ids import SecurityTier, SubscriptionId
+from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from typing import List
+
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
+from fixbackend.errors import ResourceNotFound
 
 
 def billing_info_router() -> APIRouter:
@@ -31,5 +37,46 @@ def billing_info_router() -> APIRouter:
         entries = await billing_info_service.list_billing_info(workspace.id)
 
         return [BillingEntryRead.from_model(entry) for entry in entries]
+
+    @router.get("/{workspace_id}/billing")
+    async def get_billing(workspace: UserWorkspaceDependency) -> WorkspaceBillingSettings:
+        """Get a workspace billing."""
+        return WorkspaceBillingSettings.from_model(workspace)
+
+    @router.put("/{workspace_id}/billing")
+    async def update_billing(
+        workspace: UserWorkspaceDependency,
+        workspace_repository: WorkspaceRepositoryDependency,
+        billing: WorkspaceBillingSettings,
+    ) -> WorkspaceBillingSettings:
+        """Update a workspace billing."""
+
+        def tier(billing: WorkspaceBillingSettings) -> SecurityTier:
+            match billing.security_tier:
+                case SecurityTierJson.Free:
+                    return SecurityTier.Free
+                case SecurityTierJson.Foundational:
+                    return SecurityTier.Foundational
+                case SecurityTierJson.HighSecurity:
+                    return SecurityTier.HighSecurity
+
+        org = await workspace_repository.update_security_tier(
+            workspace_id=workspace.id,
+            security_tier=tier(billing),
+        )
+        return WorkspaceBillingSettings.from_model(org)
+
+    @router.put("/{workspace_id}/subscription/{subscription_id}")
+    async def assign_subscription(
+        workspace: UserWorkspaceDependency,
+        user: AuthenticatedUser,
+        subscription_repository: SubscriptionRepositoryDependency,
+        subscription_id: SubscriptionId,
+    ) -> None:
+        """Assign a subscription to a workspace."""
+        if not await subscription_repository.user_has_subscription(user.id, subscription_id):
+            raise ResourceNotFound("Subscription not found")
+
+        await subscription_repository.update_workspace(subscription_id, workspace.id)
 
     return router

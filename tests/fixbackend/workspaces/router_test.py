@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.auth.models import User
 from fixbackend.config import Config
@@ -80,19 +79,6 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
         return evolve(workspace, security_tier=security_tier)
 
 
-class SubscriptionRepositoryMock(SubscriptionRepository):
-    def __init__(self) -> None:
-        pass
-
-    async def user_has_subscription(self, user_id: UserId, subscription_id: SubscriptionId) -> bool:
-        return subscription_id == sub_id
-
-    async def update_workspace(self, subscription_id: SubscriptionId, workspace_id: WorkspaceId) -> None:
-        assert subscription_id == sub_id
-        assert workspace_id == ws_id
-        return None
-
-
 @pytest.fixture
 async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
@@ -102,7 +88,6 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_workspace_repository] = lambda: WorkspaceRepositoryMock()
     app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_subscription_repository] = lambda: SubscriptionRepositoryMock()
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -153,27 +138,3 @@ async def test_update_workspace_settings(client: AsyncClient) -> None:
     assert response.json().get("slug") == workspace.slug
     assert response.json().get("name") == "new name"
     assert response.json().get("external_id") != str(external_id)
-
-
-@pytest.mark.asyncio
-async def test_billing(client: AsyncClient) -> None:
-    response = await client.get(f"/api/workspaces/{ws_id}/billing")
-    assert response.json().get("payment_method") == "aws_marketplace"
-    assert response.json().get("security_tier") == "free"
-
-    update_response = await client.put(
-        f"/api/workspaces/{ws_id}/billing", json={"payment_method": "aws_marketplace", "security_tier": "foundational"}
-    )
-
-    assert update_response.json().get("payment_method") == "aws_marketplace"
-    assert update_response.json().get("security_tier") == "foundational"
-
-
-@pytest.mark.asyncio
-async def test_update_subscription(client: AsyncClient) -> None:
-    response = await client.put(f"/api/workspaces/{ws_id}/subscription/{sub_id}")
-    assert response.status_code == 200
-
-    unknown_subscription = SubscriptionId(uuid.uuid4())
-    response = await client.put(f"/api/workspaces/{ws_id}/subscription/{unknown_subscription}")
-    assert response.status_code == 404
