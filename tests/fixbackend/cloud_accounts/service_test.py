@@ -41,7 +41,7 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountAlias,
@@ -455,7 +455,7 @@ async def test_get_cloud_account(repository: CloudAccountRepositoryMock, service
     assert cloud_account.user_account_name is None
 
     # wrong tenant id
-    with pytest.raises(AccessDenied):
+    with pytest.raises(NotAllowed):
         await service.get_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
 
     # wrong account id
@@ -518,7 +518,7 @@ async def test_update_cloud_account_name(
     assert updated.workspace_id == account.workspace_id
 
     # wrong tenant id
-    with pytest.raises(AccessDenied):
+    with pytest.raises(NotAllowed):
         await service.update_cloud_account_name(WorkspaceId(uuid.uuid4()), account.id, user_account_name)
 
     # wrong account id

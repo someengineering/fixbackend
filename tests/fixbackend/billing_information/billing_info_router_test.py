@@ -19,6 +19,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
+from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence
 from fixbackend.app import fast_api_app
@@ -71,6 +72,17 @@ class BillingEntryServiceMock(BillingEntryService):
     async def list_billing_info(self, workspace_id: WorkspaceId) -> List[BillingEntry]:
         return [billing_entry]
 
+    async def get_payment_methods(self, workspace: Workspace, user_id: UserId) -> WorkspacePaymentMethods:
+        return WorkspacePaymentMethods(
+            current=PaymentMethods.AwsSubscription(sub_id),
+            available=[PaymentMethods.AwsSubscription(sub_id), PaymentMethods.NoPaymentMethod()],
+        )
+
+    async def update_billing(
+        self, workspace: Workspace, tier: SecurityTier | None = None, payment_method: PaymentMethod | None = None
+    ) -> Workspace:
+        return workspace
+
 
 class SubscriptionRepositoryMock(SubscriptionRepository):
     def __init__(self) -> None:
@@ -79,7 +91,9 @@ class SubscriptionRepositoryMock(SubscriptionRepository):
     async def user_has_subscription(self, user_id: UserId, subscription_id: SubscriptionId) -> bool:
         return subscription_id == sub_id
 
-    async def update_workspace(self, subscription_id: SubscriptionId, workspace_id: WorkspaceId) -> None:
+    async def update_subscription_for_workspace(
+        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+    ) -> None:
         assert subscription_id == subscription_id
         assert workspace_id == workspace_id
         return None
@@ -140,18 +154,46 @@ async def test_list_billing_entries(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_billing(client: AsyncClient) -> None:
+async def test_get_billing(client: AsyncClient) -> None:
     response = await client.get(f"/api/workspaces/{workspace_id}/billing")
-    assert response.json().get("payment_method") == "aws_marketplace"
+    json = response.json()
+    assert json.get("payment_method") is None
+    assert json.get("workspace_payment_method") == {
+        "method": "aws_marketplace",
+        "subscription_id": str(sub_id),
+    }
+    assert json.get("available_payment_methods") == [
+        {
+            "method": "aws_marketplace",
+            "subscription_id": str(sub_id),
+        },
+        {"method": "none"},
+    ]
     assert response.json().get("security_tier") == "free"
 
-    update_response = await client.put(
+
+@pytest.mark.asyncio
+async def test_update_billing(client: AsyncClient) -> None:
+    response = await client.put(
         f"/api/workspaces/{workspace_id}/billing",
-        json={"payment_method": "aws_marketplace", "security_tier": "foundational"},
+        json={
+            "payment_method": "aws_marketplace",
+            "workspace_payment_method": {
+                "method": "aws_marketplace",
+                "subscription_id": str(sub_id),
+            },
+            "security_tier": "free",
+        },
     )
 
-    assert update_response.json().get("payment_method") == "aws_marketplace"
-    assert update_response.json().get("security_tier") == "foundational"
+    json = response.json()
+
+    assert json.get("payment_method") is None
+    assert json.get("workspace_payment_method") == {
+        "method": "aws_marketplace",
+        "subscription_id": str(sub_id),
+    }
+    assert json.get("security_tier") == "free"
 
 
 @pytest.mark.asyncio

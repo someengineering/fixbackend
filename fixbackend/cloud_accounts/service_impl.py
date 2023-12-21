@@ -44,7 +44,7 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountId,
@@ -551,7 +551,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if account is None:
             return None  # account already deleted, do nothing
         if account.workspace_id != workspace_id:
-            raise AccessDenied("Deletion of cloud accounts is only allowed by the owning organization.")
+            raise NotAllowed("Deletion of cloud accounts is only allowed by the owning organization.")
 
         await self.cloud_account_repository.update(
             cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
@@ -565,7 +565,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise ResourceNotFound(f"Cloud account {cloud_account_id} not found")
 
         if account.workspace_id != workspace_id:
-            raise AccessDenied("This account does not belong to this workspace.")
+            raise NotAllowed("This account does not belong to this workspace.")
 
         return account
 
