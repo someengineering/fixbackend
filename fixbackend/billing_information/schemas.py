@@ -16,7 +16,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
 from fixbackend.billing_information import models
 
@@ -35,6 +35,7 @@ class BillingEntryRead(BaseModel):
     period_start: datetime = Field(description="The start of the billing period")
     period_end: datetime = Field(description="The end of the billing period")
     nr_of_accounts_charged: int = Field(description="The number of accounts charged during the billing period")
+    invoice_link: Optional[str] = Field(description="Link to download the invoice")
 
     @staticmethod
     def from_model(billing_entry: BillingEntry) -> "BillingEntryRead":
@@ -46,6 +47,7 @@ class BillingEntryRead(BaseModel):
             period_start=billing_entry.period_start,
             period_end=billing_entry.period_end,
             nr_of_accounts_charged=billing_entry.nr_of_accounts_charged,
+            invoice_link=None,
         )
 
 

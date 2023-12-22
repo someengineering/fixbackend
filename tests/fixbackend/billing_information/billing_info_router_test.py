@@ -151,6 +151,7 @@ async def test_list_billing_entries(client: AsyncClient) -> None:
     assert json_billing_entry["period_start"] == billing_entry.period_start.strftime(UTC_Date_Format)
     assert json_billing_entry["period_end"] == billing_entry.period_end.strftime(UTC_Date_Format)
     assert json_billing_entry["nr_of_accounts_charged"] == billing_entry.nr_of_accounts_charged
+    assert json_billing_entry["invoice_link"] is None
 
 
 @pytest.mark.asyncio
