@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ExternalId
 
@@ -166,9 +166,16 @@ class UserInvite(BaseModel):
     }
 
 
+class FixUserSource(BaseModel):
+    source: Literal["fix"] = "fix"
+
+
+UserSource = Union[FixUserSource]
+
+
 class WorkspaceUserRead(BaseModel):
     id: UserId = Field(description="The user's unique identifier")
-    sources: List[str] = Field(description="Where the user is found")
+    sources: List[UserSource] = Field(description="Where the user is found")
     name: str = Field(description="The user's name")
     email: str = Field(description="The user's email")
     roles: List[str] = Field(description="The user's roles")
@@ -178,7 +185,7 @@ class WorkspaceUserRead(BaseModel):
     def from_model(user: User) -> "WorkspaceUserRead":
         return WorkspaceUserRead(
             id=user.id,
-            sources=[],
+            sources=[FixUserSource()],
             name=user.email,
             email=user.email,
             roles=[],
