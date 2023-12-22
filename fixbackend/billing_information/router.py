@@ -19,7 +19,7 @@ from fixbackend.billing_information import schemas
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods
 from fixbackend.billing_information.schemas import (
     BillingEntryRead,
-    SecurityTierJson,
+    ProductTier,
     WorkspaceBillingSettingsRead,
     WorkspaceBillingSettingsUpdate,
 )
@@ -63,14 +63,14 @@ def billing_info_router() -> APIRouter:
 
         def tier(billing: WorkspaceBillingSettingsUpdate) -> SecurityTier:
             match billing.security_tier:
-                case SecurityTierJson.Free:
+                case ProductTier.free:
                     return SecurityTier.Free
-                case SecurityTierJson.Foundational:
+                case ProductTier.foundational:
                     return SecurityTier.Foundational
-                case SecurityTierJson.HighSecurity:
+                case ProductTier.high_security:
                     return SecurityTier.HighSecurity
 
-        def payment_method(method: schemas.PaymentMethodV2) -> PaymentMethod:
+        def payment_method(method: schemas.PaymentMethodJson) -> PaymentMethod:
             match method:
                 case schemas.NoPaymentMethod():
                     return PaymentMethods.NoPaymentMethod()

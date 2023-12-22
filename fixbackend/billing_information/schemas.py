@@ -13,11 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing_extensions import deprecated
 
 from pydantic import BaseModel, Field
 
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Union
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 
 from fixbackend.ids import BillingId, SecurityTier, SubscriptionId, WorkspaceId
@@ -49,11 +48,6 @@ class BillingEntryRead(BaseModel):
         )
 
 
-@deprecated("Use PaymentMethodV2 union instead")
-class PaymentMethodV1(str, Enum):
-    AWS = "aws_marketplace"
-
-
 class AwsSubscription(BaseModel):
     method: Literal["aws_marketplace"]
     subscription_id: SubscriptionId = Field(description="AWS Marketplace subscription identifier")
@@ -63,20 +57,21 @@ class NoPaymentMethod(BaseModel):
     method: Literal["none"]
 
 
-PaymentMethodV2 = Union[AwsSubscription, NoPaymentMethod]
+PaymentMethodJson = Union[AwsSubscription, NoPaymentMethod]
 
 
-class SecurityTierJson(str, Enum):
-    Free = "free"
-    Foundational = "foundational"
-    HighSecurity = "high_security"
+class ProductTier(str, Enum):
+    free = "free"
+    foundational = "foundational"
+    high_security = "high_security"
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
-    payment_method: Optional[PaymentMethodV1] = Field(description="Deprecated, use workspace_payment_method instead")
-    workspace_payment_method: PaymentMethodV2 = Field(description="The payment method selected for workspace")
-    available_payment_methods: List[PaymentMethodV2] = Field(description="The payment methods available for workspace")
-    security_tier: SecurityTierJson = Field(description="The security tier of this workspace")
+    workspace_payment_method: PaymentMethodJson = Field(description="The payment method selected for workspace")
+    available_payment_methods: List[PaymentMethodJson] = Field(
+        description="The payment methods available for workspace"
+    )
+    security_tier: ProductTier = Field(description="The security tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -111,16 +106,16 @@ class WorkspaceBillingSettingsRead(BaseModel):
         workspace: Workspace,
         payment_methods: WorkspacePaymentMethods,
     ) -> "WorkspaceBillingSettingsRead":
-        def tier(workspace: Workspace) -> SecurityTierJson:
+        def tier(workspace: Workspace) -> ProductTier:
             match workspace.security_tier:
                 case SecurityTier.Free:
-                    return SecurityTierJson.Free
+                    return ProductTier.free
                 case SecurityTier.Foundational:
-                    return SecurityTierJson.Foundational
+                    return ProductTier.foundational
                 case SecurityTier.HighSecurity:
-                    return SecurityTierJson.HighSecurity
+                    return ProductTier.high_security
 
-        def payment(payment_method: PaymentMethod) -> PaymentMethodV2:
+        def payment(payment_method: PaymentMethod) -> PaymentMethodJson:
             match payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
                     return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
@@ -128,7 +123,6 @@ class WorkspaceBillingSettingsRead(BaseModel):
                     return NoPaymentMethod(method="none")
 
         return WorkspaceBillingSettingsRead(
-            payment_method=None,
             workspace_payment_method=payment(payment_methods.current),
             available_payment_methods=[payment(method) for method in payment_methods.available],
             security_tier=tier(workspace),
@@ -136,9 +130,8 @@ class WorkspaceBillingSettingsRead(BaseModel):
 
 
 class WorkspaceBillingSettingsUpdate(BaseModel):
-    payment_method: Optional[PaymentMethodV1] = Field(description="Deprecated, use workspace_payment_method instead")
-    workspace_payment_method: PaymentMethodV2 = Field(description="The payment method selected for workspace")
-    security_tier: SecurityTierJson = Field(description="The security tier of this workspace")
+    workspace_payment_method: PaymentMethodJson = Field(description="The payment method selected for workspace")
+    security_tier: ProductTier = Field(description="The security tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
