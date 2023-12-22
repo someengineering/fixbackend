@@ -70,7 +70,7 @@ def billing_info_router() -> APIRouter:
                 case ProductTier.high_security:
                     return SecurityTier.HighSecurity
 
-        def payment_method(method: schemas.PaymentMethodJson) -> PaymentMethod:
+        def payment_method(method: schemas.PaymentMethod) -> PaymentMethod:
             match method:
                 case schemas.NoPaymentMethod():
                     return PaymentMethods.NoPaymentMethod()

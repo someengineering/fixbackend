@@ -17,7 +17,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from typing import List, Literal, Union
-from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing_information import models
 
 from fixbackend.ids import BillingId, SecurityTier, SubscriptionId, WorkspaceId
 from fixbackend.subscription.models import BillingEntry
@@ -57,7 +58,7 @@ class NoPaymentMethod(BaseModel):
     method: Literal["none"]
 
 
-PaymentMethodJson = Union[AwsSubscription, NoPaymentMethod]
+PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 
 
 class ProductTier(str, Enum):
@@ -67,10 +68,8 @@ class ProductTier(str, Enum):
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
-    workspace_payment_method: PaymentMethodJson = Field(description="The payment method selected for workspace")
-    available_payment_methods: List[PaymentMethodJson] = Field(
-        description="The payment methods available for workspace"
-    )
+    workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
+    available_payment_methods: List[PaymentMethod] = Field(description="The payment methods available for workspace")
     security_tier: ProductTier = Field(description="The security tier of this workspace")
 
     model_config = {
@@ -115,7 +114,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
                 case SecurityTier.HighSecurity:
                     return ProductTier.high_security
 
-        def payment(payment_method: PaymentMethod) -> PaymentMethodJson:
+        def payment(payment_method: models.PaymentMethod) -> PaymentMethod:
             match payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
                     return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
@@ -130,7 +129,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
 
 
 class WorkspaceBillingSettingsUpdate(BaseModel):
-    workspace_payment_method: PaymentMethodJson = Field(description="The payment method selected for workspace")
+    workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
     security_tier: ProductTier = Field(description="The security tier of this workspace")
 
     model_config = {
