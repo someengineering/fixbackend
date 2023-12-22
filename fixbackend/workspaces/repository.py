@@ -32,7 +32,7 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import SecurityTierUpdated, UserJoinedWorkspace, WorkspaceCreated
-from fixbackend.errors import AccessDenied
+from fixbackend.errors import NotAllowed
 
 
 class WorkspaceRepository(ABC):
@@ -199,7 +199,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
             )
             if subcription is None:
-                raise AccessDenied("Organization must have a subscription to change the security tier")
+                raise NotAllowed("Organization must have a subscription to change the security tier")
 
             org.security_tier = security_tier.value
             await session.commit()
