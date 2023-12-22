@@ -15,7 +15,7 @@
 from datetime import datetime
 from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId, ExternalId
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -105,6 +105,7 @@ class WorkspaceCreate(BaseModel):
 
 
 class WorkspaceInviteRead(BaseModel):
+    invite_id: InvitationId = Field(description="The unique identifier of the invitation")
     workspace_id: WorkspaceId = Field(description="The unique identifier of the workspace to invite the user to")
     workspace_name: str = Field(description="The name of the workspace to invite the user to")
     user_email: str = Field(description="The email of the user to invite")
@@ -114,6 +115,7 @@ class WorkspaceInviteRead(BaseModel):
     @staticmethod
     def from_model(invite: WorkspaceInvitation, workspace: Workspace) -> "WorkspaceInviteRead":
         return WorkspaceInviteRead(
+            invite_id=invite.id,
             workspace_id=invite.workspace_id,
             workspace_name=workspace.name,
             user_email=invite.email,
@@ -125,9 +127,12 @@ class WorkspaceInviteRead(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "organization_slug": "my-org",
+                    "invite_id": "00000000-0000-0000-0000-000000000000",
+                    "workspace_id": "00000000-0000-0000-0000-000000000000",
+                    "workspace_name": "My Organization",
                     "user_email": "foo@bar.com",
-                    "expires_at": "2021-01-01T00:00:00Z",
+                    "expires_at": "2020-01-01T00:00:00Z",
+                    "accepted_at": "2020-01-01T00:00:00Z",
                 }
             ]
         }
