@@ -450,6 +450,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
     async def ready() -> Response:
         return Response(status_code=200)
 
+    @app.get("/api/info")
+    async def info() -> Response:
+        return JSONResponse(dict(environment=cfg.environment))
+
     @app.get("/docs/events", include_in_schema=False)
     async def domain_events_swagger_ui_html(req: Request) -> HTMLResponse:
         root_path = req.scope.get("root_path", "").rstrip("/")
