@@ -13,8 +13,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Optional, List
-from attrs import frozen
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
@@ -26,28 +24,7 @@ from fixbackend.notification.service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
-from tests.fixbackend.conftest import InMemoryDomainEventPublisher
-
-
-@frozen
-class NotificationEmail:
-    to: str
-    subject: str
-    text: str
-    html: Optional[str]
-
-
-class InMemoryNotificationService(NotificationService):
-    def __init__(self) -> None:
-        self.call_args: List[NotificationEmail] = []
-
-    async def send_email(self, *, to: str, subject: str, text: str, html: str | None) -> None:
-        self.call_args.append(NotificationEmail(to, subject, text, html))
-
-
-@pytest.fixture
-def notification_service() -> InMemoryNotificationService:
-    return InMemoryNotificationService()
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InMemoryEmailSender
 
 
 @pytest.fixture
@@ -74,7 +51,7 @@ async def test_invite_accept_user(
     service: InvitationService,
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    notification_service: InMemoryNotificationService,
+    email_sender: InMemoryEmailSender,
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
@@ -97,8 +74,8 @@ async def test_invite_accept_user(
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
 
     # check email
-    email = notification_service.call_args[0]
-    assert email.to == new_user_email
+    email = email_sender.call_args[0]
+    assert email.to == [new_user_email]
     assert email.subject == f"FIX Cloud {user.email} has invited you to FIX workspace"
     assert email.text.startswith(f"{user.email} has invited you to join the workspace {workspace.name}.")
     assert "https://example.com?token=" in email.text

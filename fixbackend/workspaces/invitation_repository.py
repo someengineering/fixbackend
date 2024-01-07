@@ -57,9 +57,11 @@ class InvitationRepositoryImpl(InvitationRepository):
         self,
         session_maker: AsyncSessionMaker,
         workspace_repository: WorkspaceRepository,
+        user_repository: UserRepository,
     ) -> None:
         self.session_maker = session_maker
         self.workspace_repository = workspace_repository
+        self.user_repository = user_repository
 
     async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
         async with self.session_maker() as session:
@@ -73,13 +75,11 @@ class InvitationRepositoryImpl(InvitationRepository):
             if existing_invitation:
                 return existing_invitation.to_model()
 
-            user_repository = UserRepository(session)
-
             workspace = await self.workspace_repository.get_workspace(workspace_id, session=session)
             if workspace is None:
                 raise ValueError(f"Workspace {workspace_id} does not exist.")
 
-            user = await user_repository.get_by_email(email)
+            user = await self.user_repository.get_by_email(email, session=session)
 
             if user:
                 if user.id in workspace.all_users():

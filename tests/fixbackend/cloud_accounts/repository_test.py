@@ -106,6 +106,10 @@ async def test_create_cloud_account(
         external_id=ExternalId(uuid.uuid4()),
     )
 
+    # list_by_id
+    accounts = await cloud_account_repository.list(ids=[configured_account_id])
+    assert len(accounts) == 1
+
     # list all discovered
     discovered_accounts = await cloud_account_repository.list_all_discovered_accounts()
     assert len(discovered_accounts) == 1

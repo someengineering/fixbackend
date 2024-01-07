@@ -36,6 +36,10 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         raise NotImplementedError
 
@@ -131,6 +135,14 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
             return cloud_account.to_model() if cloud_account else None
+
+    async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
+        """Get a list of cloud accounts by ids."""
+        async with self.session_maker() as session:
+            statement = select(orm.CloudAccount).where(orm.CloudAccount.id.in_(ids))
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model() for acc in accounts]
 
     async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         async def do_updade() -> CloudAccount:

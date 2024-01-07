@@ -13,7 +13,9 @@
 	// This can be used to network with other containers or the host.
 	// "forwardPorts": [5000, 5432],
 	"forwardPorts": [
-		3306, 8001
+		3306,
+		8001,
+		6379
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "bash .devcontainer/postCreate.sh",
@@ -32,7 +34,9 @@
 				"mhutchie.git-graph"
 			],
 			"settings": {
-				"mypy-type-checker.path": ["/usr/local/py-utils/bin/mypy"]
+				"mypy-type-checker.path": [
+					"/usr/local/py-utils/bin/mypy"
+				]
 			}
 		}
 	}
