@@ -84,6 +84,7 @@ class AwsAccountConfigured(Event):
 class AwsAccountDeleted(Event):
     kind: ClassVar[str] = "aws_account_deleted"
 
+    user_id: UserId
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
@@ -142,6 +143,7 @@ class WorkspaceCreated(Event):
     kind: ClassVar[str] = "workspace_created"
 
     workspace_id: WorkspaceId
+    user_id: UserId
 
 
 @frozen
@@ -149,6 +151,7 @@ class InvitationAccepted(Event):
     kind: ClassVar[str] = "workspace_invitation_accepted"
 
     workspace_id: WorkspaceId
+    user_id: Optional[UserId]
     user_email: str
 
 
@@ -165,4 +168,5 @@ class SecurityTierUpdated(Event):
     kind: ClassVar[str] = "security_tier_updated"
 
     workspace_id: WorkspaceId
+    user_id: UserId
     security_tier: str

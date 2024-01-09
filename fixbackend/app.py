@@ -49,6 +49,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
@@ -276,6 +277,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 subscription_repo,
             ),
         )
+        deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
 
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=rw_redis,

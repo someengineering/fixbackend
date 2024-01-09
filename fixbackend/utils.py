@@ -27,14 +27,19 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import hashlib
 import os
 import signal
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any
 from uuid import UUID
 
 from fixcloudutils.util import utc
+
+AnyT = TypeVar("AnyT")
+AnyR = TypeVar("AnyR")
 
 
 def uid() -> UUID:
@@ -43,6 +48,20 @@ def uid() -> UUID:
 
 def kill_running_process() -> None:
     os.kill(os.getpid(), signal.SIGINT)
+
+
+def group_by(iterable: Iterable[AnyT], f: Callable[[AnyT], AnyR]) -> Dict[AnyR, List[AnyT]]:
+    v = defaultdict(list)
+    for item in iterable:
+        key = f(item)
+        v[key].append(item)
+    return v
+
+
+def md5(s: Any) -> str:
+    md5_hash = hashlib.md5()
+    md5_hash.update(str(s).encode("utf-8"))
+    return md5_hash.hexdigest()
 
 
 def start_of_next_month(current_time: Optional[datetime] = None, hour: int = 0) -> datetime:

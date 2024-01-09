@@ -26,6 +26,7 @@ from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -251,6 +252,7 @@ async def test_create_aws_account(
     repository: CloudAccountRepositoryMock,
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
+    user: User,
 ) -> None:
     # happy case
     acc = await service.create_aws_account(
@@ -337,7 +339,7 @@ async def test_create_aws_account(
         account_name=account_name,
     )
     assert len(domain_sender.events) == 1
-    await service.delete_cloud_account(deleted_account.id, test_workspace_id)
+    await service.delete_cloud_account(user, deleted_account.id, test_workspace_id)
     deleted_account = await service.get_cloud_account(deleted_account.id, test_workspace_id)
     assert deleted_account.state == CloudAccountStates.Deleted()
     # a new account should be created
@@ -368,8 +370,7 @@ async def test_create_aws_account(
 
 @pytest.mark.asyncio
 async def test_delete_aws_account(
-    repository: CloudAccountRepositoryMock,
-    service: CloudAccountServiceImpl,
+    repository: CloudAccountRepositoryMock, service: CloudAccountServiceImpl, user: User
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=test_workspace_id,
@@ -382,11 +383,11 @@ async def test_delete_aws_account(
 
     # deleting someone's else account
     with pytest.raises(Exception):
-        await service.delete_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
+        await service.delete_cloud_account(user, account.id, WorkspaceId(uuid.uuid4()))
     assert len(repository.accounts) == 1
 
     # success
-    await service.delete_cloud_account(account.id, test_workspace_id)
+    await service.delete_cloud_account(user, account.id, test_workspace_id)
     assert len(repository.accounts) == 1
     assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Deleted)
 
