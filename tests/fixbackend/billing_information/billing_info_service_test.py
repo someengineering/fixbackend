@@ -79,7 +79,7 @@ async def test_list_payment_methods(
 
     # on paid tier we can't get the no payment method
     assert workspace.security_tier == SecurityTier.Free
-    workspace = await workspace_repository.update_security_tier(workspace.id, SecurityTier.Foundational)
+    workspace = await workspace_repository.update_security_tier(user, workspace.id, SecurityTier.Foundational)
     available_methods = await service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
@@ -102,28 +102,29 @@ async def test_update_billing(
     # we're on the free tier:
     assert workspace.security_tier == SecurityTier.Free
     # update to higher tier is possible if there is a payment method
-    workspace = await service.update_billing(workspace, new_security_tier=SecurityTier.Foundational)
+    workspace = await service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
     assert workspace.security_tier == SecurityTier.Foundational
 
     # removing the payment method on non-free tier is not possible
     with pytest.raises(NotAllowed):
-        await service.update_billing(workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
+        await service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
 
     # downgrading to free is possible
-    workspace = await service.update_billing(workspace, new_security_tier=SecurityTier.Free)
+    workspace = await service.update_billing(user, workspace, new_security_tier=SecurityTier.Free)
     assert workspace.security_tier == SecurityTier.Free
 
     # we can remove the payment method if we're on free tier
-    workspace = await service.update_billing(workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
+    workspace = await service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
     payment_methods = await service.get_payment_methods(workspace, user.id)
     assert payment_methods.current == PaymentMethods.NoPaymentMethod()
 
     # upgrading to paid tier is not possible without payment method
     with pytest.raises(NotAllowed):
-        await service.update_billing(workspace, new_security_tier=SecurityTier.Foundational)
+        await service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
 
     # but if we add the payment then we can upgrade to a paid plan
     workspace = await service.update_billing(
+        user,
         workspace,
         new_payment_method=PaymentMethods.AwsSubscription(subscription.id),
         new_security_tier=SecurityTier.HighSecurity,

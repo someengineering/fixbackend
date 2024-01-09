@@ -120,12 +120,12 @@ async def test_invite_accept_user(
     assert await service.list_invitations(workspace.id) == [invite]
     assert len(domain_event_sender.events) == 3
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
-    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.email)
+    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
 
     # invite can be revoked
     await service.revoke_invitation(invite.id)
     assert await service.list_invitations(workspace.id) == []
 
-    # invlid token is rejected
+    # invalid token is rejected
     with pytest.raises(ValueError):
         await service.accept_invitation("invalid token")

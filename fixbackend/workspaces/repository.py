@@ -69,7 +69,9 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+    async def update_security_tier(
+        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+    ) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
 
@@ -100,7 +102,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
-            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id))
+            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
 
             await session.commit()
             await session.refresh(organization)
@@ -187,7 +189,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.delete(membership)
             await session.commit()
 
-    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+    async def update_security_tier(
+        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+    ) -> Workspace:
         async with self.session_maker() as session:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
@@ -205,7 +209,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
             await session.refresh(org)
 
-            event = SecurityTierUpdated(workspace_id, security_tier.value)
+            event = SecurityTierUpdated(workspace_id, user.id, security_tier.value)
             await self.domain_event_sender.publish(event)
 
             return org.to_model()

@@ -78,7 +78,7 @@ def billing_info_router() -> APIRouter:
                     return PaymentMethods.AwsSubscription(method.subscription_id)
 
         ws = await billing_info_service.update_billing(
-            workspace, tier(billing), payment_method(billing.workspace_payment_method)
+            user, workspace, tier(billing), payment_method(billing.workspace_payment_method)
         )
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
 

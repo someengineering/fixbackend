@@ -16,6 +16,8 @@
 from typing import Annotated, List, Optional
 
 from fastapi import Depends
+
+from fixbackend.auth.models import User
 from fixbackend.billing_information.models import (
     PaymentMethod,
     PaymentMethods,
@@ -62,6 +64,7 @@ class BillingEntryService:
 
     async def update_billing(
         self,
+        user: User,
         workspace: Workspace,
         new_security_tier: Optional[SecurityTier] = None,
         new_payment_method: Optional[PaymentMethod] = None,
@@ -90,7 +93,7 @@ class BillingEntryService:
 
         if new_security_tier:
             return await self.workspace_repository.update_security_tier(
-                workspace_id=workspace.id, security_tier=new_security_tier
+                user=user, workspace_id=workspace.id, security_tier=new_security_tier
             )
 
         return workspace

@@ -20,24 +20,27 @@ from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
-from attrs import frozen
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade, check as alembic_check
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
+from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
+from fixbackend.analytics import AnalyticsEventSender
+from fixbackend.analytics.analytics_event_sender import NoAnalyticsEventSender
 from fixbackend.app import fast_api_app
-from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.auth.models import User
+from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
@@ -63,7 +66,6 @@ from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -126,6 +128,8 @@ def default_config() -> Config:
         oauth_state_token_ttl=3600,
         profiling_enabled=False,
         profiling_interval=42,
+        google_analytics_measurement_id=None,
+        google_analytics_api_secret=None,
         aws_marketplace_url="https://aws.amazon.com/marketplace",
     )
 
@@ -405,6 +409,11 @@ async def http_client(request_handler_mock: RequestHandlerMock, inventory_reques
         raise AttributeError(f'Unexpected request: {request.url.path} with content {request.content.decode("utf-8")}')
 
     return AsyncClient(transport=MockTransport(app))
+
+
+@pytest.fixture
+def analytics_event_sender() -> AnalyticsEventSender:
+    return NoAnalyticsEventSender()
 
 
 @pytest.fixture
