@@ -124,6 +124,8 @@ def default_config() -> Config:
         cloud_account_service_event_parallelism=1000,
         aws_cf_stack_notification_sqs_url=None,
         oauth_state_token_ttl=3600,
+        profiling_enabled=False,
+        profiling_interval=42,
     )
 
 

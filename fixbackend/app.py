@@ -379,6 +379,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
 
+    if cfg.profiling_enabled:
+        from pyinstrument import Profiler
+
+        @app.middleware("http")
+        async def profile_request(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            profiling = request.query_params.get("profile", False)
+            if profiling:
+                profiler = Profiler(interval=cfg.profiling_interval, async_mode="enabled")
+                profiler.start()
+                await call_next(request)
+                profiler.stop()
+                return HTMLResponse(profiler.output_html())
+            else:
+                return await call_next(request)
+
     app.add_middleware(RealIpMiddleware)
 
     workspaces_prefix = f"{API_PREFIX}/workspaces"
