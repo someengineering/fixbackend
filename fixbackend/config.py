@@ -157,12 +157,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--profiling-enabled", action="store_true", default=os.environ.get("PROFILING_ENABLED", False))
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
-    parser.add_argument(
-        "--google-analytics-measurement-id", type=float, default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID")
-    )
-    parser.add_argument(
-        "--google-analytics-api-secret", type=float, default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET")
-    )
+    parser.add_argument("--google-analytics-measurement-id", default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID"))
+    parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

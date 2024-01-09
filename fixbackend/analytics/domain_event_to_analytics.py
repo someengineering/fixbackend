@@ -113,10 +113,12 @@ def analytics(
     workspace_repo: WorkspaceRepository,
 ) -> AnalyticsEventSender:
     if (measurement_id := config.google_analytics_measurement_id) and (secret := config.google_analytics_api_secret):
+        log.info("Use Google Analytics Event Sender.")
         sender = GoogleAnalyticsEventSender(client, measurement_id, secret)
         sender.event_handler = DomainEventToAnalyticsEventHandler(
             config.instance_id, domain_event_subscriber, sender, workspace_repo
         )
         return sender
     else:
+        log.info("Analytics turned off.")
         return NoAnalyticsEventSender()

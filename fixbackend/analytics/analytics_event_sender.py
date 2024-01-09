@@ -21,9 +21,7 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient
 
 from fixbackend.analytics import AnalyticsEventSender
-from fixbackend.analytics.events import (
-    AnalyticsEvent,
-)
+from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.utils import group_by, md5
 
 log = logging.getLogger(__name__)
@@ -47,7 +45,7 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
         self.api_secret = api_secret
         self.events: List[AnalyticsEvent] = []
         self.lock = Lock()
-        self.sender = Periodic("send_events", self.send_events, timedelta(seconds=20))
+        self.sender = Periodic("send_events", self.send_events, timedelta(seconds=30))
         self.event_handler: Optional[Any] = None
 
     async def start(self) -> None:
