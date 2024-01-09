@@ -29,6 +29,7 @@ from fixcloudutils.util import utc
 from httpx import AsyncClient
 from redis.asyncio import Redis
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -546,7 +547,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         log.info("AwsAccountDiscovered published")
         return result
 
-    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(
+        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             return None  # account already deleted, do nothing
@@ -556,7 +559,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         await self.cloud_account_repository.update(
             cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
         )
-        await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
+        await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)

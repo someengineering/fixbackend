@@ -23,6 +23,7 @@ from pytest import approx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import AwsAccountInformation
@@ -58,6 +59,7 @@ async def test_receive_workspace_created(
     session: AsyncSession,
     cloud_account_repository: CloudAccountRepository,
     workspace: Workspace,
+    user: User,
 ) -> None:
     # create a cloud account
     cloud_account_id = FixCloudAccountId(uuid.uuid1())
@@ -90,7 +92,7 @@ async def test_receive_workspace_created(
     )
     # signal to the dispatcher that the new workspace was created
     await dispatcher.process_workspace_created(
-        WorkspaceCreated(workspace.id),
+        WorkspaceCreated(workspace.id, user.id),
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextTenantRun, workspace.id)

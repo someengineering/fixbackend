@@ -16,6 +16,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.models import CloudAccount
 from fixbackend.ids import (
     AwsRoleName,
@@ -47,7 +48,9 @@ class CloudAccountService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(
+        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> None:
         """Delete a cloud account."""
         raise NotImplementedError
 

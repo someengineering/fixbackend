@@ -137,7 +137,7 @@ class InvitationServiceImpl(InvitationService):
             await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id)
             await self.invitation_repository.delete_invitation(invitation_id)
 
-        event = InvitationAccepted(invitation.workspace_id, invitation.email)
+        event = InvitationAccepted(invitation.workspace_id, user.id if user else None, invitation.email)
         await self.domain_events.publish(event)
 
         return updated

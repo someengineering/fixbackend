@@ -150,10 +150,10 @@ async def test_update_security_tier(
     current_tier = workspace.security_tier
     assert current_tier == SecurityTier.Free
 
-    updated = await workspace_repository.update_security_tier(workspace.id, SecurityTier.HighSecurity)
+    updated = await workspace_repository.update_security_tier(user, workspace.id, SecurityTier.HighSecurity)
     assert updated.security_tier == SecurityTier.HighSecurity
 
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace("not_subscribed", "not_subscribed", user)
     with pytest.raises(Exception):
-        await workspace_repository.update_security_tier(without_subscription.id, SecurityTier.HighSecurity)
+        await workspace_repository.update_security_tier(user, without_subscription.id, SecurityTier.HighSecurity)

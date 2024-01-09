@@ -49,6 +49,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
@@ -108,7 +109,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
-    http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True, timeout=60))
+    http_client = deps.add(SN.http_client, AsyncClient(verify=client_context or True, timeout=60))
     engine = deps.add(
         SN.async_engine,
         create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
@@ -176,6 +177,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 subscription_repo,
             ),
         )
+        deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
         deps.add(
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo),

@@ -28,6 +28,7 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 
+from fixbackend.auth.models import User
 from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -273,6 +274,7 @@ async def test_account_deleted(
     graph_db_access: GraphDatabaseAccess,
     request_handler_mock: RequestHandlerMock,
     inventory_requests: List[Request],
+    user: User,
 ) -> None:
     async def inventory_call(request: Request) -> Response:
         if request.url.path == "/graph/resoto/search/list":
@@ -282,7 +284,9 @@ async def test_account_deleted(
         raise ValueError(f"Unexpected request: {request.url}")
 
     request_handler_mock.append(inventory_call)
-    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123"))
+    message = AwsAccountDeleted(
+        user.id, FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123")
+    )
     await inventory_service._process_account_deleted(message)
     assert len(inventory_requests) == 2
 
