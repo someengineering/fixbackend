@@ -72,6 +72,9 @@ source = ["fixbackend", "*/site-packages"]
 [tool.coverage.run]
 branch = true
 source = ["fixbackend"]
+omit = [
+    "fixbackend/ids.py",
+]
 
 [tool.coverage.report]
 show_missing = true

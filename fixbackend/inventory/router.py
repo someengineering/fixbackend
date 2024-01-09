@@ -137,8 +137,13 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             request.headers.get("accept", "application/json"), search_result, search_result.context
         )
 
+    @router.get("/{workspace_id}/inventory/node/{node_id}")
+    async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
+        return await fix.inventory.resource(graph_db, node_id)
+
+    # deprecated, needs to be removed
     @router.post("/{workspace_id}/inventory/node/{node_id}")
     async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
-        return await fix.inventory.resource(graph_db, node_id)
+        return await get_node(graph_db, node_id)
 
     return router

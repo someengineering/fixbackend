@@ -469,7 +469,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @app.get("/api/info")
     async def info() -> Response:
-        return JSONResponse(dict(environment=cfg.environment))
+        return JSONResponse(
+            dict(
+                environment=cfg.environment,
+                aws_marketplace_url=cfg.aws_marketplace_url,
+            )
+        )
 
     @app.get("/docs/events", include_in_schema=False)
     async def domain_events_swagger_ui_html(req: Request) -> HTMLResponse:

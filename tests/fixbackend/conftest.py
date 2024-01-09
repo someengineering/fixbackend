@@ -130,6 +130,7 @@ def default_config() -> Config:
         profiling_interval=42,
         google_analytics_measurement_id=None,
         google_analytics_api_secret=None,
+        aws_marketplace_url="",
     )
 
 

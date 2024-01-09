@@ -68,6 +68,7 @@ class Config(BaseSettings):
     profiling_interval: float
     google_analytics_measurement_id: Optional[str]
     google_analytics_api_secret: Optional[str]
+    aws_marketplace_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -159,6 +160,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
     parser.add_argument("--google-analytics-measurement-id", default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID"))
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
+    parser.add_argument(
+        "--aws-marketplace-url",
+        default=os.environ.get("AWS_MARKETPLACE_URL", ""),
+    )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
