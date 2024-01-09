@@ -66,6 +66,7 @@ class Config(BaseSettings):
     oauth_state_token_ttl: int
     profiling_enabled: bool
     profiling_interval: float
+    aws_marketplace_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -155,6 +156,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     )
     parser.add_argument("--profiling-enabled", action="store_true", default=os.environ.get("PROFILING_ENABLED", False))
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
+    parser.add_argument(
+        "--aws-marketplace-url",
+        default=os.environ.get("AWS_MARKETPLACE_URL", "https://aws.amazon.com/marketplace/pp/prodview-bub6gkexnxcgs"),
+    )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

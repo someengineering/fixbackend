@@ -126,6 +126,7 @@ def default_config() -> Config:
         oauth_state_token_ttl=3600,
         profiling_enabled=False,
         profiling_interval=42,
+        aws_marketplace_url="https://aws.amazon.com/marketplace",
     )
 
 
