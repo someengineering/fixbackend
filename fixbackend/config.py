@@ -162,7 +162,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
     parser.add_argument(
         "--aws-marketplace-url",
-        default=os.environ.get("AWS_MARKETPLACE_URL", "https://aws.amazon.com/marketplace/pp/prodview-bub6gkexnxcgs"),
+        default=os.environ.get("AWS_MARKETPLACE_URL", ""),
     )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
