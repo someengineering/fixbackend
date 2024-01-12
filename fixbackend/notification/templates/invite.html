@@ -1,349 +1,334 @@
 {# templates/invite.html #}
 
-<!DOCTYPE html>
-<html lang='en'>
 
-<head>
-    <title>{{ title }}</title>
-    <meta charset='utf-8'>
-    <style>
-    </style>
-    <script>
-    </script>
-</head>
-
-<body>
-    <span class="span">
-        <div class="div">
-            <div class="div-2">
-                <img loading="lazy"
-                    src="data:image/png;base64,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"
-                    class="img-2" />
-                <div class="div-3">
-                    <span style="color: #1C4396">Welcome</span>
-                    <span style="color: rgba(100, 141, 229, 1)">to FIX!</span>
-                </div>
+<span class="span">
+    <div class="div">
+        <div class="div-2">
+            <img loading="lazy"
+                src="data:image/png;base64,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"
+                class="img-2" />
+            <div class="div-3">
+                <span style="color: #1C4396">Welcome</span>
+                <span style="color: rgba(100, 141, 229, 1)">to FIX!</span>
             </div>
         </div>
-        <div class="div-4">
-            <span style="font-weight: 800; font-size: 18px; color: rgba(17, 24, 39, 1)">
-                {{ inviter }} invited you to join their workspace
-            </span>
-            <br />
-            <br />
-            <span style="color: rgba(17, 24, 39, 1)">
-                Great news! You've been invited to join Fix, the innovative all-in-one dashboard tailored for security
-                engineers. Fix streamlines your security management by prioritizing top risks, integrating user,
-                resource, and configuration data for a comprehensive overview.
-            </span>
-        </div>
-        <span class="span-2">
-            <div class="div-6">
-                <div class="invite-button-container">
-                    <a href="{{ invitation_link }}" class="invite-button">Join the workspace</a>
-                </div>
-            </div>
+    </div>
+    <div class="div-4">
+        <span style="font-weight: 800; font-size: 18px; color: rgba(17, 24, 39, 1)">
+            {{ inviter }} invited you to join their workspace
         </span>
-        <div class="div-7">
-            If you have any questions, drop our support team a message at
-            <span style="
+        <br />
+        <br />
+        <span style="color: rgba(17, 24, 39, 1)">
+            Great news! You've been invited to join Fix, the innovative all-in-one dashboard tailored for security
+            engineers. Fix streamlines your security management by prioritizing top risks, integrating user,
+            resource, and configuration data for a comprehensive overview.
+        </span>
+    </div>
+    <span class="span-2">
+        <div class="div-6">
+            <div class="invite-button-container">
+                <a href="{{ invitation_link }}" class="invite-button">Join the workspace</a>
+            </div>
+        </div>
+    </span>
+    <div class="div-7">
+        If you have any questions, drop our support team a message at
+        <span style="
               font-weight: 800;
               text-decoration: underline;
               color: rgba(28, 67, 150, 1);
             ">
-                support@fix.tt
-            </span>
-        </div>
-        <div class="div-8">
-            <span style="
+            support@fix.tt
+        </span>
+    </div>
+    <div class="div-8">
+        <span style="
               font-family: Nunito Sans, sans-serif;
               color: rgba(75, 85, 99, 1);
             ">
-                This email is intended to:
-            </span>
-            <span style="
+            This email is intended to:
+        </span>
+        <span style="
               font-family: Nunito Sans, sans-serif;
               font-weight: 600;
               color: rgba(28, 67, 150, 1);
             ">
-                {{ email }}
-            </span>
-            <br />
-            <span style="
+            {{ email }}
+        </span>
+        <br />
+        <span style="
               font-family: Nunito Sans, sans-serif;
               color: rgba(75, 85, 99, 1);
             ">
-                For more information please visit us at
-            </span>
-            <a href="https://fix.tt/" style="
+            For more information please visit us at
+        </span>
+        <a href="https://fix.tt/" style="
               font-family: Nunito Sans, sans-serif;
               font-weight: 600;
               text-decoration: underline;
               color: rgba(28, 67, 150, 1);
             " target="_blank">
-                fix.tt
-            </a>
-            <br />
-            <span style="
+            fix.tt
+        </a>
+        <br />
+        <span style="
               font-family: Nunito Sans, sans-serif;
               color: rgba(75, 85, 99, 1);
             ">
-                © 2023 Some Engineering Inc. All rights reserved.
-            </span>
-        </div>
-    </span>
-    <style>
+            © 2023 Some Engineering Inc. All rights reserved.
+        </span>
+    </div>
+</span>
+<style>
+    .span {
+        background-color: #fff;
+        display: flex;
+        max-width: 550px;
+        flex-direction: column;
+        padding: 29px 30px;
+    }
+
+    @media (max-width: 991px) {
         .span {
-            background-color: #fff;
-            display: flex;
-            max-width: 550px;
-            flex-direction: column;
-            padding: 29px 30px;
+            padding: 0 20px;
         }
+    }
 
-        @media (max-width: 991px) {
-            .span {
-                padding: 0 20px;
-            }
-        }
+    .div {
+        border-radius: 12px;
+        background-color: #e8f3fe;
+        align-self: stretch;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
 
+    @media (max-width: 991px) {
         .div {
-            border-radius: 12px;
-            background-color: #e8f3fe;
-            align-self: stretch;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        @media (max-width: 991px) {
-            .div {
-                max-width: 100%;
-            }
-        }
-
-        .div-2 {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-            display: flex;
-            min-height: 164px;
-            width: 100%;
-            align-items: center;
-            margin-top: 5%;
-        }
-
-        @media (max-width: 991px) {
-            .div-2 {
-                max-width: 100%;
-                padding: 0 20px;
-            }
-        }
-
-        .img {
-            position: absolute;
-            inset: 0;
-            height: 100%;
-            width: 100%;
-            object-fit: cover;
-            object-position: center;
-        }
-
-        .img-2 {
-            aspect-ratio: 1;
-            object-fit: contain;
-            object-position: center;
-            width: 60px;
-            overflow: hidden;
             max-width: 100%;
         }
+    }
 
-        .div-3 {
-            position: relative;
-            justify-content: center;
-            color: #648de5;
-            text-align: center;
-            align-self: stretch;
-            margin-top: 5%;
-            font: 800 28px/36px Nunito Sans, -apple-system, Roboto, Helvetica,
-                sans-serif;
+    .div-2 {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        min-height: 164px;
+        width: 100%;
+        align-items: center;
+        margin-top: 5%;
+    }
+
+    @media (max-width: 991px) {
+        .div-2 {
+            max-width: 100%;
+            padding: 0 20px;
         }
+    }
 
+    .img {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
+        object-position: center;
+    }
+
+    .img-2 {
+        aspect-ratio: 1;
+        object-fit: contain;
+        object-position: center;
+        width: 60px;
+        overflow: hidden;
+        max-width: 100%;
+    }
+
+    .div-3 {
+        position: relative;
+        justify-content: center;
+        color: #648de5;
+        text-align: center;
+        align-self: stretch;
+        margin-top: 5%;
+        font: 800 28px/36px Nunito Sans, -apple-system, Roboto, Helvetica,
+            sans-serif;
+    }
+
+    .div-4 {
+        color: #111827;
+        align-self: stretch;
+        margin-top: 30px;
+        font: 400 14px Nunito Sans, sans-serif;
+    }
+
+    @media (max-width: 991px) {
         .div-4 {
-            color: #111827;
-            align-self: stretch;
-            margin-top: 30px;
-            font: 400 14px Nunito Sans, sans-serif;
+            max-width: 100%;
         }
+    }
 
-        @media (max-width: 991px) {
-            .div-4 {
-                max-width: 100%;
-            }
-        }
+    .span-2 {
+        align-self: stretch;
+        display: flex;
+        margin-top: 26px;
+        align-items: start;
+        justify-content: space-between;
+        gap: 11px;
+    }
 
+    @media (max-width: 991px) {
         .span-2 {
-            align-self: stretch;
-            display: flex;
-            margin-top: 26px;
-            align-items: start;
-            justify-content: space-between;
-            gap: 11px;
+            max-width: 100%;
+            flex-wrap: wrap;
         }
+    }
 
-        @media (max-width: 991px) {
-            .span-2 {
-                max-width: 100%;
-                flex-wrap: wrap;
-            }
-        }
+    .div-5 {
+        display: flex;
+        flex-basis: 0%;
+        flex-direction: column;
+        align-items: center;
+    }
 
+    @media (max-width: 991px) {
         .div-5 {
-            display: flex;
-            flex-basis: 0%;
-            flex-direction: column;
-            align-items: center;
+            display: none;
         }
+    }
 
-        @media (max-width: 991px) {
-            .div-5 {
-                display: none;
-            }
-        }
+    .img-3 {
+        aspect-ratio: 1.18;
+        object-fit: contain;
+        object-position: center;
+        width: 13px;
+        fill: #111827;
+        overflow: hidden;
+    }
 
-        .img-3 {
-            aspect-ratio: 1.18;
-            object-fit: contain;
-            object-position: center;
-            width: 13px;
-            fill: #111827;
-            overflow: hidden;
-        }
+    .img-4 {
+        aspect-ratio: 1.18;
+        object-fit: contain;
+        object-position: center;
+        width: 13px;
+        fill: #111827;
+        overflow: hidden;
+        margin-top: 47px;
+    }
 
+    @media (max-width: 991px) {
         .img-4 {
-            aspect-ratio: 1.18;
-            object-fit: contain;
-            object-position: center;
-            width: 13px;
-            fill: #111827;
-            overflow: hidden;
-            margin-top: 47px;
+            margin-top: 40px;
         }
+    }
 
-        @media (max-width: 991px) {
-            .img-4 {
-                margin-top: 40px;
-            }
-        }
+    .img-5 {
+        aspect-ratio: 1.18;
+        object-fit: contain;
+        object-position: center;
+        width: 13px;
+        fill: #111827;
+        overflow: hidden;
+        margin-top: 47px;
+    }
 
+    @media (max-width: 991px) {
         .img-5 {
-            aspect-ratio: 1.18;
-            object-fit: contain;
-            object-position: center;
-            width: 13px;
-            fill: #111827;
-            overflow: hidden;
-            margin-top: 47px;
+            margin-top: 40px;
         }
+    }
 
-        @media (max-width: 991px) {
-            .img-5 {
-                margin-top: 40px;
-            }
-        }
+    .img-6 {
+        aspect-ratio: 1.18;
+        object-fit: contain;
+        object-position: center;
+        width: 13px;
+        fill: #111827;
+        overflow: hidden;
+        margin-top: 66px;
+    }
 
+    @media (max-width: 991px) {
         .img-6 {
-            aspect-ratio: 1.18;
-            object-fit: contain;
-            object-position: center;
-            width: 13px;
-            fill: #111827;
-            overflow: hidden;
-            margin-top: 66px;
+            margin-top: 40px;
         }
+    }
 
-        @media (max-width: 991px) {
-            .img-6 {
-                margin-top: 40px;
-            }
-        }
+    .div-6 {
+        color: #111827;
+        align-self: stretch;
+        flex-grow: 1;
+        flex-basis: auto;
+        font: 400 14px Nunito Sans, sans-serif;
+    }
 
+    @media (max-width: 991px) {
         .div-6 {
-            color: #111827;
-            align-self: stretch;
-            flex-grow: 1;
-            flex-basis: auto;
-            font: 400 14px Nunito Sans, sans-serif;
+            max-width: 100%;
         }
+    }
 
-        @media (max-width: 991px) {
-            .div-6 {
-                max-width: 100%;
-            }
-        }
+    .div-7 {
+        color: #1c4396;
+        align-self: stretch;
+        margin-top: 27px;
+        font: 400 14px Nunito Sans, sans-serif;
+    }
 
+    @media (max-width: 991px) {
         .div-7 {
-            color: #1c4396;
-            align-self: stretch;
-            margin-top: 27px;
-            font: 400 14px Nunito Sans, sans-serif;
+            max-width: 100%;
         }
+    }
 
-        @media (max-width: 991px) {
-            .div-7 {
-                max-width: 100%;
-            }
-        }
+    .img-7 {
+        aspect-ratio: 490;
+        object-fit: contain;
+        object-position: center;
+        width: 100%;
+        stroke-width: 1px;
+        stroke: #000;
+        overflow: hidden;
+        align-self: stretch;
+        margin-top: 27px;
+    }
 
+    @media (max-width: 991px) {
         .img-7 {
-            aspect-ratio: 490;
-            object-fit: contain;
-            object-position: center;
-            width: 100%;
-            stroke-width: 1px;
-            stroke: #000;
-            overflow: hidden;
-            align-self: stretch;
-            margin-top: 27px;
+            max-width: 100%;
         }
+    }
 
-        @media (max-width: 991px) {
-            .img-7 {
-                max-width: 100%;
-            }
-        }
+    .div-8 {
+        justify-content: center;
+        color: #1c4396;
+        text-align: center;
+        align-self: center;
+        margin-top: 28px;
+        max-width: 311px;
+        font: 400 12px/18px Ubuntu, sans-serif;
+    }
 
-        .div-8 {
-            justify-content: center;
-            color: #1c4396;
-            text-align: center;
-            align-self: center;
-            margin-top: 28px;
-            max-width: 311px;
-            font: 400 12px/18px Ubuntu, sans-serif;
-        }
+    .invite-button {
+        background-color: rgb(52, 71, 193);
+        color: white;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border: none;
+        border-radius: 20px;
+    }
 
-        .invite-button {
-            background-color: rgb(52, 71, 193);
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border: none;
-            border-radius: 20px;
-        }
-
-        .invite-button-container {
-            text-align: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-    </style>
-</body>
-
-</html>
+    .invite-button-container {
+        text-align: center;
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+</style>
