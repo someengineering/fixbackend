@@ -25,7 +25,6 @@ websockets = "^11.0.3"
 cryptography = "^41.0.6"
 aiofiles = "^23.2.1"
 pyinstrument = "^4.6.1"
-minify-html = "^0.15.0"
 
 
 [tool.poetry.group.dev.dependencies]
