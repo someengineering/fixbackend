@@ -18,11 +18,12 @@ from typing import Annotated, Optional
 from fastapi import Depends, Request
 
 from fixbackend.auth.models import User
-from fixbackend.notification.service import NotificationService, NotificationServiceDependency
+from fixbackend.notification.email_service import EmailService, EmailServiceDependency
+from fixbackend.notification.messages import VerifyEmail
 
 
 class UserVerifier(ABC):
-    def plaintext_email_content(self, request: Request, token: str) -> str:
+    def email_content(self, *, request: Request, user_email: str, token: str) -> VerifyEmail:
         # redirect is defined by the UI - use / as safe fallback
         redirect_url = request.query_params.get("redirectUrl", "/")
         verification_link = request.base_url
@@ -30,9 +31,7 @@ class UserVerifier(ABC):
             path="/auth/verify-email", query=f"token={token}&redirectUrl={redirect_url}"
         )
 
-        body_text = f"Hello fellow FIX user, click this link to verify your email. {verification_link}"
-
-        return body_text
+        return VerifyEmail(recipient=user_email, verification_link=str(verification_link))
 
     @abstractmethod
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
@@ -40,23 +39,18 @@ class UserVerifier(ABC):
 
 
 class UserVerifierImpl(UserVerifier):
-    def __init__(self, notification_service: NotificationService) -> None:
-        self.notification_service = notification_service
+    def __init__(self, email_service: EmailService) -> None:
+        self.email_service = email_service
 
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         assert request
-        body_text = self.plaintext_email_content(request, token)
+        message = self.email_content(request=request, user_email=user.email, token=token)
 
-        await self.notification_service.send_email(
-            to=user.email,
-            subject="FIX: verify your e-mail address",
-            text=body_text,
-            html=None,
-        )
+        await self.email_service.send_message(message=message)
 
 
-def get_user_verifier(notification_service: NotificationServiceDependency) -> UserVerifier:
-    return UserVerifierImpl(notification_service)
+def get_user_verifier(email_service: EmailServiceDependency) -> UserVerifier:
+    return UserVerifierImpl(email_service)
 
 
 UserVerifierDependency = Annotated[UserVerifier, Depends(get_user_verifier)]

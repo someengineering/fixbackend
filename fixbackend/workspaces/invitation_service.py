@@ -30,7 +30,8 @@ from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.notification.service import NotificationService, NotificationServiceDependency
+from fixbackend.notification.email_service import EmailService, EmailServiceDependency
+from fixbackend.notification.messages import Invite
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
@@ -76,13 +77,13 @@ class InvitationServiceImpl(InvitationService):
         self,
         workspace_repository: WorkspaceRepository,
         invitation_repository: InvitationRepository,
-        notification_service: NotificationService,
+        email_service: EmailService,
         user_repository: UserRepository,
         domain_events: DomainEventPublisher,
         config: Config,
     ) -> None:
         self.invitation_repository = invitation_repository
-        self.notification_service = notification_service
+        self.email_service = email_service
         self.workspace_repository = workspace_repository
         self.user_repository = user_repository
         self.domain_events = domain_events
@@ -103,14 +104,9 @@ class InvitationServiceImpl(InvitationService):
         }
         token = generate_state_token(state_data, secret=self.config.secret)
 
-        subject = f"FIX Cloud {inviter.email} has invited you to FIX workspace"
         invite_link = f"{accept_invite_base_url}?token={token}"
-        text = (
-            f"{inviter.email} has invited you to join the workspace {workspace.name}. "
-            "Please click on the link below to accept the invitation. \n\n"
-            f"{invite_link}"
-        )
-        await self.notification_service.send_email(to=invitee_email, subject=subject, text=text, html=None)
+        message = Invite(inviter=inviter.email, invitation_link=invite_link, recipient=invitee_email)
+        await self.email_service.send_message(message=message)
         return invitation, token
 
     async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
@@ -149,7 +145,7 @@ class InvitationServiceImpl(InvitationService):
 def get_invitation_service(
     workspace_repository: WorkspaceRepositoryDependency,
     invitation_repository: InvitationRepositoryDependency,
-    notification_service: NotificationServiceDependency,
+    email_service: EmailServiceDependency,
     user_repository: UserRepositoryDependency,
     domain_events: DomainEventPublisherDependency,
     config: ConfigDependency,
@@ -157,7 +153,7 @@ def get_invitation_service(
     return InvitationServiceImpl(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
-        notification_service=notification_service,
+        email_service=email_service,
         user_repository=user_repository,
         domain_events=domain_events,
         config=config,
