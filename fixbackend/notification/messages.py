@@ -44,7 +44,12 @@ class Signup:
         return f"Welcome to fix, {self.recipient}!"
 
     def html(self) -> str:
-        return render("signup.html", title=self.subject(), email=self.recipient)
+        return render(
+            "signup.html",
+            title=self.subject(),
+            email=self.recipient,
+            support_email="support@fix.tt",
+        )
 
 
 @frozen(kw_only=True)
