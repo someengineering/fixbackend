@@ -1,3 +1,18 @@
+#  Copyright (c) 2023. Some Engineering
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Annotated, Optional
@@ -8,7 +23,7 @@ from fastapi import Depends
 from fixbackend.config import Config, ConfigDependency
 
 
-class NotificationService(ABC):
+class EmailService(ABC):
     @abstractmethod
     async def send_email(
         self,
@@ -22,7 +37,7 @@ class NotificationService(ABC):
         raise NotImplementedError()
 
 
-class ConsoleNotificationService(NotificationService):
+class ConsoleEmailService(EmailService):
     async def send_email(
         self,
         to: str,
@@ -36,7 +51,7 @@ class ConsoleNotificationService(NotificationService):
             print(f"html: {html}")
 
 
-class NotificationServiceImpl(NotificationService):
+class EmailServiceImpl(EmailService):
     def __init__(self, config: Config) -> None:
         self.ses = boto3.client(
             "ses",
@@ -85,10 +100,10 @@ class NotificationServiceImpl(NotificationService):
         await asyncio.to_thread(send_email)
 
 
-def get_notification_service(config: ConfigDependency) -> NotificationService:
+def get_email_service(config: ConfigDependency) -> EmailService:
     if config.aws_access_key_id and config.aws_secret_access_key:
-        return NotificationServiceImpl(config)
-    return ConsoleNotificationService()
+        return EmailServiceImpl(config)
+    return ConsoleEmailService()
 
 
-NotificationServiceDependency = Annotated[NotificationService, Depends(get_notification_service)]
+EmailServiceDependency = Annotated[EmailService, Depends(get_email_service)]
