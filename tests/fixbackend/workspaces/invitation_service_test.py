@@ -14,9 +14,9 @@
 
 
 from typing import Optional, List
-from attrs import frozen
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
+from fixbackend.notification.messages import EmailMessage
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 
@@ -29,20 +29,22 @@ from fixbackend.auth.models import User
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
-@frozen
-class NotificationEmail:
-    to: str
-    subject: str
-    text: str
-    html: Optional[str]
-
-
 class InMemoryEmailService(EmailService):
     def __init__(self) -> None:
-        self.call_args: List[NotificationEmail] = []
+        self.call_args: List[EmailMessage] = []
 
-    async def send_email(self, *, to: str, subject: str, text: str, html: str | None) -> None:
-        self.call_args.append(NotificationEmail(to, subject, text, html))
+    async def send_email(
+        self,
+        *,
+        to: str,
+        subject: str,
+        text: str,
+        html: Optional[str],
+    ) -> None:
+        pass
+
+    async def send_message(self, *, message: EmailMessage) -> None:
+        self.call_args.append(message)
 
 
 @pytest.fixture
@@ -98,10 +100,10 @@ async def test_invite_accept_user(
 
     # check email
     email = email_service.call_args[0]
-    assert email.to == new_user_email
-    assert email.subject == f"FIX Cloud {user.email} has invited you to FIX workspace"
-    assert email.text.startswith(f"{user.email} has invited you to join the workspace {workspace.name}.")
-    assert "https://example.com?token=" in email.text
+    assert email.recipient == new_user_email
+    assert email.subject() == "You've been invited to join fix!"
+    assert email.text().startswith(f"{user.email} has invited you to join their workspace")
+    assert "https://example.com?token=" in email.text()
 
     # existing user
     existing_user = await user_repository.create(

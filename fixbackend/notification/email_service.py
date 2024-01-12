@@ -21,6 +21,7 @@ import boto3
 from fastapi import Depends
 
 from fixbackend.config import Config, ConfigDependency
+from fixbackend.notification.messages import EmailMessage
 
 
 class EmailService(ABC):
@@ -36,6 +37,9 @@ class EmailService(ABC):
         """Send an email to the given address."""
         raise NotImplementedError()
 
+    async def send_message(self, *, message: EmailMessage) -> None:
+        await self.send_email(to=message.recipient, subject=message.subject(), text=message.text(), html=message.html())
+
 
 class ConsoleEmailService(EmailService):
     async def send_email(
@@ -48,7 +52,7 @@ class ConsoleEmailService(EmailService):
         print(f"Sending email to {to} with subject {subject}")
         print(f"text: {text}")
         if html:
-            print(f"html: {html}")
+            print(f"html (first 100 chars): {html[:100]}")
 
 
 class EmailServiceImpl(EmailService):
