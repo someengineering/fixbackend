@@ -18,6 +18,7 @@ from attrs import frozen
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from functools import lru_cache
+import minify_html
 
 
 @lru_cache(maxsize=1)
@@ -27,7 +28,9 @@ def get_env() -> Environment:
 
 def render(template_name: str, **kwargs: Any) -> str:
     template = get_env().get_template(template_name)
-    return template.render(**kwargs)
+    rendered = template.render(**kwargs)
+    minified = minify_html.minify(rendered)
+    return minified
 
 
 @frozen(kw_only=True)
