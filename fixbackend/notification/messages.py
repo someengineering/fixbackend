@@ -28,9 +28,9 @@ def get_env() -> Environment:
 
 def render(template_name: str, **kwargs: Any) -> str:
     template = get_env().get_template(template_name)
-    rendered = template.render(**kwargs)
-    minified = minify_html.minify(rendered)
-    return minified
+    result = template.render(**kwargs)
+    # result = minify_html.minify(result)
+    return result
 
 
 @frozen(kw_only=True)
@@ -87,7 +87,11 @@ class VerifyEmail:
 
     def html(self) -> str:
         return render(
-            "verify_email.html", title=self.subject(), email=self.recipient, verification_link=self.verification_link
+            "verify_email.html",
+            title=self.subject(),
+            email=self.recipient,
+            verification_link=self.verification_link,
+            support_email="support@fix.tt",
         )
 
 
