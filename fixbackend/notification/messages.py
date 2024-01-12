@@ -57,7 +57,7 @@ class Invite:
     recipient: str
 
     def subject(self) -> str:
-        return "You've been invited to join fix!"
+        return "You've been invited to join FIX!"
 
     def text(self) -> str:
         text = (

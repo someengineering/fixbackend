@@ -101,7 +101,7 @@ async def test_invite_accept_user(
     # check email
     email = email_service.call_args[0]
     assert email.recipient == new_user_email
-    assert email.subject() == "You've been invited to join fix!"
+    assert email.subject() == "You've been invited to join FIX!"
     assert email.text().startswith(f"{user.email} has invited you to join their workspace")
     assert "https://example.com?token=" in email.text()
 
