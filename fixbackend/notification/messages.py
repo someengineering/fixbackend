@@ -69,8 +69,9 @@ class Invite:
             "invite.html",
             title=self.subject(),
             inviter=self.inviter,
-            invitation_link=self.invitation_link,
+            action_url=self.invitation_link,
             email=self.recipient,
+            support_email="support@fix.tt",
         )
 
 
