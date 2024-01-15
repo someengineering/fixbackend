@@ -29,7 +29,13 @@ from fixcloudutils.types import Json
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
-from fixbackend.inventory.schemas import ReportSummary, SearchStartData, CompletePathRequest, SearchRequest
+from fixbackend.inventory.schemas import (
+    ReportSummary,
+    SearchStartData,
+    CompletePathRequest,
+    SearchRequest,
+    ReportConfig,
+)
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -50,7 +56,19 @@ CurrentGraphDbDependency = Annotated[GraphDatabaseAccess, Depends(get_current_gr
 def inventory_router(fix: FixDependencies) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/{workspace_id}/inventory/report/{benchmark_name}")
+    @router.get("/{workspace_id}/inventory/report/config")
+    async def report_config(graph_db: CurrentGraphDbDependency) -> ReportConfig:
+        return await fix.inventory.report_config(graph_db)
+
+    @router.put("/{workspace_id}/inventory/report/config")
+    async def report_config(graph_db: CurrentGraphDbDependency, config: ReportConfig = Body(...)) -> None:
+        await fix.inventory.update_report_config(graph_db, config)
+
+    @router.get("/{workspace_id}/inventory/report/info")
+    async def report_info(graph_db: CurrentGraphDbDependency) -> Json:
+        return await fix.inventory.report_info(graph_db)
+
+    @router.get("/{workspace_id}/inventory/report/benchmark/{benchmark_name}")
     async def report(
         benchmark_name: str,
         graph_db: CurrentGraphDbDependency,

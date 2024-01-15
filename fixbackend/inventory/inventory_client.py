@@ -186,6 +186,7 @@ class InventoryClient(Service):
         benchmarks: Optional[List[str]] = None,
         short: Optional[bool] = None,
         with_checks: Optional[bool] = None,
+        ids_only: Optional[bool] = None,
     ) -> List[Json]:
         log.info(f"Get benchmarks with params: {benchmarks}, {short}, {with_checks}")
         params: Dict[str, Union[str, bool]] = {}
@@ -197,6 +198,8 @@ class InventoryClient(Service):
             params["short"] = short
         if with_checks is not None:
             params["with_checks"] = with_checks
+        if ids_only is not None:
+            params["ids_only"] = ids_only
         headers = self.__headers(access)
         response = await self._perform(
             request=self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers),
@@ -214,6 +217,7 @@ class InventoryClient(Service):
         category: Optional[str] = None,
         kind: Optional[str] = None,
         check_ids: Optional[List[str]] = None,
+        ids_only: Optional[bool] = None,
     ) -> List[Json]:
         log.info(
             f"Get issues with provider={provider}, service={service}, category={category}, kind={kind}, ids={check_ids}"
@@ -231,6 +235,8 @@ class InventoryClient(Service):
             params["kind"] = kind
         if check_ids:
             params["id"] = ",".join(check_ids)
+        if ids_only is not None:
+            params["ids_only"] = ids_only
         headers = self.__headers(access)
         response = await self._perform(
             request=self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers),
@@ -418,6 +424,24 @@ class InventoryClient(Service):
             read_content=True,
         )
         return cast(Json, response.json())
+
+    async def config(self, access: GraphDatabaseAccess, config_id: str) -> Json:
+        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson)
+        response = await self._perform(
+            request=self.client.get(self.inventory_url + f"/config/{config_id}", headers=headers),
+            expected_media_types=MediaTypeJson,
+            read_content=True,
+        )
+        return response.json()
+
+    async def update_config(self, access: GraphDatabaseAccess, config_id: str, update: Json) -> Json:
+        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson)
+        response = await self._perform(
+            request=self.client.put(self.inventory_url + f"/config/{config_id}", json=update, headers=headers),
+            expected_media_types=MediaTypeJson,
+            read_content=True,
+        )
+        return response.json()
 
     def __headers(
         self,
