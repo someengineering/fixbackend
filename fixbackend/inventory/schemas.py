@@ -144,3 +144,11 @@ class SearchRequest(BaseModel):
     skip: int = Field(default=0, description="The number of results to skip.", ge=0)
     limit: int = Field(default=50, description="The number of results to return.", gt=0, le=100)
     count: bool = Field(default=False, description="Also compute the total number of results.")
+
+
+class ReportConfig(BaseModel):
+    ignore_checks: Optional[List[str]] = Field(default=None, description="List of checks to ignore.")
+    ignore_benchmarks: Optional[List[str]] = Field(default=None, description="List of benchmarks to ignore.")
+    override_values: Optional[Json] = Field(
+        default=None, description="Default values for the report. Will be merged with the values from the config."
+    )
