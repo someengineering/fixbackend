@@ -117,13 +117,12 @@ class InventoryClient(Service):
             raise InventoryRequestTookTooLong(408, f"Request took too long: {e}") from e
         else:
             if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
-                msg = f"Inventory error: {response.status_code} {response.text}"
                 if response.status_code == 401:
-                    raise GraphDatabaseForbidden(401, msg)
+                    raise GraphDatabaseForbidden(401, response.text)
                 elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
-                    raise GraphDatabaseNotAvailable(503, msg)
+                    raise GraphDatabaseNotAvailable(503, response.text)
                 else:
-                    raise InventoryException(response.status_code, msg)
+                    raise InventoryException(response.status_code, response.text)
             if expected_media_types is not None and not response.is_error:
                 media_type, *params = response.headers.get("content-type", "").split(";")
                 emt = {expected_media_types} if isinstance(expected_media_types, str) else expected_media_types
@@ -442,6 +441,31 @@ class InventoryClient(Service):
             read_content=True,
         )
         return response.json()
+
+    async def call_json(
+        self,
+        access: GraphDatabaseAccess,
+        method: str,
+        path: str,
+        *,
+        body: Optional[Json] = None,
+        params: Optional[Dict[str, str]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+        expect_result: bool = True,
+    ) -> Json:
+        headers = self.__headers(
+            access,
+            accept=MediaTypeJson if expect_result else None,
+            content_type=MediaTypeJson if body else None,
+        )
+        if extra_headers is not None:
+            headers.update(extra_headers)
+        response = await self._perform(
+            request=self.client.request(method, self.inventory_url + path, json=body, headers=headers, params=params),
+            expected_media_types=MediaTypeJson if expect_result else None,
+            read_content=expect_result,
+        )
+        return response.json() if expect_result else None
 
     def __headers(
         self,
