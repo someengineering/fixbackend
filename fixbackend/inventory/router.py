@@ -179,7 +179,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         description="Search the inventory and return the results as a table. "
         "Based on the accept header, the result is returned in the expected format.",
         responses={200: {"content": {"text/csv": {}, "application/json": {}}}},
-        tags=["search"]
+        tags=["search"],
     )
     async def search_table(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
