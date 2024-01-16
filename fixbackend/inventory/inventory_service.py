@@ -27,6 +27,7 @@ from datetime import timedelta
 from itertools import islice
 from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
 
+from fixcloudutils.asyncio.timed import timed
 from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
@@ -134,6 +135,7 @@ class InventoryService(Service):
         # evict the cache for the tenant in the cluster
         await self.cache.evict(str(workspace_id))
 
+    @timed("fixbackend", "report_info")
     async def report_info(self, db: GraphDatabaseAccess) -> Json:
         async def compute_report_info() -> Json:
             benchmark_ids, check_ids = await asyncio.gather(
@@ -143,17 +145,20 @@ class InventoryService(Service):
 
         return await self.cache.call(compute_report_info, key=str(db.workspace_id))()
 
+    @timed("fixbackend", "report_config")
     async def report_config(self, db: GraphDatabaseAccess) -> ReportConfig:
         js = await self.client.config(db, "resoto.report.config")
         v = js.get("report_config", {})
         v["ignore_benchmarks"] = js.get("ignore_benchmarks", [])
         return ReportConfig.model_validate(v)
 
+    @timed("fixbackend", "update_report_config")
     async def update_report_config(self, db: GraphDatabaseAccess, config: ReportConfig) -> None:
         js = config.model_dump()
         update = dict(ignore_benchmarks=js.pop("ignore_benchmarks", None), report_config=js)
         await self.client.update_config(db, "resoto.report.config", update)
 
+    @timed("fixbackend", "benchmark")
     async def benchmark(
         self,
         db: GraphDatabaseAccess,
@@ -173,6 +178,7 @@ class InventoryService(Service):
 
         return await self.client.execute_single(db, report + " | dump")  # type: ignore
 
+    @timed("fixbackend", "search_table")
     async def search_table(
         self, db: GraphDatabaseAccess, request: SearchRequest
     ) -> AsyncIteratorWithContext[JsonElement]:
@@ -190,6 +196,7 @@ class InventoryService(Service):
         cmd += f" | limit {request.skip}, {request.limit} | list --json-table"
         return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
+    @timed("fixbackend", "search_start_data")
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def compute_search_start_data() -> SearchStartData:
             async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
@@ -223,6 +230,7 @@ class InventoryService(Service):
 
         return await self.cache.call(compute_search_start_data, key=str(db.workspace_id))()
 
+    @timed("fixbackend", "resource")
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
         async def neighborhood(cmd: str) -> List[JsonElement]:
             return [n async for n in await self.client.execute_single(db, cmd, env={"with-kind": "true"})]
@@ -243,6 +251,7 @@ class InventoryService(Service):
         checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
         return dict(resource=resource, failing_checks=checks, neighborhood=nb)
 
+    @timed("fixbackend", "summary")
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def compute_summary() -> ReportSummary:
             now = utc()

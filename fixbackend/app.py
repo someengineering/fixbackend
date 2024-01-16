@@ -493,7 +493,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
             swagger_ui_parameters=None,
         )
 
-    Instrumentator().instrument(app).expose(app, tags=["system"])
+    Instrumentator().instrument(
+        app,
+        should_only_respect_2xx_for_highr=True,
+        latency_lowr_buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2),
+    ).expose(app, tags=["system"])
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
