@@ -23,13 +23,19 @@ import logging
 from typing import List, Optional, Annotated, Literal, Dict
 
 from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
-from fixbackend.inventory.schemas import ReportSummary, SearchStartData, CompletePathRequest, SearchRequest
+from fixbackend.inventory.schemas import (
+    ReportSummary,
+    SearchStartData,
+    CompletePathRequest,
+    SearchRequest,
+    ReportConfig,
+)
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -48,9 +54,49 @@ CurrentGraphDbDependency = Annotated[GraphDatabaseAccess, Depends(get_current_gr
 
 
 def inventory_router(fix: FixDependencies) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(prefix="/{workspace_id}/inventory")
 
-    @router.get("/{workspace_id}/inventory/report/{benchmark_name}")
+    @router.get("/report/config", tags=["report-management"])
+    async def report_config(graph_db: CurrentGraphDbDependency) -> ReportConfig:
+        return await fix.inventory.report_config(graph_db)
+
+    @router.put("/report/config", tags=["report-management"])
+    async def update_report_config(graph_db: CurrentGraphDbDependency, config: ReportConfig = Body(...)) -> None:
+        await fix.inventory.update_report_config(graph_db, config)
+
+    @router.get("/report/info", tags=["report-management"])
+    async def report_info(graph_db: CurrentGraphDbDependency) -> Json:
+        return await fix.inventory.report_info(graph_db)
+
+    @router.get("/report/benchmark/{benchmark_name}", tags=["report-management"])
+    async def get_benchmark(benchmark_name: str, graph_db: CurrentGraphDbDependency) -> Json:
+        return await fix.inventory.client.call_json(graph_db, "get", f"/report/benchmark/{benchmark_name}")
+
+    @router.put("/report/benchmark/{benchmark_name}", tags=["report-management"])
+    async def put_benchmark(benchmark_name: str, graph_db: CurrentGraphDbDependency, body: Json = Body()) -> Json:
+        return await fix.inventory.client.call_json(graph_db, "put", f"/report/benchmark/{benchmark_name}", body=body)
+
+    @router.delete("/report/benchmark/{benchmark_name}", tags=["report-management"])
+    async def delete_benchmark(benchmark_name: str, graph_db: CurrentGraphDbDependency) -> Response:
+        await fix.inventory.client.call_json(
+            graph_db, "delete", f"/report/benchmark/{benchmark_name}", expect_result=False
+        )
+        return Response(status_code=204)
+
+    @router.get("/report/check/{check_id}", tags=["report-management"])
+    async def get_check(check_id: str, graph_db: CurrentGraphDbDependency) -> Json:
+        return await fix.inventory.client.call_json(graph_db, "get", f"/report/check/{check_id}")
+
+    @router.put("/report/check/{check_id}", tags=["report-management"])
+    async def put_check(check_id: str, graph_db: CurrentGraphDbDependency, body: Json = Body()) -> Json:
+        return await fix.inventory.client.call_json(graph_db, "put", f"/report/check/{check_id}", body=body)
+
+    @router.delete("/report/check/{check_id}", tags=["report-management"])
+    async def delete_check(check_id: str, graph_db: CurrentGraphDbDependency) -> Response:
+        await fix.inventory.client.call_json(graph_db, "delete", f"/report/check/{check_id}", expect_result=False)
+        return Response(status_code=204)
+
+    @router.get("/report/benchmark/{benchmark_name}/result", tags=["report"])
     async def report(
         benchmark_name: str,
         graph_db: CurrentGraphDbDependency,
@@ -65,15 +111,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         )
         return streaming_response(request.headers.get("accept", "application/json"), result)
 
-    @router.get("/{workspace_id}/inventory/report-summary")
+    @router.get("/report-summary", tags=["report"])
     async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
         return await fix.inventory.summary(graph_db)
 
-    @router.get("/{workspace_id}/inventory/search/start")
-    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
-        return await fix.inventory.search_start_data(graph_db)
-
-    @router.get("/{workspace_id}/inventory/model")
+    @router.get("/model", tags=["inventory"])
     async def model(
         graph_db: CurrentGraphDbDependency,
         kind: List[str] = Query(description="Kinds to return."),
@@ -90,7 +132,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             flat=flat,
         )
 
-    @router.post("/{workspace_id}/inventory/property/attributes")
+    @router.get("/search/start", tags=["search"])
+    async def search_start(graph_db: CurrentGraphDbDependency) -> SearchStartData:
+        return await fix.inventory.search_start_data(graph_db)
+
+    @router.post("/property/attributes", tags=["search"])
     async def property_attributes(
         graph_db: CurrentGraphDbDependency,
         request: Request,
@@ -105,7 +151,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         )
         return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
 
-    @router.post("/{workspace_id}/inventory/property/values")
+    @router.post("/property/values", tags=["search"])
     async def property_values(
         graph_db: CurrentGraphDbDependency,
         request: Request,
@@ -120,7 +166,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         )
         return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
 
-    @router.post("/{workspace_id}/inventory/property/path/complete")
+    @router.post("/property/path/complete", tags=["search"])
     async def complete_property_path(
         graph_db: CurrentGraphDbDependency,
         body: CompletePathRequest = Body(...),
@@ -133,6 +179,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         description="Search the inventory and return the results as a table. "
         "Based on the accept header, the result is returned in the expected format.",
         responses={200: {"content": {"text/csv": {}, "application/json": {}}}},
+        tags=["search"]
     )
     async def search_table(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
@@ -147,12 +194,12 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         search_result = await fix.inventory.search_table(graph_db, query, result_format=result_format)
         return streaming_response(accept, search_result, headers=extra_headers)
 
-    @router.get("/{workspace_id}/inventory/node/{node_id}")
+    @router.get("/node/{node_id}", tags=["search"])
     async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
         return await fix.inventory.resource(graph_db, node_id)
 
     # deprecated, needs to be removed
-    @router.post("/{workspace_id}/inventory/node/{node_id}")
+    @router.post("/node/{node_id}", tags=["deprecated"])
     async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
         return await get_node(graph_db, node_id)
 

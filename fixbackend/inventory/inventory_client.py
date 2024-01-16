@@ -35,7 +35,6 @@ from typing import (
     TypeVar,
     Generic,
     Callable,
-    Awaitable,
     Any,
 )
 
@@ -43,6 +42,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import utc_str
 from httpx import AsyncClient, Response, ReadTimeout, ConnectError
+from httpx._types import QueryParamTypes
 
 from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -99,13 +99,21 @@ class InventoryClient(Service):
 
     async def _perform(
         self,
-        request: Awaitable[Response],
+        method: str,
+        path: str,
+        *,
+        params: Optional[QueryParamTypes] = None,
+        headers: Optional[Dict[str, str]] = None,
+        content: Optional[str] = None,
+        json: Optional[Json] = None,
         expected_media_types: Optional[Union[str, Set[str]]] = None,
         allowed_error_codes: Optional[Set[int]] = None,
         read_content: bool = False,
     ) -> Response:
         try:
-            response = await request
+            response = await self.client.request(
+                method, self.inventory_url + path, params=params, headers=headers, content=content, json=json
+            )
             if read_content:
                 await response.aread()
         except ConnectError as e:
@@ -117,13 +125,12 @@ class InventoryClient(Service):
             raise InventoryRequestTookTooLong(408, f"Request took too long: {e}") from e
         else:
             if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
-                msg = f"Inventory error: {response.status_code} {response.text}"
                 if response.status_code == 401:
-                    raise GraphDatabaseForbidden(401, msg)
+                    raise GraphDatabaseForbidden(401, response.text)
                 elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
-                    raise GraphDatabaseNotAvailable(503, msg)
+                    raise GraphDatabaseNotAvailable(503, response.text)
                 else:
-                    raise InventoryException(response.status_code, msg)
+                    raise InventoryException(response.status_code, response.text)
             if expected_media_types is not None and not response.is_error:
                 media_type, *params = response.headers.get("content-type", "").split(";")
                 emt = {expected_media_types} if isinstance(expected_media_types, str) else expected_media_types
@@ -134,9 +141,12 @@ class InventoryClient(Service):
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None
     ) -> AsyncIteratorWithContext[JsonElement]:
         log.info(f"Execute command: {command}")
-        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         response = await self._perform(
-            request=self.client.post(self.inventory_url + "/cli/execute", content=command, params=env, headers=headers),
+            "POST",
+            "/cli/execute",
+            content=command,
+            params=env,
+            headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
             expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
@@ -150,12 +160,12 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Search list with query: {query}")
-        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
-        params = {"section": section}
         response = await self._perform(
-            request=self.client.post(
-                self.inventory_url + f"/graph/{graph}/search/list", content=query, params=params, headers=headers
-            ),
+            "POST",
+            f"/graph/{graph}/search/list",
+            content=query,
+            params={"section": section},
+            headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
             expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
@@ -169,12 +179,12 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Aggregate with query: {query}")
-        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
-        params = {"section": section}
         response = await self._perform(
-            request=self.client.post(
-                self.inventory_url + f"/graph/{graph}/search/aggregate", content=query, params=params, headers=headers
-            ),
+            "POST",
+            f"/graph/{graph}/search/aggregate",
+            content=query,
+            params={"section": section},
+            headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
             expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
@@ -186,6 +196,7 @@ class InventoryClient(Service):
         benchmarks: Optional[List[str]] = None,
         short: Optional[bool] = None,
         with_checks: Optional[bool] = None,
+        ids_only: Optional[bool] = None,
     ) -> List[Json]:
         log.info(f"Get benchmarks with params: {benchmarks}, {short}, {with_checks}")
         params: Dict[str, Union[str, bool]] = {}
@@ -197,9 +208,13 @@ class InventoryClient(Service):
             params["short"] = short
         if with_checks is not None:
             params["with_checks"] = with_checks
-        headers = self.__headers(access)
+        if ids_only is not None:
+            params["ids_only"] = ids_only
         response = await self._perform(
-            request=self.client.get(self.inventory_url + "/report/benchmarks", params=params, headers=headers),
+            "GET",
+            "/report/benchmarks",
+            params=params,
+            headers=self.__headers(access),
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
@@ -214,6 +229,7 @@ class InventoryClient(Service):
         category: Optional[str] = None,
         kind: Optional[str] = None,
         check_ids: Optional[List[str]] = None,
+        ids_only: Optional[bool] = None,
     ) -> List[Json]:
         log.info(
             f"Get issues with provider={provider}, service={service}, category={category}, kind={kind}, ids={check_ids}"
@@ -231,9 +247,13 @@ class InventoryClient(Service):
             params["kind"] = kind
         if check_ids:
             params["id"] = ",".join(check_ids)
-        headers = self.__headers(access)
+        if ids_only is not None:
+            params["ids_only"] = ids_only
         response = await self._perform(
-            request=self.client.get(self.inventory_url + "/report/checks", params=params, headers=headers),
+            "GET",
+            "/report/checks",
+            params=params,
+            headers=self.__headers(access),
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
@@ -249,12 +269,9 @@ class InventoryClient(Service):
     ) -> None:
         log.info(f"Delete account {account_id} from cloud {cloud}")
         query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
-        headers = self.__headers(access)
         async for node in await self.search_list(access, query):
             node_id = node["id"]
-            await self._perform(
-                self.client.delete(self.inventory_url + f"/graph/{graph}/node/{node_id}", headers=headers)
-            )
+            await self._perform("DELETE", f"/graph/{graph}/node/{node_id}", headers=self.__headers(access))
 
     async def complete_property_path(
         self,
@@ -268,15 +285,12 @@ class InventoryClient(Service):
             f"Complete property path path={request.path}, prop={request.prop}, kinds={len(request.kinds or [])}, "
             f"fuzzy={request.fuzzy}, skip={request.skip}, limit={request.limit}"
         )
-        headers = self.__headers(access)
-        params = {"section": section}
         response = await self._perform(
-            request=self.client.post(
-                self.inventory_url + f"/graph/{graph}/property/path/complete",
-                json=request.model_dump(),
-                headers=headers,
-                params=params,
-            ),
+            "POST",
+            f"/graph/{graph}/property/path/complete",
+            json=request.model_dump(),
+            headers=self.__headers(access),
+            params={"section": section},
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
@@ -297,7 +311,6 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> AsyncIteratorWithContext[JsonElement]:
         log.info(f"Get possible values with query: {query}, prop_or_predicate: {prop_or_predicate} on detail: {detail}")
-        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
         params = {
             "section": section,
             "prop": prop_or_predicate,
@@ -306,9 +319,11 @@ class InventoryClient(Service):
             "count": json.dumps(count),
         }
         response = await self._perform(
-            request=self.client.post(
-                self.inventory_url + f"/graph/{graph}/property/{detail}", content=query, params=params, headers=headers
-            ),
+            "POST",
+            f"/graph/{graph}/property/{detail}",
+            content=query,
+            params=params,
+            headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
             expected_media_types=ExpectMediaTypeNdJson,
             read_content=True,
         )
@@ -318,7 +333,9 @@ class InventoryClient(Service):
         log.info(f"Get resource with id: {id}")
         headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText)
         response = await self._perform(
-            request=self.client.get(self.inventory_url + f"/graph/{graph}/node/{id}", headers=headers),
+            "GET",
+            f"/graph/{graph}/node/{id}",
+            headers=headers,
             expected_media_types=MediaTypeJson,
             allowed_error_codes={404},
             read_content=True,
@@ -344,7 +361,6 @@ class InventoryClient(Service):
         graph: str = "resoto",
     ) -> List[Json]:
         log.info(f"Get model with flat={flat}, with_bases={with_bases}, with_property_kinds={with_property_kinds}")
-        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText)
         params = {
             "format": result_format,
             "kind": ",".join(kind) if kind else None,
@@ -358,7 +374,10 @@ class InventoryClient(Service):
             "with_metadata": json.dumps(with_metadata),
         }
         response = await self._perform(
-            request=self.client.get(self.inventory_url + f"/graph/{graph}/model", params=params, headers=headers),
+            "GET",
+            f"/graph/{graph}/model",
+            params=params,
+            headers=self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText),
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
@@ -393,7 +412,10 @@ class InventoryClient(Service):
             value = granularity if isinstance(granularity, int) else f"{granularity.total_seconds()}s"
             body["granularity"] = value
         response = await self._perform(
-            request=self.client.post(self.inventory_url + f"/timeseries/{name}", json=body, headers=headers),
+            "POST",
+            f"/timeseries/{name}",
+            json=body,
+            headers=headers,
             expected_media_types=ExpectMediaTypeNdJson,
         )
         return AsyncIteratorWithContext(response)
@@ -408,16 +430,66 @@ class InventoryClient(Service):
         section: str = "reported",
     ) -> Json:
         log.info(f"Update node with id: {id}")
-        headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson)
-        params = {"section": section}
         response = await self._perform(
-            request=self.client.patch(
-                self.inventory_url + f"/graph/{graph}/node/{node_id}", json=patch, headers=headers, params=params
-            ),
+            "PATCH",
+            f"/graph/{graph}/node/{node_id}",
+            json=patch,
+            headers=self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson),
+            params={"section": section},
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
         return cast(Json, response.json())
+
+    async def config(self, access: GraphDatabaseAccess, config_id: str) -> Json:
+        response = await self._perform(
+            "GET",
+            f"/config/{config_id}",
+            headers=self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson),
+            expected_media_types=MediaTypeJson,
+            read_content=True,
+        )
+        return response.json()  # type: ignore
+
+    async def update_config(self, access: GraphDatabaseAccess, config_id: str, update: Json) -> Json:
+        response = await self._perform(
+            "PUT",
+            f"/config/{config_id}",
+            json=update,
+            headers=self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson),
+            expected_media_types=MediaTypeJson,
+            read_content=True,
+        )
+        return response.json()  # type: ignore
+
+    async def call_json(
+        self,
+        access: GraphDatabaseAccess,
+        method: str,
+        path: str,
+        *,
+        body: Optional[Json] = None,
+        params: Optional[Dict[str, str]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+        expect_result: bool = True,
+    ) -> Json:
+        headers = self.__headers(
+            access,
+            accept=MediaTypeJson if expect_result else None,
+            content_type=MediaTypeJson if body else None,
+        )
+        if extra_headers is not None:
+            headers.update(extra_headers)
+        response = await self._perform(
+            method,
+            path,
+            json=body,
+            headers=headers,
+            params=params,
+            expected_media_types=MediaTypeJson if expect_result else None,
+            read_content=expect_result,
+        )
+        return response.json() if expect_result else None  # type: ignore
 
     def __headers(
         self,

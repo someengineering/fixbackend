@@ -377,7 +377,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
         case _:
             lifespan = setup_teardown_application
 
-    app = FastAPI(title="Fix Backend", summary="Backend for the FIX project", lifespan=lifespan)
+    app = FastAPI(
+        title="Fix Backend",
+        summary="Backend for the FIX project",
+        lifespan=lifespan,
+        swagger_ui_parameters=dict(docExpansion=False, tagsSorter="alpha", operationsSorter="alpha"),
+    )
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
 
@@ -459,15 +464,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
             body = response.content
             return body
 
-    @app.get("/health")
+    @app.get("/health", tags=["system"])
     async def health() -> Response:
         return Response(status_code=200)
 
-    @app.get("/ready")
+    @app.get("/ready", tags=["system"])
     async def ready() -> Response:
         return Response(status_code=200)
 
-    @app.get("/api/info")
+    @app.get("/api/info", tags=["system"])
     async def info() -> Response:
         return JSONResponse(
             dict(
@@ -488,7 +493,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
             swagger_ui_parameters=None,
         )
 
-    Instrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(
+        app,
+        should_only_respect_2xx_for_highr=True,
+        latency_lowr_buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2),
+    ).expose(app, tags=["system"])
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
@@ -496,12 +505,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
-        api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
+        api_router.include_router(inventory_router(deps), prefix="/workspaces")
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
-        api_router.include_router(subscription_router())
-        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing_info"])
+        api_router.include_router(subscription_router(), tags=["billing"])
+        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -524,7 +533,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 name="static_assets",
             )
 
-        @app.get("/")
+        @app.get("/", include_in_schema=False)
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
             return Response(content=body, media_type="text/html", headers={"fix-environment": cfg.environment})
