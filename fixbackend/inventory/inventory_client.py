@@ -431,7 +431,7 @@ class InventoryClient(Service):
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
-        return response.json()
+        return response.json()  # type: ignore
 
     async def update_config(self, access: GraphDatabaseAccess, config_id: str, update: Json) -> Json:
         headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson)
@@ -440,7 +440,7 @@ class InventoryClient(Service):
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
-        return response.json()
+        return response.json()  # type: ignore
 
     async def call_json(
         self,
@@ -465,7 +465,7 @@ class InventoryClient(Service):
             expected_media_types=MediaTypeJson if expect_result else None,
             read_content=expect_result,
         )
-        return response.json() if expect_result else None
+        return response.json() if expect_result else None  # type: ignore
 
     def __headers(
         self,

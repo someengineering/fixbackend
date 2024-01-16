@@ -61,7 +61,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return await fix.inventory.report_config(graph_db)
 
     @router.put("/report/config", tags=["report-management"])
-    async def report_config(graph_db: CurrentGraphDbDependency, config: ReportConfig = Body(...)) -> None:
+    async def update_report_config(graph_db: CurrentGraphDbDependency, config: ReportConfig = Body(...)) -> None:
         await fix.inventory.update_report_config(graph_db, config)
 
     @router.get("/report/info", tags=["report-management"])
