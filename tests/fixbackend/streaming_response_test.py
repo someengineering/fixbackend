@@ -37,3 +37,5 @@ async def test_streaming_json() -> None:
     assert [a async for a in response.body_iterator] == ["[", '{"a": 1}', ',{"b": 2}', "]"]
     response = streaming_response("application/ndjson", gen())
     assert [a async for a in response.body_iterator] == ['{"a": 1}\n', '{"b": 2}\n']
+    response = streaming_response("text/csv", gen())
+    assert [a async for a in response.body_iterator] == ["{'a': 1}\n", "{'b': 2}\n"]
