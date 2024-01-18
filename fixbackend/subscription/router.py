@@ -34,7 +34,7 @@ def subscription_router() -> APIRouter:
     router = APIRouter()
 
     # Attention: Changing this route will break the AWS Marketplace integration!
-    @router.post("/cloud/callbacks/aws/marketplace")
+    @router.post("/cloud/callbacks/aws/marketplace", include_in_schema=False)
     async def aws_marketplace_fulfillment(
         request: Request,
         x_amzn_marketplace_token: str = Form(alias="x-amzn-marketplace-token"),
@@ -46,7 +46,7 @@ def subscription_router() -> APIRouter:
         response.set_cookie(MarketplaceTokenCookie, x_amzn_marketplace_token, secure=True, httponly=True)
         return response
 
-    @router.get("/subscriptions/aws/marketplace/add", response_model=None, name=AddUrlName)
+    @router.get("/subscriptions/aws/marketplace/add", response_model=None, name=AddUrlName, include_in_schema=False)
     async def aws_marketplace_fulfillment_after_login(
         request: Request,
         maybe_user: OptionalAuthenticatedUser,

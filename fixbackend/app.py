@@ -49,6 +49,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
@@ -75,7 +76,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.errors import AccessDenied, ResourceNotFound, ClientError
+from fixbackend.errors import NotAllowed, ResourceNotFound, ClientError
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient, InventoryException
@@ -111,7 +112,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
-    http_client = deps.add(SN.http_client, AsyncClient(verify=ca_cert_path or True, timeout=60))
+    http_client = deps.add(SN.http_client, AsyncClient(verify=client_context or True, timeout=60))
     engine = deps.add(
         SN.async_engine,
         create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
@@ -179,6 +180,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 subscription_repo,
             ),
         )
+        deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
         deps.add(
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=UserRepository(session_maker)),
@@ -406,9 +408,29 @@ def fast_api_app(cfg: Config) -> FastAPI:
         case _:
             lifespan = setup_teardown_application
 
-    app = FastAPI(title="Fix Backend", summary="Backend for the FIX project", lifespan=lifespan)
+    app = FastAPI(
+        title="Fix Backend",
+        summary="Backend for the FIX project",
+        lifespan=lifespan,
+        swagger_ui_parameters=dict(docExpansion=False, tagsSorter="alpha", operationsSorter="alpha"),
+    )
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
+
+    if cfg.profiling_enabled:
+        from pyinstrument import Profiler
+
+        @app.middleware("http")
+        async def profile_request(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            profiling = request.query_params.get("profile", False)
+            if profiling:
+                profiler = Profiler(interval=cfg.profiling_interval, async_mode="enabled")
+                profiler.start()
+                await call_next(request)
+                profiler.stop()
+                return HTMLResponse(profiler.output_html())
+            else:
+                return await call_next(request)
 
     app.add_middleware(RealIpMiddleware)
 
@@ -434,8 +456,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         return response
 
-    @app.exception_handler(AccessDenied)
-    async def access_denied_handler(_: Request, exception: AccessDenied) -> Response:
+    @app.exception_handler(NotAllowed)
+    async def access_denied_handler(_: Request, exception: NotAllowed) -> Response:
         return JSONResponse(status_code=403, content={"message": str(exception)})
 
     @app.exception_handler(ResourceNotFound)
@@ -473,13 +495,22 @@ def fast_api_app(cfg: Config) -> FastAPI:
             body = response.content
             return body
 
-    @app.get("/health")
+    @app.get("/health", tags=["system"])
     async def health() -> Response:
         return Response(status_code=200)
 
-    @app.get("/ready")
+    @app.get("/ready", tags=["system"])
     async def ready() -> Response:
         return Response(status_code=200)
+
+    @app.get("/api/info", tags=["system"])
+    async def info() -> Response:
+        return JSONResponse(
+            dict(
+                environment=cfg.environment,
+                aws_marketplace_url=cfg.aws_marketplace_url,
+            )
+        )
 
     @app.get("/docs/events", include_in_schema=False)
     async def domain_events_swagger_ui_html(req: Request) -> HTMLResponse:
@@ -493,7 +524,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
             swagger_ui_parameters=None,
         )
 
-    Instrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(
+        app,
+        should_only_respect_2xx_for_highr=True,
+        latency_lowr_buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2),
+    ).expose(app, tags=["system"])
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
@@ -501,12 +536,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
-        api_router.include_router(inventory_router(deps), prefix="/workspaces", tags=["inventory"])
+        api_router.include_router(inventory_router(deps), prefix="/workspaces")
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
-        api_router.include_router(subscription_router())
-        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing_info"])
+        api_router.include_router(subscription_router(), tags=["billing"])
+        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -529,7 +564,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 name="static_assets",
             )
 
-        @app.get("/")
+        @app.get("/", include_in_schema=False)
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
             return Response(content=body, media_type="text/html", headers={"fix-environment": cfg.environment})

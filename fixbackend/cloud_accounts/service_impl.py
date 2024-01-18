@@ -29,6 +29,7 @@ from fixcloudutils.util import utc
 from httpx import AsyncClient
 from redis.asyncio import Redis
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -44,7 +45,7 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountId,
@@ -56,6 +57,7 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
+from fixbackend.notification.messages import SecurityScanFinished
 from fixbackend.notification.service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
@@ -287,9 +289,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         ),
                     )
                 if first_collect:
-                    text = "Your first security scan is finished! You can now view the results in the FIX console."
-                    await self.notification_service.send_email_to_workspace(
-                        workspace_id=event.tenant_id, subject="FIX: Security Scan finished!", text=text, html=None
+                    await self.notification_service.send_message_to_workspace(
+                        workspace_id=event.tenant_id, message=SecurityScanFinished()
                     )
 
             case AwsAccountDiscovered.kind:
@@ -562,17 +563,19 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         log.info("AwsAccountDiscovered published")
         return result
 
-    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(
+        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
             return None  # account already deleted, do nothing
         if account.workspace_id != workspace_id:
-            raise AccessDenied("Deletion of cloud accounts is only allowed by the owning organization.")
+            raise NotAllowed("Deletion of cloud accounts is only allowed by the owning organization.")
 
         await self.cloud_account_repository.update(
             cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
         )
-        await self.domain_events.publish(AwsAccountDeleted(cloud_account_id, workspace_id, account.account_id))
+        await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)
@@ -581,7 +584,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise ResourceNotFound(f"Cloud account {cloud_account_id} not found")
 
         if account.workspace_id != workspace_id:
-            raise AccessDenied("This account does not belong to this workspace.")
+            raise NotAllowed("This account does not belong to this workspace.")
 
         return account
 

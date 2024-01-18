@@ -28,6 +28,7 @@ from fixcloudutils.types import Json
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 
+from fixbackend.auth.models import User
 from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -44,6 +45,7 @@ from fixbackend.inventory.schemas import (
     SearchRequest,
     HistorySearch,
     HistoryChange,
+    ReportConfig,
 )
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
 
@@ -119,6 +121,13 @@ def mocked_answers(
                     {"at": "2023-12-06T16:52:38Z", "group": {"severity": "medium"}, "v": 26.92307692307692},
                     {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
                 ]
+            )
+        elif request.url.path == "/config/resoto.report.config":
+            return json_response(
+                dict(
+                    report_config=dict(ignore_checks=["a", "b"], override_values={"foo": "bla"}),
+                    ignore_benchmarks=["b1"],
+                )
             )
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
@@ -273,6 +282,7 @@ async def test_account_deleted(
     graph_db_access: GraphDatabaseAccess,
     request_handler_mock: RequestHandlerMock,
     inventory_requests: List[Request],
+    user: User,
 ) -> None:
     async def inventory_call(request: Request) -> Response:
         if request.url.path == "/graph/resoto/search/list":
@@ -282,7 +292,9 @@ async def test_account_deleted(
         raise ValueError(f"Unexpected request: {request.url}")
 
     request_handler_mock.append(inventory_call)
-    message = AwsAccountDeleted(FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123"))
+    message = AwsAccountDeleted(
+        user.id, FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123")
+    )
     await inventory_service._process_account_deleted(message)
     assert len(inventory_requests) == 2
 
@@ -313,3 +325,16 @@ async def test_process_account_name(
     )
     await inventory_service._process_account_name_changed(message)
     assert len(inventory_requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_config(
+    inventory_service: InventoryService, graph_db_access: GraphDatabaseAccess, mocked_answers: RequestHandlerMock
+) -> None:
+    await inventory_service.update_report_config(
+        graph_db_access,
+        ReportConfig(ignore_checks=["a", "b"], ignore_benchmarks=["b1"], override_values={"foo": "bla"}),
+    )
+    assert await inventory_service.report_config(graph_db_access) == ReportConfig(
+        ignore_checks=["a", "b"], ignore_benchmarks=["b1"], override_values={"foo": "bla"}
+    )

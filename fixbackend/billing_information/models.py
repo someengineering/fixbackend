@@ -13,13 +13,25 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-class ClientError(Exception):
-    pass
+from typing import Union, List
+from fixbackend.ids import SubscriptionId
+from attrs import frozen
 
 
-class ResourceNotFound(ClientError):
-    pass
+class PaymentMethods:
+    @frozen
+    class AwsSubscription:
+        subscription_id: SubscriptionId
+
+    @frozen
+    class NoPaymentMethod:
+        pass
 
 
-class NotAllowed(ClientError):
-    pass
+PaymentMethod = Union[PaymentMethods.AwsSubscription, PaymentMethods.NoPaymentMethod]
+
+
+@frozen
+class WorkspacePaymentMethods:
+    current: PaymentMethod
+    available: List[PaymentMethod]

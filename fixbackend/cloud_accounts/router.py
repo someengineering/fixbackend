@@ -18,6 +18,7 @@ import logging
 from fastapi import APIRouter
 from fixcloudutils.util import utc
 
+from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
@@ -84,11 +85,12 @@ def cloud_accounts_router() -> APIRouter:
 
     @router.delete("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def delete_cloud_account(
+        user: AuthenticatedUser,
         workspace: UserWorkspaceDependency,
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
     ) -> None:
-        await service.delete_cloud_account(cloud_account_id, workspace.id)
+        await service.delete_cloud_account(user, cloud_account_id, workspace.id)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/enable")
     async def enable_cloud_account(

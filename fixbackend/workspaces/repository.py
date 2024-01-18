@@ -32,7 +32,7 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.events import SecurityTierUpdated, UserJoinedWorkspace, WorkspaceCreated
-from fixbackend.errors import AccessDenied
+from fixbackend.errors import NotAllowed
 
 
 class WorkspaceRepository(ABC):
@@ -69,7 +69,9 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+    async def update_security_tier(
+        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+    ) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
 
@@ -100,7 +102,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
-            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id))
+            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
 
             await session.commit()
             await session.refresh(organization)
@@ -187,7 +189,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.delete(membership)
             await session.commit()
 
-    async def update_security_tier(self, workspace_id: WorkspaceId, security_tier: SecurityTier) -> Workspace:
+    async def update_security_tier(
+        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+    ) -> Workspace:
         async with self.session_maker() as session:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
@@ -199,13 +203,13 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
             )
             if subcription is None:
-                raise AccessDenied("Organization must have a subscription to change the security tier")
+                raise NotAllowed("Organization must have a subscription to change the security tier")
 
             org.security_tier = security_tier.value
             await session.commit()
             await session.refresh(org)
 
-            event = SecurityTierUpdated(workspace_id, security_tier.value)
+            event = SecurityTierUpdated(workspace_id, user.id, security_tier.value)
             await self.domain_event_sender.publish(event)
 
             return org.to_model()

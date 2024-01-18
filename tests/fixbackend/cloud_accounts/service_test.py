@@ -15,6 +15,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
+from typing_extensions import override
 
 import boto3
 import pytest
@@ -27,6 +28,7 @@ from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -42,7 +44,7 @@ from fixbackend.domain_events.events import (
     TenantAccountsCollected,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import AccessDenied, ResourceNotFound
+from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountAlias,
@@ -55,6 +57,7 @@ from fixbackend.ids import (
     UserCloudAccountName,
     WorkspaceId,
 )
+from fixbackend.notification.messages import EmailMessage
 from fixbackend.notification.service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -200,9 +203,8 @@ class InMemoryNotificationService(NotificationService):
     def __init__(self) -> None:
         self.notified_workspaces: List[WorkspaceId] = []
 
-    async def send_email_to_workspace(
-        self, workspace_id: WorkspaceId, subject: str, text: str, html: Optional[str]
-    ) -> None:
+    @override
+    async def send_message_to_workspace(self, *, workspace_id: WorkspaceId, message: EmailMessage) -> None:
         self.notified_workspaces.append(workspace_id)
 
 
@@ -273,6 +275,7 @@ async def test_create_aws_account(
     repository: CloudAccountRepositoryMock,
     domain_sender: DomainEventSenderMock,
     service: CloudAccountServiceImpl,
+    user: User,
 ) -> None:
     # happy case
     acc = await service.create_aws_account(
@@ -359,7 +362,7 @@ async def test_create_aws_account(
         account_name=account_name,
     )
     assert len(domain_sender.events) == 1
-    await service.delete_cloud_account(deleted_account.id, test_workspace_id)
+    await service.delete_cloud_account(user, deleted_account.id, test_workspace_id)
     deleted_account = await service.get_cloud_account(deleted_account.id, test_workspace_id)
     assert deleted_account.state == CloudAccountStates.Deleted()
     # a new account should be created
@@ -390,8 +393,7 @@ async def test_create_aws_account(
 
 @pytest.mark.asyncio
 async def test_delete_aws_account(
-    repository: CloudAccountRepositoryMock,
-    service: CloudAccountServiceImpl,
+    repository: CloudAccountRepositoryMock, service: CloudAccountServiceImpl, user: User
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=test_workspace_id,
@@ -404,11 +406,11 @@ async def test_delete_aws_account(
 
     # deleting someone's else account
     with pytest.raises(Exception):
-        await service.delete_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
+        await service.delete_cloud_account(user, account.id, WorkspaceId(uuid.uuid4()))
     assert len(repository.accounts) == 1
 
     # success
-    await service.delete_cloud_account(account.id, test_workspace_id)
+    await service.delete_cloud_account(user, account.id, test_workspace_id)
     assert len(repository.accounts) == 1
     assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Deleted)
 
@@ -482,7 +484,7 @@ async def test_get_cloud_account(repository: CloudAccountRepositoryMock, service
     assert cloud_account.user_account_name is None
 
     # wrong tenant id
-    with pytest.raises(AccessDenied):
+    with pytest.raises(NotAllowed):
         await service.get_cloud_account(account.id, WorkspaceId(uuid.uuid4()))
 
     # wrong account id
@@ -545,7 +547,7 @@ async def test_update_cloud_account_name(
     assert updated.workspace_id == account.workspace_id
 
     # wrong tenant id
-    with pytest.raises(AccessDenied):
+    with pytest.raises(NotAllowed):
         await service.update_cloud_account_name(WorkspaceId(uuid.uuid4()), account.id, user_account_name)
 
     # wrong account id

@@ -13,8 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
+from fixbackend.notification.messages import EmailMessage, Invite
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 
@@ -24,7 +26,30 @@ from fixbackend.notification.service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
-from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InMemoryEmailSender
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher
+
+
+class NotificationServiceMock(NotificationService):
+    def __init__(self) -> None:
+        self.call_args: List[EmailMessage] = []
+
+    async def send_email(
+        self,
+        *,
+        to: str,
+        subject: str,
+        text: str,
+        html: Optional[str],
+    ) -> None:
+        pass
+
+    async def send_message(self, *, to: str, message: EmailMessage) -> None:
+        self.call_args.append(message)
+
+
+@pytest.fixture
+def notification_service() -> NotificationServiceMock:
+    return NotificationServiceMock()
 
 
 @pytest.fixture
@@ -51,7 +76,7 @@ async def test_invite_accept_user(
     service: InvitationService,
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    email_sender: InMemoryEmailSender,
+    notification_service: NotificationServiceMock,
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
@@ -74,11 +99,12 @@ async def test_invite_accept_user(
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
 
     # check email
-    email = email_sender.call_args[0]
-    assert email.to == [new_user_email]
-    assert email.subject == f"FIX Cloud {user.email} has invited you to FIX workspace"
-    assert email.text.startswith(f"{user.email} has invited you to join the workspace {workspace.name}.")
-    assert "https://example.com?token=" in email.text
+    email = notification_service.call_args[0]
+    assert isinstance(email, Invite)
+    assert email.recipient == new_user_email
+    assert email.subject() == "You've been invited to join FIX!"
+    assert email.text().startswith(f"{user.email} has invited you to join their workspace")
+    assert "https://example.com?token=" in email.text()
 
     # existing user
     existing_user = await user_repository.create(
@@ -97,12 +123,12 @@ async def test_invite_accept_user(
     assert await service.list_invitations(workspace.id) == [invite]
     assert len(domain_event_sender.events) == 3
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
-    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.email)
+    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
 
     # invite can be revoked
     await service.revoke_invitation(invite.id)
     assert await service.list_invitations(workspace.id) == []
 
-    # invlid token is rejected
+    # invalid token is rejected
     with pytest.raises(ValueError):
         await service.accept_invitation("invalid token")

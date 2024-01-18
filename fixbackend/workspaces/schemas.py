@@ -13,14 +13,13 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId, ExternalId, SecurityTier
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, EmailStr, Field
 
 from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
-from enum import Enum
 
 
 class WorkspaceRead(BaseModel):
@@ -89,48 +88,6 @@ class WorkspaceSettingsUpdate(BaseModel):
     generate_new_external_id: bool = Field(description="Whether to generate a new external identifier")
 
 
-class PaymentMethod(str, Enum):
-    AWS = "aws_marketplace"
-
-
-class SecurityTierJson(str, Enum):
-    Free = "free"
-    Foundational = "foundational"
-    HighSecurity = "high_security"
-
-
-class WorkspaceBilling(BaseModel):
-    payment_method: PaymentMethod = Field(description="The payment method used for this workspace")
-    security_tier: SecurityTierJson = Field(description="The security tier of this workspace")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "payment_method": "aws_marketplace",
-                    "security_tier": "free",
-                }
-            ]
-        }
-    }
-
-    @staticmethod
-    def from_model(workspace: Workspace) -> "WorkspaceBilling":
-        def tier(workspace: Workspace) -> SecurityTierJson:
-            match workspace.security_tier:
-                case SecurityTier.Free:
-                    return SecurityTierJson.Free
-                case SecurityTier.Foundational:
-                    return SecurityTierJson.Foundational
-                case SecurityTier.HighSecurity:
-                    return SecurityTierJson.HighSecurity
-
-        return WorkspaceBilling(
-            payment_method=PaymentMethod.AWS,
-            security_tier=tier(workspace),
-        )
-
-
 class WorkspaceCreate(BaseModel):
     name: str = Field(description="Workspace name, a human-readable string")
     slug: str = Field(description="Workspace unique slug, used in URLs", pattern="^[a-z0-9-]+$")
@@ -148,6 +105,7 @@ class WorkspaceCreate(BaseModel):
 
 
 class WorkspaceInviteRead(BaseModel):
+    invite_id: InvitationId = Field(description="The unique identifier of the invitation")
     workspace_id: WorkspaceId = Field(description="The unique identifier of the workspace to invite the user to")
     workspace_name: str = Field(description="The name of the workspace to invite the user to")
     user_email: str = Field(description="The email of the user to invite")
@@ -157,6 +115,7 @@ class WorkspaceInviteRead(BaseModel):
     @staticmethod
     def from_model(invite: WorkspaceInvitation, workspace: Workspace) -> "WorkspaceInviteRead":
         return WorkspaceInviteRead(
+            invite_id=invite.id,
             workspace_id=invite.workspace_id,
             workspace_name=workspace.name,
             user_email=invite.email,
@@ -168,9 +127,12 @@ class WorkspaceInviteRead(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "organization_slug": "my-org",
+                    "invite_id": "00000000-0000-0000-0000-000000000000",
+                    "workspace_id": "00000000-0000-0000-0000-000000000000",
+                    "workspace_name": "My Organization",
                     "user_email": "foo@bar.com",
-                    "expires_at": "2021-01-01T00:00:00Z",
+                    "expires_at": "2020-01-01T00:00:00Z",
+                    "accepted_at": "2020-01-01T00:00:00Z",
                 }
             ]
         }
@@ -209,9 +171,16 @@ class UserInvite(BaseModel):
     }
 
 
+class FixUserSource(BaseModel):
+    source: Literal["fix"] = "fix"
+
+
+UserSource = Union[FixUserSource]
+
+
 class WorkspaceUserRead(BaseModel):
     id: UserId = Field(description="The user's unique identifier")
-    sources: List[str] = Field(description="Where the user is found")
+    sources: List[UserSource] = Field(description="Where the user is found")
     name: str = Field(description="The user's name")
     email: str = Field(description="The user's email")
     roles: List[str] = Field(description="The user's roles")
@@ -221,7 +190,7 @@ class WorkspaceUserRead(BaseModel):
     def from_model(user: User) -> "WorkspaceUserRead":
         return WorkspaceUserRead(
             id=user.id,
-            sources=[],
+            sources=[FixUserSource()],
             name=user.email,
             email=user.email,
             roles=[],

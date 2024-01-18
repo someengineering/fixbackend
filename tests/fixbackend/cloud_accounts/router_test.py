@@ -23,6 +23,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
+from fixbackend.auth.depedencies import get_current_active_verified_user
+from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
@@ -86,7 +88,9 @@ class InMemoryCloudAccountService(CloudAccountService):
         self.accounts[account.id] = account
         return account
 
-    async def delete_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> None:
+    async def delete_cloud_account(
+        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+    ) -> None:
         del self.accounts[cloud_account_id]
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
@@ -143,13 +147,14 @@ account_id = CloudAccountId("123456789012")
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
+async def client(session: AsyncSession, default_config: Config, user: User) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
     app.dependency_overrides[get_user_workspace] = lambda: workspace
+    app.dependency_overrides[get_current_active_verified_user] = lambda: user
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac

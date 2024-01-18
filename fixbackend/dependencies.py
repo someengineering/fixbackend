@@ -54,6 +54,7 @@ class ServiceNames:
     cloud_account_service = "cloud_account_service"
     domain_event_subscriber = "domain_event_subscriber"
     invitation_repository = "invitation_repository"
+    analytics_event_sender = "analytics_event_sender"
     notification_service = "notification_service"
 
 
