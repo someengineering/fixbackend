@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Literal, Dict
 
 from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
 from fastapi.responses import StreamingResponse, JSONResponse, Response
@@ -174,14 +174,25 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         count, result = await fix.inventory.client.complete_property_path(access=graph_db, request=body)
         return JSONResponse(result, headers={"Total-Count": str(count)})
 
-    @router.post("/search/table", tags=["search"])
+    @router.post(
+        "/search/table",
+        description="Search the inventory and return the results as a table. "
+        "Based on the accept header, the result is returned in the expected format.",
+        responses={200: {"content": {"text/csv": {}, "application/json": {}}}},
+        tags=["search"],
+    )
     async def search_table(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
     ) -> StreamingResponse:
-        search_result = await fix.inventory.search_table(graph_db, query)
-        return streaming_response(
-            request.headers.get("accept", "application/json"), search_result, search_result.context
-        )
+        accept = request.headers.get("accept", "application/json")
+        result_format: Literal["table", "csv"] = "table"
+        extra_headers: Optional[Dict[str, str]] = None
+        if accept == "text/csv":
+            result_format = "csv"
+            extra_headers = {"Content-Disposition": 'attachment; filename="inventory.csv"'}
+
+        search_result = await fix.inventory.search_table(graph_db, query, result_format=result_format)
+        return streaming_response(accept, search_result, headers=extra_headers)
 
     @router.get("/node/{node_id}", tags=["search"])
     async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:

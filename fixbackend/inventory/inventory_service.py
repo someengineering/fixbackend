@@ -180,7 +180,10 @@ class InventoryService(Service):
 
     @timed("fixbackend", "search_table")
     async def search_table(
-        self, db: GraphDatabaseAccess, request: SearchRequest
+        self,
+        db: GraphDatabaseAccess,
+        request: SearchRequest,
+        result_format: Literal["table", "csv"] = "table",
     ) -> AsyncIteratorWithContext[JsonElement]:
         if history := request.history:
             cmd = "history"
@@ -193,7 +196,8 @@ class InventoryService(Service):
             cmd += " " + request.query
         else:
             cmd = "search " + request.query
-        cmd += f" | limit {request.skip}, {request.limit} | list --json-table"
+        fmt_option = "--csv" if result_format == "csv" else "--json-table"
+        cmd += f" | limit {request.skip}, {request.limit} | list {fmt_option}"
         return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
     @timed("fixbackend", "search_start_data")

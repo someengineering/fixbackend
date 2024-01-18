@@ -41,6 +41,11 @@ async def ndjson_serializer(input_iterator: AsyncIterator[JsonElement]) -> Async
         yield json.dumps(item) + "\n"
 
 
+async def csv_serializer(input_iterator: AsyncIterator[JsonElement]) -> AsyncIterator[str]:
+    async for item in input_iterator:
+        yield str(item) + "\n"
+
+
 def streaming_response(
     accept: str, gen: AsyncIterator[JsonElement], headers: Optional[Dict[str, str]] = None
 ) -> StreamingResponse:
@@ -48,5 +53,7 @@ def streaming_response(
         return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson", headers=headers)
     elif accept == "application/json":
         return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)
+    elif accept == "text/csv":
+        return StreamingResponse(csv_serializer(gen), media_type="text/csv", headers=headers)
     else:
         return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)
