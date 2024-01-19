@@ -63,8 +63,7 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_router,
 )
 from fixbackend.billing_information.router import billing_info_router
-from fixbackend.notification.email_sender import Boto3EmailSender, ConsoleEmailSender, EmailSender
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.service import get_notification_service
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -205,17 +204,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
             publisher_name="cloud_account_service",
         )
 
-        def get_notification_service(
-            config: Config, user_repository: UserRepository, workspace_repository: WorkspaceRepositoryImpl
-        ) -> NotificationService:
-            if config.aws_access_key_id and config.aws_secret_access_key:
-                sender: EmailSender = Boto3EmailSender(config)
-            else:
-                sender = ConsoleEmailSender()
-            return NotificationService(workspace_repository, user_repository, sender)
-
         notification_service = deps.add(
-            SN.notification_service, get_notification_service(cfg, UserRepository(session_maker), workspace_repo)
+            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
         )
         deps.add(
             SN.cloud_account_service,
@@ -302,17 +292,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
             publisher_name="cloud_account_service",
         )
 
-        def get_notification_service(
-            config: Config, user_repository: UserRepository, workspace_repository: WorkspaceRepositoryImpl
-        ) -> NotificationService:
-            if config.aws_access_key_id and config.aws_secret_access_key:
-                sender: EmailSender = Boto3EmailSender(config)
-            else:
-                sender = ConsoleEmailSender()
-            return NotificationService(workspace_repository, user_repository, sender)
-
         notification_service = deps.add(
-            SN.notification_service, get_notification_service(cfg, UserRepository(session_maker), workspace_repo)
+            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
         )
         deps.add(
             SN.cloud_account_service,
