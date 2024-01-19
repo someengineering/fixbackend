@@ -78,6 +78,8 @@ def mocked_answers(
                 [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
                  {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
             )
+        elif request.url.path == "/cli/execute" and content.endswith("list --csv"):
+            return nd_json_response(["name,some_int", "a,1"])
         elif request.url.path == "/cli/execute" and content.startswith("history --change node_"):
             return nd_json_response(
                 [{"count": 1, "group": {"account_id": "123", "severity": "critical", "kind": "gcp_disk"}},  # fmt: skip
@@ -251,6 +253,9 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
     request = SearchRequest(query="is(account) and name==foo", history=HistorySearch(change=HistoryChange.node_created))
     result = [e async for e in await inventory_service.search_table(db, request)]
     assert result == expected
+    request = SearchRequest(query="is(account) and name==foo")
+    result = [e async for e in await inventory_service.search_table(db, request, "csv")]
+    assert result == ["name,some_int", "a,1"]
 
 
 async def test_search_start_data(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:

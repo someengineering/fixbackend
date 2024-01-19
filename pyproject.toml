@@ -74,6 +74,7 @@ branch = true
 source = ["fixbackend"]
 omit = [
     "fixbackend/ids.py",
+    "fixbackend/inventory/router.py",
 ]
 
 [tool.coverage.report]

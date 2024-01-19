@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -110,32 +111,43 @@ class InventoryClient(Service):
         allowed_error_codes: Optional[Set[int]] = None,
         read_content: bool = False,
     ) -> Response:
-        try:
-            response = await self.client.request(
-                method, self.inventory_url + path, params=params, headers=headers, content=content, json=json
-            )
-            if read_content:
-                await response.aread()
-        except ConnectError as e:
-            log.exception(f"Can not connect to inventory: {e}")
-            raise InventoryException(502, f"Can not connect to inventory: {e}") from e
-        except ReadTimeout as e:
-            log.warning(f"Request took too long: {e}")
-            # If the request takes longer than the defined timeout, we define this as client error (4xx)
-            raise InventoryRequestTookTooLong(408, f"Request took too long: {e}") from e
-        else:
-            if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
-                if response.status_code == 401:
-                    raise GraphDatabaseForbidden(401, response.text)
-                elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
-                    raise GraphDatabaseNotAvailable(503, response.text)
-                else:
-                    raise InventoryException(response.status_code, response.text)
-            if expected_media_types is not None and not response.is_error:
-                media_type, *params = response.headers.get("content-type", "").split(";")
-                emt = {expected_media_types} if isinstance(expected_media_types, str) else expected_media_types
-                assert media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}"
-            return response
+        async def do_request() -> Response:
+            nonlocal params, headers, content, json
+            try:
+                response = await self.client.request(
+                    method, self.inventory_url + path, params=params, headers=headers, content=content, json=json
+                )
+                if read_content:
+                    await response.aread()
+            except ConnectError as e:
+                log.exception(f"Can not connect to inventory: {e}")
+                raise InventoryException(502, f"Can not connect to inventory: {e}") from e
+            except ReadTimeout as e:
+                log.warning(f"Request took too long: {e}")
+                # If the request takes longer than the defined timeout, we define this as client error (4xx)
+                raise InventoryRequestTookTooLong(408, f"Request took too long: {e}") from e
+            else:
+                if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
+                    if response.status_code == 401:
+                        raise GraphDatabaseForbidden(401, response.text)
+                    elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
+                        raise GraphDatabaseNotAvailable(503, response.text)
+                    else:
+                        raise InventoryException(response.status_code, response.text)
+                if expected_media_types is not None and not response.is_error:
+                    media_type, *params = response.headers.get("content-type", "").split(";")
+                    emt = {expected_media_types} if isinstance(expected_media_types, str) else expected_media_types
+                    assert media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}"
+                return response
+
+        # TODO: This is a workaround until we know why we get this error
+        for num in range(3):
+            try:
+                return await do_request()
+            except GraphDatabaseNotAvailable:
+                log.warning(f"Graph database not available, retrying (attempt {num})")
+                await asyncio.sleep(0.1)
+        raise GraphDatabaseNotAvailable(503, "Graph database not available")
 
     async def execute_single(
         self, access: GraphDatabaseAccess, command: str, *, env: Optional[Dict[str, str]] = None

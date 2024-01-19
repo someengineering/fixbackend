@@ -18,6 +18,7 @@ import os
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
 
@@ -150,7 +151,9 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
         await asyncio.sleep(0.1)
 
     engine = create_async_engine(DATABASE_URL)
-    alembic_config = AlembicConfig("alembic.ini")
+    project_folder = Path(__file__).parent.parent.parent
+    alembic_config = AlembicConfig((project_folder / "alembic.ini").absolute())
+    alembic_config.set_main_option("script_location", str((project_folder / "migrations").absolute()))
     alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
     await asyncio.to_thread(alembic_upgrade, alembic_config, "head")  # noqa
     await asyncio.to_thread(alembic_check, alembic_config)  # noqa
