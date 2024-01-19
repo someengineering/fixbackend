@@ -45,7 +45,7 @@ from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
-from fixbackend.db import get_async_session
+from fixbackend.db import get_async_session, get_async_session_maker
 from fixbackend.dependencies import FixDependencies, ServiceNames, fix_dependencies
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
@@ -58,6 +58,8 @@ from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.notification.email_sender import EmailSender
+from fixbackend.notification.service import NotificationService
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -227,14 +229,14 @@ def graph_database_access_manager(
 
 
 @pytest.fixture
-async def user_repository(session: AsyncSession) -> UserRepository:
-    repo = await anext(get_user_repository(session))
+async def user_repository(async_session_maker: AsyncSessionMaker) -> UserRepository:
+    repo = await anext(get_user_repository(async_session_maker))
     return repo
 
 
 @pytest.fixture
-async def user(session: AsyncSession) -> User:
-    user_repository = await anext(get_user_repository(session))
+async def user(async_session_maker: AsyncSessionMaker) -> User:
+    user_repository = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -515,8 +517,9 @@ async def workspace_repository(
 async def invitation_repository(
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
 ) -> InvitationRepository:
-    return InvitationRepositoryImpl(async_session_maker, workspace_repository)
+    return InvitationRepositoryImpl(async_session_maker, workspace_repository, user_repository)
 
 
 @pytest.fixture
@@ -575,9 +578,12 @@ async def fix_deps(
 
 # noinspection PyUnresolvedReferences
 @pytest.fixture
-async def fast_api(fix_deps: FixDependencies, session: AsyncSession, default_config: Config) -> FastAPI:
+async def fast_api(
+    fix_deps: FixDependencies, session: AsyncSession, default_config: Config, async_session_maker: AsyncSessionMaker
+) -> FastAPI:
     app: FastAPI = fast_api_app(default_config)
     app.dependency_overrides[get_async_session] = lambda: session
+    app.dependency_overrides[get_async_session_maker] = lambda: async_session_maker
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[fix_dependencies] = lambda: fix_deps
     return app
@@ -596,3 +602,31 @@ async def billing_service(
     workspace_repository: WorkspaceRepository,
 ) -> BillingService:
     return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository)
+
+
+@frozen
+class NotificationEmail:
+    to: List[str]
+    subject: str
+    text: str
+    html: Optional[str]
+
+
+class InMemoryEmailSender(EmailSender):
+    def __init__(self) -> None:
+        self.call_args: List[NotificationEmail] = []
+
+    async def send_email(self, *, to: List[str], subject: str, text: str, html: str | None) -> None:
+        self.call_args.append(NotificationEmail(to, subject, text, html))
+
+
+@pytest.fixture
+def email_sender() -> InMemoryEmailSender:
+    return InMemoryEmailSender()
+
+
+@pytest.fixture
+def notification_service(
+    email_sender: EmailSender, workspace_repository: WorkspaceRepository, user_repository: UserRepository
+) -> NotificationService:
+    return NotificationService(workspace_repository, user_repository, email_sender)

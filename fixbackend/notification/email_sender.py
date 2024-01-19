@@ -11,25 +11,19 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Annotated, Optional
-
+from typing import List, Optional
 import boto3
-from fastapi import Depends
-
-from fixbackend.config import Config, ConfigDependency
-from fixbackend.notification.messages import EmailMessage
+from fixbackend.config import Config
 
 
-class EmailService(ABC):
+class EmailSender(ABC):
     @abstractmethod
     async def send_email(
         self,
         *,
-        to: str,
+        to: List[str],
         subject: str,
         text: str,
         html: Optional[str],
@@ -37,26 +31,10 @@ class EmailService(ABC):
         """Send an email to the given address."""
         raise NotImplementedError()
 
-    async def send_message(self, *, message: EmailMessage) -> None:
-        await self.send_email(to=message.recipient, subject=message.subject(), text=message.text(), html=message.html())
 
-
-class ConsoleEmailService(EmailService):
-    async def send_email(
-        self,
-        to: str,
-        subject: str,
-        text: str,
-        html: Optional[str],
-    ) -> None:
-        print(f"Sending email to {to} with subject {subject}")
-        print(f"text: {text}")
-        if html:
-            print(f"html (first 100 chars): {html[:100]}")
-
-
-class EmailServiceImpl(EmailService):
+class Boto3EmailSender(EmailSender):
     def __init__(self, config: Config) -> None:
+        self.config = config
         self.ses = boto3.client(
             "ses",
             config.aws_region,
@@ -67,11 +45,11 @@ class EmailServiceImpl(EmailService):
     async def send_email(
         self,
         *,
-        to: str,
+        to: List[str],
         subject: str,
         text: str,
         html: Optional[str],
-    ) -> None:
+    ) -> None:  # pragma: no cover
         def send_email() -> None:
             body_section = {
                 "Text": {
@@ -87,9 +65,7 @@ class EmailServiceImpl(EmailService):
 
             self.ses.send_email(
                 Destination={
-                    "ToAddresses": [
-                        to,
-                    ],
+                    "ToAddresses": to,
                 },
                 Message={
                     "Body": body_section,
@@ -104,10 +80,15 @@ class EmailServiceImpl(EmailService):
         await asyncio.to_thread(send_email)
 
 
-def get_email_service(config: ConfigDependency) -> EmailService:
-    if config.aws_access_key_id and config.aws_secret_access_key:
-        return EmailServiceImpl(config)
-    return ConsoleEmailService()
-
-
-EmailServiceDependency = Annotated[EmailService, Depends(get_email_service)]
+class ConsoleEmailSender(EmailSender):
+    async def send_email(
+        self,
+        to: List[str],
+        subject: str,
+        text: str,
+        html: Optional[str],
+    ) -> None:  # pragma: no cover
+        print(f"Sending emails to {to} with subject {subject}")
+        print(f"text: {text}")
+        if html:
+            print(f"html: {html}")

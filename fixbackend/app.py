@@ -54,6 +54,7 @@ from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
+from fixbackend.auth.user_repository import UserRepository
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
@@ -62,6 +63,7 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_router,
 )
 from fixbackend.billing_information.router import billing_info_router
+from fixbackend.notification.service import get_notification_service
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -180,7 +182,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
         deps.add(
             SN.invitation_repository,
-            InvitationRepositoryImpl(session_maker, workspace_repo),
+            InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=UserRepository(session_maker)),
         )
         deps.add(
             SN.aws_marketplace_handler,
@@ -201,20 +203,25 @@ def fast_api_app(cfg: Config) -> FastAPI:
             channel="cloud_accounts",
             publisher_name="cloud_account_service",
         )
+
+        notification_service = deps.add(
+            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
+        )
         deps.add(
             SN.cloud_account_service,
             CloudAccountServiceImpl(
-                workspace_repo,
-                CloudAccountRepositoryImpl(session_maker),
-                cloud_accounts_redis_publisher,
-                domain_event_publisher,
-                readwrite_redis,
-                cfg,
-                AwsAccountSetupHelper(boto_session),
+                workspace_repository=workspace_repo,
+                cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+                pubsub_publisher=cloud_accounts_redis_publisher,
+                domain_event_publisher=domain_event_publisher,
+                readwrite_redis=readwrite_redis,
+                config=cfg,
+                account_setup_helper=AwsAccountSetupHelper(boto_session),
                 dispatching=False,
                 http_client=http_client,
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
+                notification_serivce=notification_service,
             ),
         )
 
@@ -284,20 +291,25 @@ def fast_api_app(cfg: Config) -> FastAPI:
             channel="cloud_accounts",
             publisher_name="cloud_account_service",
         )
+
+        notification_service = deps.add(
+            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
+        )
         deps.add(
             SN.cloud_account_service,
             CloudAccountServiceImpl(
-                workspace_repo,
-                CloudAccountRepositoryImpl(session_maker),
-                cloud_accounts_redis_publisher,
-                domain_event_publisher,
-                rw_redis,
-                cfg,
-                AwsAccountSetupHelper(boto_session),
+                workspace_repository=workspace_repo,
+                cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+                pubsub_publisher=cloud_accounts_redis_publisher,
+                domain_event_publisher=domain_event_publisher,
+                readwrite_redis=rw_redis,
+                config=cfg,
+                account_setup_helper=AwsAccountSetupHelper(boto_session),
                 dispatching=True,
                 http_client=http_client,
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
+                notification_serivce=notification_service,
             ),
         )
         deps.add(

@@ -16,16 +16,16 @@
 from attrs import evolve
 from fixcloudutils.util import utc
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
+from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 
-async def create_user(email: str, session: AsyncSession) -> User:
-    user_db = await anext(get_user_repository(session))
+async def create_user(email: str, async_session_maker: AsyncSessionMaker) -> User:
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": email,
         "hashed_password": "notreallyhashed",
@@ -40,15 +40,15 @@ async def create_user(email: str, session: AsyncSession) -> User:
 async def test_create_invitation(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
 
-    user2 = await create_user("123foo@bar.com", session)
+    user2 = await create_user("123foo@bar.com", async_session_maker)
 
     invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
     assert invitation.workspace_id == org_id
@@ -68,14 +68,14 @@ async def test_create_invitation(
 async def test_list_invitations(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
 
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",
@@ -95,13 +95,13 @@ async def test_list_invitations(
 async def test_get_invitation(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",
@@ -119,13 +119,13 @@ async def test_get_invitation(
 async def test_get_invitation_by_email(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",
@@ -143,13 +143,13 @@ async def test_get_invitation_by_email(
 async def test_update_invitation(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",
@@ -168,15 +168,17 @@ async def test_update_invitation(
 
 @pytest.mark.asyncio
 async def test_delete_invitation(
-    workspace_repository: WorkspaceRepository, invitation_repository: InvitationRepository, session: AsyncSession
+    workspace_repository: WorkspaceRepository,
+    invitation_repository: InvitationRepository,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
-    user = await create_user("foo@bar.com", session)
+    user = await create_user("foo@bar.com", async_session_maker)
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
     org_id = organization.id
 
-    user_db = await anext(get_user_repository(session))
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "bar@bar.com",
         "hashed_password": "notreallyhashed",

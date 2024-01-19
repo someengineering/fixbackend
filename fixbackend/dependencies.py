@@ -55,6 +55,7 @@ class ServiceNames:
     domain_event_subscriber = "domain_event_subscriber"
     invitation_repository = "invitation_repository"
     analytics_event_sender = "analytics_event_sender"
+    notification_service = "notification_service"
 
 
 class FixDependencies(Dependencies):

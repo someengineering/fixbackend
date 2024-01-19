@@ -99,4 +99,21 @@ class VerifyEmail:
         )
 
 
-EmailMessage = Union[Signup, Invite, VerifyEmail]
+@frozen(kw_only=True)
+class SecurityScanFinished:
+    def subject(self) -> str:
+        return "FIX: Security Scan Finished"
+
+    def text(self) -> str:
+        return "Your first security scan is finished! You can now view the results in the FIX console."
+
+    def html(self) -> str:
+        return render(
+            "security_scan_finished.html",
+            title=self.subject(),
+            fix_console_url="https://app.global.fixcloud.io/",
+            foo="foo",
+        )
+
+
+EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished]

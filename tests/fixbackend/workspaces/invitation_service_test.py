@@ -16,20 +16,20 @@
 from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
-from fixbackend.notification.messages import EmailMessage
+from fixbackend.notification.messages import EmailMessage, Invite
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.invitation_repository import InvitationRepository
-from fixbackend.notification.email_service import EmailService
+from fixbackend.notification.service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
-class InMemoryEmailService(EmailService):
+class NotificationServiceMock(NotificationService):
     def __init__(self) -> None:
         self.call_args: List[EmailMessage] = []
 
@@ -43,20 +43,20 @@ class InMemoryEmailService(EmailService):
     ) -> None:
         pass
 
-    async def send_message(self, *, message: EmailMessage) -> None:
+    async def send_message(self, *, to: str, message: EmailMessage) -> None:
         self.call_args.append(message)
 
 
 @pytest.fixture
-def email_service() -> InMemoryEmailService:
-    return InMemoryEmailService()
+def notification_service() -> NotificationServiceMock:
+    return NotificationServiceMock()
 
 
 @pytest.fixture
 def service(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    email_service: EmailService,
+    notification_service: NotificationService,
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     default_config: Config,
@@ -64,7 +64,7 @@ def service(
     return InvitationServiceImpl(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
-        email_service=email_service,
+        notification_service=notification_service,
         user_repository=user_repository,
         domain_events=domain_event_sender,
         config=default_config,
@@ -76,7 +76,7 @@ async def test_invite_accept_user(
     service: InvitationService,
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
-    email_service: InMemoryEmailService,
+    notification_service: NotificationServiceMock,
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
@@ -99,7 +99,8 @@ async def test_invite_accept_user(
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
 
     # check email
-    email = email_service.call_args[0]
+    email = notification_service.call_args[0]
+    assert isinstance(email, Invite)
     assert email.recipient == new_user_email
     assert email.subject() == "You've been invited to join FIX!"
     assert email.text().startswith(f"{user.email} has invited you to join their workspace")

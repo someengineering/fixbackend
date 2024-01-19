@@ -15,6 +15,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
+from typing_extensions import override
 
 import boto3
 import pytest
@@ -22,6 +23,7 @@ from attrs import evolve
 from fixcloudutils.redis.event_stream import MessageContext, RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,12 +36,12 @@ from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.config import Config
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
+    AwsAccountDegraded,
     AwsAccountDiscovered,
     CloudAccountCollectInfo,
+    CloudAccountNameChanged,
     Event,
     TenantAccountsCollected,
-    AwsAccountDegraded,
-    CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound
@@ -51,13 +53,14 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    SecurityTier,
     UserCloudAccountName,
     WorkspaceId,
-    SecurityTier,
 )
+from fixbackend.notification.messages import EmailMessage
+from fixbackend.notification.service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
-from fixcloudutils.util import utc
 
 from tests.fixbackend.conftest import RequestHandlerMock
 
@@ -72,6 +75,10 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
 
     async def get(self, id: FixCloudAccountId) -> CloudAccount | None:
         return self.accounts.get(id)
+
+    async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
+        accs = [self.accounts.get(id) for id in ids if self.accounts.get(id)]
+        return [acc for acc in accs if acc is not None]
 
     async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         self.accounts[id] = update_fn(self.accounts[id])
@@ -192,6 +199,20 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
             raise Exception("Not allowed to describe regions")
 
 
+class InMemoryNotificationService(NotificationService):
+    def __init__(self) -> None:
+        self.notified_workspaces: List[WorkspaceId] = []
+
+    @override
+    async def send_message_to_workspace(self, *, workspace_id: WorkspaceId, message: EmailMessage) -> None:
+        self.notified_workspaces.append(workspace_id)
+
+
+@pytest.fixture
+def notification_service() -> InMemoryNotificationService:
+    return InMemoryNotificationService()
+
+
 now = datetime.utcnow()
 
 
@@ -231,19 +252,21 @@ def service(
     default_config: Config,
     boto_session: boto3.Session,
     http_client: AsyncClient,
+    notification_service: InMemoryNotificationService,
 ) -> CloudAccountServiceImpl:
     return CloudAccountServiceImpl(
-        organization_repository,
-        repository,
-        pubsub_publisher,
-        domain_sender,
-        arq_redis,
-        default_config,
-        account_setup_helper,
+        workspace_repository=organization_repository,
+        cloud_account_repository=repository,
+        pubsub_publisher=pubsub_publisher,
+        domain_event_publisher=domain_sender,
+        readwrite_redis=arq_redis,
+        config=default_config,
+        account_setup_helper=account_setup_helper,
         dispatching=False,
         boto_session=boto_session,
         http_client=http_client,
         cf_stack_queue_url=None,
+        notification_serivce=notification_service,
     )
 
 
@@ -403,7 +426,9 @@ async def test_delete_aws_account(
 
 
 @pytest.mark.asyncio
-async def test_store_last_run_info(service: CloudAccountServiceImpl) -> None:
+async def test_store_last_run_info(
+    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService
+) -> None:
     account = await service.create_aws_account(
         workspace_id=test_workspace_id,
         account_id=account_id,
@@ -421,6 +446,9 @@ async def test_store_last_run_info(service: CloudAccountServiceImpl) -> None:
         event.to_json(),
         MessageContext(id="test", kind=TenantAccountsCollected.kind, publisher="test", sent_at=now, received_at=now),
     )
+
+    assert len(notification_service.notified_workspaces) == 1
+    assert notification_service.notified_workspaces[0] == test_workspace_id
 
     account = await service.get_cloud_account(cloud_account_id, test_workspace_id)
 

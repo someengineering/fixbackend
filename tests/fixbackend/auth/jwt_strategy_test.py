@@ -15,7 +15,8 @@
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fixbackend.types import AsyncSessionMaker
 
 from fixbackend.auth.auth_backend import FixJWTStrategy
 from fixbackend.auth.models import User
@@ -30,8 +31,8 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 @pytest.fixture
-async def user(session: AsyncSession) -> User:
-    user_db = await anext(get_user_repository(session))
+async def user(async_session_maker: AsyncSessionMaker) -> User:
+    user_db = await anext(get_user_repository(async_session_maker))
     user_dict = {
         "email": "foo@bar.com",
         "hashed_password": "notreallyhashed",
@@ -57,7 +58,7 @@ async def test_token_validation(
     workspace_repository: WorkspaceRepository,
     user: User,
     default_config: Config,
-    session: AsyncSession,
+    async_session_maker: AsyncSessionMaker,
     invitation_repository: InvitationRepository,
 ) -> None:
     private_key_1 = rsa.generate_private_key(65537, 2048)
@@ -65,7 +66,7 @@ async def test_token_validation(
     strategy1 = FixJWTStrategy([private_key_1.public_key(), private_key_2.public_key()], private_key_1, 3600)
     strategy2 = FixJWTStrategy([private_key_1.public_key(), private_key_2.public_key()], private_key_2, 3600)
 
-    user_repo = await anext(get_user_repository(session))
+    user_repo = await anext(get_user_repository(async_session_maker))
 
     user_manager = UserManager(
         default_config,

@@ -57,6 +57,8 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
+from fixbackend.notification.messages import SecurityScanFinished
+from fixbackend.notification.service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -67,6 +69,7 @@ log = getLogger(__name__)
 class CloudAccountServiceImpl(CloudAccountService, Service):
     def __init__(
         self,
+        *,
         workspace_repository: WorkspaceRepository,
         cloud_account_repository: CloudAccountRepository,
         pubsub_publisher: RedisPubSubPublisher,
@@ -78,11 +81,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         http_client: AsyncClient,
         boto_session: boto3.Session,
         cf_stack_queue_url: Optional[str] = None,
+        notification_serivce: NotificationService,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
+        self.notification_service = notification_serivce
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
@@ -262,6 +267,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         match context.kind:
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
+
+                async def is_very_first_collect() -> bool:
+                    accounts = await self.cloud_account_repository.list(list(event.cloud_accounts.keys()))
+                    return all([account.last_scan_started_at is None for account in accounts])
+
+                first_collect = await is_very_first_collect()
+
                 set_workspace_id(str(event.tenant_id))
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
@@ -275,6 +287,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             last_scan_started_at=account.started_at,
                             next_scan=event.next_run,
                         ),
+                    )
+                if first_collect:
+                    await self.notification_service.send_message_to_workspace(
+                        workspace_id=event.tenant_id, message=SecurityScanFinished()
                     )
 
             case AwsAccountDiscovered.kind:

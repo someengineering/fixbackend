@@ -30,7 +30,7 @@ from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.notification.email_service import EmailService, EmailServiceDependency
+from fixbackend.notification.service import NotificationService, EmailServiceDependency
 from fixbackend.notification.messages import Invite
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
@@ -77,13 +77,13 @@ class InvitationServiceImpl(InvitationService):
         self,
         workspace_repository: WorkspaceRepository,
         invitation_repository: InvitationRepository,
-        email_service: EmailService,
+        notification_service: NotificationService,
         user_repository: UserRepository,
         domain_events: DomainEventPublisher,
         config: Config,
     ) -> None:
         self.invitation_repository = invitation_repository
-        self.email_service = email_service
+        self.notification_service = notification_service
         self.workspace_repository = workspace_repository
         self.user_repository = user_repository
         self.domain_events = domain_events
@@ -106,7 +106,7 @@ class InvitationServiceImpl(InvitationService):
 
         invite_link = f"{accept_invite_base_url}?token={token}"
         message = Invite(inviter=inviter.email, invitation_link=invite_link, recipient=invitee_email)
-        await self.email_service.send_message(message=message)
+        await self.notification_service.send_message(message=message, to=invitee_email)
         return invitation, token
 
     async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
@@ -153,7 +153,7 @@ def get_invitation_service(
     return InvitationServiceImpl(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
-        email_service=email_service,
+        notification_service=email_service,
         user_repository=user_repository,
         domain_events=domain_events,
         config=config,

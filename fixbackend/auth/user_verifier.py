@@ -18,7 +18,7 @@ from typing import Annotated, Optional
 from fastapi import Depends, Request
 
 from fixbackend.auth.models import User
-from fixbackend.notification.email_service import EmailService, EmailServiceDependency
+from fixbackend.notification.service import NotificationService, EmailServiceDependency
 from fixbackend.notification.messages import VerifyEmail
 
 
@@ -39,14 +39,14 @@ class UserVerifier(ABC):
 
 
 class UserVerifierImpl(UserVerifier):
-    def __init__(self, email_service: EmailService) -> None:
-        self.email_service = email_service
+    def __init__(self, notification_service: NotificationService) -> None:
+        self.notification_service = notification_service
 
     async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
         assert request
         message = self.email_content(request=request, user_email=user.email, token=token)
 
-        await self.email_service.send_message(message=message)
+        await self.notification_service.send_message(message=message, to=user.email)
 
 
 def get_user_verifier(email_service: EmailServiceDependency) -> UserVerifier:
