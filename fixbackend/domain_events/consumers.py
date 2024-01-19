@@ -29,6 +29,8 @@ from httpx import AsyncClient, BasicAuth, Request
 from fixbackend.config import Config
 from fixbackend.domain_events.events import UserRegistered
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.notification.messages import Signup
+from fixbackend.notification.service import NotificationService
 
 log = logging.getLogger(__name__)
 
@@ -62,3 +64,17 @@ class CustomerIoEventConsumer(Service):
         resp = await self.http_client.send(request, auth=auth)
         if not resp.is_success:
             raise RuntimeError("Error registering user in customerio: " + resp.text)
+
+
+class EmailOnSignupConsumer(Service):
+    def __init__(
+        self,
+        notification_service: NotificationService,
+        subscriber: DomainEventSubscriber,
+    ) -> None:
+        self.notification_service = notification_service
+        subscriber.subscribe(UserRegistered, self.process_user_registered_event, "email_on_signup")
+
+    async def process_user_registered_event(self, event: UserRegistered) -> None:
+        message = Signup(recipient=event.email)
+        await self.notification_service.send_message(to=event.email, message=message)
