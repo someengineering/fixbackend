@@ -73,7 +73,7 @@ from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.consumers import CustomerIoEventConsumer
+from fixbackend.domain_events.consumers import CustomerIoEventConsumer, EmailOnSignupConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.errors import NotAllowed, ResourceNotFound, ClientError
 from fixbackend.events.router import websocket_router
@@ -207,6 +207,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         notification_service = deps.add(
             SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
         )
+        deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
         deps.add(
             SN.cloud_account_service,
             CloudAccountServiceImpl(
