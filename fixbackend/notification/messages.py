@@ -46,6 +46,9 @@ class Signup:
             "signup.html",
             title=self.subject(),
             email=self.recipient,
+            visit_our_blog_url="https://fix.tt/blog",
+            connect_with_fix_on_linkedin_url="https://www.linkedin.com/company/fix/",
+            discord_url="https://discord.gg/KQ3JeMbE",
             support_email="support@fix.tt",
         )
 
