@@ -34,7 +34,12 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.domain_events.events import AwsAccountDeleted, TenantAccountsCollected, CloudAccountNameChanged
+from fixbackend.domain_events.events import (
+    AwsAccountDeleted,
+    TenantAccountsCollected,
+    CloudAccountNameChanged,
+    WorkspaceCreated,
+)
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -99,6 +104,7 @@ class InventoryService(Service):
         domain_event_subscriber.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
         domain_event_subscriber.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
         domain_event_subscriber.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
+        domain_event_subscriber.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()
@@ -130,6 +136,12 @@ class InventoryService(Service):
                 await self.evict_cache(event.tenant_id)
             else:
                 log.info(f"Cloud account not found in inventory. Ignore. {event}.")
+
+    async def _process_workspace_created(self, event: WorkspaceCreated) -> None:
+        access = await self.db_access_manager.get_database_access(event.workspace_id)
+        if access:
+            log.info(f"Workspace created: {event.workspace_id}. Create related database.")
+            await self.client.create_database(access)
 
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
         # evict the cache for the tenant in the cluster
