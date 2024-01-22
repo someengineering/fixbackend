@@ -317,6 +317,7 @@ async def test_workspace_created(
     async def inventory_call(request: Request) -> Response:
         content = request.content.decode("utf-8")
         if request.url.path == "/cli/execute" and content == "echo hi":
+            assert request.headers["FixGraphDbCreateDatabase"] == "true"
             return nd_json_response(["hi"])
         raise ValueError(f"Unexpected request: {request.url}: {content}")
 
