@@ -397,113 +397,107 @@ class InventoryService(Service):
 
             default_time_since = timedelta(days=7)
 
-            try:
-                (
-                    (severity_resource_counter, accounts),
-                    (benchmarks, checks),
-                    (failed_accounts_by_check_id, severity_by_check_id),
-                    vulnerable_changed,
-                    compliant_changed,
-                    infected_resources_ts,
-                ) = await asyncio.gather(
-                    account_summary(),
-                    benchmark_summary(),
-                    check_summary(),
-                    issues_since(default_time_since, "node_vulnerable"),
-                    issues_since(default_time_since, "node_compliant"),
-                    timeseries_infected(),
-                )
+            (
+                (severity_resource_counter, accounts),
+                (benchmarks, checks),
+                (failed_accounts_by_check_id, severity_by_check_id),
+                vulnerable_changed,
+                compliant_changed,
+                infected_resources_ts,
+            ) = await asyncio.gather(
+                account_summary(),
+                benchmark_summary(),
+                check_summary(),
+                issues_since(default_time_since, "node_vulnerable"),
+                issues_since(default_time_since, "node_compliant"),
+                timeseries_infected(),
+            )
 
-                # combine benchmark and account data
-                account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                severity_check_counter: Dict[str, int] = defaultdict(int)
-                account_check_sum_count: Dict[str, int] = defaultdict(int)
-                failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
-                available_checks = 0
-                for bid, bench in benchmarks.items():
-                    benchmark_account_issue_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                    benchmark_account_resource_counter: Dict[str, Dict[str, int]] = defaultdict(
-                        lambda: defaultdict(int)
-                    )
-                    benchmark_severity_count: Dict[str, int] = defaultdict(int)
-                    for check_info in checks.get(bid, []):
-                        check_id = check_info["id"]
-                        benchmark_severity_count[check_info["severity"]] += 1
-                        available_checks += 1
-                        if severity := severity_by_check_id.get(check_id):
-                            severity_check_counter[severity] += 1
-                            for account_id, failed_resource_count in failed_accounts_by_check_id[check_id].items():
-                                benchmark_account_issue_counter[account_id][severity] += 1
-                                benchmark_account_resource_counter[account_id][severity] += failed_resource_count
-                                account_counter[account_id][severity] += 1
-                                account_check_sum_count[severity] += 1
-                                failed_checks_by_severity[severity].add(check_id)
-                    for account_id, account in accounts.items():
-                        if account.cloud in bench.clouds:
-                            failing = benchmark_account_issue_counter.get(account_id)
-                            failed_resource_checks = benchmark_account_resource_counter.get(account_id)
-                            bench.account_summary[account_id] = BenchmarkAccountSummary(
-                                score=bench_account_score(failing or {}, benchmark_severity_count),
-                                failed_checks=failing,
-                                failed_resource_checks=failed_resource_checks,
-                            )
+            # combine benchmark and account data
+            account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            severity_check_counter: Dict[str, int] = defaultdict(int)
+            account_check_sum_count: Dict[str, int] = defaultdict(int)
+            failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
+            available_checks = 0
+            for bid, bench in benchmarks.items():
+                benchmark_account_issue_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+                benchmark_account_resource_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+                benchmark_severity_count: Dict[str, int] = defaultdict(int)
+                for check_info in checks.get(bid, []):
+                    check_id = check_info["id"]
+                    benchmark_severity_count[check_info["severity"]] += 1
+                    available_checks += 1
+                    if severity := severity_by_check_id.get(check_id):
+                        severity_check_counter[severity] += 1
+                        for account_id, failed_resource_count in failed_accounts_by_check_id[check_id].items():
+                            benchmark_account_issue_counter[account_id][severity] += 1
+                            benchmark_account_resource_counter[account_id][severity] += failed_resource_count
+                            account_counter[account_id][severity] += 1
+                            account_check_sum_count[severity] += 1
+                            failed_checks_by_severity[severity].add(check_id)
+                for account_id, account in accounts.items():
+                    if account.cloud in bench.clouds:
+                        failing = benchmark_account_issue_counter.get(account_id)
+                        failed_resource_checks = benchmark_account_resource_counter.get(account_id)
+                        bench.account_summary[account_id] = BenchmarkAccountSummary(
+                            score=bench_account_score(failing or {}, benchmark_severity_count),
+                            failed_checks=failing,
+                            failed_resource_checks=failed_resource_checks,
+                        )
 
-                # compute a score for every account by averaging the scores of all benchmark results
-                for account_id, failing in account_counter.items():
-                    scores = [
-                        ba.score
-                        for b in benchmarks.values()
-                        for aid, ba in b.account_summary.items()
-                        if aid == account_id
-                    ]
-                    accounts[account_id].score = sum(scores) // len(scores) if scores else 100
+            # compute a score for every account by averaging the scores of all benchmark results
+            for account_id, failing in account_counter.items():
+                scores = [
+                    ba.score for b in benchmarks.values() for aid, ba in b.account_summary.items() if aid == account_id
+                ]
+                accounts[account_id].score = sum(scores) // len(scores) if scores else 100
 
-                # get issues for the top 5 issue_ids
-                tops = await top_issues(failed_checks_by_severity, num=5)
+            # get issues for the top 5 issue_ids
+            tops = await top_issues(failed_checks_by_severity, num=5)
 
-                # sort top changed account by score
-                vulnerable_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
-                compliant_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
+            # sort top changed account by score
+            vulnerable_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
+            compliant_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
 
-                return ReportSummary(
-                    check_summary=CheckSummary(
-                        available_checks=available_checks,
-                        failed_checks=sum(v for v in severity_check_counter.values()),
-                        failed_checks_by_severity=severity_check_counter,
-                        available_resources=sum(v.resource_count for v in accounts.values()),
-                        failed_resources=sum(v for v in severity_resource_counter.values()),
-                        failed_resources_by_severity=severity_resource_counter,
-                    ),
-                    overall_score=overall_score(accounts),
-                    accounts=sorted(list(accounts.values()), key=lambda x: x.score),
-                    benchmarks=list(benchmarks.values()),
-                    changed_vulnerable=vulnerable_changed,
-                    changed_compliant=compliant_changed,
-                    top_checks=tops,
-                    vulnerable_resources=infected_resources_ts,
-                )
+            return ReportSummary(
+                check_summary=CheckSummary(
+                    available_checks=available_checks,
+                    failed_checks=sum(v for v in severity_check_counter.values()),
+                    failed_checks_by_severity=severity_check_counter,
+                    available_resources=sum(v.resource_count for v in accounts.values()),
+                    failed_resources=sum(v for v in severity_resource_counter.values()),
+                    failed_resources_by_severity=severity_resource_counter,
+                ),
+                overall_score=overall_score(accounts),
+                accounts=sorted(list(accounts.values()), key=lambda x: x.score),
+                benchmarks=list(benchmarks.values()),
+                changed_vulnerable=vulnerable_changed,
+                changed_compliant=compliant_changed,
+                top_checks=tops,
+                vulnerable_resources=infected_resources_ts,
+            )
 
-            except InventoryException as ex:
-                log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
-                empty = CheckSummary(
-                    available_checks=0,
-                    failed_checks=0,
-                    failed_checks_by_severity={},
-                    available_resources=0,
-                    failed_resources=0,
-                    failed_resources_by_severity={},
-                )
-                return ReportSummary(
-                    check_summary=empty,
-                    overall_score=0,
-                    accounts=[],
-                    benchmarks=[],
-                    changed_vulnerable=NoVulnerabilitiesChanged,
-                    changed_compliant=NoVulnerabilitiesChanged,
-                    top_checks=[],
-                )
-
-        return await self.cache.call(compute_summary, key=str(db.workspace_id))()
+        try:
+            return await self.cache.call(compute_summary, key=str(db.workspace_id))()
+        except InventoryException as ex:
+            log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
+            empty = CheckSummary(
+                available_checks=0,
+                failed_checks=0,
+                failed_checks_by_severity={},
+                available_resources=0,
+                failed_resources=0,
+                failed_resources_by_severity={},
+            )
+            return ReportSummary(
+                check_summary=empty,
+                overall_score=0,
+                accounts=[],
+                benchmarks=[],
+                changed_vulnerable=NoVulnerabilitiesChanged,
+                changed_compliant=NoVulnerabilitiesChanged,
+                top_checks=[],
+            )
 
     async def __aggregate_roots(self, db: GraphDatabaseAccess) -> Dict[str, Json]:
         if self.__cached_aggregate_roots is not None:
