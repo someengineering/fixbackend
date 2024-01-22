@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import List, Optional, Annotated, Literal, Dict
+from typing import List, Optional, Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
 from fastapi.responses import StreamingResponse, JSONResponse, Response
@@ -185,14 +185,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
     ) -> StreamingResponse:
         accept = request.headers.get("accept", "application/json")
-        result_format: Literal["table", "csv"] = "table"
-        extra_headers: Optional[Dict[str, str]] = {}
-        if accept == "text/csv":
-            result_format = "csv"
-            extra_headers = {"Content-Disposition": 'attachment; filename="inventory.csv"'}
-
+        result_format: Literal["table", "csv"] = "csv" if accept == "text/csv" else "table"
         search_result = await fix.inventory.search_table(graph_db, query, result_format=result_format)
-        extra_headers.update(search_result.context)
+        extra_headers = search_result.context
+        if accept == "text/csv":
+            extra_headers["Content-Disposition"] = 'attachment; filename="inventory.csv"'
         return streaming_response(accept, search_result, headers=extra_headers)
 
     @router.get("/node/{node_id}", tags=["search"])
