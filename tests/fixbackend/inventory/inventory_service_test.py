@@ -29,7 +29,7 @@ from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 
 from fixbackend.auth.models import User
-from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged
+from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged, WorkspaceCreated
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -47,6 +47,7 @@ from fixbackend.inventory.schemas import (
     HistoryChange,
     ReportConfig,
 )
+from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
@@ -302,6 +303,26 @@ async def test_account_deleted(
     )
     await inventory_service._process_account_deleted(message)
     assert len(inventory_requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_workspace_created(
+    inventory_service: InventoryService,
+    graph_db_access: GraphDatabaseAccess,
+    request_handler_mock: RequestHandlerMock,
+    inventory_requests: List[Request],
+    workspace: Workspace,
+    user: User,
+) -> None:
+    async def inventory_call(request: Request) -> Response:
+        content = request.content.decode("utf-8")
+        if request.url.path == "/cli/execute" and content == "echo hi":
+            return nd_json_response(["hi"])
+        raise ValueError(f"Unexpected request: {request.url}: {content}")
+
+    request_handler_mock.append(inventory_call)
+    await inventory_service._process_workspace_created(WorkspaceCreated(workspace.id, user.id))
+    assert len(inventory_requests) == 1
 
 
 @pytest.mark.asyncio
