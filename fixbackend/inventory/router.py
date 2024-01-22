@@ -186,12 +186,13 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     ) -> StreamingResponse:
         accept = request.headers.get("accept", "application/json")
         result_format: Literal["table", "csv"] = "table"
-        extra_headers: Optional[Dict[str, str]] = None
+        extra_headers: Optional[Dict[str, str]] = {}
         if accept == "text/csv":
             result_format = "csv"
             extra_headers = {"Content-Disposition": 'attachment; filename="inventory.csv"'}
 
         search_result = await fix.inventory.search_table(graph_db, query, result_format=result_format)
+        extra_headers.update(search_result.context)
         return streaming_response(accept, search_result, headers=extra_headers)
 
     @router.get("/node/{node_id}", tags=["search"])
