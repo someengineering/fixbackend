@@ -54,6 +54,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     SecurityTier,
+    TaskId,
     UserCloudAccountName,
     WorkspaceId,
 )
@@ -119,6 +120,7 @@ external_id = ExternalId(uuid.uuid4())
 account_name = CloudAccountName("foobar-account-name")
 user_account_name = UserCloudAccountName("foobar-user-account-name")
 account_alias = CloudAccountAlias("foobar-account-alias")
+task_id = TaskId("task_id")
 
 
 organization = Workspace(
@@ -440,7 +442,7 @@ async def test_store_last_run_info(
     cloud_account_id = account.id
     now = datetime.utcnow()
     event = TenantAccountsCollected(
-        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now)}, now
+        test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now, task_id)}, now
     )
     await service.process_domain_event(
         event.to_json(),

@@ -28,7 +28,7 @@ from fixbackend.domain_events.events import (
     WorkspaceCreated,
     Event,
 )
-from fixbackend.ids import UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
+from fixbackend.ids import TaskId, UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
 from fixbackend.utils import uid
 
 user_id = UserId(uid())
@@ -36,7 +36,8 @@ cloud_account_id = CloudAccountId("123")
 fix_cloud_account_id = FixCloudAccountId(uid())
 workspace_id = WorkspaceId(uid())
 now = utc()
-collect_info = CloudAccountCollectInfo(cloud_account_id, 123, 123, now)
+task_id = TaskId("task_123")
+collect_info = CloudAccountCollectInfo(cloud_account_id, 123, 123, now, task_id)
 events = [
     UserRegistered(user_id, "test@example.com", workspace_id),
     AwsAccountDiscovered(fix_cloud_account_id, workspace_id, cloud_account_id),
@@ -84,6 +85,7 @@ event_jsons: Dict[Type[Event], Json] = {
                 "scanned_resources": 123,
                 "duration_seconds": 123,
                 "started_at": "2023-11-28T08:19:02.393629+00:00",
+                "task_id": "task_123",
             }
         },
         "next_run": "2023-11-28T09:19:02.393629+00:00",
