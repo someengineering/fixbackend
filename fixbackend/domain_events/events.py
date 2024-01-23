@@ -29,7 +29,15 @@ from attrs import frozen
 from fixcloudutils.types import Json
 
 from fixbackend.domain_events.converter import converter
-from fixbackend.ids import UserId, WorkspaceId, FixCloudAccountId, CloudAccountId, CloudName, UserCloudAccountName
+from fixbackend.ids import (
+    UserId,
+    WorkspaceId,
+    FixCloudAccountId,
+    CloudAccountId,
+    CloudName,
+    UserCloudAccountName,
+    TaskId,
+)
 
 T = TypeVar("T")
 
@@ -127,6 +135,7 @@ class CloudAccountCollectInfo:
     scanned_resources: int
     duration_seconds: int
     started_at: datetime
+    task_id: Optional[TaskId]
 
 
 @frozen

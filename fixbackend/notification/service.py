@@ -13,14 +13,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import asyncio
 from logging import getLogger
 from typing import Annotated, Iterator, List, Optional
 
-import boto3
 from fastapi import Depends
 
-from fixbackend.config import Config, ConfigDependency
+from fixbackend.config import ConfigDependency
 from fixbackend.ids import WorkspaceId
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.messages import EmailMessage
@@ -83,69 +81,6 @@ class NotificationService:
             await self.email_sender.send_email(
                 to=email_batch, subject=message.subject(), text=message.text(), html=message.html()
             )
-
-
-class ConsoleEmailService(NotificationService):
-    async def send_email(
-        self,
-        to: str,
-        subject: str,
-        text: str,
-        html: Optional[str],
-    ) -> None:  # pragma: no cover
-        print(f"Sending email to {to} with subject {subject}")
-        print(f"text: {text}")
-        if html:
-            print(f"html (first 100 chars): {html[:100]}")
-
-
-class EmailServiceImpl(NotificationService):
-    def __init__(self, config: Config) -> None:
-        self.ses = boto3.client(
-            "ses",
-            config.aws_region,
-            aws_access_key_id=config.aws_access_key_id,
-            aws_secret_access_key=config.aws_secret_access_key,
-        )
-
-    async def send_email(
-        self,
-        *,
-        to: str,
-        subject: str,
-        text: str,
-        html: Optional[str],
-    ) -> None:  # pragma: no cover
-        def send_email() -> None:
-            body_section = {
-                "Text": {
-                    "Charset": "UTF-8",
-                    "Data": text,
-                },
-            }
-            if html:
-                body_section["Html"] = {
-                    "Charset": "UTF-8",
-                    "Data": html,
-                }
-
-            self.ses.send_email(
-                Destination={
-                    "ToAddresses": [
-                        to,
-                    ],
-                },
-                Message={
-                    "Body": body_section,
-                    "Subject": {
-                        "Charset": "UTF-8",
-                        "Data": subject,
-                    },
-                },
-                Source="noreply@fix.tt",
-            )
-
-        await asyncio.to_thread(send_email)
 
 
 def get_notification_service(

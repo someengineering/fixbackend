@@ -17,6 +17,7 @@ AwsARN = NewType("AwsARN", str)
 CloudAccountName = NewType("CloudAccountName", str)
 CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
+TaskId = NewType("TaskId", str)
 
 CloudName = NewType("CloudName", str)
 

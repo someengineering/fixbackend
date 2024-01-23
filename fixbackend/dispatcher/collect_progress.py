@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 from cattrs.preconf.json import make_converter
 from attrs import evolve
-from fixbackend.ids import FixCloudAccountId, CloudAccountId
+from fixbackend.ids import FixCloudAccountId, CloudAccountId, TaskId
 from uuid import UUID
 from datetime import datetime
 
@@ -22,6 +22,7 @@ class CollectionFailure:
 class CollectionSuccess:
     scanned_resources: int
     duration_seconds: int
+    task_id: Optional[TaskId]  # todo: make non-optional after we have a release with this change
 
 
 CollectionResult = Union[CollectionFailure, CollectionSuccess]
@@ -38,8 +39,9 @@ class AccountCollectProgress:
         self,
         scanned_resources: int,
         scan_duration: int,
+        task_id: TaskId,
     ) -> "AccountCollectProgress":
-        return evolve(self, collection_done=CollectionSuccess(scanned_resources, scan_duration))
+        return evolve(self, collection_done=CollectionSuccess(scanned_resources, scan_duration, task_id))
 
     def failed(self, error: str) -> "AccountCollectProgress":
         return evolve(self, collection_done=CollectionFailure(error))

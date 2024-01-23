@@ -38,7 +38,7 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, SecurityTier, WorkspaceId, AwsARN
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, SecurityTier, TaskId, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -139,6 +139,7 @@ class CollectAccountProgress:
         cloud_account_id: FixCloudAccountId,
         nr_of_resources_collected: int,
         scan_duration_seconds: int,
+        task_id: TaskId,
     ) -> CollectState:
         hash_key = self._collect_progress_hash_key(workspace_id)
 
@@ -147,7 +148,7 @@ class CollectAccountProgress:
         if cloud_account_id not in collect_state:
             raise Exception(f"Could not find collect job context for accound id {cloud_account_id}")
         collect_progress_done = collect_state[cloud_account_id].done(
-            scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds
+            scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds, task_id=task_id
         )
         await self.redis.hset(
             hash_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str()
@@ -251,6 +252,7 @@ class DispatcherService(Service):
                     v.collection_done.scanned_resources,
                     v.collection_done.duration_seconds,
                     v.started_at,
+                    v.collection_done.task_id,
                 )
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionSuccess)
@@ -323,6 +325,7 @@ class DispatcherService(Service):
                 account_progress.cloud_account_id,
                 sum(r.nr_of_resources_collected for r in records),
                 duration,
+                TaskId(task_id),
             )
 
         error: Optional[str] = message.get("error")
