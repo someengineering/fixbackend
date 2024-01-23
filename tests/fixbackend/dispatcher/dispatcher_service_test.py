@@ -45,6 +45,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    TaskId,
     UserCloudAccountName,
     WorkspaceId,
 )
@@ -278,6 +279,7 @@ async def test_receive_collect_done_message(
                 mr_1.nr_of_resources_collected + mr_2.nr_of_resources_collected,
                 mr_1.duration,
                 now,
+                TaskId(mr_1.task_id),
             )
         },
         None,
