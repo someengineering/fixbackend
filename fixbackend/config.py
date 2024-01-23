@@ -104,7 +104,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         "--redis-readonly-url", default=os.environ.get("REDIS_READONLY_URL", "redis://localhost:6379/0")
     )
     parser.add_argument(
-        "--redis-temp-store-url", default=os.environ.get("REDIS_TEMP_STORE_URL", "redis://localhost:6379/1")
+        "--redis-temp-store-url", default=os.environ.get("REDIS_TEMP_STORE_URL", "redis://localhost:6379/5")
     )
     parser.add_argument("--redis-queue-url", default=os.environ.get("REDIS_QUEUE_URL", "redis://localhost:6379/5"))
     parser.add_argument("--redis-password", default=os.environ.get("REDIS_PASSWORD"))
