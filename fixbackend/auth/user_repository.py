@@ -130,7 +130,7 @@ class UserRepository(BaseUserDatabase[User, UUID]):
 
         async with self.user_db() as db:
             orm_user = await db.session.get(orm.User, user.id)
-            orm_oauth_account = db.session.get(orm.OAuthAccount, oauth_account.id)
+            orm_oauth_account = await db.session.get(orm.OAuthAccount, oauth_account.id)
 
             for key, value in update_dict.items():
                 setattr(orm_oauth_account, key, value)
