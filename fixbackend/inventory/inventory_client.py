@@ -137,12 +137,12 @@ class InventoryClient(Service):
                 assert media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}"
             return response
 
-    async def create_database(self, access: GraphDatabaseAccess) -> None:
+    async def create_database(self, access: GraphDatabaseAccess, *, graph: str = "resoto") -> None:
         log.info(f"Create new database for tenant: {access.workspace_id}")
+        # Create a new database and an empty graph
         await self._perform(
             "POST",
-            "/cli/execute",
-            content="echo hi",
+            f"/graph/{graph}",
             read_content=True,
             headers=self.__headers(access, content_type=MediaTypeText, FixGraphDbCreateDatabase="true"),
         )

@@ -491,6 +491,7 @@ class InventoryService(Service):
 
         try:
             return await self.cache.call(compute_summary, key=str(db.workspace_id))()
+        # TODO: the exception handling can be removed once all existing users have a database.
         except InventoryException as ex:
             log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
             empty = CheckSummary(

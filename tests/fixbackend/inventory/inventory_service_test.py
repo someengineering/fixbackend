@@ -316,9 +316,9 @@ async def test_workspace_created(
 ) -> None:
     async def inventory_call(request: Request) -> Response:
         content = request.content.decode("utf-8")
-        if request.url.path == "/cli/execute" and content == "echo hi":
+        if request.url.path == "/graph/resoto":
             assert request.headers["FixGraphDbCreateDatabase"] == "true"
-            return nd_json_response(["hi"])
+            return json_response({"id": "root", "reported": {"kind": "graph_root", "name": "root"}})
         raise ValueError(f"Unexpected request: {request.url}: {content}")
 
     request_handler_mock.append(inventory_call)
