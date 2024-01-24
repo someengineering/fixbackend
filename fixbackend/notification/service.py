@@ -13,11 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta
 from logging import getLogger
-from typing import Annotated, Iterator, List, Optional
+from typing import Iterator, List, Optional
 
 import cattrs
 from attr import frozen
-from fastapi import Depends
 from fixcloudutils.redis.event_stream import RedisStreamPublisher, RedisStreamListener, MessageContext
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
@@ -26,7 +25,6 @@ from redis.asyncio import Redis
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
-from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import TenantAccountsCollected
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -196,10 +194,3 @@ class NotificationService(Service):
                     if not channels:  # if no channels are configured for this alert, ignore it
                         continue
                     await send_alert_for(access, benchmark, severity, channels)
-
-
-def get_notification_service(deps: FixDependency) -> NotificationService:
-    return deps.service(ServiceNames.notification_service, NotificationService)
-
-
-NotificationServiceDependency = Annotated[NotificationService, Depends(get_notification_service)]
