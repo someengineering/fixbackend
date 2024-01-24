@@ -32,7 +32,7 @@ from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.notification.service import NotificationService, EmailServiceDependency
+from fixbackend.notification.service import NotificationService, NotificationServiceDependency
 from fixbackend.notification.email.email_messages import Invite
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
