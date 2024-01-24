@@ -18,8 +18,9 @@ from typing import Annotated, Optional
 from fastapi import Depends, Request
 
 from fixbackend.auth.models import User
-from fixbackend.notification.service import NotificationService, NotificationServiceDependency
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.notification.email.email_messages import VerifyEmail
+from fixbackend.notification.service import NotificationService
 
 
 class UserVerifier(ABC):
@@ -49,8 +50,8 @@ class UserVerifierImpl(UserVerifier):
         await self.notification_service.send_message(message=message, to=user.email)
 
 
-def get_user_verifier(email_service: NotificationServiceDependency) -> UserVerifier:
-    return UserVerifierImpl(email_service)
+def get_user_verifier(deps: FixDependency) -> UserVerifier:
+    return UserVerifierImpl(deps.service(ServiceNames.notification_service, NotificationService))
 
 
 UserVerifierDependency = Annotated[UserVerifier, Depends(get_user_verifier)]
