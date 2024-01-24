@@ -35,7 +35,7 @@ from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import SubscriptionId
+from fixbackend.ids import SecurityTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
@@ -137,16 +137,17 @@ class AwsMarketplaceHandler(Service):
                         ws_id, start=last_charged, end=billing_time, min_resources_collected=100, min_nr_of_collects=3
                     )
                 ]
+                tiers = [summary.security_tier for summary in summaries]
+                # highest recorded tier
+                security_tier = max(tiers)
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
-                if usage == 0:
+                if security_tier == SecurityTier.Free or usage == 0:
                     log.info(f"AWS Marketplace: customer {customer} has no usage")
                     # move the charge timestamp tp
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, start_month)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
-                tiers = [summary.security_tier for summary in summaries]
-                security_tier = max(tiers)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
