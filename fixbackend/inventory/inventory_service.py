@@ -77,6 +77,7 @@ ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
 )
 ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
+ReportSeverityIncluded: Dict[str, List[str]] = {n: ReportSeverityList[idx:] for idx, n in enumerate(ReportSeverityList)}
 Inventory = "inventory-service"
 
 

@@ -81,13 +81,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         http_client: AsyncClient,
         boto_session: boto3.Session,
         cf_stack_queue_url: Optional[str] = None,
-        notification_serivce: NotificationService,
+        notification_service: NotificationService,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
-        self.notification_service = notification_serivce
+        self.notification_service = notification_service
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,

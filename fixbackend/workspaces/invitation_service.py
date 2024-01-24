@@ -30,7 +30,7 @@ from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.notification.service import NotificationService, EmailServiceDependency
+from fixbackend.notification.service import NotificationService, NotificationServiceDependency
 from fixbackend.notification.email.email_messages import Invite
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
@@ -145,7 +145,7 @@ class InvitationServiceImpl(InvitationService):
 def get_invitation_service(
     workspace_repository: WorkspaceRepositoryDependency,
     invitation_repository: InvitationRepositoryDependency,
-    email_service: EmailServiceDependency,
+    email_service: NotificationServiceDependency,
     user_repository: UserRepositoryDependency,
     domain_events: DomainEventPublisherDependency,
     config: ConfigDependency,

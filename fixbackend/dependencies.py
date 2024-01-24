@@ -49,6 +49,7 @@ class ServiceNames:
     customerio_consumer = "customerio_consumer"
     aws_marketplace_handler = "aws_marketplace_handler"
     workspace_repo = "workspace_repo"
+    user_repo = "user_repo"
     subscription_repo = "subscription_repo"
     billing = "billing"
     cloud_account_service = "cloud_account_service"

@@ -268,7 +268,7 @@ def service(
         boto_session=boto_session,
         http_client=http_client,
         cf_stack_queue_url=None,
-        notification_serivce=notification_service,
+        notification_service=notification_service,
     )
 
 

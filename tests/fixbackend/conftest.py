@@ -627,6 +627,16 @@ def email_sender() -> InMemoryEmailSender:
 
 @pytest.fixture
 def notification_service(
-    email_sender: EmailSender, workspace_repository: WorkspaceRepository, user_repository: UserRepository
+    default_config: Config,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
+    inventory_service: InventoryService,
+    redis: Redis,
+    email_sender: EmailSender,
 ) -> NotificationService:
-    return NotificationService(workspace_repository, user_repository, email_sender)
+    service = NotificationService(
+        default_config, workspace_repository, graph_database_access_manager, user_repository, inventory_service, redis
+    )
+    service.email_sender = email_sender
+    return service

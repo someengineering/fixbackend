@@ -63,7 +63,7 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_router,
 )
 from fixbackend.billing_information.router import billing_info_router
-from fixbackend.notification.service import get_notification_service
+from fixbackend.notification.service import NotificationService
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -150,7 +150,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
         graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
-        deps.add(
+        inventory_service = deps.add(
             SN.inventory,
             InventoryService(inventory_client, graph_db_access, domain_event_subscriber, temp_store_redis),
         )
@@ -165,6 +165,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -182,7 +183,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
         deps.add(
             SN.invitation_repository,
-            InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=UserRepository(session_maker)),
+            InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
         )
         deps.add(
             SN.aws_marketplace_handler,
@@ -205,7 +206,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
 
         notification_service = deps.add(
-            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
+            SN.notification_service,
+            NotificationService(cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis),
         )
         deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
         deps.add(
@@ -222,7 +224,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 http_client=http_client,
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
-                notification_serivce=notification_service,
+                notification_service=notification_service,
             ),
         )
 
@@ -247,21 +249,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 )
             ),
         )
-        rw_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
+        readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url))
         domain_event_subscriber = deps.add(
             SN.domain_event_subscriber,
-            DomainEventSubscriber(rw_redis, cfg, "dispatching"),
+            DomainEventSubscriber(readwrite_redis, cfg, "dispatching"),
         )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
         cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
-        db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+        graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
             RedisStreamPublisher(
-                rw_redis,
+                readwrite_redis,
                 DomainEventsStreamName,
                 "dispatching",
                 keep_unprocessed_messages_for=timedelta(days=7),
@@ -276,10 +278,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
                 session_maker,
-                db_access,
+                graph_db_access,
                 domain_event_publisher,
                 RedisPubSubPublisher(
-                    redis=rw_redis,
+                    redis=readwrite_redis,
                     channel="workspaces",
                     publisher_name="workspace_service",
                 ),
@@ -288,13 +290,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
 
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
-            redis=rw_redis,
+            redis=readwrite_redis,
             channel="cloud_accounts",
             publisher_name="cloud_account_service",
         )
-
+        user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
+        inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
+        inventory_service = deps.add(
+            SN.inventory,
+            InventoryService(inventory_client, graph_db_access, domain_event_subscriber, temp_store_redis),
+        )
         notification_service = deps.add(
-            SN.notification_service, get_notification_service(cfg, workspace_repo, UserRepository(session_maker))
+            SN.notification_service,
+            NotificationService(cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis),
         )
         deps.add(
             SN.cloud_account_service,
@@ -303,25 +311,25 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
                 pubsub_publisher=cloud_accounts_redis_publisher,
                 domain_event_publisher=domain_event_publisher,
-                readwrite_redis=rw_redis,
+                readwrite_redis=readwrite_redis,
                 config=cfg,
                 account_setup_helper=AwsAccountSetupHelper(boto_session),
                 dispatching=True,
                 http_client=http_client,
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
-                notification_serivce=notification_service,
+                notification_service=notification_service,
             ),
         )
         deps.add(
             SN.dispatching,
             DispatcherService(
-                rw_redis,
+                readwrite_redis,
                 cloud_accounts,
                 next_run_repo,
                 metering_repo,
                 collect_queue,
-                db_access,
+                graph_db_access,
                 domain_event_sender,
                 temp_store_redis,
                 domain_event_subscriber,
