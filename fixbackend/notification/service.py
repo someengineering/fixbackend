@@ -37,6 +37,10 @@ from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
 )
+from fixbackend.notification.model import AlertingSetting
+from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
+from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
+from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -76,6 +80,7 @@ class NotificationService(Service):
         user_repository: UserRepository,
         inventory_service: InventoryService,
         readwrite_redis: Redis,
+        session_maker: AsyncSessionMaker,
     ) -> None:
         self.email_sender: EmailSender = email_sender_from_config(config)
         self.workspace_repository = workspace_repository
@@ -92,6 +97,8 @@ class NotificationService(Service):
             consider_failed_after=timedelta(seconds=180),
             batch_size=50,
         )
+        self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
+        self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
 
     async def send_email(
         self,
@@ -156,15 +163,14 @@ class NotificationService(Service):
         set_workspace_id(collected.tenant_id)
         earliest_started_at = min([a.started_at for a in collected.cloud_accounts.values()], default=utc())
         task_ids = ",".join(a.task_id for a in collected.cloud_accounts.values() if a.task_id is not None)
+        now = utc()
 
-        async def send_alert_for(
-            access: GraphDatabaseAccess, benchmark: str, severity: str, channels: List[str]
-        ) -> None:
-            included_severities = ",".join(ReportSeverityIncluded.get(severity, ["none"]))
+        async def send_alert_for(access: GraphDatabaseAccess, benchmark: str, setting: AlertingSetting) -> None:
+            included_severities = ",".join(ReportSeverityIncluded.get(setting.severity, ["none"]))
             issue = f"benchmarks[]=={benchmark} and run_id in [{task_ids}] and severity in [{included_severities}]"
             request = SearchRequest(
                 query=f"/security.has_issues==true and /security.issues[].{{{issue}}}",
-                history=HistorySearch(after=earliest_started_at, change=HistoryChange.node_vulnerable),
+                history=HistorySearch(after=earliest_started_at, before=now, change=HistoryChange.node_vulnerable),
                 limit=25,
                 count=True,
             )
@@ -173,24 +179,23 @@ class NotificationService(Service):
                 cattrs.structure(e["row"], VulnerableResource) async for e in result if "row" in e  # type: ignore
             ]
             if vulnerable_resources:
-                for channel in channels:
+                for channel in setting.channels:
                     alert = VulnerableResourcesDetected(
                         workspace_id=collected.tenant_id,
                         channel=channel,
                         benchmark=benchmark,
-                        severity=severity,
+                        severity=setting.severity,
                         count=int(result.context.get("total-count", len(vulnerable_resources))),
                         examples=vulnerable_resources,
                     )
                     await self.alert_publisher.publish("vulnerable_resources_detected", cattrs.unstructure(alert))
 
-        if collected.cloud_accounts:
-            benchmark_severities = [
-                ("aws_cis_1_5", "low", ["slack", "discord"]),
-                ("aws_cis_2_0", "critical", ["email"]),
-            ]
-            if access := await self.graphdb_access.get_database_access(collected.tenant_id):
-                for benchmark, severity, channels in benchmark_severities:
-                    if not channels:  # if no channels are configured for this alert, ignore it
-                        continue
-                    await send_alert_for(access, benchmark, severity, channels)
+        # make sure we have collected some resources, have a non-empty alert config and access to the graph db
+        if sum(a.scanned_resources for a in collected.cloud_accounts.values()) > 0:
+            if (
+                (cfg := await self.workspace_alert_repo.alerting_for(collected.tenant_id))
+                and (non_empty_alerts := cfg.non_empty_alerts())
+                and (access := await self.graphdb_access.get_database_access(collected.tenant_id))
+            ):
+                for benchmark, setting in non_empty_alerts.items():
+                    await send_alert_for(access, benchmark, setting)
