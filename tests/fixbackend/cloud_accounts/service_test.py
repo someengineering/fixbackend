@@ -58,7 +58,7 @@ from fixbackend.ids import (
     UserCloudAccountName,
     WorkspaceId,
 )
-from fixbackend.notification.messages import EmailMessage
+from fixbackend.notification.email.email_messages import EmailMessage
 from fixbackend.notification.service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl

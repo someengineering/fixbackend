@@ -16,7 +16,7 @@
 from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
-from fixbackend.notification.messages import EmailMessage, Invite
+from fixbackend.notification.email.email_messages import EmailMessage, Invite
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 

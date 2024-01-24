@@ -14,7 +14,7 @@
 
 
 import pytest
-from fixbackend.notification.messages import SecurityScanFinished
+from fixbackend.notification.email.email_messages import SecurityScanFinished
 
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository

@@ -58,7 +58,7 @@ from fixbackend.ids import SubscriptionId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.notification.email_sender import EmailSender
+from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.service import NotificationService
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService

@@ -21,8 +21,8 @@ from fastapi import Depends
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import WorkspaceId
 from fixbackend.logging_context import set_workspace_id
-from fixbackend.notification.messages import EmailMessage
-from fixbackend.notification.email_sender import Boto3EmailSender, ConsoleEmailSender, EmailSender
+from fixbackend.notification.email.email_messages import EmailMessage
+from fixbackend.notification.email.email_sender import Boto3EmailSender, ConsoleEmailSender, EmailSender
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 
