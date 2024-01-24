@@ -634,9 +634,16 @@ def notification_service(
     inventory_service: InventoryService,
     redis: Redis,
     email_sender: EmailSender,
+    async_session_maker: AsyncSessionMaker,
 ) -> NotificationService:
     service = NotificationService(
-        default_config, workspace_repository, graph_database_access_manager, user_repository, inventory_service, redis
+        default_config,
+        workspace_repository,
+        graph_database_access_manager,
+        user_repository,
+        inventory_service,
+        redis,
+        async_session_maker,
     )
     service.email_sender = email_sender
     return service

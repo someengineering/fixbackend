@@ -207,7 +207,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         notification_service = deps.add(
             SN.notification_service,
-            NotificationService(cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis),
+            NotificationService(
+                cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis, session_maker
+            ),
         )
         deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
         deps.add(
@@ -302,7 +304,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         notification_service = deps.add(
             SN.notification_service,
-            NotificationService(cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis),
+            NotificationService(
+                cfg, workspace_repo, graph_db_access, user_repo, inventory_service, readwrite_redis, session_maker
+            ),
         )
         deps.add(
             SN.cloud_account_service,

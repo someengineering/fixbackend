@@ -72,6 +72,7 @@ SeverityByCheckId = Dict[str, str]
 T = TypeVar("T")
 V = TypeVar("V")
 
+ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 ReportSeverityList = ["info", "low", "medium", "high", "critical"]
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
