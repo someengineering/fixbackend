@@ -23,6 +23,8 @@ from fixbackend.notification.model import NotificationProvider
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
+NotificationProvider = Literal["slack", "discord", "pagerduty", "teams"]
+
 
 class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):
     __tablename__ = "notification_provider_config"
