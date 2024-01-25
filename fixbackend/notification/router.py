@@ -156,7 +156,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.update_notification_provider_config(workspace_id, "pagerduty", name, config)
 
-    @router.put("/{workspace_id}/notification/add/pagerduty")
+    @router.put("/{workspace_id}/notification/add/teams")
     async def add_teams(
         _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), webhook_url: str = Query()
     ) -> None:
