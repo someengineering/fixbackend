@@ -18,7 +18,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Body
 from fixcloudutils.types import Json
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
@@ -186,8 +186,11 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def update_alerting_for(
         _: AuthenticatedUser, workspace_id: WorkspaceId, setting: Dict[str, AlertingSetting] = Body()
     ) -> Response:
-        ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_alerting_for(WorkspaceAlert(workspace_id=workspace_id, alerts=setting))
-        return Response(status_code=204)
+        try:
+            ns = fix.service(ServiceNames.notification_service, NotificationService)
+            await ns.update_alerting_for(WorkspaceAlert(workspace_id=workspace_id, alerts=setting))
+            return Response(status_code=204)
+        except ValueError as ex:
+            return JSONResponse(status_code=422, content=dict(error=str(ex)))
 
     return router

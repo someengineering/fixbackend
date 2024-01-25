@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta
 from logging import getLogger
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
 import cattrs
 from attr import frozen
@@ -37,7 +37,7 @@ from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
 )
-from fixbackend.notification.model import AlertingSetting, WorkspaceAlert
+from fixbackend.notification.model import AlertingSetting, WorkspaceAlert, AllowedChannels
 from fixbackend.notification.notification_provider_config_repo import (
     NotificationProviderConfigRepository,
     NotificationProvider,
@@ -143,8 +143,20 @@ class NotificationService(Service):
     async def alerting_for(self, workspace_id: WorkspaceId) -> Optional[WorkspaceAlert]:
         return await self.workspace_alert_repo.alerting_for(workspace_id)
 
-    async def update_alerting_for(self, alert: WorkspaceAlert) -> Optional[WorkspaceAlert]:
-        return await self.workspace_alert_repo.set_alerting_for_workspace(alert)
+    async def update_alerting_for(self, alert: WorkspaceAlert) -> Union[None, WorkspaceAlert]:
+        # validate the setting:
+        # - all benchmark names must exist
+        # - all channels must be known
+        if access := await self.graphdb_access.get_database_access(alert.workspace_id):
+            benchmark_ids = set(await self.inventory_service.client.benchmarks(access, ids_only=True))
+            for benchmark, setting in alert.alerts.items():
+                if benchmark not in benchmark_ids:
+                    raise ValueError(f"Benchmark {benchmark} not found")
+                for channel in setting.channels:
+                    if channel not in AllowedChannels:
+                        raise ValueError(f"Unknown channel {channel}")
+            return await self.workspace_alert_repo.set_alerting_for_workspace(alert)
+        raise ValueError(f"Workspace {alert.workspace_id} does not have GraphDbAccess?")
 
     async def _send_alert(self, message: Json, context: MessageContext) -> None:
         if context.kind != "vulnerable_resources_detected":

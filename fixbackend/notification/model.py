@@ -26,7 +26,8 @@ from pydantic import BaseModel, Field
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_service import ReportSeverity
 
-Channel = Literal["email", "slack", "discord", "pagerduty"]
+Channel = Literal["email", "slack", "discord", "pagerduty", "teams"]
+AllowedChannels = {"email", "slack", "discord", "pagerduty", "teams"}
 
 
 class AlertingSetting(BaseModel):
