@@ -16,13 +16,14 @@ import logging
 from typing import Dict
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request, Response, Query, HTTPException
+from fastapi import APIRouter, Request, Response, Query, HTTPException, Body
 from fixcloudutils.types import Json
 from starlette.responses import RedirectResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import WorkspaceId
+from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.service import NotificationService
 
 log = logging.getLogger(__name__)
@@ -155,23 +156,38 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     @router.put("/{workspace_id}/notification/add/pagerduty")
     async def add_pagerduty(
         _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), integration_key: str = Query()
-    ) -> None:
+    ) -> Response:
         if not name or not integration_key:
             raise HTTPException(status_code=400, detail="Missing integration key")
         config = dict(integration_key=integration_key)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.update_notification_provider_config(workspace_id, "pagerduty", name, config)
+        return Response(status_code=204)
 
     @router.put("/{workspace_id}/notification/add/teams")
     async def add_teams(
         _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), webhook_url: str = Query()
-    ) -> None:
+    ) -> Response:
         if not name or not webhook_url:
             raise HTTPException(status_code=400, detail="Missing name or webhook URL")
         config = dict(webhook_url=webhook_url)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.update_notification_provider_config(workspace_id, "teams", name, config)
+        return Response(status_code=204)
+
+    @router.get("/{workspace_id}/alerting/setting")
+    async def alerting_for(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Dict[str, AlertingSetting]:
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        return setting.alerts if (setting := await ns.alerting_for(workspace_id)) else {}
+
+    @router.put("/{workspace_id}/alerting/setting")
+    async def update_alerting_for(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, setting: Dict[str, AlertingSetting] = Body()
+    ) -> Response:
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_alerting_for(WorkspaceAlert(workspace_id=workspace_id, alerts=setting))
+        return Response(status_code=204)
 
     return router
