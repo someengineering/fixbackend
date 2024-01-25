@@ -37,7 +37,7 @@ from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
 )
-from fixbackend.notification.model import AlertingSetting
+from fixbackend.notification.model import AlertingSetting, WorkspaceAlert
 from fixbackend.notification.notification_provider_config_repo import (
     NotificationProviderConfigRepository,
     NotificationProvider,
@@ -131,10 +131,20 @@ class NotificationService(Service):
                 to=email_batch, subject=message.subject(), text=message.text(), html=message.html()
             )
 
+    async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, str]:
+        configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)
+        return {c.provider: c.name for c in configs}
+
     async def update_notification_provider_config(
         self, workspace_id: WorkspaceId, provider: NotificationProvider, name: str, config: Json
     ) -> None:
         await self.provider_config_repo.update_messaging_config_for_workspace(workspace_id, provider, name, config)
+
+    async def alerting_for(self, workspace_id: WorkspaceId) -> Optional[WorkspaceAlert]:
+        return await self.workspace_alert_repo.alerting_for(workspace_id)
+
+    async def update_alerting_for(self, alert: WorkspaceAlert) -> Optional[WorkspaceAlert]:
+        return await self.workspace_alert_repo.set_alerting_for_workspace(alert)
 
     async def _send_alert(self, message: Json, context: MessageContext) -> None:
         if context.kind != "vulnerable_resources_detected":
@@ -149,10 +159,6 @@ class NotificationService(Service):
                 pass
             case "pagerduty":
                 pass
-
-    async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, str]:
-        configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)
-        return {c.provider: c.name for c in configs}
 
     async def alert_on_changed(self, collected: TenantAccountsCollected) -> None:
         set_workspace_id(collected.tenant_id)
