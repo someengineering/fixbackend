@@ -13,11 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException
 from fixcloudutils.types import Json
 from starlette.responses import RedirectResponse
-from urllib.parse import urlencode
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
@@ -144,5 +144,14 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             workspace_id=str(workspace_id),
         )
         return RedirectResponse("https://discord.com/api/oauth2/authorize?" + urlencode(params))
+
+    @router.put("/{workspace_id}/notification/add/pagerduty")
+    async def add_pagerduty(_: AuthenticatedUser, workspace_id: WorkspaceId, integration_key: str = Query()) -> None:
+        if not integration_key:
+            raise HTTPException(status_code=400, detail="Missing integration key")
+        config = dict(integration_key=integration_key)
+        # store token and webhook url
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_notification_provider_config(workspace_id, "pagerduty", "alert", config)
 
     return router
