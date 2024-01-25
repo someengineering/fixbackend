@@ -11,6 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import logging
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException
@@ -31,10 +32,12 @@ State = "add-notification-channel"
 
 
 def notification_router(fix: FixDependencies) -> APIRouter:
-    router = APIRouter(prefix="/{workspace_id}/notification")
+    router = APIRouter()
     cfg = fix.config
 
-    @router.get("/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None)
+    @router.get(
+        "/{workspace_id}/notification/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None
+    )
     async def add_slack_confirm(
         workspace_id: WorkspaceId, request: Request, code: str = Query(), state: str = Query()
     ) -> Response:
@@ -87,11 +90,12 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         # redirect to the UI: TODO: where exactly?
         return RedirectResponse("/?message=slack_channel_added")
 
-    @router.get("/add/slack")
+    @router.get("/{workspace_id}/notification/add/slack")
     async def add_slack(user: AuthenticatedUser, workspace_id: WorkspaceId, request: Request) -> Response:
         log.info(f"User {user.id} in workspace {workspace_id} wants to integrate slack notifications")
         params = dict(
             client_id=cfg.slack_oauth_client_id,
+            response_type="code",
             scope="incoming-webhook",
             state=State,
             redirect_uri=str(request.url_for(AddSlack, workspace_id=workspace_id)),
@@ -99,43 +103,46 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         log.debug("Add slack called with params: %s", params)
         return RedirectResponse("https://slack.com/oauth/v2/authorize?" + urlencode(params))
 
-    @router.get("/add/discord/confirm", name=AddDiscord, include_in_schema=False, response_model=None)
-    async def add_discord_confirm(workspace_id: WorkspaceId, code: str = Query(), state: str = Query()) -> Response:
+    @router.get("/notification/add/discord/confirm", name=AddDiscord, include_in_schema=False, response_model=None)
+    async def add_discord_confirm(request: Request, code: str = Query(), state: str = Query()) -> Response:
+        state_obj = json.loads(state)
         # if state is not the same as the one we sent, it means that the user did not come from our page
-        # if state != State:
-        #     return Response("Invalid state", status_code=400)
+        if state_obj.get("state") != State or not isinstance(state_obj.get("workspace_id"), str):
+            log.error(f"Received Invalid state: {state_obj}")
+            return Response("Invalid state", status_code=400)
+        workspace_id = WorkspaceId(state_obj["workspace_id"])
 
         # with our client and secret we authorize the request to get an access token
-        response = await fix.http_client.post(
-            "https://discord.com/api/oauth.v2.access",
-            data={
-                "client_id": cfg.discord_oauth_client_id,
-                "client_secret": cfg.discord_oauth_client_secret,
-                "code": code,
-            },
+        data = dict(
+            client_id=cfg.discord_oauth_client_id,
+            client_secret=cfg.discord_oauth_client_secret,
+            code=code,
+            grant_type="authorization_code",
+            redirect_uri=str(request.url_for(AddDiscord)),
         )
+        response = await fix.http_client.post("https://discord.com/api/oauth2/token", data=data)
         response.raise_for_status()
         data = response.json()
-        access_token = data["access_token"]
-        webhook_url = data["incoming_webhook"]["url"]
+        hook = data["webhook"]
 
+        config = dict(webhook_url=hook["url"])
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        config = dict(webhook_url=webhook_url, access_token=access_token)
-        await ns.update_notification_provider_config(workspace_id, "discord", "test", config)
+        await ns.update_notification_provider_config(workspace_id, "discord", "alert", config)
 
         # redirect to the UI
         return RedirectResponse("/?message=discord")
 
-    @router.get("/add/discord")
+    @router.get("/{workspace_id}/notification/add/discord")
     async def add_discord(_: AuthenticatedUser, workspace_id: WorkspaceId, request: Request) -> Response:
         params = dict(
             client_id=cfg.discord_oauth_client_id,
             response_type="code",
             scope="webhook.incoming",
-            state=State,
-            redirect_uri=str(request.url_for(AddDiscord, workspace_id=workspace_id)),
+            state=json.dumps(dict(state=State, workspace_id=str(workspace_id))),
+            redirect_uri=str(request.url_for(AddDiscord)),
+            workspace_id=str(workspace_id),
         )
-        return RedirectResponse("https://discord.com/oauth2/authorize?" + urlencode(params))
+        return RedirectResponse("https://discord.com/api/oauth2/authorize?" + urlencode(params))
 
     return router
