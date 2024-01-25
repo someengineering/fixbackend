@@ -69,6 +69,10 @@ class Config(BaseSettings):
     google_analytics_measurement_id: Optional[str]
     google_analytics_api_secret: Optional[str]
     aws_marketplace_url: str
+    discord_oauth_client_id: str
+    discord_oauth_client_secret: str
+    slack_oauth_client_id: str
+    slack_oauth_client_secret: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -97,6 +101,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--discord-oauth-client-id", default=os.environ.get("DISCORD_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--discord-oauth-client-secret", default=os.environ.get("DISCORD_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--slack-oauth-client-id", default=os.environ.get("SLACK_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--slack-oauth-client-secret", default=os.environ.get("SLACK_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument(
         "--redis-readwrite-url", default=os.environ.get("REDIS_READWRITE_URL", "redis://localhost:6379/0")
     )

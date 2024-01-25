@@ -16,10 +16,12 @@ from typing import Annotated, cast
 from arq import ArqRedis
 from fastapi.params import Depends
 from fixcloudutils.service import Dependencies
+from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from fixbackend.certificates.cert_store import CertificateStore
+from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -28,6 +30,7 @@ from fixbackend.types import AsyncSessionMaker
 
 
 class ServiceNames:
+    config = "config"
     http_client = "http_client"
     arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
@@ -61,6 +64,14 @@ class ServiceNames:
 
 
 class FixDependencies(Dependencies):
+    @property
+    def config(self) -> Config:
+        return self.service(ServiceNames.config, Config)
+
+    @property
+    def http_client(self) -> AsyncClient:
+        return self.service(ServiceNames.http_client, AsyncClient)
+
     @property
     def arq_redis(self) -> ArqRedis:
         return self.service(ServiceNames.arq_redis, ArqRedis)

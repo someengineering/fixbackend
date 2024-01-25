@@ -26,10 +26,10 @@ async def test_notification_provider_config_repo(async_session_maker: AsyncSessi
     cfg = {"url": "https://slack.com"}
     cfg2 = {"url": "https://slack.com", "token": "abc"}
     # insert
-    await repo.update_messaging_config_for_workspace(ws1, "slack", cfg)
+    await repo.update_messaging_config_for_workspace(ws1, "slack", "test", cfg)
     assert await repo.get_messaging_config_for_workspace(ws1, "slack") == cfg
     # update
-    await repo.update_messaging_config_for_workspace(ws1, "slack", cfg2)
+    await repo.update_messaging_config_for_workspace(ws1, "slack", "test2", cfg2)
     assert await repo.get_messaging_config_for_workspace(ws1, "slack") == cfg2
     # delete
     await repo.delete_messaging_config_for_workspace(ws1, "slack")

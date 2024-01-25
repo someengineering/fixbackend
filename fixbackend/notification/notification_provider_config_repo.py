@@ -30,6 +30,7 @@ class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):
 
     workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True)
     provider: Mapped[NotificationProvider] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
     messaging_config: Mapped[Json] = mapped_column(JSON)
 
 
@@ -47,11 +48,11 @@ class NotificationProviderConfigRepository:
                 return None
 
     async def update_messaging_config_for_workspace(
-        self, workspace_id: WorkspaceId, provider: NotificationProvider, messaging_config: Json
+        self, workspace_id: WorkspaceId, provider: NotificationProvider, name: str, messaging_config: Json
     ) -> None:
         async with self.session_maker() as session:
             messaging_config_entity = NotificationProviderConfigEntity(
-                workspace_id=workspace_id, provider=provider, messaging_config=messaging_config
+                workspace_id=workspace_id, provider=provider, name=name[0:63], messaging_config=messaging_config
             )
             await session.merge(messaging_config_entity)
             await session.commit()

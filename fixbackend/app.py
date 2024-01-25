@@ -54,6 +54,7 @@ from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
+from fixbackend.notification.router import notification_router
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
@@ -107,6 +108,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     github = github_client(cfg)
     boto_session = boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key, region_name="us-east-1")
     deps = FixDependencies()
+    deps.add(SN.config, cfg)
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
@@ -536,6 +538,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router(), tags=["billing"])
         api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing"])
+        api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")

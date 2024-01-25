@@ -134,6 +134,10 @@ def default_config() -> Config:
         google_analytics_measurement_id=None,
         google_analytics_api_secret=None,
         aws_marketplace_url="",
+        discord_oauth_client_id="",
+        discord_oauth_client_secret="",
+        slack_oauth_client_id="",
+        slack_oauth_client_secret="",
     )
 
 

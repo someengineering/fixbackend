@@ -26,6 +26,7 @@ def upgrade() -> None:
         "notification_provider_config",
         sa.Column("workspace_id", GUID(), nullable=False),
         sa.Column("provider", sa.String(length=64), nullable=False),
+        sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("messaging_config", sa.JSON(), nullable=False),
         sa.Column("created_at", UTCDateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", UTCDateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
