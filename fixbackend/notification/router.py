@@ -161,7 +161,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), webhook_url: str = Query()
     ) -> None:
         if not name or not webhook_url:
-            raise HTTPException(status_code=400, detail="Missing integration key")
+            raise HTTPException(status_code=400, detail="Missing name or webhook URL")
         config = dict(webhook_url=webhook_url)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
