@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
+from typing import Dict
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException
@@ -34,6 +35,12 @@ State = "add-notification-channel"
 def notification_router(fix: FixDependencies) -> APIRouter:
     router = APIRouter()
     cfg = fix.config
+
+    @router.get("/{workspace_id}/notifications")
+    async def notifications(workspace_id: WorkspaceId) -> Dict[str, str]:
+        return await fix.service(
+            ServiceNames.notification_service, NotificationService
+        ).list_notification_provider_configs(workspace_id)
 
     @router.get(
         "/{workspace_id}/notification/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None
@@ -113,7 +120,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         workspace_id = WorkspaceId(state_obj["workspace_id"])
 
         # with our client and secret we authorize the request to get an access token
-        data = dict(
+        data: Json = dict(
             client_id=cfg.discord_oauth_client_id,
             client_secret=cfg.discord_oauth_client_secret,
             code=code,

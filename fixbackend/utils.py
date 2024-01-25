@@ -33,7 +33,8 @@ import signal
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any
+from itertools import islice
+from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any, Iterator
 from uuid import UUID
 
 from fixcloudutils.util import utc
@@ -71,3 +72,9 @@ def start_of_next_month(current_time: Optional[datetime] = None, hour: int = 0) 
         if now.month == 12
         else datetime(now.year, now.month + 1, 1, hour=hour, tzinfo=timezone.utc)
     )
+
+
+def batch(items: Iterable[AnyT], n: int = 50) -> Iterator[List[AnyT]]:
+    it = iter(items)
+    while chunk := list(islice(it, n)):
+        yield chunk

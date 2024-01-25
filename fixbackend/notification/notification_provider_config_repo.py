@@ -11,10 +11,10 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional, Literal
+from typing import Optional, Literal, Sequence
 
 from fixcloudutils.types import Json
-from sqlalchemy import String, JSON, delete
+from sqlalchemy import String, JSON, delete, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
@@ -37,6 +37,22 @@ class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):
 class NotificationProviderConfigRepository:
     def __init__(self, session_maker: AsyncSessionMaker):
         self.session_maker = session_maker
+
+    async def all_messaging_configs_for_workspace(
+        self, workspace_id: WorkspaceId
+    ) -> Sequence[NotificationProviderConfigEntity]:
+        async with self.session_maker() as session:
+            return (
+                (
+                    await session.execute(
+                        select(NotificationProviderConfigEntity).where(
+                            NotificationProviderConfigEntity.workspace_id == workspace_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
     async def get_messaging_config_for_workspace(
         self, workspace_id: WorkspaceId, provider: NotificationProvider

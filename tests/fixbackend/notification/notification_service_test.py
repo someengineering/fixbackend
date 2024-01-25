@@ -12,15 +12,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 import pytest
-from fixbackend.notification.email.email_messages import SecurityScanFinished
 
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.notification.email.email_messages import SecurityScanFinished
+from fixbackend.notification.service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.notification.service import NotificationService
 from tests.fixbackend.conftest import InMemoryEmailSender
-from fixbackend.auth.user_repository import UserRepository
 
 
 @pytest.mark.asyncio

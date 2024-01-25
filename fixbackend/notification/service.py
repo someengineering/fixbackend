@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta
 from logging import getLogger
-from typing import Iterator, List, Optional
+from typing import List, Optional, Dict
 
 import cattrs
 from attr import frozen
@@ -44,6 +44,7 @@ from fixbackend.notification.notification_provider_config_repo import (
 )
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.utils import batch
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -103,26 +104,21 @@ class NotificationService(Service):
         self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
 
-    async def send_email(
-        self,
-        *,
-        to: str,
-        subject: str,
-        text: str,
-        html: Optional[str],
-    ) -> None:
-        """Send an email to the given address."""
+    async def start(self) -> None:
+        await self.alert_listener.start()
+        await self.alert_publisher.start()
+
+    async def stop(self) -> None:
+        await self.alert_publisher.stop()
+        await self.alert_listener.stop()
+
+    async def send_email(self, *, to: str, subject: str, text: str, html: Optional[str]) -> None:
         await self.email_sender.send_email(to=[to], subject=subject, text=text, html=html)
 
     async def send_message(self, *, to: str, message: EmailMessage) -> None:
         await self.send_email(to=to, subject=message.subject(), text=message.text(), html=message.html())
 
-    async def send_message_to_workspace(
-        self,
-        *,
-        workspace_id: WorkspaceId,
-        message: EmailMessage,
-    ) -> None:
+    async def send_message_to_workspace(self, *, workspace_id: WorkspaceId, message: EmailMessage) -> None:
         set_workspace_id(workspace_id)
         workspace = await self.workspace_repository.get_workspace(workspace_id)
         if not workspace:
@@ -130,20 +126,7 @@ class NotificationService(Service):
             return
 
         emails = [user.email for user in await self.user_repository.get_by_ids(workspace.all_users())]
-
-        def batch(items: List[str], n: int = 50) -> Iterator[List[str]]:
-            current_batch: List[str] = []
-            for item in items:
-                current_batch.append(item)
-                if len(current_batch) == n:
-                    yield current_batch
-                    current_batch = []
-            if current_batch:
-                yield current_batch
-
-        batches = list(batch(emails))
-
-        for email_batch in batches:
+        for email_batch in batch(emails):
             await self.email_sender.send_email(
                 to=email_batch, subject=message.subject(), text=message.text(), html=message.html()
             )
@@ -166,6 +149,10 @@ class NotificationService(Service):
                 pass
             case "pagerduty":
                 pass
+
+    async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, str]:
+        configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)
+        return {c.provider: c.name for c in configs}
 
     async def alert_on_changed(self, collected: TenantAccountsCollected) -> None:
         set_workspace_id(collected.tenant_id)
