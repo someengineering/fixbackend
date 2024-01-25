@@ -187,7 +187,7 @@ class AwsMarketplaceHandler(Service):
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
-                AccountsCharged.labels(security_tier=security_tier.value).inc()
+                AccountsCharged.labels(security_tier=security_tier.value).inc(usage)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
