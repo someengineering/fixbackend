@@ -23,7 +23,7 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Annotated, Optional, Tuple, List
+from typing import Annotated, Any, Literal, Optional, Tuple, List
 from uuid import uuid4
 
 import boto3
@@ -35,6 +35,8 @@ from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
+from fixbackend.domain_events.events import AwsMarketplaceSubscriptionCreated
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import SecurityTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
@@ -42,10 +44,25 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription, Subscript
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
 )
-from fixbackend.utils import start_of_next_month
+from fixbackend.utils import start_of_next_period
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
+
+
+def compute_billing_period_factor(
+    *,
+    billing_time: datetime,
+    last_charged: datetime,
+    period_value: timedelta,
+) -> float:
+    delta = billing_time - last_charged
+    # Default should be a single month. For shorter or longer periods, we use a fraction/factor of the month
+    period_lower_bound = period_value - period_value * 0.1667  # - 5 days in case of 30 days
+    period_upper_bound = period_value + period_value * 0.1667  # + 5 days in case of 30 days
+    is_full_period = period_lower_bound < delta < period_upper_bound
+    billing_factor = 1.0 if is_full_period else delta / period_value
+    return billing_factor
 
 
 class AwsMarketplaceHandler(Service):
@@ -56,6 +73,8 @@ class AwsMarketplaceHandler(Service):
         metering_repo: MeteringRepository,
         session: boto3.Session,
         sqs_queue_url: Optional[str],
+        domain_event_sender: DomainEventPublisher,
+        billing_period: Literal["month", "day"],
     ) -> None:
         self.subscription_repo = subscription_repo
         self.workspace_repo = workspace_repo
@@ -72,7 +91,9 @@ class AwsMarketplaceHandler(Service):
             if sqs_queue_url is not None
             else None
         )
-        self.marketplace_client = session.client("meteringmarketplace")
+        self.marketplace_client: Any = session.client("meteringmarketplace")
+        self.domain_event_sender = domain_event_sender
+        self.billing_period: Literal["month", "day"] = billing_period
 
     async def start(self) -> None:
         if self.listener is not None:
@@ -110,9 +131,14 @@ class AwsMarketplaceHandler(Service):
                 product_code=product_code,
                 active=True,
                 last_charge_timestamp=utc(),
-                next_charge_timestamp=start_of_next_month(hour=9),
+                next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
             )
-            return await self.subscription_repo.create(subscription)
+            event = AwsMarketplaceSubscriptionCreated(
+                workspace_id=workspace_id, user_id=user.id, subscription_id=subscription.id
+            )
+            result = await self.subscription_repo.create(subscription)
+            await self.domain_event_sender.publish(event)
+            return result
 
     async def create_billing_entry(
         self, subscription: AwsMarketplaceSubscription, now: Optional[datetime] = None
@@ -122,13 +148,22 @@ class AwsMarketplaceHandler(Service):
             return None
         try:
             billing_time = now or utc()
-            start_month = start_of_next_month(billing_time, hour=9)
+
+            next_charge = start_of_next_period(period=self.billing_period, current_time=billing_time, hour=9)
+            match self.billing_period:
+                case "month":
+                    billing_period_value = timedelta(days=30)
+                case "day":
+                    billing_period_value = timedelta(days=1)
+
             last_charged = subscription.last_charge_timestamp or billing_time
             customer = subscription.customer_identifier
-            delta = billing_time - last_charged
-            # Default should be a single month. For shorter or longer periods, we use a fraction/factor of the month
-            is_full_month = 25 < delta.days < 40
-            month_factor = 1 if is_full_month else delta.days / 28
+
+            month_factor = compute_billing_period_factor(
+                billing_time=billing_time,
+                last_charged=last_charged,
+                period_value=billing_period_value,
+            )
             if ws_id := subscription.workspace_id:
                 # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
                 summaries = [
@@ -145,7 +180,7 @@ class AwsMarketplaceHandler(Service):
                 if security_tier == SecurityTier.Free or usage == 0:
                     log.info(f"AWS Marketplace: customer {customer} has no usage")
                     # move the charge timestamp tp
-                    await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, start_month)
+                    await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 billing_entry = await self.subscription_repo.add_billing_entry(
@@ -155,7 +190,7 @@ class AwsMarketplaceHandler(Service):
                     usage,
                     last_charged,
                     billing_time,
-                    start_month,
+                    next_charge,
                 )
                 return billing_entry
             else:
