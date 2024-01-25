@@ -146,12 +146,25 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         return RedirectResponse("https://discord.com/api/oauth2/authorize?" + urlencode(params))
 
     @router.put("/{workspace_id}/notification/add/pagerduty")
-    async def add_pagerduty(_: AuthenticatedUser, workspace_id: WorkspaceId, integration_key: str = Query()) -> None:
-        if not integration_key:
+    async def add_pagerduty(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), integration_key: str = Query()
+    ) -> None:
+        if not name or not integration_key:
             raise HTTPException(status_code=400, detail="Missing integration key")
         config = dict(integration_key=integration_key)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, "pagerduty", "alert", config)
+        await ns.update_notification_provider_config(workspace_id, "pagerduty", name, config)
+
+    @router.put("/{workspace_id}/notification/add/pagerduty")
+    async def add_teams(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), webhook_url: str = Query()
+    ) -> None:
+        if not name or not webhook_url:
+            raise HTTPException(status_code=400, detail="Missing integration key")
+        config = dict(webhook_url=webhook_url)
+        # store token and webhook url
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_notification_provider_config(workspace_id, "teams", name, config)
 
     return router

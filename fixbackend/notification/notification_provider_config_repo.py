@@ -22,7 +22,7 @@ from fixbackend.ids import WorkspaceId
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
-NotificationProvider = Literal["slack", "discord", "pagerduty"]
+NotificationProvider = Literal["slack", "discord", "pagerduty", "teams"]
 
 
 class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):
