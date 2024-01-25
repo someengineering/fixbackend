@@ -46,6 +46,7 @@ from fixbackend.subscription.subscription_repository import (
 )
 from fixbackend.utils import start_of_next_period
 from fixbackend.workspaces.repository import WorkspaceRepository
+from prometheus_client import Counter
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,9 @@ def compute_billing_period_factor(
     is_full_period = period_lower_bound < delta < period_upper_bound
     billing_factor = 1.0 if is_full_period else delta / period_value
     return billing_factor
+
+
+AccountsCharged = Counter("aws_marketplace_accounts_charged", "Accounts charged by security tier", ["security_tier"])
 
 
 class AwsMarketplaceHandler(Service):
@@ -183,6 +187,7 @@ class AwsMarketplaceHandler(Service):
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
+                AccountsCharged.labels(security_tier=security_tier.value).inc()
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
