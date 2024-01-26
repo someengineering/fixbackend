@@ -16,6 +16,7 @@ from enum import Enum
 from typing import List, Dict, Optional
 
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc_str
 from pydantic import BaseModel, Field
 
 
@@ -144,6 +145,21 @@ class SearchRequest(BaseModel):
     skip: int = Field(default=0, description="The number of results to skip.", ge=0)
     limit: int = Field(default=50, description="The number of results to return.", gt=0, le=1000)
     count: bool = Field(default=False, description="Also compute the total number of results.")
+
+    def ui_link(self, base_url: str) -> str:
+        url = base_url + "/inventory?q=" + self.query
+        if self.history:
+            if self.history.before:
+                url += "&before=" + utc_str(self.history.before)
+            if self.history.after:
+                url += "&after=" + utc_str(self.history.after)
+            if self.history.change:
+                url += "&change=" + self.history.change.value
+        if self.skip:
+            url += "&skip=" + str(self.skip)
+        if self.limit:
+            url += "&limit=" + str(self.limit)
+        return url
 
 
 class ReportConfig(BaseModel):

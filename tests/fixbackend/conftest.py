@@ -138,6 +138,7 @@ def default_config() -> Config:
         discord_oauth_client_secret="",
         slack_oauth_client_id="",
         slack_oauth_client_secret="",
+        service_base_url="http://localhost:8000",
     )
 
 

@@ -73,6 +73,7 @@ class Config(BaseSettings):
     discord_oauth_client_secret: str
     slack_oauth_client_id: str
     slack_oauth_client_secret: str
+    service_base_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -168,10 +169,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
     parser.add_argument("--google-analytics-measurement-id", default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID"))
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
-    parser.add_argument(
-        "--aws-marketplace-url",
-        default=os.environ.get("AWS_MARKETPLACE_URL", ""),
-    )
+    parser.add_argument("--aws-marketplace-url", default=os.environ.get("AWS_MARKETPLACE_URL", ""))
+    parser.add_argument("--service-base-url", default=os.environ.get("SERVICE_BASE_URL", ""))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
