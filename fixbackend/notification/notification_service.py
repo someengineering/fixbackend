@@ -11,25 +11,24 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import timedelta, datetime
 from itertools import islice
 from logging import getLogger
-from typing import List, Optional, Dict, Union, Set
-from urllib.parse import urlencode
+from typing import List, Optional, Dict, Union, Set, cast
 
 import cattrs
-from attr import frozen
 from fixcloudutils.redis.event_stream import RedisStreamPublisher, RedisStreamListener, MessageContext
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
+from httpx import AsyncClient
 from redis.asyncio import Redis
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.domain_events.events import TenantAccountsCollected
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, TaskId
@@ -41,71 +40,29 @@ from fixbackend.inventory.inventory_service import (
 )
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
+from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage
 from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
 )
-from fixbackend.notification.model import WorkspaceAlert, AllowedChannels, Channel
-from fixbackend.notification.notification_provider_config_repo import (
-    NotificationProviderConfigRepository,
+from fixbackend.notification.model import (
+    WorkspaceAlert,
+    AllowedNotificationProvider,
     NotificationProvider,
+    AlertSender,
+    AlertOnChannel,
+    FailingBenchmarkChecksDetected,
+    VulnerableResource,
+    FailedBenchmarkCheck,
 )
+from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import batch
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
-
-
-@frozen
-class Alert:
-    workspace_id: WorkspaceId
-
-
-@frozen
-class AlertOnChannel:
-    alert: Alert
-    channel: Channel
-
-
-@frozen
-class VulnerableResource:
-    id: str
-    kind: str
-    name: Optional[str] = None
-    cloud: Optional[str] = None
-    account: Optional[str] = None
-    region: Optional[str] = None
-    zone: Optional[str] = None
-
-    def ui_link(self, base_url: str) -> str:
-        return f"{base_url}/inventory/resource-detail/{self.id}?{urlencode(dict(name=self.name))}"
-
-
-@frozen
-class FailedBenchmarkCheck:
-    check_id: str
-    title: str
-    severity: str
-    failed_resources: int
-    examples: List[VulnerableResource]
-
-
-@frozen
-class FailingBenchmarkChecksDetected(Alert):
-    benchmark: str
-    severity: str
-    failed_checks_count_total: int
-    examples: List[FailedBenchmarkCheck]
-    link: str
-
-
-class AlertSender(ABC):
-    @abstractmethod
-    async def send_alert(self, alert: Alert, config: Json) -> None:
-        pass
 
 
 class NotificationService(Service):
@@ -118,6 +75,8 @@ class NotificationService(Service):
         inventory_service: InventoryService,
         readwrite_redis: Redis,
         session_maker: AsyncSessionMaker,
+        http_client: AsyncClient,
+        domain_event_subscriber: DomainEventSubscriber,
     ) -> None:
         self.config = config
         self.email_sender: EmailSender = email_sender_from_config(config)
@@ -138,6 +97,14 @@ class NotificationService(Service):
         )
         self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
+        self.alert_sender: Dict[NotificationProvider, AlertSender] = {
+            "discord": DiscordNotificationSender(config, http_client),
+            # "slack": None,  # TODO: implement ne
+            # "pagerduty": None,  # TODO: implement ne
+            # "teams": None,  # TODO: implement ne
+            # "email": None,  # TODO: implement ne
+        }
+        domain_event_subscriber.subscribe(TenantAccountsCollected, self.alert_on_changed, "NotificationService")
 
     async def start(self) -> None:
         await self.alert_listener.start()
@@ -188,7 +155,7 @@ class NotificationService(Service):
                 if benchmark not in benchmark_ids:
                     raise ValueError(f"Benchmark {benchmark} not found")
                 for channel in setting.channels:
-                    if channel not in AllowedChannels:
+                    if channel not in AllowedNotificationProvider:
                         raise ValueError(f"Unknown channel {channel}")
             return await self.workspace_alert_repo.set_alerting_for_workspace(alert)
         raise ValueError(f"Workspace {alert.workspace_id} does not have GraphDbAccess?")
@@ -196,16 +163,14 @@ class NotificationService(Service):
     async def _send_alert(self, message: Json, context: MessageContext) -> None:
         if context.kind != "vulnerable_resources_detected":
             raise ValueError(f"Unexpected message kind {context.kind}")
-        alert = cattrs.structure(message, AlertOnChannel)
-        match alert.channel:
-            case "discord":
-                pass
-            case "slack":
-                pass
-            case "email":
-                pass
-            case "pagerduty":
-                pass
+        alert_on: AlertOnChannel = cattrs.structure(message, AlertOnChannel)
+        alert = cast(FailingBenchmarkChecksDetected, alert_on.alert)
+        if (sender := self.alert_sender.get(alert_on.channel)) and (
+            cfg := await self.provider_config_repo.get_messaging_config_for_workspace(
+                alert.workspace_id, alert_on.channel
+            )
+        ):
+            await sender.send_alert(alert, cfg)
 
     async def _load_alert(
         self,

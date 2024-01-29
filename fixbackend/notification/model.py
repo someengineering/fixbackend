@@ -19,15 +19,19 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Dict, List, Literal
+from abc import ABC, abstractmethod
+from typing import Dict, List, Literal, Optional
+from urllib.parse import urlencode
 
+from attr import frozen
 from pydantic import BaseModel, Field
 
 from fixbackend.ids import WorkspaceId
 from fixbackend.inventory.inventory_service import ReportSeverity
+from fixcloudutils.types import Json
 
-Channel = Literal["email", "slack", "discord", "pagerduty", "teams"]
-AllowedChannels = {"email", "slack", "discord", "pagerduty", "teams"}
+NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
+AllowedNotificationProvider = {"email", "slack", "discord", "pagerduty", "teams"}
 
 
 class AlertingSetting(BaseModel):
@@ -35,7 +39,7 @@ class AlertingSetting(BaseModel):
         default="critical",
         description="Minimum severity to send alerts for. Example: high will send alerts for high and critical",
     )
-    channels: List[Channel] = Field(default_factory=list, description="List of channels to send alerts to")
+    channels: List[NotificationProvider] = Field(default_factory=list, description="List of channels to send alerts to")
 
 
 class WorkspaceAlert(BaseModel):
@@ -45,3 +49,52 @@ class WorkspaceAlert(BaseModel):
 
     def non_empty_alerts(self) -> Dict[str, AlertingSetting]:
         return {k: v for k, v in self.alerts.items() if v.channels}
+
+
+@frozen
+class Alert:
+    workspace_id: WorkspaceId
+
+
+@frozen
+class AlertOnChannel:
+    alert: Alert
+    channel: NotificationProvider
+
+
+@frozen
+class VulnerableResource:
+    id: str
+    kind: str
+    name: Optional[str] = None
+    cloud: Optional[str] = None
+    account: Optional[str] = None
+    region: Optional[str] = None
+    zone: Optional[str] = None
+
+    def ui_link(self, base_url: str) -> str:
+        return f"{base_url}/inventory/resource-detail/{self.id}?{urlencode(dict(name=self.name))}"
+
+
+@frozen
+class FailedBenchmarkCheck:
+    check_id: str
+    title: str
+    severity: str
+    failed_resources: int
+    examples: List[VulnerableResource]
+
+
+@frozen
+class FailingBenchmarkChecksDetected(Alert):
+    benchmark: str
+    severity: str
+    failed_checks_count_total: int
+    examples: List[FailedBenchmarkCheck]
+    link: str
+
+
+class AlertSender(ABC):
+    @abstractmethod
+    async def send_alert(self, alert: Alert, config: Json) -> None:
+        pass

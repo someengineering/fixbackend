@@ -640,6 +640,8 @@ def notification_service(
     redis: Redis,
     email_sender: EmailSender,
     async_session_maker: AsyncSessionMaker,
+    http_client: AsyncClient,
+    domain_event_subscriber: DomainEventSubscriber,
 ) -> NotificationService:
     service = NotificationService(
         default_config,
@@ -649,6 +651,8 @@ def notification_service(
         inventory_service,
         redis,
         async_session_maker,
+        http_client,
+        domain_event_subscriber,
     )
     service.email_sender = email_sender
     return service

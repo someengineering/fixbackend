@@ -11,7 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional, Literal, Sequence
+from typing import Optional, Sequence
 
 from fixcloudutils.types import Json
 from sqlalchemy import String, JSON, delete, select
@@ -19,10 +19,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.ids import WorkspaceId
+from fixbackend.notification.model import NotificationProvider
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
-
-NotificationProvider = Literal["slack", "discord", "pagerduty", "teams"]
 
 
 class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):

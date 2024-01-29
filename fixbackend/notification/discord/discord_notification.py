@@ -19,7 +19,7 @@ from httpx import AsyncClient
 
 from fixbackend.config import Config, get_config
 from fixbackend.ids import WorkspaceId
-from fixbackend.notification.notification_service import (
+from fixbackend.notification.model import (
     AlertSender,
     Alert,
     FailingBenchmarkChecksDetected,
@@ -29,8 +29,8 @@ from fixbackend.notification.notification_service import (
 
 
 class DiscordNotificationSender(AlertSender):
-    def __init__(self, config: Config, http_client: AsyncClient) -> None:
-        self.config = config
+    def __init__(self, cfg: Config, http_client: AsyncClient) -> None:
+        self.config = cfg
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected) -> Json:
