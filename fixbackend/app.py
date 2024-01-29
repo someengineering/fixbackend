@@ -195,6 +195,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 metering_repo,
                 boto_session,
                 cfg.args.aws_marketplace_metering_sqs_url,
+                domain_event_publisher,
+                cfg.billing_period,
             ),
         )
         deps.add(
@@ -403,6 +405,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 metering_repo,
                 boto_session,
                 cfg.args.aws_marketplace_metering_sqs_url,
+                domain_event_publisher,
+                cfg.billing_period,
             ),
         )
         deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo, workspace_repo))

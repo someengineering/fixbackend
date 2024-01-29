@@ -31,7 +31,7 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.logging_context import set_workspace_id
 
 
-WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized"]
+WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized", "Forbidden"]
 
 
 async def get_optional_user_workspace(
@@ -48,7 +48,7 @@ async def get_optional_user_workspace(
         return "WorkspaceNotFound"
 
     if user.id not in workspace.all_users():
-        return "Unauthorized"
+        return "Forbidden"
 
     return workspace
 
@@ -57,9 +57,11 @@ async def get_user_workspace(
     maybe_workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
 ) -> Workspace:
     match maybe_workspace:
+        case "Unauthorized":
+            raise HTTPException(status_code=401, detail="Unauthorized")
         case "WorkspaceNotFound":
             raise HTTPException(status_code=404, detail="Workspace not found")
-        case "Unauthorized":
+        case "Forbidden":
             raise HTTPException(status_code=403, detail="You're not a member of this workspace")
         case workspace:
             return workspace

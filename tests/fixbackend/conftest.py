@@ -134,6 +134,7 @@ def default_config() -> Config:
         google_analytics_measurement_id=None,
         google_analytics_api_secret=None,
         aws_marketplace_url="",
+        billing_period="month",
         discord_oauth_client_id="",
         discord_oauth_client_secret="",
         slack_oauth_client_id="",
@@ -533,8 +534,17 @@ async def aws_marketplace_handler(
     metering_repository: MeteringRepository,
     workspace_repository: WorkspaceRepository,
     boto_session: BotoSession,
+    domain_event_sender: DomainEventPublisher,
 ) -> AwsMarketplaceHandler:
-    return AwsMarketplaceHandler(subscription_repository, workspace_repository, metering_repository, boto_session, None)
+    return AwsMarketplaceHandler(
+        subscription_repository,
+        workspace_repository,
+        metering_repository,
+        boto_session,
+        None,
+        domain_event_sender,
+        "month",
+    )
 
 
 @pytest.fixture

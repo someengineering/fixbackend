@@ -30,6 +30,7 @@ from fixcloudutils.types import Json
 
 from fixbackend.domain_events.converter import converter
 from fixbackend.ids import (
+    SubscriptionId,
     UserId,
     WorkspaceId,
     FixCloudAccountId,
@@ -179,3 +180,16 @@ class SecurityTierUpdated(Event):
     workspace_id: WorkspaceId
     user_id: UserId
     security_tier: str
+
+
+@frozen
+class AwsMarketplaceSubscriptionCreated(Event):
+    """
+    This event is emitted when a user gets an AWS Marketplace subscription.
+    """
+
+    kind: ClassVar[str] = "aws_marketplace_subscription_created"
+
+    workspace_id: Optional[WorkspaceId]
+    user_id: UserId
+    subscription_id: SubscriptionId

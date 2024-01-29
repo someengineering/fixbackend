@@ -15,7 +15,7 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Annotated, Optional, Sequence, List, Tuple
+from typing import Annotated, Literal, Optional, Sequence, List, Tuple
 from pathlib import Path
 from fastapi import Depends
 from pydantic_settings import BaseSettings
@@ -69,6 +69,7 @@ class Config(BaseSettings):
     google_analytics_measurement_id: Optional[str]
     google_analytics_api_secret: Optional[str]
     aws_marketplace_url: str
+    billing_period: Literal["month", "day"]
     discord_oauth_client_id: str
     discord_oauth_client_secret: str
     slack_oauth_client_id: str
@@ -171,6 +172,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
     parser.add_argument("--aws-marketplace-url", default=os.environ.get("AWS_MARKETPLACE_URL", ""))
     parser.add_argument("--service-base-url", default=os.environ.get("SERVICE_BASE_URL", ""))
+    parser.add_argument(
+        "--billing-period",
+        choices=["month", "day"],
+        default=os.environ.get("BILLING_PERIOD", "month"),
+    )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
