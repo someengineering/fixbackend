@@ -54,7 +54,7 @@ from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth import github_client, google_client
 from fixbackend.auth.router import auth_router, users_router
-from fixbackend.notification.router import notification_router
+from fixbackend.notification.notification_router import notification_router
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
@@ -64,7 +64,7 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_router,
 )
 from fixbackend.billing_information.router import billing_info_router
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue

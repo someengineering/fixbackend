@@ -20,7 +20,7 @@ from fastapi import Depends, Request
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.notification.email.email_messages import VerifyEmail
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 
 
 class UserVerifier(ABC):

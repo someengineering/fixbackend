@@ -201,7 +201,7 @@ class InventoryClient(Service):
             params["change"] = change.value
         response = await self._perform(
             "POST",
-            f"/graph/{graph}/search/list",
+            f"/graph/{graph}/search/history/list",
             content=query,
             params=params,
             headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),

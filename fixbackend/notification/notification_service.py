@@ -17,6 +17,7 @@ from datetime import timedelta, datetime
 from itertools import islice
 from logging import getLogger
 from typing import List, Optional, Dict, Union, Set
+from urllib.parse import urlencode
 
 import cattrs
 from attr import frozen
@@ -31,11 +32,12 @@ from fixbackend.config import Config
 from fixbackend.domain_events.events import TenantAccountsCollected
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, TaskId
 from fixbackend.inventory.inventory_service import (
     InventoryService,
     ReportSeverityIncluded,
     ReportSeverityPriority,
+    ReportSeverity,
 )
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
@@ -44,7 +46,7 @@ from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
 )
-from fixbackend.notification.model import AlertingSetting, WorkspaceAlert, AllowedChannels, Channel
+from fixbackend.notification.model import WorkspaceAlert, AllowedChannels, Channel
 from fixbackend.notification.notification_provider_config_repo import (
     NotificationProviderConfigRepository,
     NotificationProvider,
@@ -79,7 +81,7 @@ class VulnerableResource:
     zone: Optional[str] = None
 
     def ui_link(self, base_url: str) -> str:
-        return f"{base_url}/inventory?path={self.id}"
+        return f"{base_url}/inventory/resource-detail/{self.id}?{urlencode(dict(name=self.name))}"
 
 
 @frozen
@@ -209,23 +211,24 @@ class NotificationService(Service):
         self,
         access: GraphDatabaseAccess,
         benchmark: str,
-        task_ids: str,
-        setting: AlertingSetting,
-        now: datetime,
-        earliest_started_at: datetime,
+        task_ids: List[TaskId],
+        severity: ReportSeverity,
+        after: datetime,
+        before: datetime,
     ) -> Optional[FailingBenchmarkChecksDetected]:
-        included_severities = ",".join(ReportSeverityIncluded.get(setting.severity, ["none"]))
-        issue = f"benchmarks[]=={benchmark} and run_id in [{task_ids}] and severity in [{included_severities}]"
+        included_severities = ",".join(ReportSeverityIncluded.get(severity, ["none"]))
+        tsk_ids = ",".join(task_ids)
+        issue = f"benchmarks[]=={benchmark} and run_id in [{tsk_ids}] and severity in [{included_severities}]"
         query = f"/security.has_issues==true and /security.issues[].{{{issue}}}"
-        aggregate = "/security.issues[].check, /security.issues[].severity : sum(1) as count"
+        aggregate = "/security.issues[].check, /security.issues[].severity, /security.issues[].benchmarks[] as benchmark : sum(1) as count"
         failing_checks: Dict[str, str] = {}
         failing_resources_count: Dict[str, int] = {}
         total_failed_checks = 0
         async for agg in await self.inventory_client.search_history(
             access,
             f"search {query} | aggregate {aggregate}",
-            before=now,
-            after=earliest_started_at,
+            before=before,
+            after=after,
             change=HistoryChange.node_vulnerable,
         ):
             if (
@@ -233,6 +236,8 @@ class NotificationService(Service):
                 and (group := agg.get("group"))
                 and (check := group.get("check"))
                 and (severity := group.get("severity"))
+                and (bench := group.get("benchmark"))
+                and bench == benchmark
             ):
                 total_failed_checks += 1
                 failing_checks[check] = severity
@@ -247,32 +252,32 @@ class NotificationService(Service):
             example_count = 0
             async for node in await self.inventory_client.execute_single(
                 access,
-                f"history --before {utc_str(now)} --after {utc_str(earliest_started_at)} --change node_vulnerable {query} and /security.issues[].check in [{','.join(top_checks)}] | "  # noqa
-                f"jq --no-rewrite '{id:.id, name:.reported.name, cloud:.ancestors.cloud.reported.name, account:.ancestors.account.reported.name, region:.ancestors.region.reported.name, checks: [ .security.issues[] | select(.benchmarks[] == \"{benchmark}\") | .check ]}'",  # noqa
+                f"history --before {utc_str(before)} --after {utc_str(after)} --change node_vulnerable /security.has_issues==true and /security.issues[].{{check in [{','.join(top_checks)}] and {issue}}} | "  # noqa
+                f"jq --no-rewrite '{{id:.id, kind:.reported.kind, name:.reported.name, cloud:.ancestors.cloud.reported.name, account:.ancestors.account.reported.name, region:.ancestors.region.reported.name, checks: [ .security.issues[] | select(.benchmarks != null and .benchmarks[] == \"{benchmark}\") | .check ]}}'",  # noqa
             ):
                 if isinstance(node, dict):
                     for check in node.get("checks", []):
                         examples = example_resources[check]
-                        if check in top_checks and len(examples) < 5:
+                        if check in top_checks and len(examples) < 3:
                             examples.append(cattrs.structure(node, VulnerableResource))
                             example_count += 1
                             if example_count == 25:
                                 break
             # load definition of top checks
             top_check_defs = [
-                FailedBenchmarkCheck(cid, title, severity, failing_resources_count[cid], example_resources[cid])
+                FailedBenchmarkCheck(cid, title, sev, failing_resources_count[cid], example_resources[cid])
                 for c in await self.inventory_client.checks(access, check_ids=top_checks)
-                if (cid := c.get("id")) and (title := c.get("title")) and (severity := c.get("severity"))
+                if (cid := c.get("id")) and (title := c.get("title")) and (sev := c.get("severity"))
             ]
             # ui link
             ui_link = SearchRequest(
                 query=query,
-                history=HistorySearch(after=earliest_started_at, before=now, change=HistoryChange.node_vulnerable),
+                history=HistorySearch(after=after, before=before, change=HistoryChange.node_vulnerable),
             ).ui_link(self.config.service_base_url)
             return FailingBenchmarkChecksDetected(
                 workspace_id=access.workspace_id,
                 benchmark=benchmark,
-                severity=top_check_defs[0].severity if top_checks else setting.severity,
+                severity=top_check_defs[0].severity if top_checks else severity,
                 failed_checks_count_total=total_failed_checks,
                 examples=top_check_defs,
                 link=ui_link,
@@ -282,7 +287,7 @@ class NotificationService(Service):
     async def alert_on_changed(self, collected: TenantAccountsCollected) -> None:
         set_workspace_id(collected.tenant_id)
         earliest_started_at = min([a.started_at for a in collected.cloud_accounts.values()], default=utc())
-        task_ids = ",".join(a.task_id for a in collected.cloud_accounts.values() if a.task_id is not None)
+        task_ids = [a.task_id for a in collected.cloud_accounts.values() if a.task_id is not None]
         now = utc()
 
         # make sure we have collected some resources, have a non-empty alert config and access to the graph db
@@ -293,7 +298,9 @@ class NotificationService(Service):
                 and (access := await self.graphdb_access.get_database_access(collected.tenant_id))
             ):
                 for benchmark, setting in non_empty_alerts.items():
-                    if alert := await self._load_alert(access, benchmark, task_ids, setting, now, earliest_started_at):
+                    if alert := await self._load_alert(
+                        access, benchmark, task_ids, setting.severity, earliest_started_at, now
+                    ):
                         for channel in setting.channels:
                             await self.alert_publisher.publish(
                                 "vulnerable_resources_detected", cattrs.unstructure(AlertOnChannel(alert, channel))

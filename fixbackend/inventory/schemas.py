@@ -14,6 +14,7 @@
 from datetime import timedelta, datetime
 from enum import Enum
 from typing import List, Dict, Optional
+from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
@@ -147,19 +148,19 @@ class SearchRequest(BaseModel):
     count: bool = Field(default=False, description="Also compute the total number of results.")
 
     def ui_link(self, base_url: str) -> str:
-        url = base_url + "/inventory?q=" + self.query
+        params = {"q": self.query}
         if self.history:
             if self.history.before:
-                url += "&before=" + utc_str(self.history.before)
+                params["before"] = utc_str(self.history.before)
             if self.history.after:
-                url += "&after=" + utc_str(self.history.after)
+                params["after"] = utc_str(self.history.after)
             if self.history.change:
-                url += "&change=" + self.history.change.value
+                params["change"] = self.history.change.value
         if self.skip:
-            url += "&skip=" + str(self.skip)
+            params["skip"] = str(self.skip)
         if self.limit:
-            url += "&limit=" + str(self.limit)
-        return url
+            params["limit"] = str(self.limit)
+        return base_url + "/inventory?" + urlencode(params)
 
 
 class ReportConfig(BaseModel):

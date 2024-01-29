@@ -58,7 +58,7 @@ from fixbackend.ids import (
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.notification.email.email_messages import SecurityScanFinished
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository

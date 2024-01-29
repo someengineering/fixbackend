@@ -59,7 +59,7 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.notification.email.email_messages import EmailMessage
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 

@@ -33,7 +33,7 @@ from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.notification.email.email_messages import Invite
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency

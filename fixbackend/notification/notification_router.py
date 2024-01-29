@@ -24,7 +24,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import WorkspaceId
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"

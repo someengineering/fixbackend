@@ -11,12 +11,18 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import timedelta
 
 import pytest
+from fixcloudutils.util import utc
+from httpx import AsyncClient
 
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.graph_db.models import GraphDatabaseAccess
+from fixbackend.ids import WorkspaceId, TaskId
 from fixbackend.notification.email.email_messages import SecurityScanFinished
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
+from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryEmailSender
@@ -77,3 +83,18 @@ async def test_sent_message(
     assert args.subject == message.subject()
     assert args.text == message.text()
     assert args.html == message.html()
+
+
+@pytest.mark.skip("Only for manual testing")
+@pytest.mark.asyncio
+async def test_example_alert(notification_service: NotificationService) -> None:
+    # use real client
+    notification_service.inventory_service.client.client = AsyncClient()
+    now = utc()
+    one_year_ago = now - timedelta(days=365)
+    ws_id = WorkspaceId(uid())
+    access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "resoto", "", "resoto")
+    result = await notification_service._load_alert(
+        access, "aws_cis_2_0", [TaskId("my_manual_sync")], "high", one_year_ago, now
+    )
+    print(result)

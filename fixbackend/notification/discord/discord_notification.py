@@ -12,20 +12,20 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
+from uuid import UUID
 
 from fixcloudutils.types import Json
 from httpx import AsyncClient
 
 from fixbackend.config import Config, get_config
 from fixbackend.ids import WorkspaceId
-from fixbackend.notification.service import (
+from fixbackend.notification.notification_service import (
     AlertSender,
     Alert,
     FailingBenchmarkChecksDetected,
     FailedBenchmarkCheck,
     VulnerableResource,
 )
-from fixbackend.utils import uid
 
 
 class DiscordNotificationSender(AlertSender):
@@ -57,11 +57,8 @@ class DiscordNotificationSender(AlertSender):
                     "url": self.config.service_base_url,  # TODO: add workspace id
                     "description": (
                         f"We have completed a comprehensive scan of your infrastructure."
-                        f"\n```\n{alert.failed_checks_count_total} issues require your attention.\n```\n\n"
-                        f"These issues are in violation of the benchmark standards set in `{alert.benchmark}`. "
-                        f"Your notification settings are configured to alert you for issues of severity {alert.severity}. "
-                        "We recommend reviewing and addressing these issues promptly to ensure optimal performance and security compliance. "
-                        "Please refer to our detailed report for more information and guidance on remediation steps.\n\n"
+                        f"\n```\n{alert.failed_checks_count_total} issues require your attention.\n```\n"
+                        f"These issues are in violation of the benchmark standards set in `{alert.benchmark}`.\n"
                         f"Here is a {note}list of failing checks:\n\n"
                     ),
                     "fields": [
@@ -98,50 +95,153 @@ if __name__ == "__main__":
     config.service_base_url = "https://app.dev.fixcloud.io"
     sender = DiscordNotificationSender(config, AsyncClient())
     resources = [VulnerableResource(f"t{a}", "aws_ec2_instance", f"test_{a}") for a in range(5)]
-    a = sender.vulnerable_resources_detected(
-        FailingBenchmarkChecksDetected(
-            WorkspaceId(uid()),
-            "aws_cis_2_0",
-            "critical",
-            23,
-            [
-                FailedBenchmarkCheck(
-                    "snapshot_encrypted",
-                    "Ensure that EBS Snapshots are both encrypted and not publicly accessible",
-                    "critical",
-                    23,
-                    resources,
-                ),
-                FailedBenchmarkCheck(
-                    "unused_elastic_ip",
-                    "Ensure There are no Unassigned Elastic IPs in Your AWS Environment",
-                    "critical",
-                    12,
-                    resources,
-                ),
-                FailedBenchmarkCheck(
-                    "instance_in_vpc",
-                    "Ensure All EC2 Instances Operate Within a VPC Instead of EC2-Classic",
-                    "critical",
-                    33,
-                    resources,
-                ),
-                FailedBenchmarkCheck(
-                    "internet_facing_with_instance_profile",
-                    "Ensure No Internet Facing EC2 Instances with Instance Profiles Attached Exist",
-                    "critical",
-                    543,
-                    resources,
-                ),
-                FailedBenchmarkCheck(
-                    "old_instances",
-                    "Ensure EC2 Instances Are Not Older Than Specific Days.",
-                    "critical",
-                    2,
-                    resources,
-                ),
-            ],
-            "https://app.dev.fixcloud.io",
-        )
+    real = FailingBenchmarkChecksDetected(
+        workspace_id=WorkspaceId(UUID("9a06566c-43db-4a3d-bfbe-bf18225e346e")),
+        benchmark="aws_cis_2_0",
+        severity="high",
+        failed_checks_count_total=6,
+        examples=[
+            FailedBenchmarkCheck(
+                check_id="aws_ec2_allow_ingress_any_port_ipv4",
+                title="Ensure No Network ACLs Allow Ingress from 0.0.0.0/0 to Any Port.",
+                severity="high",
+                failed_resources=9,
+                examples=[
+                    VulnerableResource(
+                        id="n13tgNYvbBN-zM03h4CzCg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0412d0e5cb5ba0515",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="eu-central-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="SvSHgLtHmgdnV6XpMY_Ksg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0810e5746d6988e77",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="8WEnqXUiBl39JeQiLmHpRw",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0854a97eb614d5ef2",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                ],
+            ),
+            FailedBenchmarkCheck(
+                check_id="aws_ec2_allow_ingress_ssh_port_22_ipv4",
+                title="Ensure Network ACLs Do Not Allow Ingress from 0.0.0.0/0 to SSH Port 22",
+                severity="high",
+                failed_resources=9,
+                examples=[
+                    VulnerableResource(
+                        id="n13tgNYvbBN-zM03h4CzCg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0412d0e5cb5ba0515",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="eu-central-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="SvSHgLtHmgdnV6XpMY_Ksg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0810e5746d6988e77",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="8WEnqXUiBl39JeQiLmHpRw",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0854a97eb614d5ef2",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                ],
+            ),
+            FailedBenchmarkCheck(
+                check_id="aws_ec2_allow_ingress_rdp_port_3389_ipv4",
+                title="Ensure that Network ACLs do not allow ingress from 0.0.0.0/0 to Microsoft RDP port 3389",
+                severity="high",
+                failed_resources=9,
+                examples=[
+                    VulnerableResource(
+                        id="n13tgNYvbBN-zM03h4CzCg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0412d0e5cb5ba0515",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="eu-central-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="SvSHgLtHmgdnV6XpMY_Ksg",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0810e5746d6988e77",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                    VulnerableResource(
+                        id="8WEnqXUiBl39JeQiLmHpRw",
+                        kind="aws_ec2_network_acl",
+                        name="acl-0854a97eb614d5ef2",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="us-east-1",
+                        zone=None,
+                    ),
+                ],
+            ),
+            FailedBenchmarkCheck(
+                check_id="aws_s3_bucket_no_mfa_delete",
+                title="Ensure S3 bucket MFA Delete is enabled.",
+                severity="medium",
+                failed_resources=1,
+                examples=[
+                    VulnerableResource(
+                        id="sHJWmuw5bl-1WXRAS5aaog",
+                        kind="aws_s3_bucket",
+                        name="elasticbeanstalk-us-east-1-625596817853",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="global",
+                        zone=None,
+                    )
+                ],
+            ),
+            FailedBenchmarkCheck(
+                check_id="aws_s3_account_level_public_access_blocks",
+                title="Ensure S3 Account Level Public Access Block is Enabled",
+                severity="high",
+                failed_resources=1,
+                examples=[
+                    VulnerableResource(
+                        id="sHJWmuw5bl-1WXRAS5aaog",
+                        kind="aws_s3_bucket",
+                        name="elasticbeanstalk-us-east-1-625596817853",
+                        cloud="aws",
+                        account="someengineering-development",
+                        region="global",
+                        zone=None,
+                    )
+                ],
+            ),
+        ],
+        link="http://localhost:8000/inventory?q=%2Fsecurity.has_issues%3D%3Dtrue+and+%2Fsecurity.issues%5B%5D.%7Bbenchmarks%5B%5D%3D%3Daws_cis_2_0+and+run_id+in+%5Bmy_manual_sync%5D+and+severity+in+%5Bhigh%2Ccritical%5D%7D&before=2024-01-29T13%3A47%3A27Z&after=2023-01-29T13%3A47%3A27Z&change=node_vulnerable&limit=50",
     )
+    a = sender.vulnerable_resources_detected(real)
     print(json.dumps(a, indent=2))

@@ -22,7 +22,7 @@ from fixbackend.workspaces.invitation_service import InvitationService, Invitati
 
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.invitation_repository import InvitationRepository
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
