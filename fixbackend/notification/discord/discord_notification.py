@@ -54,8 +54,8 @@ class DiscordNotificationSender(AlertSender):
                     },
                     "url": self.config.service_base_url,  # TODO: add workspace id
                     "description": (
-                        f"We have completed a comprehensive scan of your infrastructure."
-                        f"\n```\n{alert.failed_checks_count_total} issues require your attention.\n```\n"
+                        f"We have completed a comprehensive scan of your infrastructure.\n"
+                        f"```\n{alert.failed_checks_count_total} issues require your attention.\n```\n"
                         f"These issues are in violation of the benchmark standards set in `{alert.benchmark}`.\n"
                         f"Here is a {note}list of failing checks:\n\n"
                     ),

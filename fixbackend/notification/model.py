@@ -20,6 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from functools import lru_cache, partial
 from typing import Dict, List, Literal, Optional, cast
@@ -29,11 +30,11 @@ from uuid import UUID
 from attr import frozen
 from cattrs import Converter
 from cattrs.strategies import configure_tagged_union, include_subclasses
+from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
 
 from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName
 from fixbackend.inventory.inventory_service import ReportSeverity
-from fixcloudutils.types import Json
 
 NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
 AllowedNotificationProvider = {"email", "slack", "discord", "pagerduty", "teams"}
