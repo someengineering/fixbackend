@@ -14,19 +14,18 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional, Tuple
-from typing_extensions import override
+from typing import Callable, Dict, List, Optional
 
 import boto3
 import pytest
 from attrs import evolve
-from fixcloudutils.redis.event_stream import MessageContext, RedisStreamPublisher
-from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
+from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing_extensions import override
 
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
@@ -62,8 +61,7 @@ from fixbackend.notification.email.email_messages import EmailMessage
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
-
-from tests.fixbackend.conftest import RequestHandlerMock
+from tests.fixbackend.conftest import RequestHandlerMock, RedisPubSubPublisherMock
 
 
 class CloudAccountRepositoryMock(CloudAccountRepository):
@@ -147,24 +145,6 @@ class WorkspaceServiceMock(WorkspaceRepositoryImpl):
         return organization
 
 
-class RedisStreamPublisherMock(RedisStreamPublisher):
-    # noinspection PyMissingConstructor
-    def __init__(self) -> None:
-        self.last_message: Optional[Tuple[str, Json]] = None
-
-    async def publish(self, kind: str, message: Json) -> None:
-        self.last_message = (kind, message)
-
-
-class RedisPubSubPublisherMock(RedisPubSubPublisher):
-    # noinspection PyMissingConstructor
-    def __init__(self) -> None:
-        self.last_message: Optional[Tuple[str, Json, Optional[str]]] = None
-
-    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
-        self.last_message = (kind, message, channel)
-
-
 class DomainEventSenderMock(DomainEventPublisher):
     def __init__(self) -> None:
         self.events: List[Event] = []
@@ -185,7 +165,7 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
         self, account_id: str, role_name: AwsRoleName, external_id: ExternalId
     ) -> AssumeRoleResult:
         if self.can_assume:
-            return AssumeRoleResults.Success("foo", "bar", "baz", datetime.utcnow())
+            return AssumeRoleResults.Success("foo", "bar", "baz", utc())
         return AssumeRoleResults.Failure("Cannot assume role")
 
     async def list_accounts(
@@ -202,6 +182,7 @@ class AwsAccountSetupHelperMock(AwsAccountSetupHelper):
 
 
 class InMemoryNotificationService(NotificationService):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         self.notified_workspaces: List[WorkspaceId] = []
 
@@ -215,7 +196,7 @@ def notification_service() -> InMemoryNotificationService:
     return InMemoryNotificationService()
 
 
-now = datetime.utcnow()
+now = utc()
 
 
 @pytest.fixture
@@ -440,7 +421,6 @@ async def test_store_last_run_info(
     )
 
     cloud_account_id = account.id
-    now = datetime.utcnow()
     event = TenantAccountsCollected(
         test_workspace_id, {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now, task_id)}, now
     )
@@ -579,9 +559,7 @@ async def test_handle_account_discovered_success(
     assert isinstance(event, AwsAccountDiscovered)
 
     # happy case, boto3 can assume role
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
+    await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
 
     message = {
         "cloud_account_id": str(account.id),
@@ -620,9 +598,7 @@ async def test_handle_account_discovered_assume_role_success(
     account_setup_helper.can_describe_regions = False
     # boto3 can not describe regions -> fail
     with pytest.raises(Exception):
-        await service.process_domain_event(
-            event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-        )
+        await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
 
 
 @pytest.mark.asyncio
@@ -649,17 +625,13 @@ async def test_handle_account_discovered_assume_role_failure(
     account_setup_helper.can_assume = False
 
     with pytest.raises(Exception):
-        await service.process_domain_event(
-            event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-        )
+        await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     # no event should be published before the account is configured
     assert len(domain_sender.events) == 1
 
     # now boto3 can assume role and event should be published
     account_setup_helper.can_assume = True
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
+    await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
     assert isinstance(event, AwsAccountConfigured)
@@ -701,9 +673,7 @@ async def test_handle_account_discovered_list_accounts_success(
     account_setup_helper.can_assume = True
     account_setup_helper.org_accounts = {account_id: account_name}
 
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
+    await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 3
     assert isinstance(domain_sender.events[1], CloudAccountNameChanged)
     assert isinstance(domain_sender.events[2], AwsAccountConfigured)
@@ -745,9 +715,7 @@ async def test_handle_account_discovered_list_aliases_success(
     account_setup_helper.org_accounts = {}
     account_setup_helper.account_alias = account_alias
 
-    await service.process_domain_event(
-        event.to_json(), MessageContext("test", event.kind, "test", datetime.utcnow(), datetime.utcnow())
-    )
+    await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
     assert isinstance(event, AwsAccountConfigured)
@@ -851,7 +819,7 @@ async def test_configure_account(
             privileged=True,
             last_scan_duration_seconds=10,
             last_scan_resources_scanned=100,
-            last_scan_started_at=datetime.utcnow(),
+            last_scan_started_at=utc(),
             next_scan=utc(),
             created_at=utc(),
             updated_at=utc(),

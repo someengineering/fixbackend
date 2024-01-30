@@ -68,9 +68,9 @@ test-all: ## run tests on every Python version with nox
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source fixbackend -m pytest
-	coverage combine
-	coverage report -m
-	coverage html
+	coverage combine || true
+	coverage report -m || true
+	coverage html || true
 	$(BROWSER) htmlcov/index.html
 
 venv:

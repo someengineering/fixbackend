@@ -30,6 +30,7 @@ from arq.connections import RedisSettings
 from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, MockTransport, Request, Response
@@ -75,6 +76,33 @@ DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
 RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
+
+
+class RedisStreamPublisherMock(RedisStreamPublisher):
+    # noinspection PyMissingConstructor
+    def __init__(self) -> None:
+        self.messages: List[Tuple[str, Json]] = []
+        self.last_message: Optional[Tuple[str, Json]] = None
+
+    async def publish(self, kind: str, message: Json) -> None:
+        self.messages.append((kind, message))
+        self.last_message = (kind, message)
+
+
+class RedisPubSubPublisherMock(RedisPubSubPublisher):
+    # noinspection PyMissingConstructor
+    def __init__(self) -> None:
+        self.messages: List[Tuple[str, Json, Optional[str]]] = []
+        self.last_message: Optional[Tuple[str, Json, Optional[str]]] = None
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.messages.append((kind, message, channel))
+        self.last_message = (kind, message, channel)
+
+
+@pytest.fixture
+def redis_publisher_mock() -> RedisPubSubPublisherMock:
+    return RedisPubSubPublisherMock()
 
 
 @pytest.fixture(scope="session")
@@ -323,6 +351,26 @@ def benchmark_json() -> List[Json]:
         {"id": "b", "type": "node", "reported": {"kind": "report_check_result", "title": "Something"}},
         {"from": "a", "to": "b", "type": "edge", "edge_type": "default"},
     ]
+
+
+@pytest.fixture
+def example_check() -> Json:
+    return {
+        "categories": [],
+        "detect": {"resoto": "is(aws_s3_bucket)"},
+        "id": "aws_c1",
+        "provider": "aws",
+        "remediation": {
+            "kind": "resoto_core_report_check_remediation",
+            "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.",
+            "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
+        },
+        "result_kind": "aws_s3_bucket",
+        "risk": "Public access policies may be applied to sensitive data buckets.",
+        "service": "s3",
+        "severity": "high",
+        "title": "Check S3 Account Level Public Access Block.",
+    }
 
 
 @pytest.fixture
@@ -652,6 +700,7 @@ def notification_service(
     async_session_maker: AsyncSessionMaker,
     http_client: AsyncClient,
     domain_event_subscriber: DomainEventSubscriber,
+    redis_publisher_mock: RedisStreamPublisherMock,
 ) -> NotificationService:
     service = NotificationService(
         default_config,
@@ -664,5 +713,6 @@ def notification_service(
         http_client,
         domain_event_subscriber,
     )
+    service.alert_publisher = redis_publisher_mock
     service.email_sender = email_sender
     return service

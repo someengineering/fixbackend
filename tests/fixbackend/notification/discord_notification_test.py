@@ -36,7 +36,7 @@ def discord_notification(
     return DiscordNotificationSender(default_config, http_client)
 
 
-def test_discord_notification(discord_notification: DiscordNotificationSender) -> None:
+async def test_discord_notification(discord_notification: DiscordNotificationSender) -> None:
     alert = FailingBenchmarkChecksDetected(
         WorkspaceId(uid()),
         "test",
@@ -54,7 +54,7 @@ def test_discord_notification(discord_notification: DiscordNotificationSender) -
         "https://fix.tt/",
     )
     # sending should not fail
-    assert discord_notification.send_alert(alert, dict(webhook_url="http://discord.com/my_webhook"))
+    await discord_notification.send_alert(alert, dict(webhook_url="http://discord.com/my_webhook"))
     # evaluate message
     message = discord_notification.vulnerable_resources_detected(alert)
     assert len(message["embeds"]) == 1

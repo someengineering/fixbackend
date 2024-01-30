@@ -163,7 +163,7 @@ class NotificationService(Service):
     async def _send_alert(self, message: Json, context: MessageContext) -> None:
         if context.kind != "vulnerable_resources_detected":
             raise ValueError(f"Unexpected message kind {context.kind}")
-        alert_on: AlertOnChannel = cattrs.structure(message, AlertOnChannel)
+        alert_on = AlertOnChannel.from_json(message)
         alert = cast(FailingBenchmarkChecksDetected, alert_on.alert)
         if (sender := self.alert_sender.get(alert_on.channel)) and (
             cfg := await self.provider_config_repo.get_messaging_config_for_workspace(
@@ -187,7 +187,7 @@ class NotificationService(Service):
         query = f"/security.has_issues==true and /security.issues[].{{{issue}}}"
         aggregate = "/security.issues[].check, /security.issues[].severity, /security.issues[].benchmarks[] as benchmark : sum(1) as count"
         failing_checks: Dict[str, str] = {}
-        failing_resources_count: Dict[str, int] = {}
+        failing_resources_count: Dict[str, int] = defaultdict(int)
         total_failed_checks = 0
         async for agg in await self.inventory_client.search_history(
             access,
@@ -268,5 +268,5 @@ class NotificationService(Service):
                     ):
                         for channel in setting.channels:
                             await self.alert_publisher.publish(
-                                "vulnerable_resources_detected", cattrs.unstructure(AlertOnChannel(alert, channel))
+                                "vulnerable_resources_detected", AlertOnChannel(alert, channel).to_json()
                             )

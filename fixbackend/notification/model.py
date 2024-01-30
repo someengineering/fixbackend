@@ -19,11 +19,16 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, List, Literal, Optional
+from functools import lru_cache, partial
+from typing import Dict, List, Literal, Optional, cast
 from urllib.parse import urlencode
+from uuid import UUID
 
 from attr import frozen
+from cattrs import Converter
+from cattrs.strategies import configure_tagged_union, include_subclasses
 from pydantic import BaseModel, Field
 
 from fixbackend.ids import WorkspaceId
@@ -60,6 +65,13 @@ class Alert:
 class AlertOnChannel:
     alert: Alert
     channel: NotificationProvider
+
+    def to_json(self) -> Json:
+        return cast(Json, converter().unstructure(self))
+
+    @classmethod
+    def from_json(cls, json: Json) -> AlertOnChannel:
+        return converter().structure(json, cls)
 
 
 @frozen
@@ -98,3 +110,13 @@ class AlertSender(ABC):
     @abstractmethod
     async def send_alert(self, alert: Alert, config: Json) -> None:
         pass
+
+
+@lru_cache()
+def converter() -> Converter:
+    cv = Converter()
+    cv.register_structure_hook(UUID, lambda v, _: UUID(v))
+    cv.register_unstructure_hook(UUID, lambda v: str(v))
+    union_strategy = partial(configure_tagged_union, tag_name="type_name")
+    include_subclasses(Alert, cv, union_strategy=union_strategy)
+    return cv

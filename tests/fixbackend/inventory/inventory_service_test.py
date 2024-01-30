@@ -66,6 +66,7 @@ def mocked_answers(
     request_handler_mock: RequestHandlerMock,
     benchmark_json: List[Json],
     azure_virtual_machine_resource_json: Json,
+    example_check: Json,
 ) -> RequestHandlerMock:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
@@ -91,7 +92,7 @@ def mocked_answers(
         elif request.url.path == "/cli/execute" and "<-[0:2]->" in content:
             return nd_json_response(neighborhood)
         elif request.url.path == "/report/checks":
-            return json_response([{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}])  # fmt: skip
+            return json_response([example_check])
         elif request.url.path == "/report/benchmarks":
             return json_response(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
