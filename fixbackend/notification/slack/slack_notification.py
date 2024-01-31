@@ -79,8 +79,9 @@ class SlackNotificationSender(AlertSender):
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"*{vr.severity}*: {vr.title}\n{vr.failed_resources} "
-                                f"additional resources detected.\nExamples: "
+                                "text": f"{vr.emoji()} *{vr.severity}*: {vr.title}\n"
+                                f"{vr.failed_resources} additional resources detected.\n"
+                                f"Examples: "
                                 + ", ".join(
                                     f"<{ex.ui_link(self.config.service_base_url)}|{ex.name}>" for ex in vr.examples
                                 ),

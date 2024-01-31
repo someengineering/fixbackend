@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from functools import lru_cache, partial
 from typing import Dict, List, Literal, Optional, cast
 from urllib.parse import urlencode
@@ -38,6 +39,7 @@ from fixbackend.inventory.inventory_service import ReportSeverity
 
 NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
 AllowedNotificationProvider = {"email", "slack", "discord", "pagerduty", "teams"}
+SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "🟥"})
 
 
 class AlertingSetting(BaseModel):
@@ -97,6 +99,9 @@ class FailedBenchmarkCheck:
     failed_resources: int
     examples: List[VulnerableResource]
 
+    def emoji(self) -> str:
+        return SeverityEmoji[self.severity]
+
 
 @frozen
 class FailingBenchmarkChecksDetected(Alert):
@@ -105,6 +110,9 @@ class FailingBenchmarkChecksDetected(Alert):
     failed_checks_count_total: int
     examples: List[FailedBenchmarkCheck]
     link: str
+
+    def emoji(self) -> str:
+        return SeverityEmoji[self.severity]
 
 
 class AlertSender(ABC):
