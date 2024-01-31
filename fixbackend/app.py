@@ -418,7 +418,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             else:
                 return await call_next(request)
 
-    app.add_middleware(RealIpMiddleware)
+    app.add_middleware(RealIpMiddleware)  # type: ignore
 
     workspaces_prefix = f"{API_PREFIX}/workspaces"
 

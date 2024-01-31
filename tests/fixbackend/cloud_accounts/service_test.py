@@ -14,8 +14,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional, Tuple
-from typing_extensions import override
+from typing import Callable, Dict, List, Optional, Tuple, override
 
 import boto3
 import pytest
