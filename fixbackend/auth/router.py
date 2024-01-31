@@ -22,22 +22,34 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
 from fixbackend.auth.auth_backend import get_auth_backend
-from fixbackend.auth.depedencies import fastapi_users
-from fixbackend.auth.oauth import get_oauth_router
-from fixbackend.auth.schemas import OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
+from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
+from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
+from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
 from fixbackend.config import Config
 
 
 async def get_auth_url(
     request: Request, state: str, client: BaseOAuth2[Any], auth_backend: AuthenticationBackend[Any, Any]
 ) -> OAuthProviderAuthUrl:
-    # as defined in https://github.com/fastapi-users/fastapi-users/blob/ff9fae631cdae00ebc15f051e54728b3c8d11420/fastapi_users/router/oauth.py#L41 # noqa
+    # as defined in oauth_router.py # noqa
     callback_url_name = f"oauth:{client.name}.{auth_backend.name}.callback"
     # where oauth should call us back
     callback_url = str(request.url_for(callback_url_name))
-    # the link to start the authorization with Google
+    # the link to start the authorization with the oauth provider
     auth_url = await client.get_authorization_url(callback_url, state)
     return OAuthProviderAuthUrl(name=client.name, authUrl=auth_url)
+
+
+async def get_associate_url(
+    request: Request, state: str, client: BaseOAuth2[Any], associated: bool
+) -> OAuthProviderAssociateUrl:
+    # as defined in oauth_router.py # noqa
+    callback_url_name = f"oauth-associate:{client.name}.callback"
+    # where oauth should call us back
+    callback_url = str(request.url_for(callback_url_name))
+    # the link to start the authorization with the oauth provider
+    auth_url = await client.get_authorization_url(callback_url, state)
+    return OAuthProviderAssociateUrl(name=client.name, authUrl=auth_url, associated=associated)
 
 
 def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitHubOAuth2) -> APIRouter:
@@ -61,6 +73,18 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     router.include_router(
+        get_oauth_associate_router(
+            oauth_client=google_client,
+            authenticator=fastapi_users.authenticator,
+            state_secret=config.secret,
+            requires_verification=True,
+        ),
+        prefix="/google/associate",
+        tags=["auth"],
+        include_in_schema=False,
+    )
+
+    router.include_router(
         get_oauth_router(
             github_client,
             auth_backend,
@@ -72,6 +96,18 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         prefix="/github",
         tags=["auth"],
         # oauth routes are not supposed to be called by the user agent, so we don't need to show them in the docs
+        include_in_schema=False,
+    )
+
+    router.include_router(
+        get_oauth_associate_router(
+            oauth_client=github_client,
+            authenticator=fastapi_users.authenticator,
+            state_secret=config.secret,
+            requires_verification=True,
+        ),
+        prefix="/github/associate",
+        tags=["auth"],
         include_in_schema=False,
     )
 
@@ -104,6 +140,25 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
 
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
+
+    @router.get("/oauth-associate", tags=["auth"])
+    async def list_oauth_associate_providers(
+        request: Request, user: AuthenticatedUser, redirect_url: str = "/"
+    ) -> List[OAuthProviderAssociateUrl]:
+        state_data: Dict[str, str] = {}
+        state_data["redirect_url"] = redirect_url
+        state_data["sub"] = str(user.id)
+        state = generate_state_token(state_data, config.secret, config.oauth_state_token_ttl)
+
+        clients: List[BaseOAuth2[Any]] = [google_client, github_client]
+        associated_clients = [
+            (client, client.name in [oa.oauth_name for oa in user.oauth_accounts]) for client in clients
+        ]
+        providers = [
+            await get_associate_url(request, state, client, already_associated)
+            for client, already_associated in associated_clients
+        ]
+        return providers
 
     return router
 
