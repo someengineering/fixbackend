@@ -1,0 +1,17 @@
+{% set exhaustive = alert.examples|length == alert.failed_checks_count_total %}
+
+We have completed a comprehensive scan of your infrastructure.
+{{ alert.failed_checks_count_total }} issues require your attention.
+These issues are in violation of the benchmark standards set in {{ alert.benchmark }}.
+
+Here is {{ "the" if exhaustive else "a non exhaustive" }} list of failing checks:
+{% for issue in alert.examples %}
+{{ issue.emoji() }} {{ issue.severity.capitalize() }} {{ issue.title }}
+   {{ issue.failed_resources }} additional resources detected. {% endfor %}
+
+{% if not exhaustive %}
+Please note that this list represents only a portion of the total issues found.
+You can review the full report with all affected resources using the below link.
+{% endif %}
+
+To view the full list of issues, please visit {{ alert.link }}.
