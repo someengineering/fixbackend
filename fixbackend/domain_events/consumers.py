@@ -29,8 +29,8 @@ from httpx import AsyncClient, BasicAuth, Request
 from fixbackend.config import Config
 from fixbackend.domain_events.events import UserRegistered
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
-from fixbackend.notification.messages import Signup
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.email.email_messages import Signup
+from fixbackend.notification.notification_service import NotificationService
 
 log = logging.getLogger(__name__)
 

@@ -26,3 +26,5 @@ from fixbackend.dispatcher.next_run_repository import NextTenantRun  # noqa
 from fixbackend.metering.metering_repository import MeteringRecordEntity  # noqa
 from fixbackend.keyvalue.json_kv import JsonEntry  # noqa
 from fixbackend.subscription.subscription_repository import SubscriptionEntity, BillingEntity  # noqa
+from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertConfigEntry  # noqa
+from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigEntity  # noqa

@@ -18,6 +18,7 @@ CloudAccountName = NewType("CloudAccountName", str)
 CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
 TaskId = NewType("TaskId", str)
+BenchmarkName = NewType("BenchmarkName", str)
 
 CloudName = NewType("CloudName", str)
 
@@ -36,11 +37,11 @@ class SecurityTier(str, Enum):
 
     def __lt__(self, other: Any) -> bool:
         if self.__class__ is other.__class__:
-            return __security_tier_order(self) < __security_tier_order(other)
+            return _security_tier_order(self) < _security_tier_order(other)
         return NotImplemented
 
 
-def __security_tier_order(tier: "SecurityTier") -> int:
+def _security_tier_order(tier: "SecurityTier") -> int:
     match tier:
         case SecurityTier.Free:
             return 0

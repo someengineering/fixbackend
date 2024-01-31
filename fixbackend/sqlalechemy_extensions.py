@@ -12,13 +12,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime, timezone
-from typing import Optional, Any
+from typing import Optional, Any, Type
 
+import cattrs
 import sqlalchemy as sa
 from fixcloudutils.asyncio.timed import perf_now
+from fixcloudutils.types import JsonElement
 from prometheus_client import Histogram, Gauge
+from pydantic import BaseModel
 from sqlalchemy import Connection, event
 from sqlalchemy.ext.asyncio import AsyncEngine
+from fastapi_users_db_sqlalchemy import GUID as FastApiUsersGUID  # type: ignore
+
+GUID = FastApiUsersGUID
 
 
 class UTCDateTime(sa.types.TypeDecorator[sa.types.DateTime]):
@@ -38,6 +44,47 @@ class UTCDateTime(sa.types.TypeDecorator[sa.types.DateTime]):
 
     def process_result_value(self, value: Optional[Any], dialect: sa.Dialect) -> Optional[Any]:
         return value.replace(tzinfo=timezone.utc) if isinstance(value, datetime) else value
+
+
+class AsJsonCattrs(sa.types.TypeDecorator[sa.types.JSON]):
+    """
+    Use this type to store complex objects as json.
+    Objects will be marshaled to and from json transparently.
+    """
+
+    impl = sa.types.JSON(none_as_null=True)
+    cache_ok = True
+
+    def __init__(self, clazz: Type[Any]):
+        super().__init__(True)
+        self.clazz = clazz
+
+    def process_bind_param(self, value: Optional[Any], dialect: sa.Dialect) -> Optional[Any]:
+        return cattrs.unstructure(value) if isinstance(value, self.clazz) else value
+
+    def process_result_value(self, value: Optional[Any], dialect: sa.Dialect) -> Optional[Any]:
+        return cattrs.structure(value, self.clazz) if value is not None else value
+
+
+class AsJsonPydantic(sa.types.TypeDecorator[sa.types.JSON]):
+    """
+    Use this type to store complex objects as json.
+    Objects will be marshaled to and from json transparently.
+    """
+
+    impl = sa.types.JSON(none_as_null=True)
+    cache_ok = True
+
+    def __init__(self, clazz: Type[BaseModel]):
+        super().__init__(True)
+        self.clazz = clazz
+
+    def process_bind_param(self, value: Optional[Any], dialect: sa.Dialect) -> Optional[Any]:
+        res = value.model_dump(mode="json") if isinstance(value, self.clazz) else value
+        return res
+
+    def process_result_value(self, value: Optional[JsonElement], dialect: sa.Dialect) -> Optional[Any]:
+        return self.clazz.model_validate(value) if value is not None else value
 
 
 class EngineMetrics:
