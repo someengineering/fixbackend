@@ -57,6 +57,8 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
 )
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
+from fixbackend.notification.slack.slack_notification import SlackNotificationSender
+from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import batch
@@ -100,9 +102,9 @@ class NotificationService(Service):
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
         self.alert_sender: Dict[NotificationProvider, AlertSender] = {
             "discord": DiscordNotificationSender(config, http_client),
-            # "slack": None,  # TODO: implement ne
+            "slack": SlackNotificationSender(config, http_client),
+            "teams": TeamsNotificationSender(config, http_client),
             # "pagerduty": None,  # TODO: implement ne
-            # "teams": None,  # TODO: implement ne
             # "email": None,  # TODO: implement ne
         }
         self.handle_events = handle_events
