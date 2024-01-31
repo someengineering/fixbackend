@@ -77,6 +77,7 @@ class NotificationService(Service):
         session_maker: AsyncSessionMaker,
         http_client: AsyncClient,
         domain_event_subscriber: DomainEventSubscriber,
+        handle_events: bool = True,
     ) -> None:
         self.config = config
         self.email_sender: EmailSender = email_sender_from_config(config)
@@ -104,15 +105,19 @@ class NotificationService(Service):
             # "teams": None,  # TODO: implement ne
             # "email": None,  # TODO: implement ne
         }
-        domain_event_subscriber.subscribe(TenantAccountsCollected, self.alert_on_changed, "NotificationService")
+        self.handle_events = handle_events
+        if handle_events:
+            domain_event_subscriber.subscribe(TenantAccountsCollected, self.alert_on_changed, "NotificationService")
 
     async def start(self) -> None:
-        await self.alert_listener.start()
-        await self.alert_publisher.start()
+        if self.handle_events:
+            await self.alert_listener.start()
+            await self.alert_publisher.start()
 
     async def stop(self) -> None:
-        await self.alert_publisher.stop()
-        await self.alert_listener.stop()
+        if self.handle_events:
+            await self.alert_publisher.stop()
+            await self.alert_listener.stop()
 
     async def send_email(self, *, to: str, subject: str, text: str, html: Optional[str]) -> None:
         await self.email_sender.send_email(to=[to], subject=subject, text=text, html=html)

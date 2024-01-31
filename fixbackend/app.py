@@ -326,6 +326,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 session_maker,
                 http_client,
                 domain_event_subscriber,
+                handle_events=False,  # fixbackend will handle events. dispatching should ignore them.
             ),
         )
         deps.add(
