@@ -15,7 +15,7 @@ import pytest
 from httpx import AsyncClient, Request, Response
 
 from fixbackend.config import Config
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
 from fixbackend.utils import uid
@@ -39,7 +39,7 @@ def discord_notification(
 async def test_discord_notification(discord_notification: DiscordNotificationSender) -> None:
     alert = FailingBenchmarkChecksDetected(
         WorkspaceId(uid()),
-        "test",
+        BenchmarkName("test"),
         "critical",
         23,
         [
@@ -48,7 +48,7 @@ async def test_discord_notification(discord_notification: DiscordNotificationSen
                 "Title of check",
                 "critical",
                 12,
-                [VulnerableResource("id1", "test_resource", "some_name")],
+                [VulnerableResource(NodeId("id1"), "test_resource", "some_name")],
             )
         ],
         "https://fix.tt/",

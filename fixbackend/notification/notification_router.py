@@ -22,7 +22,7 @@ from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, BenchmarkName
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
 
@@ -49,11 +49,11 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_slack_confirm(
         workspace_id: WorkspaceId, request: Request, code: str = Query(), state: str = Query()
     ) -> Response:
-        # if state is not the same as the one we sent, it means that the user did not come from our page
+        # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state != State:
             return Response("Invalid state", status_code=400)
 
-        # with our client and secret we authorize the request to get an access token
+        # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
             client_id=cfg.slack_oauth_client_id,
             client_secret=cfg.slack_oauth_client_secret,
@@ -70,18 +70,18 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
         # The data received has this structure:
         # { "ok": true,
-        #   "app_id": "xxxxxxx",
-        #   "authed_user": { "id": "xxxxxx" },
+        #   "app_id": "xxx",
+        #   "authed_user": { "id": "xxx" },
         #   "scope": "incoming-webhook",
         #   "token_type": "bot",
-        #   "access_token": "xxxxxxx",
-        #   "bot_user_id": "xxxxxxx",
-        #   "team": { "id": "xxxxxx", "name": "xxxxxx" },
+        #   "access_token": "xxx",
+        #   "bot_user_id": "xxx",
+        #   "team": { "id": "xxx", "name": "xxx" },
         #   "enterprise": null,
         #   "is_enterprise_install": false,
         #   "incoming_webhook": {
         #     "channel": "#name",
-        #     "channel_id": "xxxxx",
+        #     "channel_id": "xxx",
         #     "configuration_url": "https://resoto.slack.com/services/xxxx",
         #     "url": "https://hooks.slack.com/services/xxxx/xxxx"
         # }}
@@ -114,13 +114,13 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     @router.get("/notification/add/discord/confirm", name=AddDiscord, include_in_schema=False, response_model=None)
     async def add_discord_confirm(request: Request, code: str = Query(), state: str = Query()) -> Response:
         state_obj = json.loads(state)
-        # if state is not the same as the one we sent, it means that the user did not come from our page
+        # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state_obj.get("state") != State or not isinstance(state_obj.get("workspace_id"), str):
             log.error(f"Received Invalid state: {state_obj}")
             return Response("Invalid state", status_code=400)
         workspace_id = WorkspaceId(state_obj["workspace_id"])
 
-        # with our client and secret we authorize the request to get an access token
+        # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
             client_id=cfg.discord_oauth_client_id,
             client_secret=cfg.discord_oauth_client_secret,
@@ -178,13 +178,13 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         return Response(status_code=204)
 
     @router.get("/{workspace_id}/alerting/setting")
-    async def alerting_for(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Dict[str, AlertingSetting]:
+    async def alerting_for(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Dict[BenchmarkName, AlertingSetting]:
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         return setting.alerts if (setting := await ns.alerting_for(workspace_id)) else {}
 
     @router.put("/{workspace_id}/alerting/setting")
     async def update_alerting_for(
-        _: AuthenticatedUser, workspace_id: WorkspaceId, setting: Dict[str, AlertingSetting] = Body()
+        _: AuthenticatedUser, workspace_id: WorkspaceId, setting: Dict[BenchmarkName, AlertingSetting] = Body()
     ) -> Response:
         try:
             ns = fix.service(ServiceNames.notification_service, NotificationService)

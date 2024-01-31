@@ -23,7 +23,7 @@ from httpx import AsyncClient, Request, Response
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId, TaskId, FixCloudAccountId, CloudAccountId
+from fixbackend.ids import WorkspaceId, TaskId, FixCloudAccountId, CloudAccountId, NodeId, BenchmarkName
 from fixbackend.notification.email.email_messages import SecurityScanFinished
 from fixbackend.notification.model import (
     WorkspaceAlert,
@@ -114,21 +114,21 @@ async def test_example_alert(notification_service: NotificationService) -> None:
     ws_id = WorkspaceId(uid())
     access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "resoto", "", "resoto")
     result = await notification_service._load_alert(
-        access, "aws_cis_2_0", [TaskId("my_manual_sync")], "high", one_year_ago, now
+        access, BenchmarkName("aws_cis_2_0"), [TaskId("my_manual_sync")], "high", one_year_ago, now
     )
     print(result)
 
 
 @pytest.mark.asyncio
 async def test_marshal_unmarshal_alerts() -> None:
-    resource = VulnerableResource("id", "kind", "name", "cloud", "account", "region")
+    resource = VulnerableResource(NodeId("id"), "kind", "name", "cloud", "account", "region")
     alert = FailingBenchmarkChecksDetected(
         workspace_id=WorkspaceId(uid()),
-        benchmark="aws_cis_2_0",
+        benchmark=BenchmarkName("aws_cis_2_0"),
         severity="high",
         failed_checks_count_total=123,
         examples=[FailedBenchmarkCheck("test", "Some title", "high", 23, [resource, resource])],
-        link="http://foo.com",
+        link="https://foo.com",
     )
     on_channel = AlertOnChannel(alert, "email")
     js = on_channel.to_json()
@@ -180,7 +180,8 @@ async def test_send_alert(
         ws_id, "discord", "test", {"webhook_url": "https://discord.com/webhook_example"}
     )
     setting = AlertingSetting(severity="high", channels=["discord"])
-    await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={"aws_cis_2_0": setting}))
+    aws_cis_2_0 = BenchmarkName("aws_cis_2_0")
+    await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={aws_cis_2_0: setting}))
     event = TenantAccountsCollected(
         graph_db_access.workspace_id,
         {FixCloudAccountId(uid()): CloudAccountCollectInfo(CloudAccountId("12345"), 123, 123, utc(), TaskId("1"))},

@@ -31,7 +31,7 @@ from fixbackend.domain_events.events import TenantAccountsCollected
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, TaskId
+from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName
 from fixbackend.inventory.inventory_service import (
     InventoryService,
     ReportSeverityIncluded,
@@ -175,7 +175,7 @@ class NotificationService(Service):
     async def _load_alert(
         self,
         access: GraphDatabaseAccess,
-        benchmark: str,
+        benchmark: BenchmarkName,
         task_ids: List[TaskId],
         severity: ReportSeverity,
         after: datetime,

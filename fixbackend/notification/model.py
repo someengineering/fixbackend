@@ -31,7 +31,7 @@ from cattrs import Converter
 from cattrs.strategies import configure_tagged_union, include_subclasses
 from pydantic import BaseModel, Field
 
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName
 from fixbackend.inventory.inventory_service import ReportSeverity
 from fixcloudutils.types import Json
 
@@ -50,9 +50,9 @@ class AlertingSetting(BaseModel):
 class WorkspaceAlert(BaseModel):
     workspace_id: WorkspaceId
     # benchmark name -> AlertingSetting
-    alerts: Dict[str, AlertingSetting] = {}
+    alerts: Dict[BenchmarkName, AlertingSetting] = {}
 
-    def non_empty_alerts(self) -> Dict[str, AlertingSetting]:
+    def non_empty_alerts(self) -> Dict[BenchmarkName, AlertingSetting]:
         return {k: v for k, v in self.alerts.items() if v.channels}
 
 
@@ -76,7 +76,7 @@ class AlertOnChannel:
 
 @frozen
 class VulnerableResource:
-    id: str
+    id: NodeId
     kind: str
     name: Optional[str] = None
     cloud: Optional[str] = None
@@ -99,7 +99,7 @@ class FailedBenchmarkCheck:
 
 @frozen
 class FailingBenchmarkChecksDetected(Alert):
-    benchmark: str
+    benchmark: BenchmarkName
     severity: str
     failed_checks_count_total: int
     examples: List[FailedBenchmarkCheck]
