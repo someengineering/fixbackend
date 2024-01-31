@@ -1,8 +1,16 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -92,3 +100,9 @@ class ConsoleEmailSender(EmailSender):
         print(f"text: {text}")
         if html:
             print(f"html: {html}")
+
+
+def email_sender_from_config(config: Config) -> EmailSender:
+    return (
+        Boto3EmailSender(config) if config.aws_access_key_id and config.aws_secret_access_key else ConsoleEmailSender()
+    )

@@ -70,6 +70,11 @@ class Config(BaseSettings):
     google_analytics_api_secret: Optional[str]
     aws_marketplace_url: str
     billing_period: Literal["month", "day"]
+    discord_oauth_client_id: str
+    discord_oauth_client_secret: str
+    slack_oauth_client_id: str
+    slack_oauth_client_secret: str
+    service_base_url: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -98,6 +103,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument("--github-oauth-client-id", default=os.environ.get("GITHUB_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--github-oauth-client-secret", default=os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--discord-oauth-client-id", default=os.environ.get("DISCORD_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--discord-oauth-client-secret", default=os.environ.get("DISCORD_OAUTH_CLIENT_SECRET", ""))
+    parser.add_argument("--slack-oauth-client-id", default=os.environ.get("SLACK_OAUTH_CLIENT_ID", ""))
+    parser.add_argument("--slack-oauth-client-secret", default=os.environ.get("SLACK_OAUTH_CLIENT_SECRET", ""))
     parser.add_argument(
         "--redis-readwrite-url", default=os.environ.get("REDIS_READWRITE_URL", "redis://localhost:6379/0")
     )
@@ -161,10 +170,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
     parser.add_argument("--google-analytics-measurement-id", default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID"))
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
-    parser.add_argument(
-        "--aws-marketplace-url",
-        default=os.environ.get("AWS_MARKETPLACE_URL", ""),
-    )
+    parser.add_argument("--aws-marketplace-url", default=os.environ.get("AWS_MARKETPLACE_URL", ""))
+    parser.add_argument("--service-base-url", default=os.environ.get("SERVICE_BASE_URL", ""))
     parser.add_argument(
         "--billing-period",
         choices=["month", "day"],

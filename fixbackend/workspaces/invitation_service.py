@@ -17,26 +17,26 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from logging import getLogger
 from typing import Annotated, Dict, Sequence, Tuple
-from attrs import evolve
-from fastapi import Depends
 
 import jwt
+from attrs import evolve
+from fastapi import Depends
 from fastapi_users.jwt import decode_jwt, generate_jwt
+from fixcloudutils.util import utc
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.config import Config, ConfigDependency
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, WorkspaceId
-from fixbackend.notification.service import NotificationService, EmailServiceDependency
-from fixbackend.notification.messages import Invite
+from fixbackend.notification.email.email_messages import Invite
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
-from fixcloudutils.util import utc
-
 
 log = getLogger(__name__)
 
@@ -145,15 +145,15 @@ class InvitationServiceImpl(InvitationService):
 def get_invitation_service(
     workspace_repository: WorkspaceRepositoryDependency,
     invitation_repository: InvitationRepositoryDependency,
-    email_service: EmailServiceDependency,
     user_repository: UserRepositoryDependency,
     domain_events: DomainEventPublisherDependency,
+    deps: FixDependency,
     config: ConfigDependency,
 ) -> InvitationService:
     return InvitationServiceImpl(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
-        notification_service=email_service,
+        notification_service=deps.service(ServiceNames.notification_service, NotificationService),
         user_repository=user_repository,
         domain_events=domain_events,
         config=config,

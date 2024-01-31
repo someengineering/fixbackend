@@ -16,13 +16,13 @@
 from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
-from fixbackend.notification.messages import EmailMessage, Invite
+from fixbackend.notification.email.email_messages import EmailMessage, Invite
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
 
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.invitation_repository import InvitationRepository
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
