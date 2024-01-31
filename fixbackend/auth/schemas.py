@@ -32,3 +32,9 @@ class UserUpdate(schemas.BaseUserUpdate):
 class OAuthProviderAuthUrl(BaseModel):
     name: str = Field(description="Name of the OAuth provider")
     authUrl: str = Field(description="URL to initiate auth flow")
+
+
+class OAuthProviderAssociateUrl(BaseModel):
+    name: str = Field(description="Name of the OAuth provider")
+    associated: bool = Field(description="Whether the user is already associated with this provider")
+    authUrl: str = Field(description="URL to initiate association flow")
