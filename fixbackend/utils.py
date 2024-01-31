@@ -59,9 +59,10 @@ def group_by(iterable: Iterable[AnyT], f: Callable[[AnyT], AnyR]) -> Dict[AnyR, 
     return v
 
 
-def md5(s: Any) -> str:
+def md5(*elems: Any) -> str:
     md5_hash = hashlib.md5()
-    md5_hash.update(str(s).encode("utf-8"))
+    for s in elems:
+        md5_hash.update(str(s).encode("utf-8"))
     return md5_hash.hexdigest()
 
 

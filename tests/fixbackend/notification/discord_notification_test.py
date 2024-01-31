@@ -38,6 +38,7 @@ def discord_notification(
 
 async def test_discord_notification(discord_notification: DiscordNotificationSender) -> None:
     alert = FailingBenchmarkChecksDetected(
+        "some_id",
         WorkspaceId(uid()),
         BenchmarkName("test"),
         "critical",

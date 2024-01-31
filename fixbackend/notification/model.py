@@ -39,7 +39,7 @@ from fixbackend.inventory.inventory_service import ReportSeverity
 
 NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
 AllowedNotificationProvider = {"email", "slack", "discord", "pagerduty", "teams"}
-SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "🟥"})
+SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "💥"})
 
 
 class AlertingSetting(BaseModel):
@@ -61,6 +61,7 @@ class WorkspaceAlert(BaseModel):
 
 @frozen
 class Alert:
+    id: str
     workspace_id: WorkspaceId
 
 

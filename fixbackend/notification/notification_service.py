@@ -57,11 +57,12 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
 )
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
+from fixbackend.notification.pagerduty.pagerduty_notification import PagerDutyNotificationSender
 from fixbackend.notification.slack.slack_notification import SlackNotificationSender
 from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import batch
+from fixbackend.utils import batch, md5
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -104,7 +105,7 @@ class NotificationService(Service):
             "discord": DiscordNotificationSender(config, http_client),
             "slack": SlackNotificationSender(config, http_client),
             "teams": TeamsNotificationSender(config, http_client),
-            # "pagerduty": None,  # TODO: implement ne
+            "pagerduty": PagerDutyNotificationSender(config, http_client),
             # "email": None,  # TODO: implement ne
         }
         self.handle_events = handle_events
@@ -247,6 +248,7 @@ class NotificationService(Service):
                 history=HistorySearch(after=after, before=before, change=HistoryChange.node_vulnerable),
             ).ui_link(self.config.service_base_url)
             return FailingBenchmarkChecksDetected(
+                id=md5(benchmark, *task_ids),
                 workspace_id=access.workspace_id,
                 benchmark=benchmark,
                 severity=top_check_defs[0].severity if top_checks else severity,

@@ -123,6 +123,7 @@ async def test_example_alert(notification_service: NotificationService) -> None:
 async def test_marshal_unmarshal_alerts() -> None:
     resource = VulnerableResource(NodeId("id"), "kind", "name", "cloud", "account", "region")
     alert = FailingBenchmarkChecksDetected(
+        id="some_id",
         workspace_id=WorkspaceId(uid()),
         benchmark=BenchmarkName("aws_cis_2_0"),
         severity="high",
