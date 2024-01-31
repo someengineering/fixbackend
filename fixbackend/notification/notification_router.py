@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
-from typing import Dict
+from typing import Dict, List
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Body
@@ -175,6 +175,18 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.update_notification_provider_config(workspace_id, "teams", name, config)
+        return Response(status_code=204)
+
+    @router.put("/{workspace_id}/notification/add/email")
+    async def add_email(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, name: str = Query(), email: List[str] = Query()
+    ) -> Response:
+        if not name or not email:
+            raise HTTPException(status_code=400, detail="Missing name or email address")
+        config = dict(email=email)
+        # store token and webhook url
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_notification_provider_config(workspace_id, "email", name, config)
         return Response(status_code=204)
 
     @router.get("/{workspace_id}/alerting/setting")

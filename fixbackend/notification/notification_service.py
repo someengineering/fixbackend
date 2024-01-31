@@ -42,6 +42,7 @@ from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryCh
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage
+from fixbackend.notification.email.email_notification import EmailNotificationSender
 from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
@@ -106,7 +107,7 @@ class NotificationService(Service):
             "slack": SlackNotificationSender(config, http_client),
             "teams": TeamsNotificationSender(config, http_client),
             "pagerduty": PagerDutyNotificationSender(config, http_client),
-            # "email": None,  # TODO: implement ne
+            "email": EmailNotificationSender(config, self.email_sender),
         }
         self.handle_events = handle_events
         if handle_events:
