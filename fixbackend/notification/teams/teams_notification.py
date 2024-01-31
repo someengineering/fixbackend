@@ -43,6 +43,8 @@ class TeamsNotificationSender(AlertSender):
             (not_ex, "non exhaustive ") if len(alert.examples) < alert.failed_checks_count_total else ([], "")
         )
 
+        # Note: MessageCards are considered a legacy format, AdaptiveCards are not yet fully supported by webhooks.
+        # Reference: https://learn.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
         return {
             "@type": "MessageCard",
             "@context": "http://schema.org/extensions",
