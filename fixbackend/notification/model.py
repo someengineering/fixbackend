@@ -25,10 +25,9 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache, partial
 from typing import Dict, List, Literal, Optional, cast
-from urllib.parse import urlencode
 from uuid import UUID
 
-from attr import frozen
+from attr import frozen, define
 from cattrs import Converter
 from cattrs.strategies import configure_tagged_union, include_subclasses
 from fixcloudutils.types import Json
@@ -78,7 +77,7 @@ class AlertOnChannel:
         return converter().structure(json, cls)
 
 
-@frozen
+@define
 class VulnerableResource:
     id: NodeId
     kind: str
@@ -87,9 +86,7 @@ class VulnerableResource:
     account: Optional[str] = None
     region: Optional[str] = None
     zone: Optional[str] = None
-
-    def ui_link(self, base_url: str) -> str:
-        return f"{base_url}/inventory/resource-detail/{self.id}?{urlencode(dict(name=self.name))}"
+    ui_link: str = ""
 
 
 @frozen
@@ -110,7 +107,7 @@ class FailingBenchmarkChecksDetected(Alert):
     severity: ReportSeverity
     failed_checks_count_total: int
     examples: List[FailedBenchmarkCheck]
-    link: str
+    ui_link: str
 
     def emoji(self) -> str:
         return SeverityEmoji[self.severity]

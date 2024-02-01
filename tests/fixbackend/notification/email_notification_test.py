@@ -13,15 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pytest
 
-from fixbackend.config import Config
 from fixbackend.notification.email.email_notification import EmailNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from tests.fixbackend.conftest import InMemoryEmailSender
 
 
 @pytest.fixture
-def email_notification(default_config: Config, email_sender: InMemoryEmailSender) -> EmailNotificationSender:
-    return EmailNotificationSender(default_config, email_sender)
+def email_notification(email_sender: InMemoryEmailSender) -> EmailNotificationSender:
+    return EmailNotificationSender(email_sender)
 
 
 async def test_teams_notification(

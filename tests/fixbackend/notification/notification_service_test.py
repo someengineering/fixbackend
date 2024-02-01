@@ -129,7 +129,7 @@ async def test_marshal_unmarshal_alerts() -> None:
         severity="high",
         failed_checks_count_total=123,
         examples=[FailedBenchmarkCheck("test", "Some title", "high", 23, [resource, resource])],
-        link="https://foo.com",
+        ui_link="https://foo.com",
     )
     on_channel = AlertOnChannel(alert, "email")
     js = on_channel.to_json()

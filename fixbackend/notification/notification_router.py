@@ -54,7 +54,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         set_workspace_id(workspace_id)
         # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state != State:
-            return RedirectResponse(f"/workspace-settings?message=slack_added&severity=error#{workspace_id}")
+            return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=error#{workspace_id}")
 
         # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
@@ -70,9 +70,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             response.raise_for_status()
             data = response.json()
         except Exception:
-            return RedirectResponse(f"/workspace-settings?message=slack_added&severity=error#{workspace_id}")
+            return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=error#{workspace_id}")
         if not data.get("ok"):
-            return RedirectResponse(f"/workspace-settings?message=slack_added&severity=error#{workspace_id}")
+            return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=error#{workspace_id}")
 
         # The data received has this structure:
         # { "ok": true,
@@ -101,7 +101,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.update_notification_provider_config(workspace_id, "slack", hook["channel"], config)
         log.info("Slack webhook added successfully")
-        return RedirectResponse(f"/workspace-settings?message=slack_added&severity=success#{workspace_id}")
+        return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=success#{workspace_id}")
 
     @router.get("/{workspace_id}/notification/add/slack")
     async def add_slack(user: AuthenticatedUser, workspace_id: WorkspaceId, request: Request) -> Response:
@@ -123,7 +123,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state_obj.get("state") != State or not isinstance(state_obj.get("workspace_id"), str):
             log.error(f"Add discord oauth confirmation: received Invalid state: {state_obj}")
-            return RedirectResponse("/workspace-settings?message=discord_added&severity=error")
+            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
         workspace_id = WorkspaceId(state_obj["workspace_id"])
         set_workspace_id(workspace_id)
 
@@ -142,7 +142,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             hook = data["webhook"]
         except Exception as ex:
             log.info(f"Could not add discord webhook: {ex}")
-            return RedirectResponse(f"/workspace-settings?message=discord_added&severity=error#{workspace_id}")
+            return RedirectResponse(f"/workspace-settings?message=discord_added&outcome=error#{workspace_id}")
 
         config = dict(webhook_url=hook["url"])
         # store token and webhook url
@@ -151,7 +151,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
         # redirect to the UI
         log.info("Discord webhook added successfully")
-        return RedirectResponse(f"/workspace-settings?message=discord_added&severity=success#{workspace_id}")
+        return RedirectResponse(f"/workspace-settings?message=discord_added&outcome=success#{workspace_id}")
 
     @router.get("/{workspace_id}/notification/add/discord")
     async def add_discord(user: AuthenticatedUser, workspace_id: WorkspaceId, request: Request) -> Response:

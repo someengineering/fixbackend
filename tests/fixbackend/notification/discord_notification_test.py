@@ -14,7 +14,6 @@
 import pytest
 from httpx import AsyncClient, Request, Response
 
-from fixbackend.config import Config
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from tests.fixbackend.conftest import RequestHandlerMock
@@ -22,7 +21,7 @@ from tests.fixbackend.conftest import RequestHandlerMock
 
 @pytest.fixture
 def discord_notification(
-    default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
+    http_client: AsyncClient, request_handler_mock: RequestHandlerMock
 ) -> DiscordNotificationSender:
     async def handler(request: Request) -> Response:
         if "discord.com" in request.url.host:
@@ -31,7 +30,7 @@ def discord_notification(
             return Response(404)
 
     request_handler_mock.append(handler)
-    return DiscordNotificationSender(default_config, http_client)
+    return DiscordNotificationSender(http_client)
 
 
 async def test_discord_notification(

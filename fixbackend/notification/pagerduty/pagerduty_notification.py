@@ -18,7 +18,6 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
 from httpx import AsyncClient
 
-from fixbackend.config import Config
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -40,8 +39,7 @@ SeverityToPagerDutySeverity = defaultdict(
 
 
 class PagerDutyNotificationSender(AlertSender):
-    def __init__(self, cfg: Config, http_client: AsyncClient) -> None:
-        self.config = cfg
+    def __init__(self, http_client: AsyncClient) -> None:
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected, integration_key: str) -> Json:
@@ -49,11 +47,11 @@ class PagerDutyNotificationSender(AlertSender):
             "routing_key": integration_key,
             "dedup_key": alert.id,
             "event_action": "trigger",
-            "links": [{"href": alert.link, "text": "See all failed resources in FIX"}],
+            "links": [{"href": alert.ui_link, "text": "See all failed resources in FIX"}],
             "images": [
                 {
                     "src": "https://cdn.some.engineering/assets/fix-logos/fix-logo-192.png",
-                    "href": alert.link,
+                    "href": alert.ui_link,
                     "alt": "Fix Home Page",
                 }
             ],

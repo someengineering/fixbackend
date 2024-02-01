@@ -14,16 +14,13 @@
 import pytest
 from httpx import AsyncClient, Request, Response
 
-from fixbackend.config import Config
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
 
 
 @pytest.fixture
-def teams_notification(
-    default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
-) -> TeamsNotificationSender:
+def teams_notification(http_client: AsyncClient, request_handler_mock: RequestHandlerMock) -> TeamsNotificationSender:
     async def handler(request: Request) -> Response:
         if "webhook.office.com" in request.url.host:
             return Response(204)
@@ -31,7 +28,7 @@ def teams_notification(
             return Response(404)
 
     request_handler_mock.append(handler)
-    return TeamsNotificationSender(default_config, http_client)
+    return TeamsNotificationSender(http_client)
 
 
 async def test_teams_notification(

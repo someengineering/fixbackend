@@ -16,7 +16,6 @@ import logging
 from fixcloudutils.types import Json
 from httpx import AsyncClient
 
-from fixbackend.config import Config
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -27,8 +26,7 @@ log = logging.getLogger(__name__)
 
 
 class SlackNotificationSender(AlertSender):
-    def __init__(self, cfg: Config, http_client: AsyncClient) -> None:
-        self.config = cfg
+    def __init__(self, http_client: AsyncClient) -> None:
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected) -> Json:
@@ -81,10 +79,7 @@ class SlackNotificationSender(AlertSender):
                                 "type": "mrkdwn",
                                 "text": f"{vr.emoji()} *{vr.severity}*: {vr.title}\n"
                                 f"{vr.failed_resources} additional resources detected.\n"
-                                f"Examples: "
-                                + ", ".join(
-                                    f"<{ex.ui_link(self.config.service_base_url)}|{ex.name}>" for ex in vr.examples
-                                ),
+                                f"Examples: " + ", ".join(f"<{ex.ui_link}|{ex.name}>" for ex in vr.examples),
                             },
                         }
                         for vr in alert.examples
@@ -101,7 +96,7 @@ class SlackNotificationSender(AlertSender):
                                 },
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"See the full list of failing resources <{alert.link}|View In Fix>",
+                                    "text": f"See the full list of failing resources <{alert.ui_link}|View In Fix>",
                                 },
                             ],
                         },

@@ -15,7 +15,7 @@
           {{ issue.failed_resources }} additional resources detected.<br/>
           Examples:
           {% for example in issue.examples %}
-            <a href="{{ example.ui_link(config.service_base_url) }}">{{ example.name }}</a>,
+            <a href="{{ example.ui_link }}">{{ example.name }}</a>,
           {% endfor %}
         </li>
       {% endfor %}
@@ -26,5 +26,5 @@
         You can review the full report with all affected resources using the below link.
       </p>
     {% endif %}
-     <p style="font-size: 16px;">To view the full list of issues, please visit <a href="{{ alert.link }}">Fix</a>.</p>
+     <p style="font-size: 16px;">To view the full list of issues, please visit <a href="{{ alert.ui_link }}">Fix</a>.</p>
 {% endblock content %}

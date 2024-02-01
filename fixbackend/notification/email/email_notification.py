@@ -15,21 +15,15 @@ import logging
 
 from fixcloudutils.types import Json
 
-from fixbackend.config import Config
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
-from fixbackend.notification.model import (
-    AlertSender,
-    Alert,
-    FailingBenchmarkChecksDetected,
-)
+from fixbackend.notification.model import AlertSender, Alert, FailingBenchmarkChecksDetected
 
 log = logging.getLogger(__name__)
 
 
 class EmailNotificationSender(AlertSender):
-    def __init__(self, cfg: Config, email_sender: EmailSender) -> None:
-        self.config = cfg
+    def __init__(self, email_sender: EmailSender) -> None:
         self.sender = email_sender
 
     async def send_alert(self, alert: Alert, config: Json) -> None:
@@ -37,8 +31,8 @@ class EmailNotificationSender(AlertSender):
             match alert:
                 case FailingBenchmarkChecksDetected() as vrd:
                     subject = f"{vrd.emoji()} {vrd.severity.capitalize()}: New issues Detected in your Infrastructure!"
-                    text = email_messages.render("failing_benchmarks_detected.txt", alert=vrd, config=self.config)
-                    html = email_messages.render("failing_benchmarks_detected.html", alert=vrd, config=self.config)
+                    text = email_messages.render("failing_benchmarks_detected.txt", alert=vrd)
+                    html = email_messages.render("failing_benchmarks_detected.html", alert=vrd)
                 case _:
                     raise ValueError(f"Unknown alert: {alert}")
 

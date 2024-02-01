@@ -16,13 +16,13 @@ from typing import Any, Union
 from attrs import frozen
 
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from functools import lru_cache
 
 
 @lru_cache(maxsize=1)
 def get_env() -> Environment:
-    return Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"))
+    return Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"), undefined=StrictUndefined)
 
 
 def render(template_name: str, **kwargs: Any) -> str:

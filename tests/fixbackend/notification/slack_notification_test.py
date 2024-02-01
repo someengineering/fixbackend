@@ -14,16 +14,13 @@
 import pytest
 from httpx import AsyncClient, Request, Response
 
-from fixbackend.config import Config
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from fixbackend.notification.slack.slack_notification import SlackNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
 
 
 @pytest.fixture
-def slack_notification(
-    default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
-) -> SlackNotificationSender:
+def slack_notification(http_client: AsyncClient, request_handler_mock: RequestHandlerMock) -> SlackNotificationSender:
     async def handler(request: Request) -> Response:
         if "slack.com" in request.url.host:
             return Response(204)
@@ -31,7 +28,7 @@ def slack_notification(
             return Response(404)
 
     request_handler_mock.append(handler)
-    return SlackNotificationSender(default_config, http_client)
+    return SlackNotificationSender(http_client)
 
 
 async def test_slack_notification(

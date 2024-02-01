@@ -14,4 +14,4 @@ Please note that this list represents only a portion of the total issues found.
 You can review the full report with all affected resources using the below link.
 {% endif %}
 
-To view the full list of issues, please visit {{ alert.link }}.
+To view the full list of issues, please visit {{ alert.ui_link }}.

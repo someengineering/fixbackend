@@ -16,7 +16,6 @@ import logging
 from fixcloudutils.types import Json
 from httpx import AsyncClient
 
-from fixbackend.config import Config
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -27,8 +26,7 @@ log = logging.getLogger(__name__)
 
 
 class DiscordNotificationSender(AlertSender):
-    def __init__(self, cfg: Config, http_client: AsyncClient) -> None:
-        self.config = cfg
+    def __init__(self, http_client: AsyncClient) -> None:
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected) -> Json:
@@ -52,7 +50,7 @@ class DiscordNotificationSender(AlertSender):
                         "url": "https://fix.tt",
                         "icon_url": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
                     },
-                    "url": self.config.service_base_url,  # TODO: add workspace id
+                    "url": alert.ui_link,
                     "description": (
                         f"We have completed a comprehensive scan of your infrastructure.\n"
                         f"```\n{alert.failed_checks_count_total} issues require your attention.\n```\n"
@@ -63,14 +61,12 @@ class DiscordNotificationSender(AlertSender):
                         {
                             "name": f"{vr.emoji()} **{vr.severity.capitalize()}**: *{vr.title}*",
                             "value": f"{vr.failed_resources} additional resources detected.\nExamples: "
-                            + ", ".join(
-                                f"[{rr.name}]({rr.ui_link(self.config.service_base_url)})" for rr in vr.examples
-                            ),
+                            + ", ".join(f"[{rr.name}]({rr.ui_link})" for rr in vr.examples),
                         }
                         for vr in alert.examples
                     ]
                     + exhausted
-                    + [{"name": "See the full list of failing resources", "value": f"[View in FIX]({alert.link})"}],
+                    + [{"name": "See the full list of failing resources", "value": f"[View in FIX]({alert.ui_link})"}],
                     "color": 16744272,
                 }
             ]

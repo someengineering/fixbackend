@@ -447,10 +447,10 @@ def alert_failing_benchmark_checks_detected() -> FailingBenchmarkChecksDetected:
                 "critical",
                 12,
                 [
-                    VulnerableResource(NodeId("id1"), "test_resource_1", "some_name_1"),
-                    VulnerableResource(NodeId("id2"), "test_resource_2", "some_name_2"),
-                    VulnerableResource(NodeId("id3"), "test_resource_3", "some_name_3"),
-                    VulnerableResource(NodeId("id4"), "test_resource_4", "some_name_4"),
+                    VulnerableResource(NodeId("id1"), "test_resource_1", "some_name_1", ui_link="https://fix.tt/1"),
+                    VulnerableResource(NodeId("id2"), "test_resource_2", "some_name_2", ui_link="https://fix.tt/2"),
+                    VulnerableResource(NodeId("id3"), "test_resource_3", "some_name_3", ui_link="https://fix.tt/3"),
+                    VulnerableResource(NodeId("id4"), "test_resource_4", "some_name_4", ui_link="https://fix.tt/4"),
                 ],
             )
         ],

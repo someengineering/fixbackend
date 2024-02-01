@@ -16,7 +16,6 @@ import logging
 from fixcloudutils.types import Json
 from httpx import AsyncClient
 
-from fixbackend.config import Config
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -27,8 +26,7 @@ log = logging.getLogger(__name__)
 
 
 class TeamsNotificationSender(AlertSender):
-    def __init__(self, cfg: Config, http_client: AsyncClient) -> None:
-        self.config = cfg
+    def __init__(self, http_client: AsyncClient) -> None:
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected) -> Json:
@@ -60,10 +58,7 @@ class TeamsNotificationSender(AlertSender):
                             "name": failed.emoji(),
                             "value": f"***{failed.severity.capitalize()}*** **{failed.title}**\n\n"
                             f"*{failed.failed_resources} additional resources detected.*\n\n"
-                            f"Examples: "
-                            + ", ".join(
-                                f"[{vr.name}]({vr.ui_link(self.config.service_base_url)})" for vr in failed.examples
-                            ),
+                            f"Examples: " + ", ".join(f"[{vr.name}]({vr.ui_link})" for vr in failed.examples),
                         }
                         for failed in alert.examples
                     ]
@@ -75,7 +70,7 @@ class TeamsNotificationSender(AlertSender):
                 {
                     "@type": "OpenUri",
                     "name": "View in FIX",
-                    "targets": [{"os": "default", "uri": alert.link}],
+                    "targets": [{"os": "default", "uri": alert.ui_link}],
                 }
             ],
         }

@@ -14,7 +14,6 @@
 import pytest
 from httpx import AsyncClient, Request, Response
 
-from fixbackend.config import Config
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from fixbackend.notification.pagerduty.pagerduty_notification import PagerDutyNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
@@ -22,7 +21,7 @@ from tests.fixbackend.conftest import RequestHandlerMock
 
 @pytest.fixture
 def pagerduty_notification(
-    default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
+    http_client: AsyncClient, request_handler_mock: RequestHandlerMock
 ) -> PagerDutyNotificationSender:
     async def handler(request: Request) -> Response:
         if "events.pagerduty.com" in request.url.host:
@@ -31,7 +30,7 @@ def pagerduty_notification(
             return Response(404)
 
     request_handler_mock.append(handler)
-    return PagerDutyNotificationSender(default_config, http_client)
+    return PagerDutyNotificationSender(http_client)
 
 
 async def test_pagerduty_notification(

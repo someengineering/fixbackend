@@ -16,6 +16,7 @@ from datetime import timedelta, datetime
 from itertools import islice
 from logging import getLogger
 from typing import List, Optional, Dict, Union, Set, cast
+from urllib.parse import urlencode
 
 import cattrs
 from fixcloudutils.redis.event_stream import RedisStreamPublisher, RedisStreamListener, MessageContext
@@ -103,11 +104,11 @@ class NotificationService(Service):
         self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
         self.alert_sender: Dict[NotificationProvider, AlertSender] = {
-            "discord": DiscordNotificationSender(config, http_client),
-            "slack": SlackNotificationSender(config, http_client),
-            "teams": TeamsNotificationSender(config, http_client),
-            "pagerduty": PagerDutyNotificationSender(config, http_client),
-            "email": EmailNotificationSender(config, self.email_sender),
+            "discord": DiscordNotificationSender(http_client),
+            "slack": SlackNotificationSender(http_client),
+            "teams": TeamsNotificationSender(http_client),
+            "pagerduty": PagerDutyNotificationSender(http_client),
+            "email": EmailNotificationSender(self.email_sender),
         }
         self.handle_events = handle_events
         if handle_events:
@@ -233,7 +234,10 @@ class NotificationService(Service):
                     for check in node.get("checks", []):
                         examples = example_resources[check]
                         if check in top_checks and len(examples) < 3:
-                            examples.append(cattrs.structure(node, VulnerableResource))
+                            resource = cattrs.structure(node, VulnerableResource)
+                            # the ui link does not come from the inventory and needs to be computed explicitly
+                            resource.ui_link = f"{self.config.service_base_url}/inventory/resource-detail/{resource.id}?{urlencode(dict(name=resource.name))}#{access.workspace_id}"  # noqa: E501
+                            examples.append(resource)
                             example_count += 1
                             if example_count == 25:
                                 break
@@ -247,7 +251,7 @@ class NotificationService(Service):
             ui_link = SearchRequest(
                 query=query,
                 history=HistorySearch(after=after, before=before, change=HistoryChange.node_vulnerable),
-            ).ui_link(self.config.service_base_url)
+            ).ui_link(self.config.service_base_url, access.workspace_id)
             return FailingBenchmarkChecksDetected(
                 id=md5(benchmark, *task_ids),
                 workspace_id=access.workspace_id,
@@ -255,7 +259,7 @@ class NotificationService(Service):
                 severity=top_check_defs[0].severity if top_checks else severity,
                 failed_checks_count_total=total_failed_checks,
                 examples=top_check_defs,
-                link=ui_link,
+                ui_link=ui_link,
             )
         return None
 

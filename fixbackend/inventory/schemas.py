@@ -20,6 +20,8 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
 from pydantic import BaseModel, Field
 
+from fixbackend.ids import WorkspaceId
+
 
 class AccountSummary(BaseModel):
     id: str = Field(description="The account id")
@@ -147,7 +149,7 @@ class SearchRequest(BaseModel):
     limit: int = Field(default=50, description="The number of results to return.", gt=0, le=1000)
     count: bool = Field(default=False, description="Also compute the total number of results.")
 
-    def ui_link(self, base_url: str) -> str:
+    def ui_link(self, base_url: str, workspace_id: WorkspaceId) -> str:
         params = {"q": self.query}
         if self.history:
             if self.history.before:
@@ -160,7 +162,7 @@ class SearchRequest(BaseModel):
             params["skip"] = str(self.skip)
         if self.limit:
             params["limit"] = str(self.limit)
-        return base_url + "/inventory?" + urlencode(params)
+        return base_url + "/inventory?" + urlencode(params) + f"#{workspace_id}"
 
 
 class ReportConfig(BaseModel):
