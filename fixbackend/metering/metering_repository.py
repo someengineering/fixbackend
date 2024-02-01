@@ -120,7 +120,7 @@ class MeteringRepository:
         if end is not None:
             query = query.where(MeteringRecordEntity.timestamp <= end)
         async with self.session_maker() as session:
-            async for (account_id, account_name, count, tiers) in await session.stream(query):
+            async for account_id, account_name, count, tiers in await session.stream(query):
                 if count >= min_nr_of_collects:
                     tiers = [SecurityTier(t) for t in tiers.split(",")]
 
