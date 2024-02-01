@@ -76,6 +76,7 @@ source = ["fixbackend"]
 omit = [
     "fixbackend/ids.py",
     "fixbackend/inventory/router.py",
+    "fixbackend/notification/notification_router.py",
 ]
 
 [tool.coverage.report]
