@@ -46,6 +46,7 @@ from fixbackend.inventory.schemas import (
     HistorySearch,
     HistoryChange,
     ReportConfig,
+    SortOrder,
 )
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
@@ -77,7 +78,7 @@ def mocked_answers(
             )
         elif request.url.path == "/cli/execute" and content.endswith("list --json-table"):
             return nd_json_response(
-                [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
+                [{"columns": [{"name": "name", "kind": "string", "display": "Name", "path": "/reported.name"}, {"name": "some_int", "kind": "int32", "display": "Some Int", "path": "/reported.some_int"}]},  # fmt: skip
                  {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
             )
         elif request.url.path == "/cli/execute" and content.endswith("list --csv"):
@@ -237,12 +238,12 @@ async def test_dict_values_by() -> None:
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
 
 
-async def test_search_list(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
+async def test_search_table(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
     expected = [
         {
             "columns": [
-                {"name": "name", "kind": "string", "display": "Name"},
-                {"name": "some_int", "kind": "int32", "display": "Some Int"},
+                {"name": "name", "kind": "string", "display": "Name", "path": "/reported.name"},
+                {"name": "some_int", "kind": "int32", "display": "Some Int", "path": "/reported.some_int"},
             ]
         },
         {"id": "123", "row": {"name": "a", "some_int": 1}},
@@ -256,6 +257,11 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
     result = [e async for e in await inventory_service.search_table(db, request)]
     assert result == expected
     request = SearchRequest(query="is(account) and name==foo")
+    result = [e async for e in await inventory_service.search_table(db, request, "csv")]
+    assert result == ["name,some_int", "a,1"]
+    request = SearchRequest(
+        query="is(account) and name==foo", sort=[SortOrder(path="/reported.name", direction="desc")]
+    )
     result = [e async for e in await inventory_service.search_table(db, request, "csv")]
     assert result == ["name,some_int", "a,1"]
 
