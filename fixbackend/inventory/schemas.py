@@ -143,7 +143,7 @@ class HistorySearch(BaseModel):
 
 
 class SortOrder(BaseModel):
-    path: str = Field(description="The name of the path to sort by.")
+    path: str = Field(description="The path to the property to sort by.")
     direction: Literal["asc", "desc"] = Field(description="The sort direction. Only 'asc' and 'desc' are allowed.")
 
 
