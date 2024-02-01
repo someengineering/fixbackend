@@ -55,11 +55,12 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import SubscriptionId
+from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
+from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
@@ -431,6 +432,32 @@ def azure_virtual_machine_resource_json() -> Json:
     }
 
 
+@pytest.fixture
+def alert_failing_benchmark_checks_detected() -> FailingBenchmarkChecksDetected:
+    return FailingBenchmarkChecksDetected(
+        "some_id",
+        WorkspaceId(uid()),
+        BenchmarkName("benchmark_name"),
+        "critical",
+        23,
+        [
+            FailedBenchmarkCheck(
+                "example_check",
+                "Title of check",
+                "critical",
+                12,
+                [
+                    VulnerableResource(NodeId("id1"), "test_resource_1", "some_name_1"),
+                    VulnerableResource(NodeId("id2"), "test_resource_2", "some_name_2"),
+                    VulnerableResource(NodeId("id3"), "test_resource_3", "some_name_3"),
+                    VulnerableResource(NodeId("id4"), "test_resource_4", "some_name_4"),
+                ],
+            )
+        ],
+        "https://fix.tt/",
+    )
+
+
 def json_response(content: JsonElement, additional_headers: Optional[Dict[str, str]] = None) -> Response:
     return Response(
         200,
@@ -629,6 +656,7 @@ async def fix_deps(
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
 ) -> FixDependencies:
+    # noinspection PyTestUnpassedFixture
     return FixDependencies(
         **{
             ServiceNames.async_engine: db_engine,

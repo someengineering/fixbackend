@@ -96,7 +96,7 @@ class VulnerableResource:
 class FailedBenchmarkCheck:
     check_id: str
     title: str
-    severity: str
+    severity: ReportSeverity
     failed_resources: int
     examples: List[VulnerableResource]
 
@@ -107,7 +107,7 @@ class FailedBenchmarkCheck:
 @frozen
 class FailingBenchmarkChecksDetected(Alert):
     benchmark: BenchmarkName
-    severity: str
+    severity: ReportSeverity
     failed_checks_count_total: int
     examples: List[FailedBenchmarkCheck]
     link: str

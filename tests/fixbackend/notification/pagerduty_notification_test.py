@@ -15,33 +15,31 @@ import pytest
 from httpx import AsyncClient, Request, Response
 
 from fixbackend.config import Config
-from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
+from fixbackend.notification.pagerduty.pagerduty_notification import PagerDutyNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
 
 
 @pytest.fixture
-def discord_notification(
+def pagerduty_notification(
     default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
-) -> DiscordNotificationSender:
+) -> PagerDutyNotificationSender:
     async def handler(request: Request) -> Response:
-        if "discord.com" in request.url.host:
+        if "events.pagerduty.com" in request.url.host:
             return Response(204)
         else:
             return Response(404)
 
     request_handler_mock.append(handler)
-    return DiscordNotificationSender(default_config, http_client)
+    return PagerDutyNotificationSender(default_config, http_client)
 
 
-async def test_discord_notification(
-    discord_notification: DiscordNotificationSender,
+async def test_pagerduty_notification(
+    pagerduty_notification: PagerDutyNotificationSender,
     alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected,
 ) -> None:
     # sending should not fail
-    await discord_notification.send_alert(
-        alert_failing_benchmark_checks_detected, dict(webhook_url="http://discord.com/my_webhook")
-    )
+    await pagerduty_notification.send_alert(alert_failing_benchmark_checks_detected, dict(integration_key="xyz"))
     # evaluate message
-    message = discord_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
-    assert len(message["embeds"]) == 1
+    message = pagerduty_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected, "xyz")
+    assert message["routing_key"] == "xyz"

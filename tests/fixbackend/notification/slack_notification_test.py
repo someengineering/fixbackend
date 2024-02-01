@@ -15,33 +15,32 @@ import pytest
 from httpx import AsyncClient, Request, Response
 
 from fixbackend.config import Config
-from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
+from fixbackend.notification.slack.slack_notification import SlackNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
 
 
 @pytest.fixture
-def discord_notification(
+def slack_notification(
     default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
-) -> DiscordNotificationSender:
+) -> SlackNotificationSender:
     async def handler(request: Request) -> Response:
-        if "discord.com" in request.url.host:
+        if "slack.com" in request.url.host:
             return Response(204)
         else:
             return Response(404)
 
     request_handler_mock.append(handler)
-    return DiscordNotificationSender(default_config, http_client)
+    return SlackNotificationSender(default_config, http_client)
 
 
-async def test_discord_notification(
-    discord_notification: DiscordNotificationSender,
-    alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected,
+async def test_slack_notification(
+    slack_notification: SlackNotificationSender, alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected
 ) -> None:
     # sending should not fail
-    await discord_notification.send_alert(
-        alert_failing_benchmark_checks_detected, dict(webhook_url="http://discord.com/my_webhook")
+    await slack_notification.send_alert(
+        alert_failing_benchmark_checks_detected, dict(webhook_url="https://slack.com/my_webhook")
     )
     # evaluate message
-    message = discord_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
-    assert len(message["embeds"]) == 1
+    message = slack_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
+    assert len(message["attachments"]) == 1

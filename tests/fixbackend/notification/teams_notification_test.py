@@ -15,33 +15,32 @@ import pytest
 from httpx import AsyncClient, Request, Response
 
 from fixbackend.config import Config
-from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
+from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from tests.fixbackend.conftest import RequestHandlerMock
 
 
 @pytest.fixture
-def discord_notification(
+def teams_notification(
     default_config: Config, http_client: AsyncClient, request_handler_mock: RequestHandlerMock
-) -> DiscordNotificationSender:
+) -> TeamsNotificationSender:
     async def handler(request: Request) -> Response:
-        if "discord.com" in request.url.host:
+        if "webhook.office.com" in request.url.host:
             return Response(204)
         else:
             return Response(404)
 
     request_handler_mock.append(handler)
-    return DiscordNotificationSender(default_config, http_client)
+    return TeamsNotificationSender(default_config, http_client)
 
 
-async def test_discord_notification(
-    discord_notification: DiscordNotificationSender,
-    alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected,
+async def test_teams_notification(
+    teams_notification: TeamsNotificationSender, alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected
 ) -> None:
     # sending should not fail
-    await discord_notification.send_alert(
-        alert_failing_benchmark_checks_detected, dict(webhook_url="http://discord.com/my_webhook")
+    await teams_notification.send_alert(
+        alert_failing_benchmark_checks_detected, dict(webhook_url="https://team.webhook.office.com/webhookb2/test")
     )
     # evaluate message
-    message = discord_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
-    assert len(message["embeds"]) == 1
+    message = teams_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
+    assert len(message["sections"]) == 1
