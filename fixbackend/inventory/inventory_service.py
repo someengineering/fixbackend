@@ -210,6 +210,8 @@ class InventoryService(Service):
             cmd += " " + request.query
         else:
             cmd = "search " + request.query
+        if request.sort:
+            cmd += " | sort " + ", ".join(f"{s.path} {s.direction}" for s in request.sort)
         fmt_option = "--csv" if result_format == "csv" else "--json-table"
         cmd += f" | limit {request.skip}, {request.limit} | list {fmt_option}"
         return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
