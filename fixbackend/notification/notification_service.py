@@ -16,6 +16,7 @@ from datetime import timedelta, datetime
 from itertools import islice
 from logging import getLogger
 from typing import List, Optional, Dict, Union, Set, cast
+from urllib.parse import urlencode
 
 import cattrs
 from fixcloudutils.redis.event_stream import RedisStreamPublisher, RedisStreamListener, MessageContext
@@ -42,6 +43,7 @@ from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryCh
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage
+from fixbackend.notification.email.email_notification import EmailNotificationSender
 from fixbackend.notification.email.email_sender import (
     EmailSender,
     email_sender_from_config,
@@ -57,9 +59,12 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
 )
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
+from fixbackend.notification.pagerduty.pagerduty_notification import PagerDutyNotificationSender
+from fixbackend.notification.slack.slack_notification import SlackNotificationSender
+from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import batch
+from fixbackend.utils import batch, md5
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -99,11 +104,11 @@ class NotificationService(Service):
         self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
         self.alert_sender: Dict[NotificationProvider, AlertSender] = {
-            "discord": DiscordNotificationSender(config, http_client),
-            # "slack": None,  # TODO: implement ne
-            # "pagerduty": None,  # TODO: implement ne
-            # "teams": None,  # TODO: implement ne
-            # "email": None,  # TODO: implement ne
+            "discord": DiscordNotificationSender(http_client),
+            "slack": SlackNotificationSender(http_client),
+            "teams": TeamsNotificationSender(http_client),
+            "pagerduty": PagerDutyNotificationSender(http_client),
+            "email": EmailNotificationSender(self.email_sender),
         }
         self.handle_events = handle_events
         if handle_events:
@@ -229,7 +234,10 @@ class NotificationService(Service):
                     for check in node.get("checks", []):
                         examples = example_resources[check]
                         if check in top_checks and len(examples) < 3:
-                            examples.append(cattrs.structure(node, VulnerableResource))
+                            resource = cattrs.structure(node, VulnerableResource)
+                            # the ui link does not come from the inventory and needs to be computed explicitly
+                            resource.ui_link = f"{self.config.service_base_url}/inventory/resource-detail/{resource.id}?{urlencode(dict(name=resource.name))}#{access.workspace_id}"  # noqa: E501
+                            examples.append(resource)
                             example_count += 1
                             if example_count == 25:
                                 break
@@ -243,14 +251,15 @@ class NotificationService(Service):
             ui_link = SearchRequest(
                 query=query,
                 history=HistorySearch(after=after, before=before, change=HistoryChange.node_vulnerable),
-            ).ui_link(self.config.service_base_url)
+            ).ui_link(self.config.service_base_url, access.workspace_id)
             return FailingBenchmarkChecksDetected(
+                id=md5(benchmark, *task_ids),
                 workspace_id=access.workspace_id,
                 benchmark=benchmark,
                 severity=top_check_defs[0].severity if top_checks else severity,
                 failed_checks_count_total=total_failed_checks,
                 examples=top_check_defs,
-                link=ui_link,
+                ui_link=ui_link,
             )
         return None
 

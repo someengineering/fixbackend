@@ -25,51 +25,54 @@ from fixbackend.notification.model import (
 log = logging.getLogger(__name__)
 
 
-class DiscordNotificationSender(AlertSender):
+class TeamsNotificationSender(AlertSender):
     def __init__(self, http_client: AsyncClient) -> None:
         self.http_client = http_client
 
     def vulnerable_resources_detected(self, alert: FailingBenchmarkChecksDetected) -> Json:
         not_ex = [
             {
-                "name": "Note",
+                "name": "",
                 "value": "Please note that this list represents only a portion of the total issues found. "
-                "You can review the full report with all affected resources using below link.\n",
+                "You can review the full report with all affected resources using below button.\n",
             }
         ]
         exhausted, note = (
             (not_ex, "non exhaustive ") if len(alert.examples) < alert.failed_checks_count_total else ([], "")
         )
 
+        # Note: MessageCards are considered a legacy format, AdaptiveCards are not yet fully supported by webhooks.
+        # Reference: https://learn.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
         return {
-            "embeds": [
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "16744272",
+            "summary": "New issues Detected in your Infrastructure",
+            "sections": [
                 {
-                    "title": f"{alert.severity.capitalize()}: New issues Detected in your Infrastructure!",
-                    "author": {
-                        "name": "FIX",
-                        "url": "https://fix.tt",
-                        "icon_url": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
-                    },
-                    "url": alert.ui_link,
-                    "description": (
-                        f"We have completed a comprehensive scan of your infrastructure.\n"
-                        f"```\n{alert.failed_checks_count_total} issues require your attention.\n```\n"
-                        f"These issues are in violation of the benchmark standards set in `{alert.benchmark}`.\n"
-                        f"Here is a {note}list of failing checks:\n\n"
-                    ),
-                    "fields": [
+                    "activityTitle": "**New issues Detected in your Infrastructure!**",
+                    "activitySubtitle": f"{alert.emoji()} **{alert.severity.capitalize()}**: {alert.failed_checks_count_total} new issues",  # noqa: E501
+                    "activityImage": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
+                    "facts": [
                         {
-                            "name": f"{vr.emoji()} **{vr.severity.capitalize()}**: *{vr.title}*",
-                            "value": f"{vr.failed_resources} additional resources detected.\nExamples: "
-                            + ", ".join(f"[{rr.name}]({rr.ui_link})" for rr in vr.examples),
+                            "name": failed.emoji(),
+                            "value": f"***{failed.severity.capitalize()}*** **{failed.title}**\n\n"
+                            f"*{failed.failed_resources} additional resources detected.*\n\n"
+                            f"Examples: " + ", ".join(f"[{vr.name}]({vr.ui_link})" for vr in failed.examples),
                         }
-                        for vr in alert.examples
+                        for failed in alert.examples
                     ]
-                    + exhausted
-                    + [{"name": "See the full list of failing resources", "value": f"[View in FIX]({alert.ui_link})"}],
-                    "color": 16744272,
+                    + exhausted,
+                    "markdown": True,
                 }
-            ]
+            ],
+            "potentialAction": [
+                {
+                    "@type": "OpenUri",
+                    "name": "View in FIX",
+                    "targets": [{"os": "default", "uri": alert.ui_link}],
+                }
+            ],
         }
 
     async def send_alert(self, alert: Alert, config: Json) -> None:
@@ -80,6 +83,6 @@ class DiscordNotificationSender(AlertSender):
                 case _:
                     raise ValueError(f"Unknown alert: {alert}")
 
-            log.info(f"Send discord notification for workspace {alert.workspace_id}")
+            log.info(f"Send teams notification for workspace {alert.workspace_id}")
             response = await self.http_client.post(url, json=message)
             response.raise_for_status()

@@ -115,7 +115,7 @@ class InventoryService(Service):
         await self.cache.stop()
 
     async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
-        set_workspace_id(str(event.tenant_id))
+        set_workspace_id(event.tenant_id)
         set_cloud_account_id(event.aws_account_id)
         set_fix_cloud_account_id(event.cloud_account_id)
         access = await self.db_access_manager.get_database_access(event.tenant_id)

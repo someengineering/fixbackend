@@ -20,23 +20,25 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from functools import lru_cache, partial
 from typing import Dict, List, Literal, Optional, cast
-from urllib.parse import urlencode
 from uuid import UUID
 
-from attr import frozen
+from attr import frozen, define
 from cattrs import Converter
 from cattrs.strategies import configure_tagged_union, include_subclasses
+from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
 
 from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName
 from fixbackend.inventory.inventory_service import ReportSeverity
-from fixcloudutils.types import Json
 
 NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
 AllowedNotificationProvider = {"email", "slack", "discord", "pagerduty", "teams"}
+SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "💥"})
 
 
 class AlertingSetting(BaseModel):
@@ -58,6 +60,7 @@ class WorkspaceAlert(BaseModel):
 
 @frozen
 class Alert:
+    id: str
     workspace_id: WorkspaceId
 
 
@@ -74,7 +77,7 @@ class AlertOnChannel:
         return converter().structure(json, cls)
 
 
-@frozen
+@define
 class VulnerableResource:
     id: NodeId
     kind: str
@@ -83,27 +86,31 @@ class VulnerableResource:
     account: Optional[str] = None
     region: Optional[str] = None
     zone: Optional[str] = None
-
-    def ui_link(self, base_url: str) -> str:
-        return f"{base_url}/inventory/resource-detail/{self.id}?{urlencode(dict(name=self.name))}"
+    ui_link: str = ""
 
 
 @frozen
 class FailedBenchmarkCheck:
     check_id: str
     title: str
-    severity: str
+    severity: ReportSeverity
     failed_resources: int
     examples: List[VulnerableResource]
+
+    def emoji(self) -> str:
+        return SeverityEmoji[self.severity]
 
 
 @frozen
 class FailingBenchmarkChecksDetected(Alert):
     benchmark: BenchmarkName
-    severity: str
+    severity: ReportSeverity
     failed_checks_count_total: int
     examples: List[FailedBenchmarkCheck]
-    link: str
+    ui_link: str
+
+    def emoji(self) -> str:
+        return SeverityEmoji[self.severity]
 
 
 class AlertSender(ABC):

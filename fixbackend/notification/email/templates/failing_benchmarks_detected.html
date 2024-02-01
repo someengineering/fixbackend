@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {# can we show all issues #}
+  {% set exhaustive = alert.examples|length == alert.failed_checks_count_total %}
+
+  <h1 style="font-weight: bold;">New issues Detected in your Infrastructure! </h1>
+  <p style="font-size: 16px;">We have completed a comprehensive scan of your infrastructure.</p>
+  <p style="font-size: 16px;"><strong>{{ alert.failed_checks_count_total }} issues require your attention.</strong> These issues are in violation of the benchmark standards set in <code>{{ alert.benchmark }}</code>.</p>
+  <p style="font-size: 16px;">Here is {{ "the" if exhaustive else "a non exhaustive" }} list of failing checks:</p>
+  <ul>
+    {% for issue in alert.examples %}
+      <li style="font-size: 16px;">
+        {{ issue.emoji() }} <strong> {{ issue.severity.capitalize() }}:</strong> {{ issue.title }}<br/>
+        {{ issue.failed_resources }} additional resources detected.<br/>
+        Examples:
+        {% for example in issue.examples %}
+          <a href="{{ example.ui_link }}">{{ example.name }}</a>,
+        {% endfor %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% if not exhaustive %}
+    <p style="font-size: 16px;">
+      Please note that this list represents only a portion of the total issues found.
+      You can review the full report with all affected resources using the below link.
+    </p>
+  {% endif %}
+  <p style="font-size: 16px;">To view the full list of issues, please visit <a href="{{ alert.ui_link }}">Fix</a>.</p>
+  <div class="email-footer">
+    <p style="font-size: 10px;">
+      If you believe you have received this email in error,
+      please contact your Fix workspace administrator or <a href="mailto:support@fix.tt?subject=Please%20unsubscribe%20from%20workspace%20{{ alert.workspace_id }}">notify support</a>.
+    </p>
+  </div>
+{% endblock content %}
