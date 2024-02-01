@@ -22,7 +22,7 @@
     },
     "mypy-type-checker.args": [
         "--python-version",
-        "3.11",
+        "3.12",
         "--install-types",
         "--config-file",
         "mypy.ini"

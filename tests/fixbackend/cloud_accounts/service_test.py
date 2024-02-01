@@ -14,7 +14,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, override
 
 import boto3
 import pytest
@@ -25,7 +25,6 @@ from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import override
 
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
