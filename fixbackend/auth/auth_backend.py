@@ -64,7 +64,11 @@ class FixJWTStrategy(Strategy[User, UUID]):
 
     def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
         # try to decode the token without verifying the signature to get the key id
-        unverified = jwt.api_jwt.decode_complete(token, options={"verify_signature": False})
+        try:
+            unverified = jwt.api_jwt.decode_complete(token, options={"verify_signature": False})
+        except jwt.exceptions.DecodeError:  # token is not a valid JWT
+            return None
+
         header = unverified["header"]
         key_id = header.get("kid")
 

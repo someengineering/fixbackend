@@ -88,3 +88,6 @@ async def test_token_validation(
     user3 = await strategy2.read_token(token1, user_manager)
     user4 = await strategy2.read_token(token2, user_manager)
     assert user1 == user2 == user3 == user4 == user
+
+    # decoding invalid token returns None
+    assert strategy1.decode_token("invalid token") is None
