@@ -26,8 +26,8 @@ from fixbackend.ids import WorkspaceId, BenchmarkName
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
-from fixbackend.notification.schemas import NotificationSettings
-from fixbackend.notification.user_notification_repo import UserNotificationReporitoryDependency
+from fixbackend.notification.schemas import UserNotificationSettingsRead
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsReporitoryDependency
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
@@ -231,24 +231,24 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/{workspace_id}/notification/user")
     async def get_user_notification_settings(
-        user: AuthenticatedUser, user_notification_repo: UserNotificationReporitoryDependency
-    ) -> NotificationSettings:
+        user: AuthenticatedUser, user_notification_repo: UserNotificationSettingsReporitoryDependency
+    ) -> UserNotificationSettingsRead:
         settings = await user_notification_repo.get_notification_settings(user.id)
 
-        return NotificationSettings.from_model(settings)
+        return UserNotificationSettingsRead.from_model(settings)
 
     @router.put("/{workspace_id}/notification/user")
     async def update_user_notification_settings(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
-        notification_settings: NotificationSettings,
-        user_notification_repo: UserNotificationReporitoryDependency,
-    ) -> NotificationSettings:
+        notification_settings: UserNotificationSettingsRead,
+        user_notification_repo: UserNotificationSettingsReporitoryDependency,
+    ) -> UserNotificationSettingsRead:
 
         updated = await user_notification_repo.update_notification_settings(
             user.id, notification_settings.to_model(user.id)
         )
 
-        return NotificationSettings.from_model(updated)
+        return UserNotificationSettingsRead.from_model(updated)
 
     return router

@@ -34,7 +34,7 @@ from attr import frozen
 
 
 @frozen
-class NotificationSettings:
+class UserNotificationSettings:
     user_id: UserId
     weekly_report: bool
     inactivity_reminder: bool
@@ -47,15 +47,15 @@ class UserNotificationSettingsEntity(Base):
     weekly_report: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     inactivity_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    def to_model(self) -> NotificationSettings:
-        return NotificationSettings(
+    def to_model(self) -> UserNotificationSettings:
+        return UserNotificationSettings(
             user_id=self.user_id,
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
         )
 
     @staticmethod
-    def from_model(settings: NotificationSettings) -> "UserNotificationSettingsEntity":
+    def from_model(settings: UserNotificationSettings) -> "UserNotificationSettingsEntity":
         return UserNotificationSettingsEntity(
             user_id=settings.user_id,
             weekly_report=settings.weekly_report,
@@ -63,30 +63,30 @@ class UserNotificationSettingsEntity(Base):
         )
 
 
-class UserNotificationRepository(ABC):
+class UserNotificationSettingsRepository(ABC):
     @abstractmethod
-    async def get_notification_settings(self, user_id: UserId) -> NotificationSettings:
+    async def get_notification_settings(self, user_id: UserId) -> UserNotificationSettings:
         pass
 
     @abstractmethod
     async def update_notification_settings(
-        self, user_id: UserId, settings: NotificationSettings
-    ) -> NotificationSettings:
+        self, user_id: UserId, settings: UserNotificationSettings
+    ) -> UserNotificationSettings:
         pass
 
 
-class UserNotificationRepositoryImpl(UserNotificationRepository):
+class UserNotificationSettingsRepositoryImpl(UserNotificationSettingsRepository):
 
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
     @override
-    async def get_notification_settings(self, user_id: UserId) -> NotificationSettings:
+    async def get_notification_settings(self, user_id: UserId) -> UserNotificationSettings:
         async with self.session_maker() as session:
             if result := await session.get(UserNotificationSettingsEntity, user_id):
                 return result.to_model()
             else:
-                return NotificationSettings(
+                return UserNotificationSettings(
                     user_id=user_id,
                     weekly_report=True,
                     inactivity_reminder=False,
@@ -94,8 +94,8 @@ class UserNotificationRepositoryImpl(UserNotificationRepository):
 
     @override
     async def update_notification_settings(
-        self, user_id: UserId, settings: NotificationSettings
-    ) -> NotificationSettings:
+        self, user_id: UserId, settings: UserNotificationSettings
+    ) -> UserNotificationSettings:
         async with self.session_maker() as session:
             existing = await session.get(UserNotificationSettingsEntity, user_id)
             if existing:
@@ -109,8 +109,12 @@ class UserNotificationRepositoryImpl(UserNotificationRepository):
             return settings
 
 
-def get_user_notification_repo(session_maker: AsyncSessionMakerDependency) -> UserNotificationRepository:
-    return UserNotificationRepositoryImpl(session_maker)
+def get_user_notification_settings_repo(
+    session_maker: AsyncSessionMakerDependency,
+) -> UserNotificationSettingsRepository:
+    return UserNotificationSettingsRepositoryImpl(session_maker)
 
 
-UserNotificationReporitoryDependency = Annotated[UserNotificationRepository, Depends(get_user_notification_repo)]
+UserNotificationSettingsReporitoryDependency = Annotated[
+    UserNotificationSettingsRepository, Depends(get_user_notification_settings_repo)
+]
