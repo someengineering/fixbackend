@@ -14,7 +14,7 @@
 
 from pydantic import BaseModel, Field
 from fixbackend.ids import UserId
-from fixbackend.notification.user_notification_repo import UserNotificationSettings as NotificationSettingsModel
+from fixbackend.notification.user_notification_repo import UserNotificationSettings
 
 
 class UserNotificationSettingsRead(BaseModel):
@@ -22,14 +22,14 @@ class UserNotificationSettingsRead(BaseModel):
     inactivity_reminder: bool = Field(description="Whether to send a reminder for open incidents")
 
     @staticmethod
-    def from_model(model: NotificationSettingsModel) -> "UserNotificationSettingsRead":
+    def from_model(model: UserNotificationSettings) -> "UserNotificationSettingsRead":
         return UserNotificationSettingsRead(
             weekly_report=model.weekly_report,
             inactivity_reminder=model.inactivity_reminder,
         )
 
-    def to_model(self, user_id: UserId) -> NotificationSettingsModel:
-        return NotificationSettingsModel(
+    def to_model(self, user_id: UserId) -> UserNotificationSettings:
+        return UserNotificationSettings(
             user_id=user_id,
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
