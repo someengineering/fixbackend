@@ -27,6 +27,7 @@ from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.schemas import NotificationSettings
+from fixbackend.notification.user_notification_repo import UserNotificationReporitoryDependency
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
@@ -228,15 +229,26 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         except ValueError as ex:
             return JSONResponse(status_code=422, content=dict(error=str(ex)))
 
-    @router.get("/user/notification")
-    async def get_user_notification_settings(user: AuthenticatedUser) -> NotificationSettings:
-        # todo: implement those mocks
-        return NotificationSettings(weekly_report=False, incident_reminder=False)
-
-    @router.put("/user/notification")
-    async def update_user_notification_settings(
-        user: AuthenticatedUser, notification_settings: NotificationSettings
+    @router.get("/{workspace_id}/notification/user")
+    async def get_user_notification_settings(
+        user: AuthenticatedUser, user_notification_repo: UserNotificationReporitoryDependency
     ) -> NotificationSettings:
-        return notification_settings
+        settings = await user_notification_repo.get_notification_settings(user.id)
+
+        return NotificationSettings.from_model(settings)
+
+    @router.put("/{workspace_id}/notification/user")
+    async def update_user_notification_settings(
+        user: AuthenticatedUser,
+        workspace_id: WorkspaceId,
+        notification_settings: NotificationSettings,
+        user_notification_repo: UserNotificationReporitoryDependency,
+    ) -> NotificationSettings:
+
+        updated = await user_notification_repo.update_notification_settings(
+            user.id, notification_settings.to_model(user.id)
+        )
+
+        return NotificationSettings.from_model(updated)
 
     return router
