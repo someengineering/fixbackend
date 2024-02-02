@@ -30,6 +30,7 @@ from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
+from uuid import UUID
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -44,6 +45,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         invitation_repository: InvitationRepository,
     ):
         super().__init__(user_repository, password_helper)
+        self.user_repository = user_repository
         self.user_verifier = user_verifier
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
@@ -83,6 +85,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def create_default_workspace(self, user: User) -> Workspace:
         org_slug = re.sub("[^a-zA-Z0-9-]", "-", user.email)
         return await self.workspace_repository.create_workspace(user.email, org_slug, user)
+
+    async def remove_oauth_account(self, account_id: UUID) -> None:
+        await self.user_repository.remove_oauth_account(account_id)
 
 
 async def get_user_manager(
