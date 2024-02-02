@@ -6,7 +6,7 @@ A good intro: https://harrisonmorgan.dev/2021/02/15/getting-started-with-fastapi
 
 ### Update the database schema to the latest version
 
-From the project root:
+Just start the app, it will automatically run the migrations. Alternatively, you can run the following command from the root of the project:
 
 `poetry run alembic upgrade head`
 
@@ -14,4 +14,6 @@ From the project root:
 
 `poetry run alembic revision --autogenerate -m "your message"`
 
-It will detect model changes and create 90% correct migration, but make sure to manually check the results for anomalies
+It will detect model changes and create 90% correct migration, but make sure to manually check the results for anomalies. 
+
+If you see an empty migration, you probably forgot to import your new model class in `fixbackend/all_models.py`.

@@ -13,19 +13,25 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Any, Dict, List
+from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
+from fixbackend.auth.user_manager import UserManagerDependency
 
 from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
 from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
 from fixbackend.config import Config
+
+from logging import getLogger
+
+log = getLogger(__name__)
 
 
 async def get_auth_url(
@@ -41,15 +47,16 @@ async def get_auth_url(
 
 
 async def get_associate_url(
-    request: Request, state: str, client: BaseOAuth2[Any], associated: bool
-) -> OAuthProviderAssociateUrl:
+    request: Request,
+    state: str,
+    client: BaseOAuth2[Any],
+) -> str:
     # as defined in oauth_router.py # noqa
     callback_url_name = f"oauth-associate:{client.name}.callback"
     # where oauth should call us back
     callback_url = str(request.url_for(callback_url_name))
     # the link to start the authorization with the oauth provider
-    auth_url = await client.get_authorization_url(callback_url, state)
-    return OAuthProviderAssociateUrl(name=client.name, authUrl=auth_url, associated=associated)
+    return await client.get_authorization_url(callback_url, state)
 
 
 def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitHubOAuth2) -> APIRouter:
@@ -141,6 +148,16 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
 
+    @router.delete("/oauth-accounts/{provider}", tags=["auth"])
+    async def unlink_oauth_account(
+        user: AuthenticatedUser, provider_id: UUID, user_manager: UserManagerDependency
+    ) -> None:
+        user_oauth_accounts = [acc.id for acc in user.oauth_accounts]
+        if provider_id not in user_oauth_accounts:
+            raise HTTPException(status_code=403, detail="Not allowed to unlink this provider")
+
+        await user_manager.remove_oauth_account(provider_id)
+
     @router.get("/oauth-associate", tags=["auth"])
     async def list_oauth_associate_providers(
         request: Request, user: AuthenticatedUser, redirect_url: str = "/"
@@ -150,15 +167,47 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         state_data["sub"] = str(user.id)
         state = generate_state_token(state_data, config.secret, config.oauth_state_token_ttl)
 
-        clients: List[BaseOAuth2[Any]] = [google_client, github_client]
-        associated_clients = [
-            (client, client.name in [oa.oauth_name for oa in user.oauth_accounts]) for client in clients
-        ]
-        providers = [
-            await get_associate_url(request, state, client, already_associated)
-            for client, already_associated in associated_clients
-        ]
-        return providers
+        clients: Dict[str, BaseOAuth2[Any]] = {
+            google_client.name: google_client,
+            github_client.name: github_client,
+        }
+
+        associate_urls: List[OAuthProviderAssociateUrl] = []
+
+        user_oauth_accounts_names = {acc.oauth_name for acc in user.oauth_accounts}
+
+        # step 1: put already associated accounts
+        for oauth_account in user.oauth_accounts:
+            client = clients.get(oauth_account.oauth_name)
+            if not client:
+                log.warning(f"Unknown oauth provider {oauth_account.oauth_name}")
+                continue
+            auth_url = await get_associate_url(request, state, client)
+            associate_urls.append(
+                OAuthProviderAssociateUrl(
+                    name=oauth_account.oauth_name,
+                    associated=True,
+                    account_id=oauth_account.id,
+                    authUrl=auth_url,
+                )
+            )
+
+        # step 2: add not yet associated accounts
+        for client_name, client in clients.items():
+            # skip already associated accounts
+            if client_name in user_oauth_accounts_names:
+                continue
+            auth_url = await get_associate_url(request, state, client)
+            associate_urls.append(
+                OAuthProviderAssociateUrl(
+                    name=client_name,
+                    associated=False,
+                    account_id=None,
+                    authUrl=auth_url,
+                )
+            )
+
+        return associate_urls
 
     return router
 

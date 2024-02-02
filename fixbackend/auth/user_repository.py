@@ -142,6 +142,15 @@ class UserRepository(BaseUserDatabase[User, UUID]):
 
             return orm_user.to_domain()
 
+    async def remove_oauth_account(self, account_id: UUID) -> None:
+        """Remove an OAuth account from a user."""
+        async with self.user_db() as db:
+            orm_oauth_account = await db.session.get(orm.OAuthAccount, account_id)
+            if orm_oauth_account is None:
+                return None
+            await db.session.delete(orm_oauth_account)
+            await db.session.commit()
+
 
 async def get_user_repository(session_maker: AsyncSessionMakerDependency) -> AsyncIterator[UserRepository]:
     yield UserRepository(session_maker)

@@ -62,6 +62,7 @@ from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -744,3 +745,8 @@ def notification_service(
     service.alert_publisher = redis_publisher_mock
     service.email_sender = email_sender
     return service
+
+
+@pytest.fixture
+def user_notification_repository(async_session_maker: AsyncSessionMaker) -> UserNotificationSettingsRepositoryImpl:
+    return UserNotificationSettingsRepositoryImpl(async_session_maker)
