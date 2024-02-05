@@ -148,7 +148,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         clients: List[BaseOAuth2[Any]] = [google_client, github_client]
         return [await get_auth_url(request, state, client, auth_backend) for client in clients]
 
-    @router.delete("/oauth-accounts/{provider}", tags=["auth"])
+    @router.delete("/oauth-accounts/{provider_id}", tags=["auth"])
     async def unlink_oauth_account(
         user: AuthenticatedUser, provider_id: UUID, user_manager: UserManagerDependency
     ) -> None:
@@ -187,6 +187,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
                 OAuthProviderAssociateUrl(
                     name=oauth_account.oauth_name,
                     associated=True,
+                    account_email=oauth_account.account_email,
                     account_id=oauth_account.id,
                     authUrl=auth_url,
                 )
@@ -202,6 +203,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
                 OAuthProviderAssociateUrl(
                     name=client_name,
                     associated=False,
+                    account_email=None,
                     account_id=None,
                     authUrl=auth_url,
                 )
