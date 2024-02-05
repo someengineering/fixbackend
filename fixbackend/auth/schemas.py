@@ -38,4 +38,5 @@ class OAuthProviderAssociateUrl(BaseModel):
     name: str = Field(description="Name of the OAuth provider")
     associated: bool = Field(description="Whether the user is already associated with this provider")
     account_id: uuid.UUID | None = Field(description="ID of the OAuth account, if associated")
+    account_email: str | None = Field(description="Email of the user if already associated")
     authUrl: str = Field(description="URL to initiate association flow")

@@ -231,7 +231,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/{workspace_id}/notification/user")
     async def get_user_notification_settings(
-        user: AuthenticatedUser, user_notification_repo: UserNotificationSettingsReporitoryDependency
+        user: AuthenticatedUser,
+        workspace_id: WorkspaceId,
+        user_notification_repo: UserNotificationSettingsReporitoryDependency,
     ) -> UserNotificationSettingsRead:
         settings = await user_notification_repo.get_notification_settings(user.id)
 
