@@ -206,9 +206,11 @@ class NotificationService(Service):
     ) -> Optional[FailingBenchmarkChecksDetected]:
         included_severities = ",".join(ReportSeverityIncluded.get(severity, ["none"]))
         tsk_ids = ",".join(task_ids)
-        issue = f"benchmarks[]=={benchmark} and run_id in [{tsk_ids}] and severity in [{included_severities}]"
-        query = f"/security.has_issues==true and /security.issues[].{{{issue}}}"
-        aggregate = "/security.issues[].check, /security.issues[].severity, /security.issues[].benchmarks[] as benchmark : sum(1) as count"
+        issue = f"benchmarks[]=={benchmark} and severity in [{included_severities}]"
+        query = (
+            f"/security.has_issues==true and /security.run_id in [{tsk_ids}] and /diff.node_vulnerable[].{{{issue}}}"
+        )
+        aggregate = "/diff.node_vulnerable[].check, /diff.node_vulnerable[].severity, /diff.node_vulnerable[].benchmarks[] as benchmark : sum(1) as count"  # noqa: E501
         failing_checks: Dict[str, str] = {}
         failing_resources_count: Dict[str, int] = defaultdict(int)
         total_failed_checks = 0
@@ -217,7 +219,7 @@ class NotificationService(Service):
             f"search {query} | aggregate {aggregate}",
             before=before,
             after=after,
-            change=HistoryChange.node_vulnerable,
+            change=[HistoryChange.node_vulnerable, HistoryChange.node_compliant],
         ):
             if (
                 (count := agg.get("count"))
@@ -240,7 +242,7 @@ class NotificationService(Service):
             example_count = 0
             async for node in await self.inventory_client.execute_single(
                 access,
-                f"history --before {utc_str(before)} --after {utc_str(after)} --change node_vulnerable /security.has_issues==true and /security.issues[].{{check in [{','.join(top_checks)}] and {issue}}} | "  # noqa
+                f"history --before {utc_str(before)} --after {utc_str(after)} --change node_vulnerable --change node_compliant /security.has_issues==true and /diff.node_vulnerable[].{{check in [{','.join(top_checks)}] and {issue}}} | "  # noqa
                 f"jq --no-rewrite '{{id:.id, kind:.reported.kind, name:.reported.name, cloud:.ancestors.cloud.reported.name, account:.ancestors.account.reported.name, region:.ancestors.region.reported.name, checks: [ .security.issues[] | select(.benchmarks != null and .benchmarks[] == \"{benchmark}\") | .check ]}}'",  # noqa
             ):
                 if isinstance(node, dict):

@@ -282,11 +282,14 @@ class InventoryService(Service):
                 accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
                 resource_count_by_severity: Dict[str, int] = defaultdict(int)
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
+                severity_prop = "/security.severity"
+                # TODO: after 7d of inventory in production, we can uncomment the next line
+                # severity_prop = "/security.severity" if change == "node_vulnerable" else "/security.diff.previous"
                 async for elem in await self.client.execute_single(
                     db,
                     f"history --change {change} --after {duration.total_seconds()}s | aggregate "
                     f"/ancestors.account.reported.id as account_id, "
-                    f"/security.severity as severity,"
+                    f"{severity_prop} as severity,"
                     f"kind as kind"
                     ": count(name) as count",
                 ):

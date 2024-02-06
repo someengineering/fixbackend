@@ -187,7 +187,7 @@ class InventoryClient(Service):
         *,
         before: Optional[datetime] = None,
         after: Optional[datetime] = None,
-        change: Optional[HistoryChange] = None,
+        change: Optional[List[HistoryChange]] = None,
         graph: str = "resoto",
         section: str = "reported",
     ) -> AsyncIteratorWithContext[Json]:
@@ -198,7 +198,7 @@ class InventoryClient(Service):
         if after:
             params["after"] = utc_str(after)
         if change:
-            params["change"] = change.value
+            params["change"] = ",".join(c.value for c in change)
         response = await self._perform(
             "POST",
             f"/graph/{graph}/search/history/list",
