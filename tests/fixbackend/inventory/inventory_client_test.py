@@ -153,7 +153,7 @@ async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
 
 async def test_search_history(mocked_inventory_client: InventoryClient) -> None:
     response = await mocked_inventory_client.search_history(
-        db_access, "is(account)", before=utc(), after=utc(), change=HistoryChange.node_vulnerable
+        db_access, "is(account)", before=utc(), after=utc(), change=[HistoryChange.node_vulnerable]
     )
     result = [n async for n in response]
     assert len(result) == 1

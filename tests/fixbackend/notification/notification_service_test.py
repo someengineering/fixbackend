@@ -115,7 +115,12 @@ async def test_example_alert(notification_service: NotificationService) -> None:
     ws_id = WorkspaceId(uid())
     access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "resoto", "", "resoto")
     result = await notification_service._load_alert(
-        access, BenchmarkName("aws_cis_2_0"), [TaskId("my_manual_sync")], "high", one_year_ago, now
+        access,
+        BenchmarkName("aws_cis_2_0"),
+        [TaskId("c8b9f9a4-c420-11ee-b3d8-dad780437c54")],
+        "high",
+        one_year_ago,
+        now,
     )
     print(result)
 
