@@ -32,6 +32,12 @@ class NotificationProviderConfigEntity(Base, CreatedUpdatedMixin):
     name: Mapped[str] = mapped_column(String(64))
     messaging_config: Mapped[Json] = mapped_column(JSON)
 
+    def readable_config(self) -> Json:
+        if email := self.messaging_config.get("email"):
+            return {"email": email}
+        else:
+            return {}
+
 
 class NotificationProviderConfigRepository:
     def __init__(self, session_maker: AsyncSessionMaker):

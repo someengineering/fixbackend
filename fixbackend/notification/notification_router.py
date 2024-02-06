@@ -39,7 +39,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     cfg = fix.config
 
     @router.get("/{workspace_id}/notifications")
-    async def notifications(workspace_id: WorkspaceId) -> Dict[str, str]:
+    async def notifications(workspace_id: WorkspaceId) -> Dict[str, Json]:
         set_workspace_id(workspace_id)
         return await fix.service(
             ServiceNames.notification_service, NotificationService
