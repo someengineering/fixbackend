@@ -143,9 +143,9 @@ class NotificationService(Service):
                 to=email_batch, subject=message.subject(), text=message.text(), html=message.html()
             )
 
-    async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, str]:
+    async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, Json]:
         configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)
-        return {c.provider: c.name for c in configs}
+        return {c.provider: {"name": c.name, **c.readable_config()} for c in configs}
 
     async def delete_notification_provider_config(
         self, workspace_id: WorkspaceId, provider: NotificationProvider
