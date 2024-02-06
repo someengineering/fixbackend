@@ -147,6 +147,19 @@ class NotificationService(Service):
         configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)
         return {c.provider: c.name for c in configs}
 
+    async def delete_notification_provider_config(
+        self, workspace_id: WorkspaceId, provider: NotificationProvider
+    ) -> None:
+        if alerting := await self.workspace_alert_repo.alerting_for(workspace_id):
+            changed = False
+            for benchmark, alert in alerting.alerts.items():
+                if provider in alert.channels:
+                    alert.channels.remove(provider)
+                    changed = True
+            if changed:
+                await self.workspace_alert_repo.set_alerting_for_workspace(alerting)
+            await self.provider_config_repo.delete_messaging_config_for_workspace(workspace_id, provider)
+
     async def update_notification_provider_config(
         self, workspace_id: WorkspaceId, provider: NotificationProvider, name: str, config: Json
     ) -> None:
