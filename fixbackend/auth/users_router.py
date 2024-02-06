@@ -26,7 +26,7 @@ def users_router() -> APIRouter:
 
     router.include_router(fastapi_users.get_users_router(UserRead, UserUpdate))
 
-    @router.get("/me/notifications/")
+    @router.get("/me/settings/notifications")
     async def get_user_notification_settings(
         user: AuthenticatedUser,
         user_notification_repo: UserNotificationSettingsReporitoryDependency,
@@ -34,7 +34,7 @@ def users_router() -> APIRouter:
         settings = await user_notification_repo.get_notification_settings(user.id)
         return UserNotificationSettingsRead.from_model(settings)
 
-    @router.put("/me/notifications/")
+    @router.put("/me/settings/notifications")
     async def update_user_notification_settings(
         user: AuthenticatedUser,
         notification_settings: UserNotificationSettingsRead,

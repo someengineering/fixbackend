@@ -39,12 +39,12 @@ async def client(default_config: Config, user: User) -> AsyncIterator[AsyncClien
 
 @pytest.mark.asyncio
 async def test_user_notification_settings(client: AsyncClient) -> None:
-    response = await client.get("/api/users/me/notifications/")
+    response = await client.get("/api/users/me/settings/notifications")
     assert response.status_code == 200
     assert response.json() == {"inactivity_reminder": False, "weekly_report": True}
 
     response = await client.put(
-        "/api/users/me/notifications/", json={"inactivity_reminder": True, "weekly_report": False}
+        "/api/users/me/settings/notifications", json={"inactivity_reminder": True, "weekly_report": False}
     )
     assert response.status_code == 200
     assert response.json() == {"inactivity_reminder": True, "weekly_report": False}
