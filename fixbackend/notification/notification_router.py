@@ -24,7 +24,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import WorkspaceId, BenchmarkName
 from fixbackend.logging_context import set_workspace_id, set_context
-from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
+from fixbackend.notification.model import WorkspaceAlert, AlertingSetting, NotificationProvider
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.schemas import UserNotificationSettingsRead
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsReporitoryDependency
@@ -234,7 +234,6 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         user: AuthenticatedUser, user_notification_repo: UserNotificationSettingsReporitoryDependency
     ) -> UserNotificationSettingsRead:
         settings = await user_notification_repo.get_notification_settings(user.id)
-
         return UserNotificationSettingsRead.from_model(settings)
 
     @router.put("/{workspace_id}/notification/user")
@@ -244,11 +243,37 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         notification_settings: UserNotificationSettingsRead,
         user_notification_repo: UserNotificationSettingsReporitoryDependency,
     ) -> UserNotificationSettingsRead:
-
         updated = await user_notification_repo.update_notification_settings(
             user.id, notification_settings.to_model(user.id)
         )
-
         return UserNotificationSettingsRead.from_model(updated)
+
+    async def _delete_notification_provider_config(
+        workspace_id: WorkspaceId, provider: NotificationProvider
+    ) -> Response:
+        set_workspace_id(workspace_id=workspace_id)
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.delete_notification_provider_config(workspace_id, provider)
+        return Response(status_code=204)
+
+    @router.delete("/{workspace_id}/notification/slack")
+    async def delete_slack(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
+        return await _delete_notification_provider_config(workspace_id, "slack")
+
+    @router.delete("/{workspace_id}/notification/discord")
+    async def delete_discord(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
+        return await _delete_notification_provider_config(workspace_id, "discord")
+
+    @router.delete("/{workspace_id}/notification/pagerduty")
+    async def delete_pagerduty(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
+        return await _delete_notification_provider_config(workspace_id, "pagerduty")
+
+    @router.delete("/{workspace_id}/notification/teams")
+    async def delete_teams(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
+        return await _delete_notification_provider_config(workspace_id, "teams")
+
+    @router.delete("/{workspace_id}/notification/email")
+    async def delete_email(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
+        return await _delete_notification_provider_config(workspace_id, "email")
 
     return router

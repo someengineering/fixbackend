@@ -32,6 +32,7 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
     VulnerableResource,
     AlertOnChannel,
+    AllowedNotificationProvider,
 )
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.utils import uid
@@ -214,3 +215,35 @@ async def test_send_alert(
 
     # send alert
     await notification_service._send_alert(message, MessageContext("1", kind, "test", utc(), utc()))
+
+
+async def test_alert_settings(notification_service: NotificationService, workspace: Workspace) -> None:
+    # insert provider configs
+    repo = notification_service.provider_config_repo
+    ws_id = workspace.id
+    await repo.update_messaging_config_for_workspace(ws_id, "email", "test", {"test": "test"})
+    await repo.update_messaging_config_for_workspace(ws_id, "discord", "test", {"test": "test"})
+    await repo.update_messaging_config_for_workspace(ws_id, "slack", "test", {"test": "test"})
+    await repo.update_messaging_config_for_workspace(ws_id, "pagerduty", "test", {"test": "test"})
+    await repo.update_messaging_config_for_workspace(ws_id, "teams", "test", {"test": "test"})
+    # define alert settings
+    alerting = WorkspaceAlert(
+        workspace_id=ws_id,
+        alerts={
+            BenchmarkName("foo"): AlertingSetting(severity="high", channels=list(AllowedNotificationProvider)),
+            BenchmarkName("bla"): AlertingSetting(severity="critical", channels=list(AllowedNotificationProvider)),
+            BenchmarkName("bar"): AlertingSetting(severity="info", channels=list(AllowedNotificationProvider)),
+        },
+    )
+    await notification_service.workspace_alert_repo.set_alerting_for_workspace(alerting)
+    # remove provider configs
+    await notification_service.delete_notification_provider_config(ws_id, "email")
+    await notification_service.delete_notification_provider_config(ws_id, "discord")
+    await notification_service.delete_notification_provider_config(ws_id, "slack")
+    # check that alert settings are still there
+    alerting = await notification_service.workspace_alert_repo.alerting_for(ws_id)  # type: ignore
+    for setting in alerting.alerts.values():
+        assert set(setting.channels) == {"pagerduty", "teams"}
+    # get config
+    config = await notification_service.list_notification_provider_configs(ws_id)
+    assert set(config.keys()) == {"pagerduty", "teams"}
