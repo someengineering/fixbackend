@@ -26,7 +26,7 @@ from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
-from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead, UserUpdate
+from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead
 from fixbackend.config import Config
 
 from logging import getLogger
@@ -210,11 +210,5 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
             )
 
         return associate_urls
-
-    return router
-
-
-def users_router() -> APIRouter:
-    router = fastapi_users.get_users_router(UserRead, UserUpdate)
 
     return router

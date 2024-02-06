@@ -22,7 +22,6 @@ from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
-from fixbackend.workspaces.models import Workspace
 
 
 @pytest.fixture
@@ -39,13 +38,13 @@ async def client(default_config: Config, user: User) -> AsyncIterator[AsyncClien
 
 
 @pytest.mark.asyncio
-async def test_user_notification_settings(client: AsyncClient, workspace: Workspace) -> None:
-    response = await client.get(f"/api/workspaces/{workspace.id}/notification/user")
+async def test_user_notification_settings(client: AsyncClient) -> None:
+    response = await client.get("/api/users/me/notifications/")
     assert response.status_code == 200
     assert response.json() == {"inactivity_reminder": False, "weekly_report": True}
 
     response = await client.put(
-        f"/api/workspaces/{workspace.id}/notification/user", json={"inactivity_reminder": True, "weekly_report": False}
+        "/api/users/me/notifications/", json={"inactivity_reminder": True, "weekly_report": False}
     )
     assert response.status_code == 200
     assert response.json() == {"inactivity_reminder": True, "weekly_report": False}
