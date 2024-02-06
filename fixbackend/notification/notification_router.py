@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Body
@@ -51,9 +51,20 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         "/{workspace_id}/notification/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None
     )
     async def add_slack_confirm(
-        workspace_id: WorkspaceId, request: Request, code: str = Query(), state: str = Query()
+        workspace_id: WorkspaceId,
+        request: Request,
+        code: Optional[str] = Query(default=None),
+        state: Optional[str] = Query(default=None),
+        error: Optional[str] = Query(default=None),
+        error_description: Optional[str] = Query(default=None),
     ) -> Response:
         set_workspace_id(workspace_id)
+        if error is not None:
+            log.info(f"Add slack oauth confirmation: received error: {error}. description: {error_description}")
+            return RedirectResponse("/workspace-settings?message=slack_added&outcome=error")
+        if state is None or code is None:
+            log.info(f"Add slack oauth confirmation: received no state or code: {state}, {code}")
+            return RedirectResponse("/workspace-settings?message=slack_added&outcome=error")
         # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state != State:
             return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=error#{workspace_id}")
@@ -120,11 +131,23 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         return RedirectResponse("https://slack.com/oauth/v2/authorize?" + urlencode(params))
 
     @router.get("/notification/add/discord/confirm", name=AddDiscord, include_in_schema=False, response_model=None)
-    async def add_discord_confirm(request: Request, code: str = Query(), state: str = Query()) -> Response:
+    async def add_discord_confirm(
+        request: Request,
+        code: Optional[str] = Query(default=None),
+        state: Optional[str] = Query(default=None),
+        error: Optional[str] = Query(default=None),
+        error_description: Optional[str] = Query(default=None),
+    ) -> Response:
+        if error is not None:
+            log.info(f"Add discord oauth confirmation: received error: {error}. description: {error_description}")
+            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
+        if state is None or code is None:
+            log.info(f"Add discord oauth confirmation: received no state or code: {state}, {code}")
+            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
         state_obj = json.loads(state)
         # if the state is not the same as the one we sent, it means that the user did not come from our page
         if state_obj.get("state") != State or not isinstance(state_obj.get("workspace_id"), str):
-            log.error(f"Add discord oauth confirmation: received Invalid state: {state_obj}")
+            log.info(f"Add discord oauth confirmation: received Invalid state: {state_obj}")
             return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
         workspace_id = WorkspaceId(state_obj["workspace_id"])
         set_workspace_id(workspace_id)
