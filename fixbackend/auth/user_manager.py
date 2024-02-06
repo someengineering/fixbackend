@@ -22,7 +22,7 @@ from fastapi_users.password import PasswordHelperProtocol
 
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
-from fixbackend.auth.user_verifier import UserVerifier, UserVerifierDependency
+from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
 from fixbackend.config import Config, ConfigDependency
 from fixbackend.domain_events.events import UserRegistered
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -39,14 +39,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         config: Config,
         user_repository: UserRepository,
         password_helper: PasswordHelperProtocol | None,
-        user_verifier: UserVerifier,
+        auth_email_sender: AuthEmailSender,
         workspace_repository: WorkspaceRepository,
         domain_events_publisher: DomainEventPublisher,
         invitation_repository: InvitationRepository,
     ):
         super().__init__(user_repository, password_helper)
         self.user_repository = user_repository
-        self.user_verifier = user_verifier
+        self.auth_email_sender = auth_email_sender
         self.reset_password_token_secret = config.secret
         self.verification_token_secret = config.secret
         self.workspace_repository = workspace_repository
@@ -60,10 +60,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             await self.request_verify(user, request)
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None) -> None:
-        await self.user_verifier.verify(user, token, request)
+        await self.auth_email_sender.send_verify_email(user, token, request)
 
     async def on_after_verify(self, user: User, request: Request | None = None) -> None:
         await self.add_to_workspace(user)
+
+    async def on_after_forgot_password(self, user: User, token: str, request: Request | None = None) -> None:
+        await self.auth_email_sender.send_password_reset(user, token, request)
 
     async def add_to_workspace(self, user: User) -> None:
         if (
@@ -93,7 +96,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 async def get_user_manager(
     config: ConfigDependency,
     user_repository: UserRepositoryDependency,
-    user_verifier: UserVerifierDependency,
+    user_verifier: AuthEmailSenderDependency,
     workspace_repository: WorkspaceRepositoryDependency,
     domain_event_publisher: DomainEventPublisherDependency,
     invitation_repository: InvitationRepositoryDependency,
