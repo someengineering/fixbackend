@@ -19,7 +19,7 @@ from fastapi import Request, FastAPI
 from httpx import AsyncClient
 
 from fixbackend.auth.models import User
-from fixbackend.auth.user_verifier import UserVerifier, get_user_verifier
+from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
@@ -31,11 +31,11 @@ from fixbackend.workspaces.models import WorkspaceInvitation
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
-class InMemoryVerifier(UserVerifier):
+class InMemoryVerifier(AuthEmailSender):
     def __init__(self) -> None:
         self.verification_requests: List[Tuple[User, str]] = []
 
-    async def verify(self, user: User, token: str, request: Optional[Request]) -> None:
+    async def send_verify_email(self, user: User, token: str, request: Optional[Request]) -> None:
         return self.verification_requests.append((user, token))
 
 
@@ -82,7 +82,7 @@ async def test_registration_flow(
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
-    fast_api.dependency_overrides[get_user_verifier] = lambda: verifier
+    fast_api.dependency_overrides[get_auth_email_sender] = lambda: verifier
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
     fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
 

@@ -103,6 +103,27 @@ class VerifyEmail:
 
 
 @frozen(kw_only=True)
+class PasswordReset:
+    recipient: str
+    password_reset_link: str
+
+    def subject(self) -> str:
+        return "FIX: password reset"
+
+    def text(self) -> str:
+        return f"You requested a password reset link for your FIX account. Here it is: {self.password_reset_link}"
+
+    def html(self) -> str:
+        return render(
+            "password_reset.html",
+            title=self.subject(),
+            email=self.recipient,
+            action_link=self.password_reset_link,
+            support_email="support@fix.tt",
+        )
+
+
+@frozen(kw_only=True)
 class SecurityScanFinished:
     def subject(self) -> str:
         return "FIX: Security Scan Finished"
@@ -119,4 +140,4 @@ class SecurityScanFinished:
         )
 
 
-EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished]
+EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset]
