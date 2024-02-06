@@ -53,7 +53,8 @@ from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
-from fixbackend.auth.router import auth_router, users_router
+from fixbackend.auth.router import auth_router
+from fixbackend.auth.users_router import users_router
 from fixbackend.notification.notification_router import notification_router
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.certificates.cert_store import CertificateStore
