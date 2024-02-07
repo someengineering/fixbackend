@@ -19,6 +19,7 @@ CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
 TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
+RoleAssignmentId = NewType("RoleAssignmentId", UUID)
 
 CloudName = NewType("CloudName", str)
 

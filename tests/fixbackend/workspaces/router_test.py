@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.workspaces.dependencies import get_user_workspace
-from fixbackend.auth.models import User
+from fixbackend.auth.models import Roles, User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
@@ -43,6 +43,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
+    roles=[Roles.workspace_owner],
 )
 workspace = Workspace(
     id=ws_id,
@@ -65,7 +66,7 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     ) -> Workspace | None:
         return workspace
 
-    async def list_workspaces(self, owner_id: UserId) -> Sequence[Workspace]:
+    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         return [workspace]
 
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:

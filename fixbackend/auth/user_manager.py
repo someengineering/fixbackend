@@ -15,10 +15,12 @@
 import re
 import uuid
 from typing import Annotated, AsyncIterator, Optional
+from attrs import evolve
 
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.password import PasswordHelperProtocol
+from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryDependency
 
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
@@ -43,6 +45,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         workspace_repository: WorkspaceRepository,
         domain_events_publisher: DomainEventPublisher,
         invitation_repository: InvitationRepository,
+        role_repository: RoleRepository,
     ):
         super().__init__(user_repository, password_helper)
         self.user_repository = user_repository
@@ -52,6 +55,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self.workspace_repository = workspace_repository
         self.domain_events_publisher = domain_events_publisher
         self.invitation_repository = invitation_repository
+        self.role_repository = role_repository
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if user.is_verified:  # oauth2 users are already verified
@@ -92,6 +96,24 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def remove_oauth_account(self, account_id: UUID) -> None:
         await self.user_repository.remove_oauth_account(account_id)
 
+    async def get(self, id: UUID) -> User:
+        user = await super().get(id)
+        roles = await self.role_repository.list_roles(user.id)
+        user = evolve(user, roles=roles)
+        return user
+
+    async def get_by_email(self, user_email: str) -> User:
+        user = await super().get_by_email(user_email)
+        roles = await self.role_repository.list_roles(user.id)
+        user = evolve(user, roles=roles)
+        return user
+
+    async def get_by_oauth_account(self, oauth: str, account_id: str) -> User:
+        user = await super().get_by_oauth_account(oauth, account_id)
+        roles = await self.role_repository.list_roles(user.id)
+        user = evolve(user, roles=roles)
+        return user
+
 
 async def get_user_manager(
     config: ConfigDependency,
@@ -100,6 +122,7 @@ async def get_user_manager(
     workspace_repository: WorkspaceRepositoryDependency,
     domain_event_publisher: DomainEventPublisherDependency,
     invitation_repository: InvitationRepositoryDependency,
+    role_repository: RoleRepositoryDependency,
 ) -> AsyncIterator[UserManager]:
     yield UserManager(
         config,
@@ -109,6 +132,7 @@ async def get_user_manager(
         workspace_repository,
         domain_event_publisher,
         invitation_repository,
+        role_repository,
     )
 
 

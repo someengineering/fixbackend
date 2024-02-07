@@ -40,6 +40,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
+    roles=[],
 )
 
 subscription = SimpleNamespace(

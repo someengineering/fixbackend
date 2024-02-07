@@ -61,6 +61,7 @@ class ServiceNames:
     analytics_event_sender = "analytics_event_sender"
     notification_service = "notification_service"
     email_on_signup_consumer = "email_on_signup_consumer"
+    role_repository = "role_repository"
 
 
 class FixDependencies(Dependencies):

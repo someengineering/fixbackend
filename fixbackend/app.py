@@ -53,6 +53,7 @@ from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
+from fixbackend.auth.role_repository import RoleRepositoryImpl
 from fixbackend.auth.router import auth_router
 from fixbackend.auth.users_router import users_router
 from fixbackend.notification.notification_router import notification_router
@@ -188,6 +189,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
         )
+        deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
         deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(

@@ -13,18 +13,20 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Callable, List, Optional, Sequence, Tuple
+import jwt
 
 import pytest
 from fastapi import Request, FastAPI
 from httpx import AsyncClient
 
-from fixbackend.auth.models import User
+from fixbackend.auth.models import Role, Roles, User
+from fixbackend.auth.role_repository import RoleRepository, get_role_repository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
-from fixbackend.ids import InvitationId, WorkspaceId
+from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
 from fixbackend.workspaces.models import WorkspaceInvitation
 
@@ -76,15 +78,32 @@ class InMemoryInvitationRepo(InvitationRepository):
         raise NotImplementedError
 
 
+class InMemoryRoleRepository(RoleRepository):
+    def __init__(self) -> None:
+        self.roles: List[Role] = []
+
+    async def list_roles(self, user_id: UserId) -> List[Role]:
+        return self.roles
+
+    async def add_role(self, user_id: UserId, role: Role) -> None:
+        self.roles.append(role)
+
+    async def remove_role(self, user_id: UserId, role: Role) -> None:
+        self.roles.remove(role)
+
+
 @pytest.mark.asyncio
 async def test_registration_flow(
     api_client: AsyncClient, fast_api: FastAPI, domain_event_sender: InMemoryDomainEventPublisher
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
+    role_repo = InMemoryRoleRepository()
+    role_repo.roles = [Role(name="foo", description="bar", permissions=set()), Roles.workspace_owner]
     fast_api.dependency_overrides[get_auth_email_sender] = lambda: verifier
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
     fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
+    fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
 
     registration_json = {
         "email": "user@example.com",
@@ -123,6 +142,9 @@ async def test_registration_flow(
     assert response.status_code == 204
     auth_cookie = response.cookies.get(session_cookie_name)
     assert auth_cookie is not None
+    # role is set on login
+    auth_token = jwt.api_jwt.decode_complete(auth_cookie, options={"verify_signature": False})
+    assert auth_token["payload"]["roles"] == ["foo", "workspace_owner"]
 
     # organization is created by default
     response = await api_client.get("/api/workspaces/", cookies={session_cookie_name: auth_cookie})

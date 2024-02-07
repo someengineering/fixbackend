@@ -50,13 +50,13 @@ class UserRepository(BaseUserDatabase[User, UUID]):
         """Get a single user by id."""
         async with self.user_db() as db:
             user = await db.get(id)  # type: ignore[arg-type]
-            return user.to_domain() if user else None
+            return user.to_model() if user else None
 
     async def get_by_email(self, email: str, *, session: Optional[AsyncSession] = None) -> Optional[User]:
         """Get a single user by email."""
         async with self.user_db(session) as db:
             user = await db.get_by_email(email)
-            return user.to_domain() if user else None
+            return user.to_model() if user else None
 
     async def get_by_ids(self, ids: List[UserId]) -> List[User]:
         """Get a list of users by ids."""
@@ -64,19 +64,19 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             result = await db.session.execute(select(orm.User).filter(orm.User.id.in_(ids)))  # type: ignore
             users = result.unique().scalars().all()
 
-            return [user.to_domain() for user in users]
+            return [user.to_model() for user in users]
 
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
         """Get a single user by OAuth account id."""
         async with self.user_db() as db:
             user = await db.get_by_oauth_account(oauth, account_id)
-            return user.to_domain() if user else None
+            return user.to_model() if user else None
 
     async def create(self, create_dict: Dict[str, Any]) -> User:
         """Create a user."""
         async with self.user_db() as db:
             user = await db.create(create_dict)
-            return user.to_domain()
+            return user.to_model()
 
     async def update(self, user: User, update_dict: Dict[str, Any]) -> User:
         """Update a user."""
@@ -93,13 +93,13 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             db.session.add(orm_user)
             await db.session.commit()
             await db.session.refresh(orm_user)
-            return orm_user.to_domain()
+            return orm_user.to_model()
 
     async def delete(self, user: User) -> None:
         """Delete a user."""
 
         async with self.user_db() as db:
-            await db.delete(orm.User.from_domain(user))
+            await db.delete(orm.User.from_model(user))
 
     async def add_oauth_account(self, user: User, create_dict: Dict[str, Any]) -> User:
         """Create an OAuth account and add it to the user."""
@@ -118,7 +118,7 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             await db.session.commit()
             await db.session.refresh(orm_user)
 
-            return orm_user.to_domain()
+            return orm_user.to_model()
 
     async def update_oauth_account(
         self,
@@ -140,7 +140,7 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             if orm_user is None:
                 raise ValueError(f"User {user.id} not found")
 
-            return orm_user.to_domain()
+            return orm_user.to_model()
 
     async def remove_oauth_account(self, account_id: UUID) -> None:
         """Remove an OAuth account from a user."""

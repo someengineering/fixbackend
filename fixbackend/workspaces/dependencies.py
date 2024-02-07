@@ -68,3 +68,6 @@ async def get_user_workspace(
 
 
 UserWorkspaceDependency = Annotated[Workspace, Depends(get_user_workspace)]
+
+
+WorkspaceReadPermission = Annotated[None, Depends(get_user_workspace)]

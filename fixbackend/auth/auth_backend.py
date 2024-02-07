@@ -113,6 +113,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
         payload: Dict[str, Any] = {
             "sub": str(user.id),
             "aud": self.token_audience,
+            "roles": [role.name for role in user.roles],
         }
         headers = {
             "kid": self.kid(self.private_key.public_key()),
