@@ -103,7 +103,7 @@ class DomainEventToAnalyticsEventHandler:
             case SecurityTierUpdated() as event:
                 await self.sender.send(AESecurityTierUpdated(event.user_id, event.workspace_id, event.security_tier))
             case _:
-                log.error(f"Does not know how to handle event: {event}")
+                log.info(f"Do not know how to handle event: {event}. Ignore.")
 
 
 def analytics(

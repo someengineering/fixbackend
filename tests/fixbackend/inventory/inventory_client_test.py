@@ -30,7 +30,7 @@ from httpx import Request, Response
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
-from fixbackend.inventory.schemas import CompletePathRequest
+from fixbackend.inventory.schemas import CompletePathRequest, HistoryChange
 from tests.fixbackend.conftest import RequestHandlerMock, nd_json_response, json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
@@ -54,6 +54,8 @@ def mocked_inventory_client(
                  {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
         elif request.url.path == "/graph/resoto/search/list":
+            return nd_json_response([dict(id="123", reported={})])
+        elif request.url.path == "/graph/resoto/search/history/list":
             return nd_json_response([dict(id="123", reported={})])
         elif request.method == "DELETE" and request.url.path == "/graph/resoto/node/123":
             return nd_json_response([dict(id="123", reported={})])
@@ -147,3 +149,11 @@ async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
     result = await mocked_inventory_client.timeseries(db_access, name="infected_resources", start=utc(), end=utc())
     result_list = [e async for e in result]
     assert len(result_list) == 8
+
+
+async def test_search_history(mocked_inventory_client: InventoryClient) -> None:
+    response = await mocked_inventory_client.search_history(
+        db_access, "is(account)", before=utc(), after=utc(), change=[HistoryChange.node_vulnerable]
+    )
+    result = [n async for n in response]
+    assert len(result) == 1

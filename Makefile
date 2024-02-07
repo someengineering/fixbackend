@@ -58,7 +58,7 @@ clean-env: ## remove environment
 lint: ## static code analysis
 	black --line-length 120 --check fixbackend tests
 	flake8 --max-line-length 999 fixbackend tests
-	mypy --python-version 3.11 --config-file mypy.ini fixbackend tests
+	mypy --python-version 3.12 --config-file mypy.ini fixbackend tests
 
 test: ## run tests quickly with the default Python
 	pytest
@@ -68,9 +68,9 @@ test-all: ## run tests on every Python version with nox
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source fixbackend -m pytest
-	coverage combine
-	coverage report -m
-	coverage html
+	coverage combine || true
+	coverage report -m || true
+	coverage html || true
 	$(BROWSER) htmlcov/index.html
 
 venv:

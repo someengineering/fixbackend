@@ -46,6 +46,7 @@ from fixbackend.inventory.schemas import (
     HistorySearch,
     HistoryChange,
     ReportConfig,
+    SortOrder,
 )
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
@@ -66,6 +67,7 @@ def mocked_answers(
     request_handler_mock: RequestHandlerMock,
     benchmark_json: List[Json],
     azure_virtual_machine_resource_json: Json,
+    example_check: Json,
 ) -> RequestHandlerMock:
     async def mock(request: Request) -> Response:
         content = request.content.decode("utf-8")
@@ -76,7 +78,7 @@ def mocked_answers(
             )
         elif request.url.path == "/cli/execute" and content.endswith("list --json-table"):
             return nd_json_response(
-                [{"columns": [{"name": "name", "kind": "string", "display": "Name"}, {"name": "some_int", "kind": "int32", "display": "Some Int"}]},  # fmt: skip
+                [{"columns": [{"name": "name", "kind": "string", "display": "Name", "path": "/reported.name"}, {"name": "some_int", "kind": "int32", "display": "Some Int", "path": "/reported.some_int"}]},  # fmt: skip
                  {"id": "123", "row": {"name": "a", "some_int": 1}}]  # fmt: skip
             )
         elif request.url.path == "/cli/execute" and content.endswith("list --csv"):
@@ -91,7 +93,7 @@ def mocked_answers(
         elif request.url.path == "/cli/execute" and "<-[0:2]->" in content:
             return nd_json_response(neighborhood)
         elif request.url.path == "/report/checks":
-            return json_response([{"categories": [], "detect": {"resoto": "is(aws_s3_bucket)"}, "id": "aws_c1", "provider": "aws", "remediation": {"kind": "resoto_core_report_check_remediation", "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.", "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html", }, "result_kind": "aws_s3_bucket", "risk": "Public access policies may be applied to sensitive data buckets.", "service": "s3", "severity": "high", "title": "Check S3 Account Level Public Access Block."}])  # fmt: skip
+            return json_response([example_check])
         elif request.url.path == "/report/benchmarks":
             return json_response(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
@@ -236,12 +238,12 @@ async def test_dict_values_by() -> None:
     assert [a for a in dict_values_by(inv, lambda x: -x)] == [1, 2, 3, 11, 12, 13, 21, 22, 23]
 
 
-async def test_search_list(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
+async def test_search_table(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
     expected = [
         {
             "columns": [
-                {"name": "name", "kind": "string", "display": "Name"},
-                {"name": "some_int", "kind": "int32", "display": "Some Int"},
+                {"name": "name", "kind": "string", "display": "Name", "path": "/reported.name"},
+                {"name": "some_int", "kind": "int32", "display": "Some Int", "path": "/reported.some_int"},
             ]
         },
         {"id": "123", "row": {"name": "a", "some_int": 1}},
@@ -255,6 +257,11 @@ async def test_search_list(inventory_service: InventoryService, mocked_answers: 
     result = [e async for e in await inventory_service.search_table(db, request)]
     assert result == expected
     request = SearchRequest(query="is(account) and name==foo")
+    result = [e async for e in await inventory_service.search_table(db, request, "csv")]
+    assert result == ["name,some_int", "a,1"]
+    request = SearchRequest(
+        query="is(account) and name==foo", sort=[SortOrder(path="/reported.name", direction="desc")]
+    )
     result = [e async for e in await inventory_service.search_table(db, request, "csv")]
     assert result == ["name,some_int", "a,1"]
 

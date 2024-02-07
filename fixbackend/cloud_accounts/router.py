@@ -143,7 +143,7 @@ def cloud_accounts_callback_router() -> APIRouter:
     async def aws_cloudformation_callback(
         payload: AwsCloudFormationLambdaCallbackParameters, service: CloudAccountServiceDependency
     ) -> None:
-        set_workspace_id(str(payload.workspace_id))
+        set_workspace_id(payload.workspace_id)
         set_cloud_account_id(payload.account_id)
         await service.create_aws_account(
             workspace_id=payload.workspace_id,

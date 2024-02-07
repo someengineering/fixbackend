@@ -57,8 +57,8 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
-from fixbackend.notification.messages import SecurityScanFinished
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.email.email_messages import SecurityScanFinished
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -81,13 +81,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         http_client: AsyncClient,
         boto_session: boto3.Session,
         cf_stack_queue_url: Optional[str] = None,
-        notification_serivce: NotificationService,
+        notification_service: NotificationService,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
-        self.notification_service = notification_serivce
+        self.notification_service = notification_service
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
@@ -200,7 +200,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 await send_response(msg, str(uid()), "Invalid format for CF stack create/update event")
                 return None
             # Create/Update the account on our side
-            set_workspace_id(str(workspace_id))
+            set_workspace_id(workspace_id)
             set_cloud_account_id(account_id)
             account = await self.create_aws_account(
                 workspace_id=workspace_id,
@@ -274,7 +274,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
                 first_collect = await is_very_first_collect()
 
-                set_workspace_id(str(event.tenant_id))
+                set_workspace_id(event.tenant_id)
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
                     set_cloud_account_id(account.account_id)
@@ -296,8 +296,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
                 set_cloud_account_id(discovered_event.aws_account_id)
-                set_fix_cloud_account_id(str(discovered_event.cloud_account_id))
-                set_workspace_id(str(discovered_event.tenant_id))
+                set_fix_cloud_account_id(discovered_event.cloud_account_id)
+                set_workspace_id(discovered_event.tenant_id)
                 await self.process_discovered_event(discovered_event)
                 await send_pub_sub_message(discovered_event)
 
@@ -344,7 +344,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         called_from_event: bool,
     ) -> None:
         set_cloud_account_id(account.account_id)
-        set_fix_cloud_account_id(str(account.id))
+        set_fix_cloud_account_id(account.id)
         set_workspace_id(account.workspace_id)
 
         if account.cloud != "aws":

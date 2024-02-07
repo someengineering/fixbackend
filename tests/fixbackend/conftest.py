@@ -30,6 +30,7 @@ from arq.connections import RedisSettings
 from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
+from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
 from httpx import AsyncClient, MockTransport, Request, Response
@@ -54,12 +55,14 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import SubscriptionId
+from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.notification.email_sender import EmailSender
-from fixbackend.notification.service import NotificationService
+from fixbackend.notification.email.email_sender import EmailSender
+from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
+from fixbackend.notification.notification_service import NotificationService
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -75,6 +78,33 @@ DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
 RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
+
+
+class RedisStreamPublisherMock(RedisStreamPublisher):
+    # noinspection PyMissingConstructor
+    def __init__(self) -> None:
+        self.messages: List[Tuple[str, Json]] = []
+        self.last_message: Optional[Tuple[str, Json]] = None
+
+    async def publish(self, kind: str, message: Json) -> None:
+        self.messages.append((kind, message))
+        self.last_message = (kind, message)
+
+
+class RedisPubSubPublisherMock(RedisPubSubPublisher):
+    # noinspection PyMissingConstructor
+    def __init__(self) -> None:
+        self.messages: List[Tuple[str, Json, Optional[str]]] = []
+        self.last_message: Optional[Tuple[str, Json, Optional[str]]] = None
+
+    async def publish(self, kind: str, message: Json, channel: Optional[str] = None) -> None:
+        self.messages.append((kind, message, channel))
+        self.last_message = (kind, message, channel)
+
+
+@pytest.fixture
+def redis_publisher_mock() -> RedisPubSubPublisherMock:
+    return RedisPubSubPublisherMock()
 
 
 @pytest.fixture(scope="session")
@@ -135,6 +165,11 @@ def default_config() -> Config:
         google_analytics_api_secret=None,
         aws_marketplace_url="",
         billing_period="month",
+        discord_oauth_client_id="",
+        discord_oauth_client_secret="",
+        slack_oauth_client_id="",
+        slack_oauth_client_secret="",
+        service_base_url="http://localhost:8000",
     )
 
 
@@ -321,6 +356,26 @@ def benchmark_json() -> List[Json]:
 
 
 @pytest.fixture
+def example_check() -> Json:
+    return {
+        "categories": [],
+        "detect": {"resoto": "is(aws_s3_bucket)"},
+        "id": "aws_c1",
+        "provider": "aws",
+        "remediation": {
+            "kind": "resoto_core_report_check_remediation",
+            "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.",
+            "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
+        },
+        "result_kind": "aws_s3_bucket",
+        "risk": "Public access policies may be applied to sensitive data buckets.",
+        "service": "s3",
+        "severity": "high",
+        "title": "Check S3 Account Level Public Access Block.",
+    }
+
+
+@pytest.fixture
 def aws_ec2_model_json() -> Json:
     return {
         "type": "object",
@@ -376,6 +431,32 @@ def azure_virtual_machine_resource_json() -> Json:
             "severity": "medium",
         },
     }
+
+
+@pytest.fixture
+def alert_failing_benchmark_checks_detected() -> FailingBenchmarkChecksDetected:
+    return FailingBenchmarkChecksDetected(
+        "some_id",
+        WorkspaceId(uid()),
+        BenchmarkName("benchmark_name"),
+        "critical",
+        23,
+        [
+            FailedBenchmarkCheck(
+                "example_check",
+                "Title of check",
+                "critical",
+                12,
+                [
+                    VulnerableResource(NodeId("id1"), "test_resource_1", "some_name_1", ui_link="https://fix.tt/1"),
+                    VulnerableResource(NodeId("id2"), "test_resource_2", "some_name_2", ui_link="https://fix.tt/2"),
+                    VulnerableResource(NodeId("id3"), "test_resource_3", "some_name_3", ui_link="https://fix.tt/3"),
+                    VulnerableResource(NodeId("id4"), "test_resource_4", "some_name_4", ui_link="https://fix.tt/4"),
+                ],
+            )
+        ],
+        "https://fix.tt/",
+    )
 
 
 def json_response(content: JsonElement, additional_headers: Optional[Dict[str, str]] = None) -> Response:
@@ -576,6 +657,7 @@ async def fix_deps(
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
 ) -> FixDependencies:
+    # noinspection PyTestUnpassedFixture
     return FixDependencies(
         **{
             ServiceNames.async_engine: db_engine,
@@ -637,6 +719,34 @@ def email_sender() -> InMemoryEmailSender:
 
 @pytest.fixture
 def notification_service(
-    email_sender: EmailSender, workspace_repository: WorkspaceRepository, user_repository: UserRepository
+    default_config: Config,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
+    inventory_service: InventoryService,
+    redis: Redis,
+    email_sender: EmailSender,
+    async_session_maker: AsyncSessionMaker,
+    http_client: AsyncClient,
+    domain_event_subscriber: DomainEventSubscriber,
+    redis_publisher_mock: RedisStreamPublisherMock,
 ) -> NotificationService:
-    return NotificationService(workspace_repository, user_repository, email_sender)
+    service = NotificationService(
+        default_config,
+        workspace_repository,
+        graph_database_access_manager,
+        user_repository,
+        inventory_service,
+        redis,
+        async_session_maker,
+        http_client,
+        domain_event_subscriber,
+    )
+    service.alert_publisher = redis_publisher_mock
+    service.email_sender = email_sender
+    return service
+
+
+@pytest.fixture
+def user_notification_repository(async_session_maker: AsyncSessionMaker) -> UserNotificationSettingsRepositoryImpl:
+    return UserNotificationSettingsRepositoryImpl(async_session_maker)

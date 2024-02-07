@@ -47,7 +47,7 @@ from httpx._types import QueryParamTypes
 from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
-from fixbackend.inventory.schemas import CompletePathRequest
+from fixbackend.inventory.schemas import CompletePathRequest, HistoryChange
 
 T = TypeVar("T")
 ContextHeaders = {"Total-Count", "Result-Count"}
@@ -175,6 +175,35 @@ class InventoryClient(Service):
             f"/graph/{graph}/search/list",
             content=query,
             params={"section": section},
+            headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
+            expected_media_types=ExpectMediaTypeNdJson,
+        )
+        return AsyncIteratorWithContext(response)
+
+    async def search_history(
+        self,
+        access: GraphDatabaseAccess,
+        query: str,
+        *,
+        before: Optional[datetime] = None,
+        after: Optional[datetime] = None,
+        change: Optional[List[HistoryChange]] = None,
+        graph: str = "resoto",
+        section: str = "reported",
+    ) -> AsyncIteratorWithContext[Json]:
+        log.info(f"Search list with query: {query}")
+        params: Dict[str, str] = {"section": section}
+        if before:
+            params["before"] = utc_str(before)
+        if after:
+            params["after"] = utc_str(after)
+        if change:
+            params["change"] = ",".join(c.value for c in change)
+        response = await self._perform(
+            "POST",
+            f"/graph/{graph}/search/history/list",
+            content=query,
+            params=params,
             headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
             expected_media_types=ExpectMediaTypeNdJson,
         )

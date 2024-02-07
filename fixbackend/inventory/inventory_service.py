@@ -72,11 +72,13 @@ SeverityByCheckId = Dict[str, str]
 T = TypeVar("T")
 V = TypeVar("V")
 
+ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 ReportSeverityList = ["info", "low", "medium", "high", "critical"]
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
 )
 ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
+ReportSeverityIncluded: Dict[str, List[str]] = {n: ReportSeverityList[idx:] for idx, n in enumerate(ReportSeverityList)}
 Inventory = "inventory-service"
 
 
@@ -113,7 +115,7 @@ class InventoryService(Service):
         await self.cache.stop()
 
     async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
-        set_workspace_id(str(event.tenant_id))
+        set_workspace_id(event.tenant_id)
         set_cloud_account_id(event.aws_account_id)
         set_fix_cloud_account_id(event.cloud_account_id)
         access = await self.db_access_manager.get_database_access(event.tenant_id)
@@ -208,6 +210,8 @@ class InventoryService(Service):
             cmd += " " + request.query
         else:
             cmd = "search " + request.query
+        if request.sort:
+            cmd += " | sort " + ", ".join(f"{s.path} {s.direction}" for s in request.sort)
         fmt_option = "--csv" if result_format == "csv" else "--json-table"
         cmd += f" | limit {request.skip}, {request.limit} | list {fmt_option}"
         return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
@@ -278,11 +282,14 @@ class InventoryService(Service):
                 accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
                 resource_count_by_severity: Dict[str, int] = defaultdict(int)
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
+                severity_prop = "/security.severity"
+                # TODO: after 7d of inventory in production, we can uncomment the next line
+                # severity_prop = "/security.severity" if change == "node_vulnerable" else "/security.diff.previous"
                 async for elem in await self.client.execute_single(
                     db,
                     f"history --change {change} --after {duration.total_seconds()}s | aggregate "
                     f"/ancestors.account.reported.id as account_id, "
-                    f"/security.severity as severity,"
+                    f"{severity_prop} as severity,"
                     f"kind as kind"
                     ": count(name) as count",
                 ):

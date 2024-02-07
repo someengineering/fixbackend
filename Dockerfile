@@ -1,12 +1,12 @@
 # Build Container to create a wheel and export requirements.txt file
-FROM python:3.11 as build-stage
+FROM python:3.12 as build-stage
 WORKDIR /app
 ADD . /app
 RUN pip install poetry && poetry build && poetry export -f requirements.txt -o dist/requirements.txt
 
 
 # Create final image by installing the wheel with all requirements
-FROM python:3.11-slim as final-stage
+FROM python:3.12-slim as final-stage
 WORKDIR /app
 COPY --from=build-stage /app/dist /app/dist
 RUN  apt-get update \

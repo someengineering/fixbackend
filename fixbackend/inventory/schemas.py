@@ -13,10 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal
+from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc_str
 from pydantic import BaseModel, Field
+
+from fixbackend.ids import WorkspaceId
 
 
 class AccountSummary(BaseModel):
@@ -138,12 +142,33 @@ class HistorySearch(BaseModel):
     change: Optional[HistoryChange] = Field(default=None, description="The change to search for.")
 
 
+class SortOrder(BaseModel):
+    path: str = Field(description="The path to the property to sort by.")
+    direction: Literal["asc", "desc"] = Field(description="The sort direction. Only 'asc' and 'desc' are allowed.")
+
+
 class SearchRequest(BaseModel):
     query: str = Field(description="The query to execute.")
     history: Optional[HistorySearch] = Field(default=None, description="If the history should be searched.")
     skip: int = Field(default=0, description="The number of results to skip.", ge=0)
     limit: int = Field(default=50, description="The number of results to return.", gt=0, le=1000)
     count: bool = Field(default=False, description="Also compute the total number of results.")
+    sort: List[SortOrder] = Field(default_factory=list, description="The sort order.")
+
+    def ui_link(self, base_url: str, workspace_id: WorkspaceId) -> str:
+        params = {"q": self.query}
+        if self.history:
+            if self.history.before:
+                params["before"] = utc_str(self.history.before)
+            if self.history.after:
+                params["after"] = utc_str(self.history.after)
+            if self.history.change:
+                params["change"] = self.history.change.value
+        if self.skip:
+            params["skip"] = str(self.skip)
+        if self.limit:
+            params["limit"] = str(self.limit)
+        return base_url + "/inventory?" + urlencode(params) + f"#{workspace_id}"
 
 
 class ReportConfig(BaseModel):

@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Optional, override
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import Request
@@ -22,7 +23,7 @@ from fixbackend.auth.auth_backend import FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import get_user_repository
-from fixbackend.auth.user_verifier import UserVerifier
+from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.config import Config
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -43,9 +44,19 @@ async def user(async_session_maker: AsyncSessionMaker) -> User:
     return user
 
 
-class UserVerifierMock(UserVerifier):
-    async def verify(self, user: User, token: str, request: Request | None) -> None:
-        return None
+class AuthEmailSenderMock(AuthEmailSender):
+    def __init__(
+        self,
+    ) -> None:
+        pass
+
+    @override
+    async def send_verify_email(self, user: User, token: str, request: Optional[Request]) -> None:
+        pass
+
+    @override
+    async def send_password_reset(self, user: User, token: str, request: Optional[Request]) -> None:
+        pass
 
 
 class DomainEventSenderMock(DomainEventPublisher):
@@ -72,7 +83,7 @@ async def test_token_validation(
         default_config,
         user_repo,
         None,
-        UserVerifierMock(),
+        AuthEmailSenderMock(),
         workspace_repository,
         DomainEventSenderMock(),
         invitation_repository,
@@ -88,3 +99,6 @@ async def test_token_validation(
     user3 = await strategy2.read_token(token1, user_manager)
     user4 = await strategy2.read_token(token2, user_manager)
     assert user1 == user2 == user3 == user4 == user
+
+    # decoding invalid token returns None
+    assert strategy1.decode_token("invalid token") is None

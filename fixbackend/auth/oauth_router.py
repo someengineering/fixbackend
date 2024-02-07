@@ -15,6 +15,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
+from fastapi_users.authentication.authenticator import Authenticator
 
 import jwt
 from fastapi import APIRouter, Depends, Query, Request, Response, status
@@ -28,6 +29,8 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallback
 from httpx_oauth.oauth2 import BaseOAuth2, OAuth2Token
 from pydantic import BaseModel
+from fixbackend.auth.models import User
+from fixbackend.auth.schemas import UserRead
 
 from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.config import Config
@@ -63,7 +66,7 @@ def get_oauth_router(
     backend: AuthenticationBackend[Any, Any],
     state_secret: SecretType,
     redirect_url: Optional[str] = None,
-    associate_by_email: bool = False,
+    associate_by_email: bool = True,
     is_verified_by_default: bool = False,
     state_token_ttl: int = 3600,
 ) -> APIRouter:
@@ -178,6 +181,128 @@ def get_oauth_router(
         response.headers["location"] = quote(str(decoded_state.get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;")
         response.status_code = status.HTTP_303_SEE_OTHER
         await user_manager.on_after_login(user, request, response)
+        return response
+
+    return router
+
+
+def get_oauth_associate_router(
+    oauth_client: BaseOAuth2[Any],
+    authenticator: Authenticator,
+    state_secret: SecretType,
+    redirect_url: Optional[str] = None,
+    requires_verification: bool = False,
+    state_token_ttl: int = 3600,
+) -> APIRouter:
+    """Generate a router with the OAuth routes to associate an authenticated user."""
+    router = APIRouter()
+
+    user_schema = UserRead
+
+    get_current_active_user: Any = authenticator.current_user(active=True, verified=requires_verification)
+
+    callback_route_name = f"oauth-associate:{oauth_client.name}.callback"
+
+    if redirect_url is not None:
+        oauth2_authorize_callback = OAuth2AuthorizeCallback(
+            oauth_client,
+            redirect_url=redirect_url,
+        )
+    else:
+        oauth2_authorize_callback = OAuth2AuthorizeCallback(
+            oauth_client,
+            route_name=callback_route_name,
+        )
+
+    @router.get(
+        "/authorize",
+        name=f"oauth-associate:{oauth_client.name}.authorize",
+        response_model=OAuth2AuthorizeResponse,
+    )
+    async def authorize(
+        request: Request,
+        scopes: List[str] = Query(None),
+        user: User = Depends(get_current_active_user),
+    ) -> OAuth2AuthorizeResponse:
+        if redirect_url is not None:
+            authorize_redirect_url = redirect_url
+        else:
+            authorize_redirect_url = str(request.url_for(callback_route_name))
+
+        state_data: Dict[str, str] = {"sub": str(user.id)}
+        state = generate_state_token(state_data, state_secret, state_token_ttl)
+        authorization_url = await oauth_client.get_authorization_url(
+            authorize_redirect_url,
+            state,
+            scopes,
+        )
+
+        return OAuth2AuthorizeResponse(authorization_url=authorization_url)
+
+    @router.get(
+        "/callback",
+        response_model=user_schema,
+        name=callback_route_name,
+        description="The response varies based on the authentication backend used.",
+        responses={
+            status.HTTP_400_BAD_REQUEST: {
+                "model": ErrorModel,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "INVALID_STATE_TOKEN": {
+                                "summary": "Invalid state token.",
+                                "value": None,
+                            },
+                        }
+                    }
+                },
+            },
+        },
+    )
+    async def callback(
+        request: Request,
+        user_manager: UserManagerDependency,
+        user: User = Depends(get_current_active_user),
+        access_token_state: Tuple[OAuth2Token, str] = Depends(oauth2_authorize_callback),
+    ) -> Response:
+        token, state = access_token_state
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+
+        def redirect_to_root() -> Response:
+            response = Response()
+            response.headers["location"] = "/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
+
+        if account_email is None:
+            log.info("OAuth callback: no email address returned by OAuth provider")
+            return redirect_to_root()
+
+        try:
+            state_data = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
+        except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
+            log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
+
+        if state_data.get("sub") != str(user.id):
+            return redirect_to_root()
+
+        user = await user_manager.oauth_associate_callback(
+            user,
+            oauth_client.name,
+            token["access_token"],
+            account_id,
+            account_email,
+            token.get("expires_at"),
+            token.get("refresh_token"),
+            request,
+        )
+
+        # replace the redirect url with the one from the JWT token
+        response = Response(status_code=status.HTTP_303_SEE_OTHER)
+        response.headers["location"] = quote(str(state_data.get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;")
+
         return response
 
     return router

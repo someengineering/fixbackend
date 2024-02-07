@@ -17,7 +17,7 @@ from nox_poetry import session, Session
 locations = ["fixbackend", "tests", "noxfile.py"]
 
 
-@session(python=["3.11"])  # type: ignore
+@session(python=["3.12"])  # type: ignore
 def black(session: Session) -> None:
     opts = ["--line-length", "120", "--check"]
     args = session.posargs or locations + opts
@@ -25,7 +25,7 @@ def black(session: Session) -> None:
     session.run("black", *args)
 
 
-@session(python=["3.11"])  # type: ignore
+@session(python=["3.12"])  # type: ignore
 def flake8(session: Session) -> None:
     opts = ["--max-line-length", "999"]  # checked via black
     args = session.posargs or locations + opts
@@ -33,14 +33,14 @@ def flake8(session: Session) -> None:
     session.run("flake8", *args)
 
 
-@session(python=["3.11"])  # type: ignore
+@session(python=["3.12"])  # type: ignore
 def test(session: Session) -> None:
     args = session.posargs or ["--cov"]
     session.run_always("poetry", "install", "--quiet", external=True)
     session.run("pytest", *args)
 
 
-@session(python=["3.11"])  # type: ignore
+@session(python=["3.12"])  # type: ignore
 def mypy(session: Session) -> None:
     opts = ["--strict"]
     args = session.posargs or [] + opts + locations

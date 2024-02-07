@@ -167,7 +167,7 @@ def workspaces_router() -> APIRouter:
         """Delete invite."""
         await invitation_service.revoke_invitation(invite_id)
 
-    @router.get("{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
+    @router.get("/{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
         token: str, invitation_service: InvitationServiceDependency, request: Request
     ) -> Response:
