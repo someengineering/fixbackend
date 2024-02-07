@@ -35,7 +35,7 @@ from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import AwsMarketplaceSubscriptionCreated
+from fixbackend.domain_events.events import AwsMarketplaceSubscriptionCreated, BillingEntryCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import SecurityTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -196,6 +196,9 @@ class AwsMarketplaceHandler(Service):
                     last_charged,
                     billing_time,
                     next_charge,
+                )
+                await self.domain_event_sender.publish(
+                    BillingEntryCreated(subscription.workspace_id, subscription.id, security_tier, usage)
                 )
                 return billing_entry
             else:

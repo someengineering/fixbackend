@@ -12,37 +12,45 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
+import uuid
 from asyncio import Lock
 from datetime import timedelta
+from functools import lru_cache
 from typing import List, Optional, Any
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.types import Json
 from httpx import AsyncClient
+from prometheus_client import Counter
 
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
+from fixbackend.ids import WorkspaceId, UserId
 from fixbackend.utils import group_by, md5
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
+
+AnalyticsCounter = Counter("fixbackend_analytics_events", "Fixbackend Analytics Events", ["kind"])
 
 
 class NoAnalyticsEventSender(AnalyticsEventSender):
     async def send(self, event: AnalyticsEvent) -> None:
         log.info(f"Would send analytics event: {event.kind}")
 
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        return UserId(uuid.uuid5(uuid.NAMESPACE_DNS, "fixbackend"))
+
 
 class GoogleAnalyticsEventSender(AnalyticsEventSender):
     def __init__(
-        self,
-        client: AsyncClient,
-        measurement_id: str,
-        api_secret: str,
+        self, client: AsyncClient, measurement_id: str, api_secret: str, workspace_repo: WorkspaceRepository
     ) -> None:
         super().__init__()
         self.client = client
         self.measurement_id = measurement_id
         self.api_secret = api_secret
+        self.workspace_repo = workspace_repo
         self.events: List[AnalyticsEvent] = []
         self.lock = Lock()
         self.sender = Periodic("send_events", self.send_events, timedelta(seconds=30))
@@ -58,6 +66,7 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
 
     async def send(self, event: AnalyticsEvent) -> None:
         async with self.lock:
+            AnalyticsCounter.labels(kind=event.kind).inc()
             self.events.append(event)
 
     async def send_events(self) -> None:
@@ -97,3 +106,10 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
 
         if counter:
             log.info(f"Sent {counter} events to Google Analytics")
+
+    @lru_cache(maxsize=1024)
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        if (workspace := await self.workspace_repo.get_workspace(workspace_id)) and (workspace.all_users()):
+            return workspace.all_users()[0]
+        else:
+            return UserId(uuid.uuid5(uuid.NAMESPACE_DNS, "fixbackend"))

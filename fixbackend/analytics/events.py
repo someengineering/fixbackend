@@ -50,28 +50,59 @@ class AEUserRegistered(AnalyticsEvent):
 
 
 @frozen
-class AEAwsAccountDiscovered(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_aws_account_discovered"
+class AEAccountDiscovered(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_account_discovered"
     workspace_id: WorkspaceId
+    cloud: str
 
 
 @frozen
-class AEAwsAccountConfigured(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_aws_account_configured"
+class AEAccountConfigured(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_account_configured"
     workspace_id: WorkspaceId
+    cloud: str
 
 
 @frozen
-class AEAwsAccountDeleted(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_aws_account_deleted"
+class AEAccountDeleted(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_account_deleted"
     workspace_id: WorkspaceId
+    cloud: str
 
 
 @frozen
-class AEAwsAccountDegraded(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_aws_account_degraded"
+class AEAccountDegraded(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_account_degraded"
     workspace_id: WorkspaceId
+    cloud: str
     error: str
+
+
+@frozen
+class AEAccountNameChanged(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_account_name_changed"
+    workspace_id: WorkspaceId
+    cloud: str
+
+
+@frozen
+class AEFirstWorkspaceCollectFinished(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_first_workspace_collect_finished"
+    workspace_id: WorkspaceId
+
+
+@frozen
+class AEWorkspaceCollectFinished(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_workspace_collect_finished"
+    workspace_id: WorkspaceId
+    accounts: int
+    resources: int
+
+
+@frozen
+class AEFirstAccountCollectFinished(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_first_account_collect_finished"
+    workspace_id: WorkspaceId
 
 
 @frozen
@@ -97,3 +128,31 @@ class AESecurityTierUpdated(AnalyticsEvent):
     kind: ClassVar[str] = "fix_security_tier_updated"
     workspace_id: WorkspaceId
     security_tier: str
+
+
+@frozen
+class AESubscriptionCreated(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_subscription_created"
+    workspace_id: WorkspaceId
+    provider: str
+
+
+@frozen
+class AEUserLoggedIn(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_user_logged_in"
+
+
+@frozen
+class AEFailingBenchmarkChecksAlertSend(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_failed_benchmark_checks_alert_send"
+    workspace_id: WorkspaceId
+    benchmark: str
+    failed_checks_count_total: int
+
+
+@frozen
+class AEBillingEntryCreated(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_billing_entry_created"
+    workspace_id: WorkspaceId
+    security_tier: str
+    usage: int
