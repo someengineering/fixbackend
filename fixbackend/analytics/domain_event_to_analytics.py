@@ -91,8 +91,8 @@ class DomainEventToAnalyticsEventHandler:
                 await self.sender.send(AEAwsAccountConfigured(self.fixbackend_user_id, event.tenant_id))
             case AwsAccountDeleted() as event:
                 await self.sender.send(AEAwsAccountDeleted(event.user_id, event.tenant_id))
-            case AEAwsAccountDegraded() as event:
-                await self.sender.send(AEAwsAccountDegraded(self.fixbackend_user_id, event.workspace_id, event.error))
+            case AwsAccountDegraded() as event:
+                await self.sender.send(AEAwsAccountDegraded(self.fixbackend_user_id, event.tenant_id, event.error))
             case WorkspaceCreated() as event:
                 await self.sender.send(AEWorkspaceCreated(event.user_id, event.workspace_id))
             case InvitationAccepted() as event:
