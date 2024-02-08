@@ -15,9 +15,9 @@ import logging
 import uuid
 from asyncio import Lock
 from datetime import timedelta
-from functools import lru_cache
 from typing import List, Optional, Any
 
+from async_lru import alru_cache
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.types import Json
 from httpx import AsyncClient
@@ -107,7 +107,7 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
         if counter:
             log.info(f"Sent {counter} events to Google Analytics")
 
-    @lru_cache(maxsize=1024)
+    @alru_cache(maxsize=1024)
     async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
         if (workspace := await self.workspace_repo.get_workspace(workspace_id)) and (workspace.all_users()):
             return workspace.all_users()[0]
