@@ -300,15 +300,15 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             next_scan=event.next_run,
                         ),
                     )
+
+                user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                 if first_workspace_collect:
-                    user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                     await self.analytics_event_sender.send(AEFirstWorkspaceCollectFinished(user_id, event.tenant_id))
                     # inform workspace users about the first successful collect
                     await self.notification_service.send_message_to_workspace(
                         workspace_id=event.tenant_id, message=SecurityScanFinished()
                     )
                 if first_account_collect:
-                    user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                     await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
 
                 await self.analytics_event_sender.send(
@@ -600,7 +600,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise NotAllowed("Deletion of cloud accounts is only allowed by the owning organization.")
 
         await self.cloud_account_repository.update(
-            cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
+            cloud_account_id,
+            lambda acc: evolve(
+                acc,
+                state_updated_at=utc(),
+                state=CloudAccountStates.Deleted(),
+                next_scan=None,
+                last_scan_resources_scanned=0,
+                last_scan_duration_seconds=0,
+                last_scan_started_at=None,
+            ),
         )
         await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
 
