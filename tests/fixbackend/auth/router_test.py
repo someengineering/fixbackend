@@ -130,7 +130,7 @@ async def test_registration_flow(
     assert workspace_json.get("name") == user.email
 
     # domain event is sent
-    assert len(domain_event_sender.events) == 3
+    assert len(domain_event_sender.events) == 2
     event = domain_event_sender.events[1]
     assert isinstance(event, UserRegistered)
     assert event.user_id == user.id

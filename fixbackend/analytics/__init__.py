@@ -14,14 +14,9 @@
 from abc import ABC, abstractmethod
 from fixcloudutils.service import Service
 from fixbackend.analytics.events import AnalyticsEvent
-from fixbackend.ids import UserId, WorkspaceId
 
 
 class AnalyticsEventSender(Service, ABC):
     @abstractmethod
     async def send(self, event: AnalyticsEvent) -> None:
-        pass
-
-    @abstractmethod
-    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
         pass

@@ -12,6 +12,8 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
+import uuid
+from functools import lru_cache
 
 from httpx import AsyncClient
 
@@ -19,19 +21,14 @@ from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.analytics_event_sender import GoogleAnalyticsEventSender, NoAnalyticsEventSender
 from fixbackend.analytics.events import (
     AEUserRegistered,
-    AEAccountDiscovered,
-    AEAccountConfigured,
-    AEAccountDeleted,
-    AEAccountDegraded,
+    AEAwsAccountDiscovered,
+    AEAwsAccountConfigured,
+    AEAwsAccountDeleted,
+    AEAwsAccountDegraded,
     AEWorkspaceCreated,
     AEInvitationAccepted,
     AEUserJoinedWorkspace,
     AESecurityTierUpdated,
-    AESubscriptionCreated,
-    AEUserLoggedIn,
-    AEFailingBenchmarkChecksAlertSend,
-    AEAccountNameChanged,
-    AEBillingEntryCreated,
 )
 from fixbackend.config import Config
 from fixbackend.domain_events.events import (
@@ -46,20 +43,25 @@ from fixbackend.domain_events.events import (
     UserJoinedWorkspace,
     SecurityTierUpdated,
     Event,
-    AwsMarketplaceSubscriptionCreated,
-    UserLoggedIn,
-    FailingBenchmarkChecksAlertSend,
-    BillingEntryCreated,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
 
 
 class DomainEventToAnalyticsEventHandler:
-    def __init__(self, domain_event_subscriber: DomainEventSubscriber, sender: AnalyticsEventSender) -> None:
+    def __init__(
+        self,
+        instance_id: str,
+        domain_event_subscriber: DomainEventSubscriber,
+        sender: AnalyticsEventSender,
+        workspace_repo: WorkspaceRepository,
+    ) -> None:
         self.sender = sender
+        self.workspace_repo = workspace_repo
+        self.fixbackend_user_id = UserId(uuid.uuid5(uuid.NAMESPACE_DNS, instance_id))
         domain_event_subscriber.subscribe(UserRegistered, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(AwsAccountDiscovered, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(AwsAccountConfigured, self.handle, "domain_event_to_analytics")
@@ -70,55 +72,36 @@ class DomainEventToAnalyticsEventHandler:
         domain_event_subscriber.subscribe(InvitationAccepted, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(UserJoinedWorkspace, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(SecurityTierUpdated, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsMarketplaceSubscriptionCreated, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(UserLoggedIn, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(FailingBenchmarkChecksAlertSend, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(BillingEntryCreated, self.handle, "domain_event_to_analytics")
+
+    @lru_cache(maxsize=1024)
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        if (workspace := await self.workspace_repo.get_workspace(workspace_id)) and (workspace.all_users()):
+            return workspace.all_users()[0]
+        else:
+            return self.fixbackend_user_id
 
     async def handle(self, event: Event) -> None:
         match event:
             case UserRegistered() as event:
                 await self.sender.send(AEUserRegistered(event.user_id, event.tenant_id))
             case AwsAccountDiscovered() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountDiscovered(user_id, event.tenant_id, "aws"))
+                user_id = await self.user_id_from_workspace(event.tenant_id)
+                await self.sender.send(AEAwsAccountDiscovered(user_id, event.tenant_id))
             case AwsAccountConfigured() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountConfigured(user_id, event.tenant_id, "aws"))
+                await self.sender.send(AEAwsAccountConfigured(self.fixbackend_user_id, event.tenant_id))
             case AwsAccountDeleted() as event:
-                await self.sender.send(AEAccountDeleted(event.user_id, event.tenant_id, "aws"))
+                await self.sender.send(AEAwsAccountDeleted(event.user_id, event.tenant_id))
             case AwsAccountDegraded() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountDegraded(user_id, event.tenant_id, "aws", event.error))
-            case CloudAccountNameChanged() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountNameChanged(user_id, event.tenant_id, event.cloud))
+                await self.sender.send(AEAwsAccountDegraded(self.fixbackend_user_id, event.tenant_id, event.error))
             case WorkspaceCreated() as event:
                 await self.sender.send(AEWorkspaceCreated(event.user_id, event.workspace_id))
             case InvitationAccepted() as event:
-                user_id = event.user_id or await self.sender.user_id_from_workspace(event.workspace_id)
+                user_id = event.user_id or await self.user_id_from_workspace(event.workspace_id)
                 await self.sender.send(AEInvitationAccepted(user_id, event.workspace_id))
             case UserJoinedWorkspace() as event:
                 await self.sender.send(AEUserJoinedWorkspace(event.user_id, event.workspace_id))
             case SecurityTierUpdated() as event:
                 await self.sender.send(AESecurityTierUpdated(event.user_id, event.workspace_id, event.security_tier))
-            case AwsMarketplaceSubscriptionCreated() as event:
-                if ws_id := event.workspace_id:
-                    await self.sender.send(AESubscriptionCreated(event.user_id, ws_id, "aws_marketplace"))
-            case UserLoggedIn() as event:
-                await self.sender.send(AEUserLoggedIn(event.user_id))
-            case FailingBenchmarkChecksAlertSend() as event:
-                user_id = await self.sender.user_id_from_workspace(event.workspace_id)
-                await self.sender.send(
-                    AEFailingBenchmarkChecksAlertSend(
-                        user_id, event.workspace_id, event.benchmark, event.failed_checks_count_total
-                    )
-                )
-            case BillingEntryCreated() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(
-                    AEBillingEntryCreated(user_id, event.tenant_id, event.security_tier, event.usage)
-                )
             case _:
                 log.info(f"Do not know how to handle event: {event}. Ignore.")
 
@@ -131,8 +114,10 @@ def analytics(
 ) -> AnalyticsEventSender:
     if (measurement_id := config.google_analytics_measurement_id) and (secret := config.google_analytics_api_secret):
         log.info("Use Google Analytics Event Sender.")
-        sender = GoogleAnalyticsEventSender(client, measurement_id, secret, workspace_repo)
-        sender.event_handler = DomainEventToAnalyticsEventHandler(domain_event_subscriber, sender)
+        sender = GoogleAnalyticsEventSender(client, measurement_id, secret)
+        sender.event_handler = DomainEventToAnalyticsEventHandler(
+            config.instance_id, domain_event_subscriber, sender, workspace_repo
+        )
         return sender
     else:
         log.info("Analytics turned off.")

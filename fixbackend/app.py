@@ -55,7 +55,6 @@ from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
 from fixbackend.auth.router import auth_router
 from fixbackend.auth.users_router import users_router
-from fixbackend.billing_information.service import BillingEntryService
 from fixbackend.notification.notification_router import notification_router
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.certificates.cert_store import CertificateStore
@@ -184,12 +183,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 subscription_repo,
             ),
         )
-        deps.add(
-            SN.billing_entry_service, BillingEntryService(subscription_repo, workspace_repo, domain_event_publisher)
-        )
-        analytics_event_sender = deps.add(
-            SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
-        )
+        deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
         deps.add(
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
@@ -227,7 +221,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 readwrite_redis,
                 session_maker,
                 http_client,
-                domain_event_publisher,
                 domain_event_subscriber,
             ),
         )
@@ -247,7 +240,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
                 notification_service=notification_service,
-                analytics_event_sender=analytics_event_sender,
             ),
         )
 
@@ -334,13 +326,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 readwrite_redis,
                 session_maker,
                 http_client,
-                domain_event_publisher,
                 domain_event_subscriber,
                 handle_events=False,  # fixbackend will handle events. dispatching should ignore them.
             ),
-        )
-        analytics_event_sender = deps.add(
-            SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
         )
         deps.add(
             SN.cloud_account_service,
@@ -357,7 +345,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 boto_session=boto_session,
                 cf_stack_queue_url=cfg.aws_cf_stack_notification_sqs_url,
                 notification_service=notification_service,
-                analytics_event_sender=analytics_event_sender,
             ),
         )
         deps.add(

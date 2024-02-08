@@ -23,7 +23,7 @@
 
 from abc import ABC
 from datetime import datetime
-from typing import ClassVar, Dict, Optional, TypeVar, Type, List
+from typing import ClassVar, Dict, Optional, TypeVar, Type
 
 from attrs import frozen
 from fixcloudutils.types import Json
@@ -38,9 +38,6 @@ from fixbackend.ids import (
     CloudName,
     UserCloudAccountName,
     TaskId,
-    BenchmarkName,
-    ReportSeverity,
-    NotificationProvider,
 )
 
 T = TypeVar("T")
@@ -64,14 +61,6 @@ class UserRegistered(Event):
     user_id: UserId
     email: str
     tenant_id: WorkspaceId
-
-
-@frozen
-class UserLoggedIn(Event):
-    kind: ClassVar[str] = "user_logged_in"
-
-    user_id: UserId
-    email: str
 
 
 @frozen
@@ -191,9 +180,6 @@ class SecurityTierUpdated(Event):
     workspace_id: WorkspaceId
     user_id: UserId
     security_tier: str
-    is_paid_tier: bool
-    is_higher_tier: bool
-    previous_tier: str
 
 
 @frozen
@@ -207,32 +193,3 @@ class AwsMarketplaceSubscriptionCreated(Event):
     workspace_id: Optional[WorkspaceId]
     user_id: UserId
     subscription_id: SubscriptionId
-
-
-@frozen
-class FailingBenchmarkChecksAlertSend(Event):
-    """
-    This event is emitted when a user gets notified about failing benchmark checks.
-    """
-
-    kind: ClassVar[str] = "failing_benchmark_checks_alert_send"
-
-    workspace_id: WorkspaceId
-    benchmark: BenchmarkName
-    severity: ReportSeverity
-    failed_checks_count_total: int
-    channels: List[NotificationProvider]
-
-
-@frozen
-class BillingEntryCreated(Event):
-    """
-    This event is emitted when a billing entry for a workspace is created.
-    """
-
-    kind: ClassVar[str] = "billing_entry_created"
-
-    tenant_id: WorkspaceId
-    subscription_id: SubscriptionId
-    security_tier: str
-    usage: int

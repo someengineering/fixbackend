@@ -28,13 +28,17 @@ from redis.asyncio import Redis
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
-from fixbackend.domain_events.events import TenantAccountsCollected, FailingBenchmarkChecksAlertSend
-from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.events import TenantAccountsCollected
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider
-from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
+from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName
+from fixbackend.inventory.inventory_service import (
+    InventoryService,
+    ReportSeverityIncluded,
+    ReportSeverityPriority,
+    ReportSeverity,
+)
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
@@ -47,6 +51,7 @@ from fixbackend.notification.email.email_sender import (
 from fixbackend.notification.model import (
     WorkspaceAlert,
     AllowedNotificationProvider,
+    NotificationProvider,
     AlertSender,
     AlertOnChannel,
     FailingBenchmarkChecksDetected,
@@ -76,7 +81,6 @@ class NotificationService(Service):
         readwrite_redis: Redis,
         session_maker: AsyncSessionMaker,
         http_client: AsyncClient,
-        domain_event_sender: DomainEventPublisher,
         domain_event_subscriber: DomainEventSubscriber,
         handle_events: bool = True,
     ) -> None:
@@ -107,7 +111,6 @@ class NotificationService(Service):
             "email": EmailNotificationSender(self.email_sender),
         }
         self.handle_events = handle_events
-        self.domain_event_sender = domain_event_sender
         if handle_events:
             domain_event_subscriber.subscribe(TenantAccountsCollected, self.alert_on_changed, "NotificationService")
 
@@ -296,12 +299,3 @@ class NotificationService(Service):
                             await self.alert_publisher.publish(
                                 "vulnerable_resources_detected", AlertOnChannel(alert, channel).to_json()
                             )
-                        await self.domain_event_sender.publish(
-                            FailingBenchmarkChecksAlertSend(
-                                collected.tenant_id,
-                                benchmark,
-                                alert.severity,
-                                alert.failed_checks_count_total,
-                                setting.channels,
-                            )
-                        )

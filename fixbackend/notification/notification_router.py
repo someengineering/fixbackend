@@ -22,9 +22,9 @@ from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
-from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
+from fixbackend.ids import WorkspaceId, BenchmarkName
 from fixbackend.logging_context import set_workspace_id, set_context
-from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
+from fixbackend.notification.model import WorkspaceAlert, AlertingSetting, NotificationProvider
 from fixbackend.notification.notification_service import NotificationService
 
 log = logging.getLogger(__name__)

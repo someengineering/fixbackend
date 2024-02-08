@@ -25,14 +25,14 @@ from sqlalchemy.orm import selectinload
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
-from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import NotAllowed
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
+from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.events import SecurityTierUpdated, UserJoinedWorkspace, WorkspaceCreated
+from fixbackend.errors import NotAllowed
 
 
 class WorkspaceRepository(ABC):
@@ -208,6 +208,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             org.security_tier = security_tier.value
             await session.commit()
             await session.refresh(org)
+
+            event = SecurityTierUpdated(workspace_id, user.id, security_tier.value)
+            await self.domain_event_sender.publish(event)
 
             return org.to_model()
 

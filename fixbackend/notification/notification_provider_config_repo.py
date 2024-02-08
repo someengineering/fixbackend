@@ -18,7 +18,8 @@ from sqlalchemy import String, JSON, delete, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
-from fixbackend.ids import WorkspaceId, NotificationProvider
+from fixbackend.ids import WorkspaceId
+from fixbackend.notification.model import NotificationProvider
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 

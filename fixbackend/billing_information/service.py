@@ -23,27 +23,21 @@ from fixbackend.billing_information.models import (
     PaymentMethods,
     WorkspacePaymentMethods,
 )
-from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import SecurityTierUpdated
-from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import NotAllowed
+
 from fixbackend.ids import SecurityTier, UserId, WorkspaceId
 from fixbackend.subscription.models import BillingEntry
-from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.subscription.subscription_repository import SubscriptionRepository, SubscriptionRepositoryDependency
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
+from fixbackend.errors import NotAllowed
 
 
 class BillingEntryService:
     def __init__(
-        self,
-        subscription_repository: SubscriptionRepository,
-        workspace_repository: WorkspaceRepository,
-        domain_event_sender: DomainEventPublisher,
+        self, subscription_repository: SubscriptionRepository, workspace_repository: WorkspaceRepository
     ) -> None:
         self.subscription_repository = subscription_repository
         self.workspace_repository = workspace_repository
-        self.domain_event_sender = domain_event_sender
 
     async def list_billing_info(self, workspace_id: WorkspaceId) -> List[BillingEntry]:
         billing_entries = [
@@ -98,24 +92,18 @@ class BillingEntryService:
                     )
 
         if new_security_tier:
-            workspace = await self.workspace_repository.update_security_tier(
+            return await self.workspace_repository.update_security_tier(
                 user=user, workspace_id=workspace.id, security_tier=new_security_tier
             )
-            event = SecurityTierUpdated(
-                workspace.id,
-                user.id,
-                new_security_tier.value,
-                new_security_tier.paid,
-                new_security_tier > current_tier,
-                current_tier.value,
-            )
-            await self.domain_event_sender.publish(event)
 
         return workspace
 
 
-def get_billing_entry_service(fix_dependency: FixDependency) -> BillingEntryService:
-    return fix_dependency.service(ServiceNames.billing_entry_service, BillingEntryService)
+def get_billing_entry_service(
+    subscription_repository: SubscriptionRepositoryDependency,
+    workspace_repository: WorkspaceRepositoryDependency,
+) -> BillingEntryService:
+    return BillingEntryService(subscription_repository, workspace_repository)
 
 
 BillingEntryServiceDependency = Annotated[BillingEntryService, Depends(get_billing_entry_service)]

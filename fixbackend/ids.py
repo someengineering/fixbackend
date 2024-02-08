@@ -1,4 +1,4 @@
-from typing import NewType, Any, Literal
+from typing import NewType, Any
 from uuid import UUID
 from enum import Enum
 from functools import total_ordering
@@ -14,16 +14,13 @@ BillingId = NewType("BillingId", UUID)
 NodeId = NewType("NodeId", str)
 AwsRoleName = NewType("AwsRoleName", str)
 AwsARN = NewType("AwsARN", str)
-CloudName = NewType("CloudName", str)
 CloudAccountName = NewType("CloudAccountName", str)
 CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
 TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
 
-
-NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
-ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
+CloudName = NewType("CloudName", str)
 
 
 class CloudNames:
@@ -37,10 +34,6 @@ class SecurityTier(str, Enum):
     Free = "FreeAccount"
     Foundational = "FoundationalSecurityAccount"
     HighSecurity = "HighSecurityAccount"
-
-    @property
-    def paid(self) -> bool:
-        return self != SecurityTier.Free
 
     def __lt__(self, other: Any) -> bool:
         if self.__class__ is other.__class__:

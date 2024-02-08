@@ -728,7 +728,6 @@ def notification_service(
     email_sender: EmailSender,
     async_session_maker: AsyncSessionMaker,
     http_client: AsyncClient,
-    domain_event_sender: DomainEventPublisher,
     domain_event_subscriber: DomainEventSubscriber,
     redis_publisher_mock: RedisStreamPublisherMock,
 ) -> NotificationService:
@@ -741,7 +740,6 @@ def notification_service(
         redis,
         async_session_maker,
         http_client,
-        domain_event_sender,
         domain_event_subscriber,
     )
     service.alert_publisher = redis_publisher_mock
