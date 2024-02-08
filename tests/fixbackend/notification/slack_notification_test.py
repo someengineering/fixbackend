@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pytest
-from httpx import AsyncClient, Request, Response
+from httpx import AsyncClient, Request, Response, HTTPError
 
 from fixbackend.notification.model import FailingBenchmarkChecksDetected
 from fixbackend.notification.slack.slack_notification import SlackNotificationSender
@@ -22,8 +22,11 @@ from tests.fixbackend.conftest import RequestHandlerMock
 @pytest.fixture
 def slack_notification(http_client: AsyncClient, request_handler_mock: RequestHandlerMock) -> SlackNotificationSender:
     async def handler(request: Request) -> Response:
-        if "slack.com" in request.url.host:
+        url = str(request.url)
+        if "slack.com/my_webhook" in url:
             return Response(204)
+        elif "slack.com/failure/5xx" in url:
+            return Response(500)
         else:
             return Response(404)
 
@@ -34,10 +37,14 @@ def slack_notification(http_client: AsyncClient, request_handler_mock: RequestHa
 async def test_slack_notification(
     slack_notification: SlackNotificationSender, alert_failing_benchmark_checks_detected: FailingBenchmarkChecksDetected
 ) -> None:
-    # sending should not fail
-    await slack_notification.send_alert(
-        alert_failing_benchmark_checks_detected, dict(webhook_url="https://slack.com/my_webhook")
-    )
+    alert = alert_failing_benchmark_checks_detected
     # evaluate message
     message = slack_notification.vulnerable_resources_detected(alert_failing_benchmark_checks_detected)
     assert len(message["attachments"]) == 1
+    # sending should not fail
+    await slack_notification.send_alert(alert, dict(webhook_url="https://slack.com/my_webhook"))
+    # 5xx should raise an error
+    with pytest.raises(HTTPError):
+        await slack_notification.send_alert(alert, dict(webhook_url="https://slack.com/failure/5xx"))
+    # 4xx is ignored
+    await slack_notification.send_alert(alert, dict(webhook_url="https://slack.com/does_not_exist"))
