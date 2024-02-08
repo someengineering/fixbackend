@@ -69,5 +69,5 @@ class CertificateStore:
             await load_cert_key_pair(self.signing_cert_1_path, self.signing_key_1_path),
             await load_cert_key_pair(self.signing_cert_2_path, self.signing_key_2_path),
         ]
-        bundle.sort(key=lambda pair: pair.cert.not_valid_after, reverse=True)
+        bundle.sort(key=lambda pair: pair.cert.not_valid_after_utc, reverse=True)
         return bundle
