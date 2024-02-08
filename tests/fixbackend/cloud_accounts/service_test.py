@@ -26,6 +26,7 @@ from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
@@ -235,6 +236,7 @@ def service(
     boto_session: boto3.Session,
     http_client: AsyncClient,
     notification_service: InMemoryNotificationService,
+    analytics_event_sender: AnalyticsEventSender,
 ) -> CloudAccountServiceImpl:
     return CloudAccountServiceImpl(
         workspace_repository=organization_repository,
@@ -249,6 +251,7 @@ def service(
         http_client=http_client,
         cf_stack_queue_url=None,
         notification_service=notification_service,
+        analytics_event_sender=analytics_event_sender,
     )
 
 

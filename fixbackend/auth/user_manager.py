@@ -15,22 +15,23 @@
 import re
 import uuid
 from typing import Annotated, AsyncIterator, Optional
+from uuid import UUID
 
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.password import PasswordHelperProtocol
+from starlette.responses import Response
 
-from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.models import User
+from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
 from fixbackend.config import Config, ConfigDependency
-from fixbackend.domain_events.events import UserRegistered
-from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
+from fixbackend.domain_events.events import UserRegistered, UserLoggedIn
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
-from uuid import UUID
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -67,6 +68,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def on_after_forgot_password(self, user: User, token: str, request: Request | None = None) -> None:
         await self.auth_email_sender.send_password_reset(user, token, request)
+
+    async def on_after_login(
+        self, user: User, request: Optional[Request] = None, response: Optional[Response] = None
+    ) -> None:
+        await super().on_after_login(user, request, response)
+        await self.domain_events_publisher.publish(UserLoggedIn(user.id, user.email))
 
     async def add_to_workspace(self, user: User) -> None:
         if (
