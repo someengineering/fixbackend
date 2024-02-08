@@ -72,7 +72,6 @@ SeverityByCheckId = Dict[str, str]
 T = TypeVar("T")
 V = TypeVar("V")
 
-ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 ReportSeverityList = ["info", "low", "medium", "high", "critical"]
 ReportSeverityScore: Dict[str, int] = defaultdict(
     lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
@@ -282,9 +281,8 @@ class InventoryService(Service):
                 accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
                 resource_count_by_severity: Dict[str, int] = defaultdict(int)
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
-                severity_prop = "/security.severity"
-                # TODO: after 7d of inventory in production, we can uncomment the next line
-                # severity_prop = "/security.severity" if change == "node_vulnerable" else "/security.diff.previous"
+                # vulnerable: use current severity, compliant: use previous severity
+                severity_prop = "/security.severity" if change == "node_vulnerable" else "/diff.previous"
                 async for elem in await self.client.execute_single(
                     db,
                     f"history --change {change} --after {duration.total_seconds()}s | aggregate "
@@ -295,6 +293,8 @@ class InventoryService(Service):
                 ):
                     assert isinstance(elem, dict), f"Expected Json object but got {elem}"
                     severity = elem["group"]["severity"]
+                    if severity is None:  # safeguard for history entries in old format
+                        continue
                     if isinstance(acc_id := elem["group"]["account_id"], str):
                         accounts_by_severity[severity].add(acc_id)
                     resource_count_by_severity[severity] += elem["count"]

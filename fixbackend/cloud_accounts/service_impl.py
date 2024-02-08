@@ -29,6 +29,12 @@ from fixcloudutils.util import utc
 from httpx import AsyncClient
 from redis.asyncio import Redis
 
+from fixbackend.analytics import AnalyticsEventSender
+from fixbackend.analytics.events import (
+    AEFirstAccountCollectFinished,
+    AEFirstWorkspaceCollectFinished,
+    AEWorkspaceCollectFinished,
+)
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
@@ -82,12 +88,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         boto_session: boto3.Session,
         cf_stack_queue_url: Optional[str] = None,
         notification_service: NotificationService,
+        analytics_event_sender: AnalyticsEventSender,
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
         self.notification_service = notification_service
+        self.analytics_event_sender = analytics_event_sender
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[AwsAccountDiscovered.kind] = Backoff(
             base_delay=5,
@@ -95,44 +103,48 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             retries=8,
             log_failed_attempts=False,
         )
-        self.periodic: Optional[Periodic] = None
         if dispatching:
-            self.periodic = Periodic(
+            self.periodic: Optional[Periodic] = Periodic(
                 "configure_discovered_accounts", self.configure_discovered_accounts, timedelta(minutes=1)
             )
-
-        self.domain_event_listener = RedisStreamListener(
-            readwrite_redis,
-            DomainEventsStreamName,
-            group="fixbackend-cloudaccountservice-domain",
-            listener=config.instance_id,
-            message_processor=self.process_domain_event,
-            consider_failed_after=timedelta(minutes=5),
-            batch_size=config.cloud_account_service_event_parallelism,
-            parallelism=config.cloud_account_service_event_parallelism,
-            backoff=backoff_config,
-        )
+            # dispatcher should not handle domain events or CF stack events
+            self.domain_event_listener: Optional[RedisStreamListener] = None
+            self.cf_listener: Optional[SQSRawListener] = None
+        else:
+            self.periodic = None
+            self.domain_event_listener = RedisStreamListener(
+                readwrite_redis,
+                DomainEventsStreamName,
+                group="fixbackend-cloudaccountservice-domain",
+                listener=config.instance_id,
+                message_processor=self.process_domain_event,
+                consider_failed_after=timedelta(minutes=5),
+                batch_size=config.cloud_account_service_event_parallelism,
+                parallelism=config.cloud_account_service_event_parallelism,
+                backoff=backoff_config,
+            )
+            self.cf_listener = (
+                SQSRawListener(
+                    session=boto_session,
+                    queue_url=cf_stack_queue_url,
+                    message_processor=self.process_cf_stack_event,
+                    consider_failed_after=timedelta(minutes=5),
+                    max_nr_of_messages_in_one_batch=1,
+                    wait_for_new_messages_to_arrive=timedelta(seconds=10),
+                )
+                if cf_stack_queue_url
+                else None
+            )
         self.instance_id = config.instance_id
         self.account_setup_helper = account_setup_helper
         self.dispatching = dispatching
         self.fast_lane_timeout = timedelta(minutes=1)
         self.become_degraded_timeout = timedelta(minutes=15)
-        self.cf_listener = (
-            SQSRawListener(
-                session=boto_session,
-                queue_url=cf_stack_queue_url,
-                message_processor=self.process_cf_stack_event,
-                consider_failed_after=timedelta(minutes=5),
-                max_nr_of_messages_in_one_batch=1,
-                wait_for_new_messages_to_arrive=timedelta(seconds=10),
-            )
-            if cf_stack_queue_url
-            else None
-        )
         self.http_client = http_client
 
     async def start(self) -> Any:
-        await self.domain_event_listener.start()
+        if self.domain_event_listener:
+            await self.domain_event_listener.start()
         if self.periodic:
             await self.periodic.start()
         if self.cf_listener:
@@ -141,9 +153,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     async def stop(self) -> Any:
         if self.cf_listener:
             await self.cf_listener.stop()
-        await self.domain_event_listener.stop()
         if self.periodic:
             await self.periodic.stop()
+        if self.domain_event_listener:
+            await self.domain_event_listener.stop()
 
     async def process_cf_stack_event(self, message: Json) -> Optional[CloudAccount]:
         log.info(f"Received CF stack event: {message}")
@@ -268,11 +281,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             case TenantAccountsCollected.kind:
                 event = TenantAccountsCollected.from_json(message)
 
-                async def is_very_first_collect() -> bool:
-                    accounts = await self.cloud_account_repository.list(list(event.cloud_accounts.keys()))
-                    return all([account.last_scan_started_at is None for account in accounts])
-
-                first_collect = await is_very_first_collect()
+                accounts = await self.cloud_account_repository.list(list(event.cloud_accounts.keys()))
+                collected_accounts = [account for account in accounts if account.id in event.cloud_accounts]
+                first_workspace_collect = all(account.last_scan_started_at is None for account in accounts)
+                first_account_collect = any(account.last_scan_started_at is None for account in collected_accounts)
 
                 set_workspace_id(event.tenant_id)
                 for account_id, account in event.cloud_accounts.items():
@@ -288,10 +300,25 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             next_scan=event.next_run,
                         ),
                     )
-                if first_collect:
+
+                user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
+                if first_workspace_collect:
+                    await self.analytics_event_sender.send(AEFirstWorkspaceCollectFinished(user_id, event.tenant_id))
+                    # inform workspace users about the first successful collect
                     await self.notification_service.send_message_to_workspace(
                         workspace_id=event.tenant_id, message=SecurityScanFinished()
                     )
+                if first_account_collect:
+                    await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
+
+                await self.analytics_event_sender.send(
+                    AEWorkspaceCollectFinished(
+                        user_id,
+                        event.tenant_id,
+                        len(collected_accounts),
+                        sum(a.scanned_resources for a in event.cloud_accounts.values()),
+                    )
+                )
 
             case AwsAccountDiscovered.kind:
                 discovered_event = AwsAccountDiscovered.from_json(message)
@@ -573,7 +600,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             raise NotAllowed("Deletion of cloud accounts is only allowed by the owning organization.")
 
         await self.cloud_account_repository.update(
-            cloud_account_id, lambda acc: evolve(acc, state_updated_at=utc(), state=CloudAccountStates.Deleted())
+            cloud_account_id,
+            lambda acc: evolve(
+                acc,
+                state_updated_at=utc(),
+                state=CloudAccountStates.Deleted(),
+                next_scan=None,
+                last_scan_resources_scanned=0,
+                last_scan_duration_seconds=0,
+                last_scan_started_at=None,
+            ),
         )
         await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
 

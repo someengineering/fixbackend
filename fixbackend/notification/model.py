@@ -17,7 +17,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache, partial
-from typing import Dict, List, Literal, Optional, cast, Set
+from typing import Dict, List, Optional, cast, Set
 from uuid import UUID
 
 from attr import frozen, define
@@ -26,10 +26,8 @@ from cattrs.strategies import configure_tagged_union, include_subclasses
 from fixcloudutils.types import Json
 from pydantic import BaseModel, Field
 
-from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName
-from fixbackend.inventory.inventory_service import ReportSeverity
+from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName, NotificationProvider, ReportSeverity
 
-NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
 AllowedNotificationProvider: Set[NotificationProvider] = {"email", "slack", "discord", "pagerduty", "teams"}
 SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "💥"})
 

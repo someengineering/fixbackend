@@ -18,16 +18,21 @@ from httpx import AsyncClient, Request, Response, MockTransport
 from pytest import fixture
 
 from fixbackend.analytics.analytics_event_sender import GoogleAnalyticsEventSender
-from fixbackend.analytics.events import AEAwsAccountDegraded
+from fixbackend.analytics.events import (
+    AEAccountDegraded,
+)
 from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.utils import uid, md5
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 user_id = UserId(uid())
 workspace_id = WorkspaceId(uid())
 
 
 @fixture
-def google_analytics_event_sender() -> Tuple[GoogleAnalyticsEventSender, List[Request]]:
+def google_analytics_event_sender(
+    workspace_repository: WorkspaceRepository,
+) -> Tuple[GoogleAnalyticsEventSender, List[Request]]:
     request_list = []
 
     async def mock(request: Request) -> Response:
@@ -35,20 +40,20 @@ def google_analytics_event_sender() -> Tuple[GoogleAnalyticsEventSender, List[Re
         return Response(204)
 
     client = AsyncClient(transport=MockTransport(mock))
-    return GoogleAnalyticsEventSender(client, "test", "test"), request_list
+    return GoogleAnalyticsEventSender(client, "test", "test", workspace_repository), request_list
 
 
 async def test_send_events(google_analytics_event_sender: Tuple[GoogleAnalyticsEventSender, List[Request]]) -> None:
     sender, request_list = google_analytics_event_sender
-    await sender.send(AEAwsAccountDegraded(user_id, workspace_id, "some_error"))
+    await sender.send(AEAccountDegraded(user_id, workspace_id, "aws", "some_error"))
     await sender.send_events()
     assert len(request_list) == 1
     assert json.loads(request_list[0].content) == {
         "client_id": md5(user_id),
         "events": [
             {
-                "name": "fix_aws_account_degraded",
-                "params": {"error": "some_error", "workspace_id": str(workspace_id)},
+                "name": "fix_account_degraded",
+                "params": {"error": "some_error", "cloud": "aws", "workspace_id": str(workspace_id)},
             }
         ],
     }

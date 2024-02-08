@@ -61,6 +61,7 @@ class ServiceNames:
     analytics_event_sender = "analytics_event_sender"
     notification_service = "notification_service"
     email_on_signup_consumer = "email_on_signup_consumer"
+    billing_entry_service = "billing_entry_services"
     role_repository = "role_repository"
 
 

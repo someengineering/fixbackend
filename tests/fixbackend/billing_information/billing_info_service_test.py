@@ -18,6 +18,7 @@ from fixcloudutils.util import utc
 from fixbackend.auth.models import User
 from fixbackend.billing_information.models import PaymentMethods
 from fixbackend.billing_information.service import BillingEntryService
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import SecurityTier
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
@@ -26,15 +27,23 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.errors import NotAllowed
 
 
-@pytest.mark.asyncio
-async def test_list_billing_entries(
+@pytest.fixture
+async def billing_entry_service(
     subscription_repository: SubscriptionRepository,
     workspace_repository: WorkspaceRepository,
+    domain_event_sender: DomainEventPublisher,
+) -> BillingEntryService:
+    return BillingEntryService(subscription_repository, workspace_repository, domain_event_sender)
+
+
+@pytest.mark.asyncio
+async def test_list_billing_entries(
+    billing_entry_service: BillingEntryService,
+    subscription_repository: SubscriptionRepository,
     subscription: AwsMarketplaceSubscription,
     workspace: Workspace,
     user: User,
 ) -> None:
-    service = BillingEntryService(subscription_repository, workspace_repository)
 
     now = utc().replace(microsecond=0)
 
@@ -43,7 +52,7 @@ async def test_list_billing_entries(
     )
 
     # no address provided
-    billing_info = await service.list_billing_info(workspace.id)
+    billing_info = await billing_entry_service.list_billing_info(workspace.id)
     assert len(billing_info) == 1
     billing_entry = billing_info[0]
     assert billing_entry.id is not None
@@ -54,17 +63,16 @@ async def test_list_billing_entries(
 
 @pytest.mark.asyncio
 async def test_list_payment_methods(
-    subscription_repository: SubscriptionRepository,
+    billing_entry_service: BillingEntryService,
     workspace_repository: WorkspaceRepository,
     subscription: AwsMarketplaceSubscription,
     workspace: Workspace,
     user: User,
 ) -> None:
-    service = BillingEntryService(subscription_repository, workspace_repository)
 
     # we're on the free tier:
     assert workspace.security_tier == SecurityTier.Free
-    available_methods = await service.get_payment_methods(workspace, user.id)
+    available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
             assert subscription_id == subscription.id
@@ -80,7 +88,7 @@ async def test_list_payment_methods(
     # on paid tier we can't get the no payment method
     assert workspace.security_tier == SecurityTier.Free
     workspace = await workspace_repository.update_security_tier(user, workspace.id, SecurityTier.Foundational)
-    available_methods = await service.get_payment_methods(workspace, user.id)
+    available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
             assert subscription_id == subscription.id
@@ -91,39 +99,38 @@ async def test_list_payment_methods(
 
 @pytest.mark.asyncio
 async def test_update_billing(
-    subscription_repository: SubscriptionRepository,
-    workspace_repository: WorkspaceRepository,
     subscription: AwsMarketplaceSubscription,
+    billing_entry_service: BillingEntryService,
     workspace: Workspace,
     user: User,
 ) -> None:
-    service = BillingEntryService(subscription_repository, workspace_repository)
-
     # we're on the free tier:
     assert workspace.security_tier == SecurityTier.Free
     # update to higher tier is possible if there is a payment method
-    workspace = await service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
+    workspace = await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
     assert workspace.security_tier == SecurityTier.Foundational
 
     # removing the payment method on non-free tier is not possible
     with pytest.raises(NotAllowed):
-        await service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
+        await billing_entry_service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
 
     # downgrading to free is possible
-    workspace = await service.update_billing(user, workspace, new_security_tier=SecurityTier.Free)
+    workspace = await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Free)
     assert workspace.security_tier == SecurityTier.Free
 
     # we can remove the payment method if we're on free tier
-    workspace = await service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
-    payment_methods = await service.get_payment_methods(workspace, user.id)
+    workspace = await billing_entry_service.update_billing(
+        user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod()
+    )
+    payment_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     assert payment_methods.current == PaymentMethods.NoPaymentMethod()
 
     # upgrading to paid tier is not possible without payment method
     with pytest.raises(NotAllowed):
-        await service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
+        await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
 
     # but if we add the payment then we can upgrade to a paid plan
-    workspace = await service.update_billing(
+    workspace = await billing_entry_service.update_billing(
         user,
         workspace,
         new_payment_method=PaymentMethods.AwsSubscription(subscription.id),
