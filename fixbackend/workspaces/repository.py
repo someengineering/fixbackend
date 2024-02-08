@@ -23,7 +23,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fixbackend.auth.models import User
+from fixbackend.auth.models import RoleName, User
+from fixbackend.auth.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
@@ -84,12 +85,14 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         domain_event_sender: DomainEventPublisher,
         pubsub_publisher: RedisPubSubPublisher,
         subscription_repository: SubscriptionRepository,
+        role_repository: RoleRepository,
     ) -> None:
         self.session_maker = session_maker
         self.graph_db_access_manager = graph_db_access_manager
         self.domain_event_sender = domain_event_sender
         self.pubsub_publisher = pubsub_publisher
         self.subscription_repository = subscription_repository
+        self.role_repository = role_repository
 
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
@@ -102,6 +105,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
+            await self.role_repository.add_roles(owner.id, workspace_id, RoleName.workspace_owner, session=session)
             await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
 
             await session.commit()

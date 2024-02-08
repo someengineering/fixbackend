@@ -13,62 +13,62 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from attrs import frozen
 from fastapi_users.models import OAuthAccountProtocol, UserOAuthProtocol
 
-from fixbackend.ids import UserId
+from fixbackend.ids import UserRoleId, UserId, WorkspaceId
+from enum import IntFlag
+from functools import reduce
+
+
+# do not change the int
+class WorkspacePermission(IntFlag):
+    create = 2**0
+    read = 2**1
+    update = 2**2
+    delete = 2**3
+    invite_to = 2**4
+    remove_from = 2**5
+
+
+class RoleName(IntFlag):
+    workspace_member = 2**0
+    workspace_admin = 2**1
+    workspace_owner = 2**2
+
+
+workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
+workspace_admin_permissions = (
+    workspace_member_permissions
+    | WorkspacePermission.invite_to
+    | WorkspacePermission.remove_from
+    | WorkspacePermission.update
+)
+workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
+
+roles_to_permissions: Dict[RoleName, WorkspacePermission] = {
+    RoleName.workspace_member: workspace_member_permissions,
+    RoleName.workspace_admin: workspace_admin_permissions,
+    RoleName.workspace_owner: workspace_owner_permissions,
+}
 
 
 @frozen
-class Permission:
-    name: str
+class UserRoles:
+    id: UserRoleId
+    user_id: UserId
+    workspace_id: WorkspaceId
+    role_names: RoleName
 
-
-@frozen
-class Role:
-    name: str
-    description: str
-    permissions: Set[Permission]
-
-
-class Permissions:
-    invite_to_workspace = Permission(name="workspace:invite_member")
-    remove_from_workspace = Permission(name="workspace:remove_member")
-    read_workspace = Permission(name="workspace:read")
-    update_workspace = Permission(name="workspace:update")
-    delete_workspace = Permission(name="workspace:delete")
-    create_workspace = Permission(name="workspace:create")
-
-
-class Roles:
-    workspace_member = Role(
-        "workspace_member",
-        "A member of the workspace",
-        {Permissions.read_workspace, Permissions.create_workspace},
-    )
-
-    workspace_admin = Role(
-        "workspace_admin",
-        "An admin of the workspace",
-        workspace_member.permissions
-        | {
-            Permissions.invite_to_workspace,
-            Permissions.remove_from_workspace,
-            Permissions.update_workspace,
-        },
-    )
-
-    workspace_owner = Role(
-        "workspace_owner", "The owner of the workspace", workspace_admin.permissions | {Permissions.delete_workspace}
-    )
-
-
-all_roles = [Roles.workspace_member, Roles.workspace_admin, Roles.workspace_owner]
-
-roles_dict: Dict[str, Role] = {role.name: role for role in all_roles}
+    def permissions(self) -> WorkspacePermission:
+        return reduce(
+            lambda x, y: x | y,
+            [roles_to_permissions[role] for role in self.role_names],
+            WorkspacePermission(0),
+        )
 
 
 @frozen
@@ -91,4 +91,4 @@ class User(UserOAuthProtocol[UserId, OAuthAccount]):
     is_superuser: bool
     is_verified: bool
     oauth_accounts: List[OAuthAccount]
-    roles: List[Role]
+    roles: List[UserRoles]

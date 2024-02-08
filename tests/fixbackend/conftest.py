@@ -580,12 +580,20 @@ def pubsub_publisher() -> InMemoryRedisPubSubPublisher:
 
 
 @pytest.fixture
+async def role_repository(
+    async_session_maker: AsyncSessionMaker,
+) -> RoleRepository:
+    return RoleRepositoryImpl(async_session_maker)
+
+
+@pytest.fixture
 async def workspace_repository(
     async_session_maker: AsyncSessionMaker,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
     pubsub_publisher: InMemoryRedisPubSubPublisher,
     subscription_repository: SubscriptionRepository,
+    role_repository: RoleRepository,
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(
         async_session_maker,
@@ -593,6 +601,7 @@ async def workspace_repository(
         domain_event_sender,
         pubsub_publisher,
         subscription_repository,
+        role_repository,
     )
 
 
@@ -603,13 +612,6 @@ async def invitation_repository(
     user_repository: UserRepository,
 ) -> InvitationRepository:
     return InvitationRepositoryImpl(async_session_maker, workspace_repository, user_repository)
-
-
-@pytest.fixture
-async def role_repository(
-    async_session_maker: AsyncSessionMaker,
-) -> RoleRepository:
-    return RoleRepositoryImpl(async_session_maker)
 
 
 @pytest.fixture

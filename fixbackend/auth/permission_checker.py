@@ -15,35 +15,28 @@
 
 from fastapi import HTTPException
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import Permission
+from fixbackend.auth.models import WorkspacePermission
 
 from logging import getLogger
+
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 log = getLogger(__name__)
 
 
-class PermissionChecker:
-    def __init__(self, *required_permissions: Permission):
+class WorkspacePermissionChecker:
+    def __init__(self, required_permissions: WorkspacePermission):
         self.required_permissions = required_permissions
 
-    async def __call__(
-        self,
-        user: AuthenticatedUser,
-    ) -> bool:
-        # role_names: List[str] = []  # if we get the authenticated user, the jwt cookie should be there.
-        # if session_token and (token := strategy.decode_token(session_token)):
-        #     role_names = token.get("roles", [])
-
-        # user_roles: List[Role] = []
-        # for role_name in role_names:
-        #     if role := roles_dict.get(role_name):
-        #         user_roles.append(role)
-        #     else:
-        #         log.warning(f"Role {role} is not known to the system. Ignoring.")
+    async def __call__(self, user: AuthenticatedUser, workspace: UserWorkspaceDependency) -> bool:
 
         for permission in self.required_permissions:
             for role in user.roles:
-                if permission in role.permissions:
+                # wrong workspace, look at the other role
+                if role.workspace_id != workspace.id:
+                    continue
+                # permission found, go to the next one
+                if permission in role.permissions():
                     break
             else:
                 raise HTTPException(status_code=403, detail=f"Missing permission {permission.name}")

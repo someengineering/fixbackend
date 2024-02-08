@@ -170,6 +170,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -182,6 +184,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
         deps.add(SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo))
@@ -189,7 +192,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.invitation_repository,
             InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
         )
-        deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
         deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(
@@ -290,6 +292,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
 
         workspace_repo = deps.add(
             SN.workspace_repo,
@@ -303,6 +306,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
 
@@ -387,6 +391,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -399,6 +405,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
         aws_marketplace = deps.add(
