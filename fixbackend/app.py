@@ -42,7 +42,7 @@ from fastapi.staticfiles import StaticFiles
 from fixcloudutils.logging import setup_logger
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from httpx import AsyncClient
+from httpx import AsyncClient, Limits, Timeout
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -115,7 +115,15 @@ def fast_api_app(cfg: Config) -> FastAPI:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
-    http_client = deps.add(SN.http_client, AsyncClient(verify=client_context or True, timeout=60))
+    http_client = deps.add(
+        SN.http_client,
+        AsyncClient(
+            verify=client_context or True,
+            timeout=Timeout(pool=10, connect=10, read=60, write=60),
+            follow_redirects=True,
+            limits=Limits(max_connections=512, max_keepalive_connections=50),
+        ),
+    )
     engine = deps.add(
         SN.async_engine,
         create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
