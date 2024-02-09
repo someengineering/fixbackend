@@ -251,7 +251,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             return JSONResponse(status_code=422, content=dict(error=str(ex)))
 
     @router.delete("/{workspace_id}/notification/{channel}")
-    async def send_test_alert(
+    async def delete_channel(
         _: AuthenticatedUser, workspace_id: WorkspaceId, channel: NotificationProvider
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
@@ -260,7 +260,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         return Response(status_code=204)
 
     @router.post("/{workspace_id}/notification/{channel}/test")
-    async def delete_slack(_: AuthenticatedUser, workspace_id: WorkspaceId, channel: NotificationProvider) -> Response:
+    async def send_test_alert(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, channel: NotificationProvider
+    ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.send_test_alert(workspace_id, channel)
