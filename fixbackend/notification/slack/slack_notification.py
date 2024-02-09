@@ -16,6 +16,7 @@ import logging
 from fixcloudutils.types import Json
 from httpx import AsyncClient
 
+from fixbackend.httpx_extensions import HttpXResponse, SuccessResponse, ServerError
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -113,6 +114,11 @@ class SlackNotificationSender(AlertSender):
                 case _:
                     raise ValueError(f"Unknown alert: {alert}")
 
-            log.info(f"Send slack notification for workspace {alert.workspace_id}")
-            response = await self.http_client.post(url, json=message)
-            response.raise_for_status()
+            match HttpXResponse.read(await self.http_client.post(url, json=message)):
+                case SuccessResponse():
+                    log.info("Send slack alert notification")
+                case ServerError(response):
+                    log.info(f"Could not send slack notification due to server error: {response.text}. Retry.")
+                    response.raise_for_status()  # raise exception and trigger retry
+                case error:
+                    log.info(f"Could not send slack notification due to error: {error}. Give up.")

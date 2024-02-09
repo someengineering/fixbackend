@@ -15,7 +15,7 @@ from collections import defaultdict
 from datetime import timedelta, datetime
 from itertools import islice
 from logging import getLogger
-from typing import List, Optional, Dict, Union, Set, cast
+from typing import List, Optional, Dict, Union, Set
 from urllib.parse import urlencode
 
 import cattrs
@@ -184,7 +184,8 @@ class NotificationService(Service):
         if context.kind != "vulnerable_resources_detected":
             raise ValueError(f"Unexpected message kind {context.kind}")
         alert_on = AlertOnChannel.from_json(message)
-        alert = cast(FailingBenchmarkChecksDetected, alert_on.alert)
+        alert = alert_on.alert
+        set_workspace_id(alert.workspace_id)
         if (sender := self.alert_sender.get(alert_on.channel)) and (
             cfg := await self.provider_config_repo.get_messaging_config_for_workspace(
                 alert.workspace_id, alert_on.channel

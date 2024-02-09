@@ -20,6 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
+from datetime import datetime
 from typing import List, Optional, Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
@@ -35,6 +36,7 @@ from fixbackend.inventory.schemas import (
     CompletePathRequest,
     SearchRequest,
     ReportConfig,
+    HistoryChange,
 )
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -200,5 +202,21 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.post("/node/{node_id}", tags=["deprecated"])
     async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
         return await get_node(graph_db, node_id)
+
+    @router.get("/node/{node_id}/history", tags=["search"])
+    async def get_node_history(
+        request: Request,
+        graph_db: CurrentGraphDbDependency,
+        node_id: NodeId = Path(),
+        before: Optional[datetime] = Query(default=None),
+        after: Optional[datetime] = Query(default=None),
+        changes: Optional[List[HistoryChange]] = Query(default=None),
+        limit: int = Query(default=20, ge=1),
+    ) -> StreamingResponse:
+        result = await fix.inventory.client.search_history(
+            graph_db, query=f"id({node_id}) limit {limit}", before=before, after=after, change=changes
+        )
+        accept = request.headers.get("accept", "application/json")
+        return streaming_response(accept, result, result.context)
 
     return router
