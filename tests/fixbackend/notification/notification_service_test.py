@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
 from datetime import timedelta
+from typing import List
 
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
@@ -252,3 +253,22 @@ async def test_alert_settings(notification_service: NotificationService, workspa
     # get config
     config = await notification_service.list_notification_provider_configs(ws_id)
     assert set(config.keys()) == {"pagerduty", "teams"}
+
+
+@pytest.mark.asyncio
+async def test_send_test_alert(
+    notification_service: NotificationService,
+    graph_db_access: GraphDatabaseAccess,
+    success_handler_mock: RequestHandlerMock,
+    inventory_requests: List[Request],
+) -> None:
+    # setup
+    ws_id = graph_db_access.workspace_id
+    await notification_service.update_notification_provider_config(
+        ws_id, "discord", "test", {"webhook_url": "https://discord.com/webhook_example"}
+    )
+    # test alert
+    await notification_service.send_test_alert(ws_id, "discord")
+    # ensure that an alert was created
+    assert len(inventory_requests) == 1
+    assert str(inventory_requests[0].url) == "https://discord.com/webhook_example"

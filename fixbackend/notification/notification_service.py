@@ -33,7 +33,7 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider
+from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
@@ -306,3 +306,28 @@ class NotificationService(Service):
                                 setting.channels,
                             )
                         )
+
+    async def send_test_alert(self, workspace_id: WorkspaceId, provider: NotificationProvider) -> None:
+        if access := await self.graphdb_access.get_database_access(workspace_id):
+            ui_link = SearchRequest(query="all").ui_link(self.config.service_base_url, access.workspace_id)
+            now = utc()
+            resource = VulnerableResource(id=NodeId("example"), name="example", kind="account", ui_link=ui_link)
+            alert = FailingBenchmarkChecksDetected(
+                id=md5("test", workspace_id),
+                workspace_id=workspace_id,
+                benchmark=BenchmarkName("Example Benchmark"),
+                severity="info",
+                failed_checks_count_total=2,
+                examples=[
+                    FailedBenchmarkCheck("test-1", "Example Check Only For Testing!", "info", 1, [resource]),
+                    FailedBenchmarkCheck("test-2", "Please Ignore.", "medium", 1, [resource]),
+                ],
+                ui_link=ui_link,
+            )
+            await self._send_alert(
+                AlertOnChannel(alert, provider).to_json(),
+                MessageContext("test-message", "vulnerable_resources_detected", "fixbackend", now, now),
+            )
+
+        else:
+            log.error(f"Workspace {workspace_id} does not have GraphDbAccess?")
