@@ -486,6 +486,15 @@ async def inventory_requests() -> List[Request]:
 
 
 @pytest.fixture
+async def success_handler_mock(request_handler_mock: RequestHandlerMock) -> RequestHandlerMock:
+    async def always_success(_: Request) -> Response:
+        return Response(204)
+
+    request_handler_mock.append(always_success)
+    return request_handler_mock
+
+
+@pytest.fixture
 async def http_client(request_handler_mock: RequestHandlerMock, inventory_requests: List[Request]) -> AsyncClient:
     async def app(request: Request) -> Response:
         inventory_requests.append(request)

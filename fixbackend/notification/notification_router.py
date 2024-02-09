@@ -250,32 +250,22 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         except ValueError as ex:
             return JSONResponse(status_code=422, content=dict(error=str(ex)))
 
-    async def _delete_notification_provider_config(
-        workspace_id: WorkspaceId, provider: NotificationProvider
+    @router.delete("/{workspace_id}/notification/{channel}")
+    async def delete_channel(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, channel: NotificationProvider
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.delete_notification_provider_config(workspace_id, provider)
+        await ns.delete_notification_provider_config(workspace_id, channel)
         return Response(status_code=204)
 
-    @router.delete("/{workspace_id}/notification/slack")
-    async def delete_slack(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
-        return await _delete_notification_provider_config(workspace_id, "slack")
-
-    @router.delete("/{workspace_id}/notification/discord")
-    async def delete_discord(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
-        return await _delete_notification_provider_config(workspace_id, "discord")
-
-    @router.delete("/{workspace_id}/notification/pagerduty")
-    async def delete_pagerduty(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
-        return await _delete_notification_provider_config(workspace_id, "pagerduty")
-
-    @router.delete("/{workspace_id}/notification/teams")
-    async def delete_teams(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
-        return await _delete_notification_provider_config(workspace_id, "teams")
-
-    @router.delete("/{workspace_id}/notification/email")
-    async def delete_email(_: AuthenticatedUser, workspace_id: WorkspaceId) -> Response:
-        return await _delete_notification_provider_config(workspace_id, "email")
+    @router.post("/{workspace_id}/notification/{channel}/test")
+    async def send_test_alert(
+        _: AuthenticatedUser, workspace_id: WorkspaceId, channel: NotificationProvider
+    ) -> Response:
+        set_workspace_id(workspace_id=workspace_id)
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.send_test_alert(workspace_id, channel)
+        return Response(status_code=204)
 
     return router
