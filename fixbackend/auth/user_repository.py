@@ -27,6 +27,7 @@ from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.ids import UserId
 from fixbackend.types import AsyncSessionMaker
 from contextlib import asynccontextmanager
+from fastapi_users.exceptions import UserAlreadyExists
 
 
 class UserRepository(BaseUserDatabase[User, UUID]):
@@ -111,8 +112,22 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             orm_user = await db.session.get(orm.User, user.id)
             if orm_user is None:
                 raise ValueError(f"User {user.id} not found")
+            existing_account_query_result = await db.session.execute(
+                select(orm.OAuthAccount).where(orm.OAuthAccount.account_id == create_dict["account_id"])
+            )
+            existing_account = existing_account_query_result.scalar_one_or_none()
+            if existing_account:
+                if existing_account.user_id != user.id:
+                    # this oauth account is already linked to another user, do not let this happen
+                    raise UserAlreadyExists(f"Account {create_dict['account_id']} already linked to another user")
+
             oauth_account = db.oauth_account_table(**create_dict)
             db.session.add(oauth_account)
+
+            if existing_account:
+                # remove the old oauth association
+                await db.session.delete(existing_account)
+
             orm_user.oauth_accounts.append(oauth_account)  # type: ignore
             db.session.add(orm_user)
             await db.session.commit()
