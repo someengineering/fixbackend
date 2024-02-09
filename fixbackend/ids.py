@@ -20,6 +20,7 @@ CloudAccountAlias = NewType("CloudAccountAlias", str)
 UserCloudAccountName = NewType("UserCloudAccountName", str)
 TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
+UserRoleId = NewType("UserRoleId", UUID)
 
 
 NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]

@@ -47,6 +47,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
+    roles=[],
 )
 
 now = utc().replace(microsecond=0)

@@ -53,6 +53,7 @@ from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
+from fixbackend.auth.role_repository import RoleRepositoryImpl
 from fixbackend.auth.router import auth_router
 from fixbackend.auth.users_router import users_router
 from fixbackend.billing_information.service import BillingEntryService
@@ -178,6 +179,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -190,6 +193,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
         deps.add(
@@ -302,6 +306,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         )
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
 
         workspace_repo = deps.add(
             SN.workspace_repo,
@@ -315,6 +320,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
 
@@ -405,6 +411,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+        role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -417,6 +425,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                     publisher_name="workspace_service",
                 ),
                 subscription_repo,
+                role_repo,
             ),
         )
         aws_marketplace = deps.add(
