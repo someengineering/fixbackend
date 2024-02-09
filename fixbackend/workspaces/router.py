@@ -100,7 +100,6 @@ def workspaces_router() -> APIRouter:
         organization: WorkspaceCreate,
         user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.create))],
     ) -> WorkspaceRead:
         """Create a workspace."""
         try:

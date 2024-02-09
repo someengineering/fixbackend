@@ -13,13 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from fastapi import HTTPException
+from typing import Annotated
+from fastapi import HTTPException, Path
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import WorkspacePermission
 
 from logging import getLogger
+from fixbackend.ids import WorkspaceId
 
-from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 log = getLogger(__name__)
 
@@ -28,12 +29,17 @@ class WorkspacePermissionChecker:
     def __init__(self, required_permissions: WorkspacePermission):
         self.required_permissions = required_permissions
 
-    async def __call__(self, user: AuthenticatedUser, workspace: UserWorkspaceDependency) -> bool:
+    async def __call__(
+        self,
+        user: AuthenticatedUser,
+        workspace_id: Annotated[WorkspaceId, Path()],
+    ) -> bool:
 
         for permission in self.required_permissions:
             for role in user.roles:
                 # wrong workspace, look at the other role
-                if role.workspace_id != workspace.id:
+
+                if role.workspace_id != workspace_id:
                     continue
                 # permission found, go to the next one
                 if permission in role.permissions():
