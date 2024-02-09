@@ -24,17 +24,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.workspaces.dependencies import get_user_workspace
-from fixbackend.auth.models import User
+from fixbackend.auth.models import RoleName, User, UserRoles
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import ExternalId, SubscriptionId, UserId, WorkspaceId, SecurityTier
+from fixbackend.ids import ExternalId, UserRoleId, SubscriptionId, UserId, WorkspaceId, SecurityTier
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
 ws_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
 user_id = UserId(uuid.uuid4())
+role_id = UserRoleId(uuid.uuid4())
 user = User(
     id=user_id,
     email="foo@example.com",
@@ -43,6 +44,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
+    roles=[UserRoles(role_id, user_id, ws_id, RoleName.workspace_owner)],
 )
 workspace = Workspace(
     id=ws_id,
@@ -65,7 +67,7 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     ) -> Workspace | None:
         return workspace
 
-    async def list_workspaces(self, owner_id: UserId) -> Sequence[Workspace]:
+    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
         return [workspace]
 
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:

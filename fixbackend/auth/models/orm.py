@@ -18,14 +18,14 @@ from typing import List
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
 from sqlalchemy.orm import Mapped, relationship
 
-from fixbackend.auth import models as domain
+from fixbackend.auth import models
 from fixbackend.base_model import Base
 from fixbackend.ids import UserId
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    def to_domain(self) -> domain.OAuthAccount:
-        return domain.OAuthAccount(
+    def to_model(self) -> models.OAuthAccount:
+        return models.OAuthAccount(
             id=self.id,
             oauth_name=self.oauth_name,
             access_token=self.access_token,
@@ -36,7 +36,7 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
         )
 
     @staticmethod
-    def from_domain(acc: domain.OAuthAccount) -> "OAuthAccount":
+    def from_model(acc: models.OAuthAccount) -> "OAuthAccount":
         return OAuthAccount(
             id=acc.id,
             oauth_name=acc.oauth_name,
@@ -51,19 +51,20 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
 
-    def to_domain(self) -> domain.User:
-        return domain.User(
+    def to_model(self) -> models.User:
+        return models.User(
             id=UserId(self.id),
             email=self.email,
             hashed_password=self.hashed_password,
             is_active=self.is_active,
             is_superuser=self.is_superuser,
             is_verified=self.is_verified,
-            oauth_accounts=[acc.to_domain() for acc in self.oauth_accounts],
+            oauth_accounts=[acc.to_model() for acc in self.oauth_accounts],
+            roles=[],
         )
 
     @staticmethod
-    def from_domain(user: domain.User) -> "User":
+    def from_model(user: models.User) -> "User":
         return User(
             id=user.id,
             email=user.email,
@@ -71,5 +72,5 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_active=user.is_active,
             is_superuser=user.is_superuser,
             is_verified=user.is_verified,
-            oauth_accounts=[OAuthAccount.from_domain(acc) for acc in user.oauth_accounts],
+            oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
         )

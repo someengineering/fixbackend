@@ -100,17 +100,18 @@ class InventoryService(Service):
         self,
         client: InventoryClient,
         db_access_manager: GraphDatabaseAccessManager,
-        domain_event_subscriber: DomainEventSubscriber,
+        domain_event_subscriber: Optional[DomainEventSubscriber],
         redis: Redis,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
-        domain_event_subscriber.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
-        domain_event_subscriber.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
-        domain_event_subscriber.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
-        domain_event_subscriber.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
+        if sub := domain_event_subscriber:
+            sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
+            sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
+            sub.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
+            sub.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()

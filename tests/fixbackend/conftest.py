@@ -42,6 +42,7 @@ from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.analytics_event_sender import NoAnalyticsEventSender
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
+from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -588,12 +589,20 @@ def pubsub_publisher() -> InMemoryRedisPubSubPublisher:
 
 
 @pytest.fixture
+async def role_repository(
+    async_session_maker: AsyncSessionMaker,
+) -> RoleRepository:
+    return RoleRepositoryImpl(async_session_maker)
+
+
+@pytest.fixture
 async def workspace_repository(
     async_session_maker: AsyncSessionMaker,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_sender: DomainEventPublisher,
     pubsub_publisher: InMemoryRedisPubSubPublisher,
     subscription_repository: SubscriptionRepository,
+    role_repository: RoleRepository,
 ) -> WorkspaceRepository:
     return WorkspaceRepositoryImpl(
         async_session_maker,
@@ -601,6 +610,7 @@ async def workspace_repository(
         domain_event_sender,
         pubsub_publisher,
         subscription_repository,
+        role_repository,
     )
 
 
