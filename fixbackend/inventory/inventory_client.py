@@ -69,6 +69,10 @@ class GraphDatabaseNotAvailable(InventoryException):
     pass
 
 
+class NoSuchGraph(InventoryException):
+    pass
+
+
 class GraphDatabaseForbidden(InventoryException):
     pass
 
@@ -129,6 +133,8 @@ class InventoryClient(Service):
                     raise GraphDatabaseForbidden(401, response.text)
                 elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
                     raise GraphDatabaseNotAvailable(503, response.text)
+                elif response.status_code == 404 and "NoSuchGraph" in response.text:
+                    raise NoSuchGraph(404, response.text)
                 else:
                     raise InventoryException(response.status_code, response.text)
             if expected_media_types is not None and not response.is_error:

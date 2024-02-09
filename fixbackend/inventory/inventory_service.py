@@ -45,7 +45,12 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudNames, WorkspaceId
 from fixbackend.ids import NodeId
-from fixbackend.inventory.inventory_client import InventoryClient, AsyncIteratorWithContext, InventoryException
+from fixbackend.inventory.inventory_client import (
+    InventoryClient,
+    AsyncIteratorWithContext,
+    InventoryException,
+    NoSuchGraph,
+)
 from fixbackend.inventory.schemas import (
     AccountSummary,
     ReportSummary,
@@ -498,9 +503,10 @@ class InventoryService(Service):
 
         try:
             return await self.cache.call(compute_summary, key=str(db.workspace_id))()
-        # TODO: the exception handling can be removed once all existing users have a database.
         except InventoryException as ex:
-            log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
+            # in case no account is collected yet -> no graph, this is expected.
+            if not isinstance(ex, NoSuchGraph):
+                log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
             empty = CheckSummary(
                 available_checks=0,
                 failed_checks=0,
