@@ -46,6 +46,7 @@ def main() -> None:
         ssl_ca_certs=args.ca_cert,
         ssl_certfile=args.host_cert,
         ssl_keyfile=args.host_key,
+        factory=True,
     )
 
 
