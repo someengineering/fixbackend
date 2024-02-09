@@ -18,6 +18,7 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
 from httpx import AsyncClient
 
+from fixbackend.httpx_extensions import HttpXResponse, ServerError, SuccessResponse
 from fixbackend.notification.model import (
     AlertSender,
     Alert,
@@ -78,6 +79,13 @@ class PagerDutyNotificationSender(AlertSender):
                 case _:
                     raise ValueError(f"Unknown alert: {alert}")
 
-            log.info(f"Send pagerduty notification for workspace {alert.workspace_id}")
-            response = await self.http_client.post("https://events.pagerduty.com/v2/enqueue", json=message)
-            response.raise_for_status()
+            match HttpXResponse.read(
+                await self.http_client.post("https://events.pagerduty.com/v2/enqueue", json=message)
+            ):
+                case SuccessResponse():
+                    log.info("Send pagerduty alert notification.")
+                case ServerError(response):
+                    log.info(f"Could not send pagerduty notification due to server error: {response.text}. Retry.")
+                    response.raise_for_status()  # raise exception and trigger retry
+                case error:
+                    log.info(f"Could not send pagerduty notification due to error: {error}. Give up.")
