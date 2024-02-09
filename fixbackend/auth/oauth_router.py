@@ -288,16 +288,20 @@ def get_oauth_associate_router(
         if state_data.get("sub") != str(user.id):
             return redirect_to_root()
 
-        user = await user_manager.oauth_associate_callback(
-            user,
-            oauth_client.name,
-            token["access_token"],
-            account_id,
-            account_email,
-            token.get("expires_at"),
-            token.get("refresh_token"),
-            request,
-        )
+        try:
+            user = await user_manager.oauth_associate_callback(
+                user,
+                oauth_client.name,
+                token["access_token"],
+                account_id,
+                account_email,
+                token.get("expires_at"),
+                token.get("refresh_token"),
+                request,
+            )
+        except UserAlreadyExists:
+            log.info(f"OAuth callback: user already exists: {account_email}, {state}")
+            # ignore the error and redirect to the redirect_url
 
         # replace the redirect url with the one from the JWT token
         response = Response(status_code=status.HTTP_303_SEE_OTHER)
