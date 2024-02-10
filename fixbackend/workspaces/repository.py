@@ -189,7 +189,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         async with self.session_maker() as session:
             membership = await session.get(orm.OrganizationMembers, (workspace_id, user_id))
             if membership is None:
-                raise ValueError(f"User {uuid} is not a member of workspace {workspace_id}")
+                raise ValueError(f"User {user_id} is not a member of workspace {workspace_id}")
             await session.delete(membership)
             await session.commit()
 
