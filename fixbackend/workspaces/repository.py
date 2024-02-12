@@ -14,11 +14,12 @@
 
 import uuid
 from abc import ABC, abstractmethod
+from logging import getLogger
 from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -30,10 +31,12 @@ from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreate
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
+from fixbackend.ids import ExternalId, SecurityTier, UserId, WorkspaceId
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
+
+log = getLogger(__name__)
 
 
 class WorkspaceRepository(ABC):
@@ -189,7 +192,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         async with self.session_maker() as session:
             membership = await session.get(orm.OrganizationMembers, (workspace_id, user_id))
             if membership is None:
-                raise ValueError(f"User {user_id} is not a member of workspace {workspace_id}")
+                # no one to remove
+                log.info("Removing user %s from workspace %s, but they are not a member. Ignoring.")
+                return None
             await session.delete(membership)
             await session.commit()
 
