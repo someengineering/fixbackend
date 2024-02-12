@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from fastapi_users.exceptions import UserAlreadyExists
 
 
-class UserRepository(BaseUserDatabase[User, UUID]):
+class UserRepository(BaseUserDatabase[User, UserId]):
     def __init__(
         self,
         session_maker: AsyncSessionMaker,
@@ -47,7 +47,7 @@ class UserRepository(BaseUserDatabase[User, UUID]):
             async with self.session_maker() as session:
                 yield SQLAlchemyUserDatabase(session, orm.User, orm.OAuthAccount)
 
-    async def get(self, id: UUID) -> Optional[User]:
+    async def get(self, id: UserId) -> Optional[User]:
         """Get a single user by id."""
         async with self.user_db() as db:
             user = await db.get(id)  # type: ignore[arg-type]

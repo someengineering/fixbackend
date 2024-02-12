@@ -26,6 +26,7 @@ from fixbackend.auth.user_manager import UserManagerDependency
 from fixbackend.auth.auth_backend import get_auth_backend
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
+from fixbackend.auth.auth_router import get_auth_router
 from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead
 from fixbackend.config import Config
 
@@ -119,7 +120,12 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
     )
 
     router.include_router(
-        fastapi_users.get_auth_router(auth_backend, requires_verification=True),
+        get_auth_router(
+            backend=auth_backend,
+            get_user_manager=fastapi_users.get_user_manager,
+            authenticator=fastapi_users.authenticator,
+            requires_verification=True,
+        ),
         prefix="/jwt",
         tags=["auth"],
     )
