@@ -22,7 +22,7 @@ from sqlalchemy import select, INT, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import SecurityTier, WorkspaceId, CloudAccountId
+from fixbackend.ids import ProductTier, WorkspaceId, CloudAccountId
 from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
@@ -60,7 +60,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=model.nr_of_error_messages,
             started_at=model.started_at,
             duration=model.duration,
-            security_tier=model.security_tier.value,
+            security_tier=model.product_tier.value,
         )
 
     def to_model(self) -> MeteringRecord:
@@ -77,7 +77,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=self.nr_of_error_messages,
             started_at=self.started_at,
             duration=self.duration,
-            security_tier=SecurityTier(self.security_tier),
+            product_tier=ProductTier(self.security_tier),
         )
 
 
@@ -122,15 +122,15 @@ class MeteringRepository:
         async with self.session_maker() as session:
             async for account_id, account_name, count, tiers in await session.stream(query):
                 if count >= min_nr_of_collects:
-                    tiers = [SecurityTier(t) for t in tiers.split(",")]
+                    tiers = [ProductTier(t) for t in tiers.split(",")]
 
-                    max_tier = max(tiers, default=SecurityTier.Free)
+                    max_tier = max(tiers, default=ProductTier.Free)
 
                     yield MeteringSummary(
                         account_id=account_id,
                         account_name=account_name,
                         count=count,
-                        security_tier=max_tier,
+                        product_tier=max_tier,
                     )
 
     async def list(

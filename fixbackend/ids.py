@@ -1,7 +1,7 @@
+from collections import defaultdict
+from enum import Enum
 from typing import NewType, Any, Literal
 from uuid import UUID
-from enum import Enum
-from functools import total_ordering
 
 WorkspaceId = NewType("WorkspaceId", UUID)
 InvitationId = NewType("InvitationId", UUID)
@@ -32,28 +32,39 @@ class CloudNames:
     GCP: CloudName = CloudName("gcp")
 
 
-@total_ordering
-class SecurityTier(str, Enum):
+class ProductTier(str, Enum):
     # do not change the values of these enums, or things will break
     Free = "FreeAccount"
-    Foundational = "FoundationalSecurityAccount"
-    HighSecurity = "HighSecurityAccount"
+    # Paid Tiers
+    Plus = "PlusAccount"
+    Business = "BusinessAccount"
+    Enterprise = "EnterpriseAccount"
 
     @property
     def paid(self) -> bool:
-        return self != SecurityTier.Free
+        return self != ProductTier.Free
 
     def __lt__(self, other: Any) -> bool:
-        if self.__class__ is other.__class__:
-            return _security_tier_order(self) < _security_tier_order(other)
+        if isinstance(other, ProductTier):
+            return _product_tier_order[self] < _product_tier_order[other]
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, ProductTier):
+            return _product_tier_order[self] <= _product_tier_order[other]
+        return NotImplemented
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, ProductTier):
+            return _product_tier_order[self] > _product_tier_order[other]
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, ProductTier):
+            return _product_tier_order[self] >= _product_tier_order[other]
         return NotImplemented
 
 
-def _security_tier_order(tier: "SecurityTier") -> int:
-    match tier:
-        case SecurityTier.Free:
-            return 0
-        case SecurityTier.Foundational:
-            return 1
-        case SecurityTier.HighSecurity:
-            return 2
+_product_tier_order = defaultdict(
+    lambda: 0, {ProductTier.Free: 1, ProductTier.Plus: 2, ProductTier.Business: 3, ProductTier.Enterprise: 4}
+)
