@@ -14,11 +14,12 @@
 
 import uuid
 from abc import ABC, abstractmethod
+from logging import getLogger
 from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -28,12 +29,14 @@ from fixbackend.auth.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import NotAllowed
+from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, WorkspaceId, UserId, SecurityTier
+from fixbackend.ids import ExternalId, SecurityTier, UserId, WorkspaceId
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
+
+log = getLogger(__name__)
 
 
 class WorkspaceRepository(ABC):
@@ -141,7 +144,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             if org is None:
-                raise ValueError(f"Organization {workspace_id} does not exist.")
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
             org.name = name
             if generate_external_id:
                 org.external_id = ExternalId(uuid.uuid4())
@@ -179,7 +182,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             try:
                 await session.commit()
             except IntegrityError:
-                raise ValueError("Can't add user to workspace.")
+                raise WrongState("User is already a member of the workspace")
 
         event = UserJoinedWorkspace(workspace_id, user_id)
         await self.domain_event_sender.publish(event)
@@ -189,7 +192,9 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         async with self.session_maker() as session:
             membership = await session.get(orm.OrganizationMembers, (workspace_id, user_id))
             if membership is None:
-                raise ValueError(f"User {user_id} is not a member of workspace {workspace_id}")
+                # no one to remove
+                log.info("Removing user %s from workspace %s, but they are not a member. Ignoring.")
+                return None
             await session.delete(membership)
             await session.commit()
 
@@ -201,7 +206,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             if org is None:
-                raise ValueError(f"Organization {workspace_id} does not exist.")
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
             subcription = await anext(
                 self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
