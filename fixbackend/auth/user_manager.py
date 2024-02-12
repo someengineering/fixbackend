@@ -36,17 +36,7 @@ from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
-class UserIdIDMixin:
-    def parse_id(self, value: Any) -> UserId:
-        if isinstance(value, UUID):
-            return UserId(value)
-        try:
-            return UserId(UUID(value))
-        except ValueError as e:
-            raise exceptions.InvalidID() from e
-
-
-class UserManager(UserIdIDMixin, BaseUserManager[User, UserId]):
+class UserManager(BaseUserManager[User, UserId]):
     def __init__(
         self,
         config: Config,
@@ -67,6 +57,14 @@ class UserManager(UserIdIDMixin, BaseUserManager[User, UserId]):
         self.domain_events_publisher = domain_events_publisher
         self.invitation_repository = invitation_repository
         self.role_repository = role_repository
+
+    def parse_id(self, value: Any) -> UserId:
+        if isinstance(value, UUID):
+            return UserId(value)
+        try:
+            return UserId(UUID(value))
+        except ValueError as e:
+            raise exceptions.InvalidID() from e
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if user.is_verified:  # oauth2 users are already verified
