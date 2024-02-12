@@ -629,8 +629,8 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.exception_handler(401)
         async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
             response = await http_exception_handler(request, exception)
-            return response
             logout_cookie._set_logout_cookie(response)  # noqa
+            return response
 
     return app
 
