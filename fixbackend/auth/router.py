@@ -12,15 +12,17 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi_users.authentication import AuthenticationBackend
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
+from starlette.routing import Route
+from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import UserManagerDependency
 
 from fixbackend.auth.auth_backend import get_auth_backend
@@ -30,6 +32,8 @@ from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuth
 from fixbackend.config import Config
 
 from logging import getLogger
+
+from fixbackend.ids import UserId
 
 log = getLogger(__name__)
 
@@ -118,8 +122,29 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
         include_in_schema=False,
     )
 
+    logout_route_name = f"auth:{auth_backend.name}.logout"
+    auth_router = fastapi_users.get_auth_router(auth_backend, requires_verification=True)
+    # remove the logout route, as we have our own
+    auth_router.routes = list(
+        filter(lambda route: not (isinstance(route, Route) and route.name == logout_route_name), auth_router.routes)
+    )
+
+    @auth_router.post("/logout", name=logout_route_name)
+    async def logout(
+        user_token: Tuple[Optional[User], Optional[str]] = Depends(
+            fastapi_users.authenticator.current_user_token(optional=True, active=True, verified=True)
+        ),
+        strategy: Strategy[User, UserId] = Depends(auth_backend.get_strategy),
+    ) -> Response:
+        user, token = user_token
+        if user is None or token is None:
+            # no one to logout
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+        return await auth_backend.logout(strategy, user, token)
+
     router.include_router(
-        fastapi_users.get_auth_router(auth_backend, requires_verification=True),
+        auth_router,
         prefix="/jwt",
         tags=["auth"],
     )

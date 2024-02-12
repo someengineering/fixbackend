@@ -13,30 +13,30 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
-import uuid
-from typing import Annotated, AsyncIterator, Optional
+from typing import Annotated, Any, AsyncIterator, Optional
 from uuid import UUID
-from attrs import evolve
 
+from attrs import evolve
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, UUIDIDMixin
+from fastapi_users import BaseUserManager, exceptions
 from fastapi_users.password import PasswordHelperProtocol
 from starlette.responses import Response
-from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryDependency
 
 from fixbackend.auth.models import User
+from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryDependency
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
 from fixbackend.config import Config, ConfigDependency
 from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
-from fixbackend.domain_events.events import UserRegistered, UserLoggedIn
+from fixbackend.domain_events.events import UserLoggedIn, UserRegistered
 from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.ids import UserId
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
 
 
-class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
+class UserManager(BaseUserManager[User, UserId]):
     def __init__(
         self,
         config: Config,
@@ -57,6 +57,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self.domain_events_publisher = domain_events_publisher
         self.invitation_repository = invitation_repository
         self.role_repository = role_repository
+
+    def parse_id(self, value: Any) -> UserId:
+        if isinstance(value, UUID):
+            return UserId(value)
+        try:
+            return UserId(UUID(value))
+        except ValueError as e:
+            raise exceptions.InvalidID() from e
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         if user.is_verified:  # oauth2 users are already verified
@@ -103,7 +111,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def remove_oauth_account(self, account_id: UUID) -> None:
         await self.user_repository.remove_oauth_account(account_id)
 
-    async def get(self, id: UUID) -> User:
+    async def get(self, id: UserId) -> User:
         user = await super().get(id)
         roles = await self.role_repository.list_roles(user.id)
         user = evolve(user, roles=roles)
