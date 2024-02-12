@@ -23,3 +23,7 @@ class ResourceNotFound(ClientError):
 
 class NotAllowed(ClientError):
     pass
+
+
+class WrongState(ClientError):
+    pass

@@ -51,7 +51,7 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import NotAllowed, ResourceNotFound
+from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountId,
@@ -495,7 +495,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         organization = await self.workspace_repository.get_workspace(workspace_id)
         if organization is None:
-            raise ValueError("Organization does not exist")
+            raise ResourceNotFound("Organization does not exist")
         if not compare_digest(str(organization.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
@@ -670,7 +670,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case CloudAccountStates.Configured(access, _):
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, True))
                 case _:
-                    raise ValueError(f"Account {cloud_account_id} is not configured, cannot enable account")
+                    raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         result = await self.cloud_account_repository.update(cloud_account_id, update_state)
         return result
@@ -688,7 +688,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case CloudAccountStates.Configured(access, _):
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, False))
                 case _:
-                    raise ValueError(f"Account {cloud_account_id} is not configured, cannot enable account")
+                    raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         return await self.cloud_account_repository.update(cloud_account_id, update_state)
 

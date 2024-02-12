@@ -9,11 +9,15 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.errors import ResourceNotFound
+from fixbackend.errors import ResourceNotFound, WrongState
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import WorkspaceInvitation, orm
 from fixbackend.workspaces.repository import WorkspaceRepository
+
+from logging import getLogger
+
+log = getLogger(__name__)
 
 
 class InvitationRepository(ABC):
@@ -77,13 +81,13 @@ class InvitationRepositoryImpl(InvitationRepository):
 
             workspace = await self.workspace_repository.get_workspace(workspace_id, session=session)
             if workspace is None:
-                raise ValueError(f"Workspace {workspace_id} does not exist.")
+                raise ResourceNotFound(f"Workspace {workspace_id} does not exist.")
 
             user = await self.user_repository.get_by_email(email, session=session)
 
             if user:
                 if user.id in workspace.all_users():
-                    raise ValueError(f"User {user.id} is already a member of workspace {workspace_id}")
+                    raise WrongState(f"User {user.id} is already a member of workspace {workspace_id}")
 
             invite = orm.OrganizationInvite(
                 organization_id=workspace_id,
@@ -152,7 +156,8 @@ class InvitationRepositoryImpl(InvitationRepository):
         async with self.session_maker() as session:
             invite = await session.get(orm.OrganizationInvite, invitation_id)
             if invite is None:
-                raise ValueError(f"Invitation {invitation_id} does not exist.")
+                log.info(f"Invitation {invitation_id} does not exist, skipping deletion.")
+                return None  # let's be idempotent
             await session.delete(invite)
             await session.commit()
 

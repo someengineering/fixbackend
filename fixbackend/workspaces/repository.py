@@ -29,7 +29,7 @@ from fixbackend.auth.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.errors import NotAllowed
+from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import ExternalId, SecurityTier, UserId, WorkspaceId
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
@@ -144,7 +144,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             if org is None:
-                raise ValueError(f"Organization {workspace_id} does not exist.")
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
             org.name = name
             if generate_external_id:
                 org.external_id = ExternalId(uuid.uuid4())
@@ -182,7 +182,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             try:
                 await session.commit()
             except IntegrityError:
-                raise ValueError("Can't add user to workspace.")
+                raise WrongState("User is already a member of the workspace")
 
         event = UserJoinedWorkspace(workspace_id, user_id)
         await self.domain_event_sender.publish(event)
@@ -206,7 +206,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             org = results.unique().scalar_one_or_none()
             if org is None:
-                raise ValueError(f"Organization {workspace_id} does not exist.")
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
             subcription = await anext(
                 self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
