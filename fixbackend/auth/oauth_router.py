@@ -137,7 +137,6 @@ def get_oauth_router(
         strategy: Strategy[models.UP, models.ID] = Depends(backend.get_strategy),
     ) -> Response:
         token, state = access_token_state
-        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
         def redirect_to_root() -> Response:
             response = Response()
@@ -145,14 +144,16 @@ def get_oauth_router(
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
 
-        if account_email is None:
-            log.info("OAuth callback: no email address returned by OAuth provider")
-            return redirect_to_root()
-
         try:
             decoded_state = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
             log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
+
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+
+        if account_email is None:
+            log.info("OAuth callback: no email address returned by OAuth provider")
             return redirect_to_root()
 
         try:
@@ -267,7 +268,6 @@ def get_oauth_associate_router(
         access_token_state: Tuple[OAuth2Token, str] = Depends(oauth2_authorize_callback),
     ) -> Response:
         token, state = access_token_state
-        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
         def redirect_to_root() -> Response:
             response = Response()
@@ -275,14 +275,16 @@ def get_oauth_associate_router(
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
 
-        if account_email is None:
-            log.info("OAuth callback: no email address returned by OAuth provider")
-            return redirect_to_root()
-
         try:
             state_data = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
             log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
+
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+
+        if account_email is None:
+            log.info("OAuth callback: no email address returned by OAuth provider")
             return redirect_to_root()
 
         if state_data.get("sub") != str(user.id):
