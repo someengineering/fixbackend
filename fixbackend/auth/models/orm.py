@@ -13,10 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import List
+from typing import List, Optional
 
-from fastapi_users_db_sqlalchemy import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
-from sqlalchemy.orm import Mapped, relationship
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
 from fixbackend.base_model import Base
@@ -24,6 +25,9 @@ from fixbackend.ids import UserId
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+
+    username: Mapped[Optional[str]] = mapped_column(String(length=320), nullable=True)
+
     def to_model(self) -> models.OAuthAccount:
         return models.OAuthAccount(
             id=self.id,
@@ -33,6 +37,7 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
             refresh_token=self.refresh_token,
             account_id=self.account_id,
             account_email=self.account_email,
+            username=self.username,
         )
 
     @staticmethod
@@ -74,3 +79,45 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_verified=user.is_verified,
             oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
         )
+
+
+# class OAuthAccount(Base):
+
+#     __tablename__ = "oauth_account"
+
+#     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+#     oauth_name: Mapped[str] = mapped_column(String(length=100), index=True, nullable=False)
+#     access_token: Mapped[str] = mapped_column(String(length=1024), nullable=False)
+#     expires_at: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+#     refresh_token: Mapped[Optional[str]] = mapped_column(String(length=1024), nullable=True)
+#     account_id: Mapped[str] = mapped_column(String(length=320), index=True, nullable=False)
+#     account_email: Mapped[str] = mapped_column(String(length=320), nullable=False)
+#     username: Mapped[Optional[str]] = mapped_column(String(length=320), nullable=True)
+
+#     @declared_attr
+#     def user_id(cls) -> Mapped[UserId]:
+#         return mapped_column(GUID, ForeignKey("user.id", ondelete="cascade"), nullable=False)
+
+#     def to_model(self) -> models.OAuthAccount:
+#         return models.OAuthAccount(
+#             id=self.id,
+#             oauth_name=self.oauth_name,
+#             access_token=self.access_token,
+#             expires_at=self.expires_at,
+#             refresh_token=self.refresh_token,
+#             account_id=self.account_id,
+#             account_email=self.account_email,
+#             username=self.username,
+#         )
+
+#     @staticmethod
+#     def from_model(acc: models.OAuthAccount) -> "OAuthAccount":
+#         return OAuthAccount(
+#             id=acc.id,
+#             oauth_name=acc.oauth_name,
+#             access_token=acc.access_token,
+#             expires_at=acc.expires_at,
+#             refresh_token=acc.refresh_token,
+#             account_id=acc.account_id,
+#             account_email=acc.account_email,
+#         )
