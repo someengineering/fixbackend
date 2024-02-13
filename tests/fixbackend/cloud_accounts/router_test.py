@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.auth.models import User
+from fixbackend.auth.models import RoleName, User, UserRoles
 from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
@@ -45,6 +45,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     UserCloudAccountName,
+    UserRoleId,
     WorkspaceId,
     SecurityTier,
 )
@@ -150,11 +151,15 @@ account_id = CloudAccountId("123456789012")
 async def client(session: AsyncSession, default_config: Config, user: User) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
 
+    admin_user = evolve(
+        user, roles=[UserRoles(UserRoleId(uuid.uuid4()), user.id, workspace_id, RoleName.workspace_admin)]
+    )
+
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
     app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_current_active_verified_user] = lambda: user
+    app.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
