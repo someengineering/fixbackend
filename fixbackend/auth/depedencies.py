@@ -1,4 +1,5 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2019 François Voron
+#  Copyright (c) 2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +14,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Annotated, Optional
-from uuid import UUID
 from datetime import datetime, timedelta
 
 from fastapi import Depends, Cookie
@@ -24,10 +24,11 @@ from fixbackend.auth.auth_backend import get_auth_backend, get_session_strategy,
 from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import get_user_manager
 from fixbackend.config import get_config
+from fixbackend.ids import UserId
 from fixbackend.logging_context import set_user_id
 
 # todo: use dependency injection
-fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [get_auth_backend(get_config())])
+fastapi_users = FastAPIUsers[User, UserId](get_user_manager, [get_auth_backend(get_config())])
 
 # the value below is a dependency itself
 get_current_active_user = fastapi_users.current_user(active=True, verified=True)

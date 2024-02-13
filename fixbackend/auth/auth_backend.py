@@ -17,7 +17,6 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from uuid import UUID
 
 import jwt
 from cryptography import x509
@@ -34,6 +33,7 @@ from fixbackend.certificates.cert_store import CertKeyPair
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency
 from fixbackend.certificates.cert_store import load_cert_key_pair
+from fixbackend.ids import UserId
 
 # copied from jwt package
 AllowedPrivateKeys = Union[
@@ -42,7 +42,7 @@ AllowedPrivateKeys = Union[
 AllowedPublicKeys = Union[rsa.RSAPublicKey, ec.EllipticCurvePublicKey, ed25519.Ed25519PublicKey, ed448.Ed448PublicKey]
 
 
-class FixJWTStrategy(Strategy[User, UUID]):
+class FixJWTStrategy(Strategy[User, UserId]):
     def __init__(
         self,
         public_keys: List[AllowedPublicKeys],
@@ -90,7 +90,7 @@ class FixJWTStrategy(Strategy[User, UUID]):
         except jwt.PyJWTError:
             return None
 
-    async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UUID]) -> Optional[User]:
+    async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UserId]) -> Optional[User]:
         if token is None:
             return None
 
@@ -161,7 +161,7 @@ async def get_localhost_key_pair() -> List[CertKeyPair]:
     return [CertKeyPair(cert=cert, private_key=key)]
 
 
-async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UUID]:
+async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UserId]:
     # only to make it easier to run locally
     if os.environ.get("LOCAL_DEV_ENV") is not None:
         cert_key_pairs = await get_localhost_key_pair()

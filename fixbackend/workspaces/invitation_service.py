@@ -31,6 +31,7 @@ from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
 from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.notification.email.email_messages import Invite
 from fixbackend.notification.notification_service import NotificationService
@@ -94,7 +95,7 @@ class InvitationServiceImpl(InvitationService):
     ) -> Tuple[WorkspaceInvitation, str]:
         workspace = await self.workspace_repository.get_workspace(workspace_id)
         if workspace is None:
-            raise ValueError(f"Workspace {workspace_id} does not exist.")
+            raise ResourceNotFound(f"Workspace {workspace_id} does not exist.")
 
         # this is idempotent and will return the existing invitation if it exists
         invitation = await self.invitation_repository.create_invitation(workspace_id, invitee_email)
@@ -117,12 +118,12 @@ class InvitationServiceImpl(InvitationService):
             decoded_state = decode_jwt(token, self.config.secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
             log.info(f"accept invitation callback: invalid state token: {token}, {ex}")
-            raise ValueError("Invalid state token.", ex)
+            raise NotAllowed("Invalid state token.", ex)
 
         invitation_id = decoded_state["invitation_id"]
         invitation = await self.invitation_repository.get_invitation(invitation_id)
         if invitation is None:
-            raise ValueError(f"Invitation {invitation_id} does not exist.")
+            raise ResourceNotFound(f"Invitation {invitation_id} does not exist.")
 
         updated = await self.invitation_repository.update_invitation(
             invitation_id, lambda invite: evolve(invite, accepted_at=utc())

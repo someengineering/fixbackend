@@ -16,6 +16,7 @@
 from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
+from fixbackend.errors import NotAllowed
 from fixbackend.notification.email.email_messages import EmailMessage, Invite
 from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
 
@@ -130,5 +131,5 @@ async def test_invite_accept_user(
     assert await service.list_invitations(workspace.id) == []
 
     # invalid token is rejected
-    with pytest.raises(ValueError):
+    with pytest.raises(NotAllowed):
         await service.accept_invitation("invalid token")
