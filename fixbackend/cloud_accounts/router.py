@@ -14,11 +14,14 @@
 
 from datetime import timedelta
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.auth.models import WorkspacePermission
+from fixbackend.auth.permission_checker import WorkspacePermissionChecker
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
@@ -79,6 +82,7 @@ def cloud_accounts_router() -> APIRouter:
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
         update: AwsCloudAccountUpdate,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_cloud_accounts))],
     ) -> CloudAccountRead:
         updated = await service.update_cloud_account_name(workspace.id, cloud_account_id, update.name)
         return CloudAccountRead.from_model(updated)
@@ -89,6 +93,7 @@ def cloud_accounts_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_cloud_accounts))],
     ) -> None:
         await service.delete_cloud_account(user, cloud_account_id, workspace.id)
 
@@ -97,6 +102,7 @@ def cloud_accounts_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_cloud_accounts))],
     ) -> CloudAccountRead:
         updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
         return CloudAccountRead.from_model(updated)
@@ -106,6 +112,7 @@ def cloud_accounts_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         cloud_account_id: FixCloudAccountId,
         service: CloudAccountServiceDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_cloud_accounts))],
     ) -> CloudAccountRead:
         updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
         return CloudAccountRead.from_model(updated)
