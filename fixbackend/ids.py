@@ -34,11 +34,12 @@ class CloudNames:
 
 class ProductTier(str, Enum):
     # do not change the values of these enums, or things will break
-    Free = "FreeAccount"
+    Trial = "Trial"
+    Free = "Free"
     # Paid Tiers
-    Plus = "PlusAccount"
-    Business = "BusinessAccount"
-    Enterprise = "EnterpriseAccount"
+    Plus = "Plus"
+    Business = "Business"
+    Enterprise = "Enterprise"
 
     @property
     def paid(self) -> bool:

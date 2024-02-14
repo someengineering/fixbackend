@@ -62,6 +62,7 @@ PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 
 
 class ProductTierRead(str, Enum):
+    Trial = "Trial"
     Free = "Free"
     Plus = "Plus"
     Business = "Business"
@@ -69,6 +70,8 @@ class ProductTierRead(str, Enum):
 
     def to_tier(self) -> ProductTier:
         match self:
+            case ProductTierRead.Trial:
+                return ProductTier.Trial
             case ProductTierRead.Free:
                 return ProductTier.Free
             case ProductTierRead.Plus:
@@ -81,6 +84,8 @@ class ProductTierRead(str, Enum):
     @staticmethod
     def from_tier(tier: ProductTier) -> "ProductTierRead":
         match tier:
+            case ProductTier.Trial:
+                return ProductTierRead.Trial
             case ProductTier.Free:
                 return ProductTierRead.Free
             case ProductTier.Plus:

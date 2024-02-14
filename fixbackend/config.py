@@ -210,10 +210,12 @@ class ProductTierSetting:
 
 
 Free = ProductTierSetting(retention_period=timedelta(days=31), seats_included=1, seats_max=1)
+Trial = ProductTierSetting(retention_period=timedelta(days=183), seats_included=1, seats_max=1)
 ProductTierSettings = defaultdict(
     lambda: Free,
     {
         ProductTier.Free: Free,
+        ProductTier.Trial: Trial,
         ProductTier.Plus: ProductTierSetting(retention_period=timedelta(days=92), seats_included=2, seats_max=20),
         ProductTier.Business: ProductTierSetting(retention_period=timedelta(days=183), seats_included=5, seats_max=50),
         ProductTier.Enterprise: ProductTierSetting(

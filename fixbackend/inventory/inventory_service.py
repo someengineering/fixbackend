@@ -34,7 +34,7 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.config import ProductTierSettings, Free
+from fixbackend.config import ProductTierSettings, Trial
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     TenantAccountsCollected,
@@ -152,7 +152,7 @@ class InventoryService(Service):
         if access:
             log.info(f"Workspace created: {event.workspace_id}. Create related database.")
             await self.client.create_database(access)
-            await self.change_db_retention_period(event.workspace_id, Free.retention_period)
+            await self.change_db_retention_period(event.workspace_id, Trial.retention_period)
 
     async def _process_product_tier_changed(self, event: ProductTierChanged) -> None:
         log.info(f"Product tier changed: {event.workspace_id}: {event.product_tier}")
