@@ -287,15 +287,11 @@ def get_oauth_associate_router(
 
         redirect_url = state_data.get("redirect_url", "/")
 
-        if account_email is None:
-            log.info("OAuth callback: no email address returned by OAuth provider")
-            return redirect_with_error(redirect_url, "no_email_returned_by_provider")
-
         account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
         if account_email is None:
             log.info("OAuth callback: no email address returned by OAuth provider")
-            return redirect_to_root()
+            return redirect_with_error(redirect_url, "no_email_returned_by_provider")
 
         if state_data.get("sub") != str(user.id):
             return redirect_with_error(redirect_url, "invalid_user")
