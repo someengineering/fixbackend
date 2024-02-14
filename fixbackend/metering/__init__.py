@@ -17,7 +17,7 @@ from uuid import UUID
 
 from attrs import frozen
 
-from fixbackend.ids import WorkspaceId, CloudAccountId, SecurityTier
+from fixbackend.ids import WorkspaceId, CloudAccountId, ProductTier
 
 
 @frozen
@@ -34,7 +34,7 @@ class MeteringRecord:
     nr_of_error_messages: int
     started_at: datetime
     duration: int
-    security_tier: SecurityTier
+    product_tier: ProductTier
 
 
 @frozen
@@ -42,4 +42,4 @@ class MeteringSummary:
     account_id: str
     account_name: str
     count: int
-    security_tier: SecurityTier
+    product_tier: ProductTier

@@ -19,7 +19,7 @@ from fixbackend.auth.models import User
 from fixbackend.billing_information.models import PaymentMethods
 from fixbackend.billing_information.service import BillingEntryService
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import SecurityTier
+from fixbackend.ids import ProductTier
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
@@ -47,9 +47,7 @@ async def test_list_billing_entries(
 
     now = utc().replace(microsecond=0)
 
-    await subscription_repository.add_billing_entry(
-        subscription.id, workspace.id, SecurityTier.Foundational, 42, now, now, now
-    )
+    await subscription_repository.add_billing_entry(subscription.id, workspace.id, ProductTier.Plus, 42, now, now, now)
 
     # no address provided
     billing_info = await billing_entry_service.list_billing_info(workspace.id)
@@ -58,7 +56,7 @@ async def test_list_billing_entries(
     assert billing_entry.id is not None
     assert billing_entry.period_start == now
     assert billing_entry.period_end == now
-    assert billing_entry.tier == SecurityTier.Foundational
+    assert billing_entry.tier == ProductTier.Plus
 
 
 @pytest.mark.asyncio
@@ -71,7 +69,7 @@ async def test_list_payment_methods(
 ) -> None:
 
     # we're on the free tier:
-    assert workspace.security_tier == SecurityTier.Free
+    assert workspace.product_tier == ProductTier.Free
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
@@ -86,8 +84,8 @@ async def test_list_payment_methods(
             assert False, "Expected no_payment_method payment method"
 
     # on paid tier we can't get the no payment method
-    assert workspace.security_tier == SecurityTier.Free
-    workspace = await workspace_repository.update_security_tier(user, workspace.id, SecurityTier.Foundational)
+    assert workspace.product_tier == ProductTier.Free
+    workspace = await workspace_repository.update_security_tier(user, workspace.id, ProductTier.Plus)
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
@@ -105,18 +103,18 @@ async def test_update_billing(
     user: User,
 ) -> None:
     # we're on the free tier:
-    assert workspace.security_tier == SecurityTier.Free
+    assert workspace.product_tier == ProductTier.Free
     # update to higher tier is possible if there is a payment method
-    workspace = await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
-    assert workspace.security_tier == SecurityTier.Foundational
+    workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
+    assert workspace.product_tier == ProductTier.Plus
 
     # removing the payment method on non-free tier is not possible
     with pytest.raises(NotAllowed):
         await billing_entry_service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
 
     # downgrading to free is possible
-    workspace = await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Free)
-    assert workspace.security_tier == SecurityTier.Free
+    workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Free)
+    assert workspace.product_tier == ProductTier.Free
 
     # we can remove the payment method if we're on free tier
     workspace = await billing_entry_service.update_billing(
@@ -127,13 +125,13 @@ async def test_update_billing(
 
     # upgrading to paid tier is not possible without payment method
     with pytest.raises(NotAllowed):
-        await billing_entry_service.update_billing(user, workspace, new_security_tier=SecurityTier.Foundational)
+        await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
 
     # but if we add the payment then we can upgrade to a paid plan
     workspace = await billing_entry_service.update_billing(
         user,
         workspace,
         new_payment_method=PaymentMethods.AwsSubscription(subscription.id),
-        new_security_tier=SecurityTier.HighSecurity,
+        new_product_tier=ProductTier.Business,
     )
-    assert workspace.security_tier == SecurityTier.HighSecurity
+    assert workspace.product_tier == ProductTier.Business

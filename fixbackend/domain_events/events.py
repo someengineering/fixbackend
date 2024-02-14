@@ -185,12 +185,12 @@ class UserJoinedWorkspace(Event):
 
 
 @frozen
-class SecurityTierUpdated(Event):
-    kind: ClassVar[str] = "security_tier_updated"
+class ProductTierUpdated(Event):
+    kind: ClassVar[str] = "product_tier_updated"
 
     workspace_id: WorkspaceId
     user_id: UserId
-    security_tier: str
+    product_tier: str
     is_paid_tier: bool
     is_higher_tier: bool
     previous_tier: str
@@ -234,5 +234,5 @@ class BillingEntryCreated(Event):
 
     tenant_id: WorkspaceId
     subscription_id: SubscriptionId
-    security_tier: str
+    product_tier: str
     usage: int

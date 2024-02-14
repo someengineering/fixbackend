@@ -31,7 +31,7 @@ from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreate
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, SecurityTier, UserId, WorkspaceId
+from fixbackend.ids import ExternalId, WorkspaceId, UserId, ProductTier
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
@@ -74,7 +74,7 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
     ) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
@@ -100,9 +100,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
-            organization = orm.Organization(
-                id=workspace_id, name=name, slug=slug, security_tier=SecurityTier.Free.value
-            )
+            organization = orm.Organization(id=workspace_id, name=name, slug=slug, security_tier=ProductTier.Free.value)
             owner_relationship = orm.OrganizationOwners(user_id=owner.id)
             organization.owners.append(owner_relationship)
             session.add(organization)
@@ -199,7 +197,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
 
     async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
     ) -> Workspace:
         async with self.session_maker() as session:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
@@ -208,10 +206,10 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if org is None:
                 raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
-            subcription = await anext(
+            subscription = await anext(
                 self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
             )
-            if subcription is None:
+            if subscription is None:
                 raise NotAllowed("Organization must have a subscription to change the security tier")
 
             org.security_tier = security_tier.value

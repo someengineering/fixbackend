@@ -24,7 +24,7 @@ from typing import Union, Optional
 
 from attr import frozen
 
-from fixbackend.ids import SecurityTier, SubscriptionId, WorkspaceId, UserId, BillingId
+from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId, UserId, BillingId
 
 
 @frozen
@@ -45,7 +45,7 @@ class BillingEntry:
     id: BillingId
     workspace_id: WorkspaceId
     subscription_id: SubscriptionId
-    tier: SecurityTier
+    tier: ProductTier
     nr_of_accounts_charged: int
     period_start: datetime
     period_end: datetime

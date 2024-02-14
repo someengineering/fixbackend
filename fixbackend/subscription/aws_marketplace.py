@@ -37,7 +37,7 @@ from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import AwsMarketplaceSubscriptionCreated, BillingEntryCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import SecurityTier, SubscriptionId
+from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
@@ -66,7 +66,7 @@ def compute_billing_period_factor(
     return billing_factor
 
 
-AccountsCharged = Counter("aws_marketplace_accounts_charged", "Accounts charged by security tier", ["security_tier"])
+AccountsCharged = Counter("aws_marketplace_accounts_charged", "Accounts charged by security tier", ["product_tier"])
 
 
 class AwsMarketplaceHandler(Service):
@@ -176,29 +176,29 @@ class AwsMarketplaceHandler(Service):
                         ws_id, start=last_charged, end=billing_time, min_resources_collected=100, min_nr_of_collects=3
                     )
                 ]
-                tiers = [summary.security_tier for summary in summaries]
+                tiers = [summary.product_tier for summary in summaries]
                 # highest recorded tier
-                security_tier = max(tiers)
+                product_tier = max(tiers)
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
-                if security_tier == SecurityTier.Free or usage == 0:
+                if product_tier == ProductTier.Free or usage == 0:
                     log.info(f"AWS Marketplace: customer {customer} has no usage")
                     # move the charge timestamp tp
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
-                AccountsCharged.labels(security_tier=security_tier.value).inc(usage)
+                AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
                     subscription.workspace_id,
-                    security_tier,
+                    product_tier,
                     usage,
                     last_charged,
                     billing_time,
                     next_charge,
                 )
                 await self.domain_event_sender.publish(
-                    BillingEntryCreated(subscription.workspace_id, subscription.id, security_tier, usage)
+                    BillingEntryCreated(subscription.workspace_id, subscription.id, product_tier, usage)
                 )
                 return billing_entry
             else:
