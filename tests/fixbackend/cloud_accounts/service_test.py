@@ -52,7 +52,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
-    SecurityTier,
+    ProductTier,
     TaskId,
     UserCloudAccountName,
     WorkspaceId,
@@ -128,7 +128,7 @@ organization = Workspace(
     external_id=external_id,
     owners=[],
     members=[],
-    security_tier=SecurityTier.Free,
+    product_tier=ProductTier.Free,
 )
 
 

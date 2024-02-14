@@ -38,7 +38,7 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, SecurityTier, TaskId, WorkspaceId, AwsARN
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskId, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -292,10 +292,10 @@ class DispatcherService(Service):
                 f"Took {duration}. Messages: {messages}"
             )
             if workspace := await self.workspace_repository.get_workspace(workspace_id):
-                tier = workspace.security_tier
+                tier = workspace.product_tier
             else:
                 log.warning(f"Could not find security tier workspace with id {workspace_id}, will use free as default")
-                tier = SecurityTier.Free
+                tier = ProductTier.Free
             records = [
                 MeteringRecord(
                     id=uuid.uuid4(),
@@ -310,7 +310,7 @@ class DispatcherService(Service):
                     nr_of_error_messages=len(messages),
                     started_at=started_at,
                     duration=duration,
-                    security_tier=tier,
+                    product_tier=tier,
                 )
                 for account_id, account_details in account_info.items()
             ]

@@ -24,7 +24,7 @@ from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
-from fixbackend.ids import BillingId, ExternalId, SecurityTier, SubscriptionId, UserId, WorkspaceId
+from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
 from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
@@ -37,7 +37,7 @@ from attrs import evolve
 
 external_id = ExternalId(uuid.uuid4())
 workspace_id = WorkspaceId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], SecurityTier.Free)
+workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free)
 user_id = UserId(uuid.uuid4())
 user = User(
     id=user_id,
@@ -56,7 +56,7 @@ billing_entry = BillingEntry(
     id=BillingId(uuid.uuid4()),
     workspace_id=workspace_id,
     subscription_id=SubscriptionId(uuid.uuid4()),
-    tier=SecurityTier.Foundational,
+    tier=ProductTier.Plus,
     nr_of_accounts_charged=42,
     period_start=now,
     period_end=now,
@@ -83,7 +83,7 @@ class BillingEntryServiceMock(BillingEntryService):
         self,
         user: User,
         workspace: Workspace,
-        tier: SecurityTier | None = None,
+        tier: ProductTier | None = None,
         payment_method: PaymentMethod | None = None,
     ) -> Workspace:
         return workspace
@@ -124,9 +124,9 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
         return evolve(workspace, name=name, external_id=new_external_id)
 
     async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
     ) -> Workspace:
-        return evolve(workspace, security_tier=security_tier)
+        return evolve(workspace, product_tier=security_tier)
 
 
 @pytest.fixture
@@ -176,7 +176,7 @@ async def test_get_billing(client: AsyncClient) -> None:
         },
         {"method": "none"},
     ]
-    assert response.json().get("security_tier") == "free"
+    assert response.json().get("product_tier") == "Free"
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_update_billing(client: AsyncClient) -> None:
                 "method": "aws_marketplace",
                 "subscription_id": str(sub_id),
             },
-            "security_tier": "free",
+            "product_tier": "Free",
         },
     )
 
@@ -200,7 +200,7 @@ async def test_update_billing(client: AsyncClient) -> None:
         "method": "aws_marketplace",
         "subscription_id": str(sub_id),
     }
-    assert json.get("security_tier") == "free"
+    assert json.get("product_tier") == "Free"
 
 
 @pytest.mark.asyncio

@@ -24,10 +24,10 @@ from fixbackend.billing_information.models import (
     WorkspacePaymentMethods,
 )
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import SecurityTierUpdated
+from fixbackend.domain_events.events import ProductTierUpdated
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed
-from fixbackend.ids import SecurityTier, UserId, WorkspaceId
+from fixbackend.ids import ProductTier, UserId, WorkspaceId
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
@@ -56,7 +56,7 @@ class BillingEntryService:
         current: PaymentMethod = PaymentMethods.NoPaymentMethod()
 
         payment_methods: List[PaymentMethod] = []
-        if workspace.security_tier == SecurityTier.Free:
+        if workspace.product_tier == ProductTier.Free:
             payment_methods.append(PaymentMethods.NoPaymentMethod())
 
         if current_subscription := await anext(
@@ -72,15 +72,15 @@ class BillingEntryService:
         self,
         user: User,
         workspace: Workspace,
-        new_security_tier: Optional[SecurityTier] = None,
+        new_product_tier: Optional[ProductTier] = None,
         new_payment_method: Optional[PaymentMethod] = None,
     ) -> Workspace:
-        if new_security_tier is not None:
-            if new_security_tier != SecurityTier.Free and new_payment_method is PaymentMethods.NoPaymentMethod():
+        if new_product_tier is not None:
+            if new_product_tier != ProductTier.Free and new_payment_method is PaymentMethods.NoPaymentMethod():
                 raise NotAllowed("Payment method is required for non-free tiers")
 
-        current_tier = workspace.security_tier
-        if current_tier != SecurityTier.Free and new_payment_method is not None:
+        current_tier = workspace.product_tier
+        if current_tier != ProductTier.Free and new_payment_method is not None:
             # at this point we could silently downgrade the security tier to free,
             # but explicit is better than implicit so the user must move to the free tier first
             if new_payment_method == PaymentMethods.NoPaymentMethod():
@@ -97,16 +97,16 @@ class BillingEntryService:
                         workspace_id=workspace.id, subscription_id=None
                     )
 
-        if new_security_tier:
+        if new_product_tier:
             workspace = await self.workspace_repository.update_security_tier(
-                user=user, workspace_id=workspace.id, security_tier=new_security_tier
+                user=user, workspace_id=workspace.id, security_tier=new_product_tier
             )
-            event = SecurityTierUpdated(
+            event = ProductTierUpdated(
                 workspace.id,
                 user.id,
-                new_security_tier.value,
-                new_security_tier.paid,
-                new_security_tier > current_tier,
+                new_product_tier.value,
+                new_product_tier.paid,
+                new_product_tier > current_tier,
                 current_tier.value,
             )
             await self.domain_event_sender.publish(event)

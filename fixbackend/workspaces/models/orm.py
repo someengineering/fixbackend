@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
 from fixbackend.base_model import Base
-from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, SecurityTier
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, ProductTier
 from fixbackend.workspaces import models
 
 
@@ -45,7 +45,7 @@ class Organization(Base):
             external_id=self.external_id,
             owners=[UserId(owner.user_id) for owner in self.owners],
             members=[UserId(member.user_id) for member in self.members],
-            security_tier=SecurityTier(self.security_tier),
+            product_tier=ProductTier(self.security_tier),
         )
 
 

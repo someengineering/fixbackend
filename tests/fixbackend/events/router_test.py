@@ -28,12 +28,12 @@ from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
 from fixbackend.events.websocket_event_handler import WebsocketEventHandler, get_websocket_event_handler
-from fixbackend.ids import ExternalId, WorkspaceId, SecurityTier
+from fixbackend.ids import ExternalId, WorkspaceId, ProductTier
 from fixbackend.workspaces.dependencies import get_optional_user_workspace
 from fixbackend.workspaces.models import Workspace
 
 workspace_id = WorkspaceId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", ExternalId(uuid.uuid4()), [], [], SecurityTier.Free)
+workspace = Workspace(workspace_id, "foo", "foo", ExternalId(uuid.uuid4()), [], [], ProductTier.Free)
 
 
 class WebsocketHandlerMock(WebsocketEventHandler):

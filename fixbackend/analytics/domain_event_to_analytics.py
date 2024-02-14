@@ -26,7 +26,7 @@ from fixbackend.analytics.events import (
     AEWorkspaceCreated,
     AEInvitationAccepted,
     AEUserJoinedWorkspace,
-    AESecurityTierUpdated,
+    AEProductTierUpdated,
     AESubscriptionCreated,
     AEUserLoggedIn,
     AEFailingBenchmarkChecksAlertSend,
@@ -44,7 +44,7 @@ from fixbackend.domain_events.events import (
     WorkspaceCreated,
     InvitationAccepted,
     UserJoinedWorkspace,
-    SecurityTierUpdated,
+    ProductTierUpdated,
     Event,
     AwsMarketplaceSubscriptionCreated,
     UserLoggedIn,
@@ -69,7 +69,7 @@ class DomainEventToAnalyticsEventHandler:
         domain_event_subscriber.subscribe(WorkspaceCreated, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(InvitationAccepted, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(UserJoinedWorkspace, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(SecurityTierUpdated, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(ProductTierUpdated, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(AwsMarketplaceSubscriptionCreated, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(UserLoggedIn, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(FailingBenchmarkChecksAlertSend, self.handle, "domain_event_to_analytics")
@@ -100,8 +100,8 @@ class DomainEventToAnalyticsEventHandler:
                 await self.sender.send(AEInvitationAccepted(user_id, event.workspace_id))
             case UserJoinedWorkspace() as event:
                 await self.sender.send(AEUserJoinedWorkspace(event.user_id, event.workspace_id))
-            case SecurityTierUpdated() as event:
-                await self.sender.send(AESecurityTierUpdated(event.user_id, event.workspace_id, event.security_tier))
+            case ProductTierUpdated() as event:
+                await self.sender.send(AEProductTierUpdated(event.user_id, event.workspace_id, event.product_tier))
             case AwsMarketplaceSubscriptionCreated() as event:
                 if ws_id := event.workspace_id:
                     await self.sender.send(AESubscriptionCreated(event.user_id, ws_id, "aws_marketplace"))
@@ -116,9 +116,7 @@ class DomainEventToAnalyticsEventHandler:
                 )
             case BillingEntryCreated() as event:
                 user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(
-                    AEBillingEntryCreated(user_id, event.tenant_id, event.security_tier, event.usage)
-                )
+                await self.sender.send(AEBillingEntryCreated(user_id, event.tenant_id, event.product_tier, event.usage))
             case _:
                 log.info(f"Do not know how to handle event: {event}. Ignore.")
 
