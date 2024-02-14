@@ -28,7 +28,7 @@ from fixbackend.auth.models import RoleName, User, UserRoles
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.ids import ExternalId, UserRoleId, SubscriptionId, UserId, WorkspaceId, SecurityTier
+from fixbackend.ids import ExternalId, UserRoleId, SubscriptionId, UserId, WorkspaceId, ProductTier
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
 
@@ -53,7 +53,7 @@ workspace = Workspace(
     external_id=external_id,
     owners=[user.id],
     members=[],
-    security_tier=SecurityTier.Free,
+    product_tier=ProductTier.Free,
 )
 sub_id = SubscriptionId(uuid.uuid4())
 
@@ -78,9 +78,9 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
         return evolve(workspace, name=name, external_id=new_external_id)
 
     async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: SecurityTier
+        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
     ) -> Workspace:
-        return evolve(workspace, security_tier=security_tier)
+        return evolve(workspace, product_tier=security_tier)
 
 
 @pytest.fixture

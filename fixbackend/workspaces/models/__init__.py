@@ -17,7 +17,7 @@ from typing import List, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, SecurityTier
+from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, ProductTier
 
 
 @frozen
@@ -28,7 +28,7 @@ class Workspace:
     external_id: ExternalId
     owners: List[UserId]
     members: List[UserId]
-    security_tier: SecurityTier
+    product_tier: ProductTier
 
     def all_users(self) -> List[UserId]:
         return self.owners + self.members
