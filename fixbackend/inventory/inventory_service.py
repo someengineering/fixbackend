@@ -34,11 +34,13 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
+from fixbackend.config import ProductTierSettings, Free
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     TenantAccountsCollected,
     CloudAccountNameChanged,
     WorkspaceCreated,
+    ProductTierChanged,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -112,6 +114,7 @@ class InventoryService(Service):
             sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
             sub.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
             sub.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
+            sub.subscribe(ProductTierChanged, self._process_product_tier_changed, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()
@@ -149,6 +152,23 @@ class InventoryService(Service):
         if access:
             log.info(f"Workspace created: {event.workspace_id}. Create related database.")
             await self.client.create_database(access)
+            await self.change_db_retention_period(event.workspace_id, Free.retention_period)
+
+    async def _process_product_tier_changed(self, event: ProductTierChanged) -> None:
+        log.info(f"Product tier changed: {event.workspace_id}: {event.product_tier}")
+        setting = ProductTierSettings[event.product_tier]
+        await self.change_db_retention_period(event.workspace_id, setting.retention_period)
+
+    async def change_db_retention_period(self, workspace_id: WorkspaceId, retention_period: timedelta) -> None:
+        access = await self.db_access_manager.get_database_access(workspace_id)
+        if access:
+            log.info(f"Change retention period for database: {workspace_id}: {retention_period}")
+            await self.client.update_config(
+                access,
+                "resoto.core",
+                {"resotocore": {"graph_update": {"keep_history_for_days": retention_period.days}}},
+                patch=True,
+            )
 
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
         # evict the cache for the tenant in the cluster

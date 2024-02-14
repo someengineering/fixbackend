@@ -41,6 +41,7 @@ from fixbackend.ids import (
     BenchmarkName,
     ReportSeverity,
     NotificationProvider,
+    ProductTier,
 )
 
 T = TypeVar("T")
@@ -185,15 +186,15 @@ class UserJoinedWorkspace(Event):
 
 
 @frozen
-class ProductTierUpdated(Event):
-    kind: ClassVar[str] = "product_tier_updated"
+class ProductTierChanged(Event):
+    kind: ClassVar[str] = "product_tier_changed"
 
     workspace_id: WorkspaceId
     user_id: UserId
-    product_tier: str
+    product_tier: ProductTier
     is_paid_tier: bool
     is_higher_tier: bool
-    previous_tier: str
+    previous_tier: ProductTier
 
 
 @frozen
