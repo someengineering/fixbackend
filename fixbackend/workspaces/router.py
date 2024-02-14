@@ -75,7 +75,7 @@ def workspaces_router() -> APIRouter:
     @router.get("/{workspace_id}/settings")
     async def get_workspace_settings(
         workspace: UserWorkspaceDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_settings))],
     ) -> WorkspaceSettingsRead:
         """Get a workspace."""
         return WorkspaceSettingsRead.from_model(workspace)
@@ -85,7 +85,7 @@ def workspaces_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         settings: WorkspaceSettingsUpdate,
         workspace_repository: WorkspaceRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
     ) -> WorkspaceSettingsRead:
         """Update a workspace."""
         org = await workspace_repository.update_workspace(
