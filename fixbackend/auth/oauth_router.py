@@ -62,7 +62,7 @@ def generate_state_token(data: Dict[str, str], secret: SecretType, lifetime_seco
 # forked version of fastapi_users.router.oauth.get_oauth_router
 # to allow for redirect_url to be set via the JWT token
 def get_oauth_router(
-    oauth_client: BaseOAuth2[Any] | GithubOauthClient,
+    oauth_client: BaseOAuth2[Any],
     backend: AuthenticationBackend[Any, Any],
     state_secret: SecretType,
     redirect_url: Optional[str] = None,

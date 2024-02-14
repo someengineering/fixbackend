@@ -19,7 +19,7 @@ class GithubOauthClient(GitHubOAuth2):
             name,
         )
 
-    async def get_id_email_username(self, token: str) -> Tuple[str, Optional[str], Optional[str]]:
+    async def get_id_email_username(self, token: str) -> Tuple[str, Optional[str], Optional[str]]:  # pragma: no cover
         async with httpx.AsyncClient(headers={**self.request_headers, "Authorization": f"token {token}"}) as client:
             response = await client.get(PROFILE_ENDPOINT)
 
