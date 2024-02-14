@@ -20,7 +20,7 @@ from typing import List, Literal, Union
 from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
 from fixbackend.billing_information import models
 
-from fixbackend.ids import BillingId, SecurityTier, SubscriptionId, WorkspaceId
+from fixbackend.ids import BillingId, ProductTier, SubscriptionId, WorkspaceId
 from fixbackend.subscription.models import BillingEntry
 from enum import Enum
 
@@ -31,7 +31,7 @@ class BillingEntryRead(BaseModel):
     id: BillingId = Field(description="Id of the billing entry")
     workspace_id: WorkspaceId = Field(description="The workspace's unique identifier")
     subscription_id: SubscriptionId = Field(description="The subscription's unique identifier")
-    tier: SecurityTier = Field(description="Security tier during the billing period")
+    tier: ProductTier = Field(description="Product tier during the billing period")
     period_start: datetime = Field(description="The start of the billing period")
     period_end: datetime = Field(description="The end of the billing period")
     nr_of_accounts_charged: int = Field(description="The number of accounts charged during the billing period")
@@ -42,7 +42,7 @@ class BillingEntryRead(BaseModel):
             id=billing_entry.id,
             workspace_id=billing_entry.workspace_id,
             subscription_id=billing_entry.subscription_id,
-            tier=SecurityTier(billing_entry.tier),
+            tier=ProductTier(billing_entry.tier),
             period_start=billing_entry.period_start,
             period_end=billing_entry.period_end,
             nr_of_accounts_charged=billing_entry.nr_of_accounts_charged,
@@ -61,16 +61,40 @@ class NoPaymentMethod(BaseModel):
 PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 
 
-class ProductTier(str, Enum):
-    free = "free"
-    foundational = "foundational"
-    high_security = "high_security"
+class ProductTierRead(str, Enum):
+    Free = "Free"
+    Plus = "Plus"
+    Business = "Business"
+    Enterprise = "Enterprise"
+
+    def to_tier(self) -> ProductTier:
+        match self:
+            case ProductTierRead.Free:
+                return ProductTier.Free
+            case ProductTierRead.Plus:
+                return ProductTier.Plus
+            case ProductTierRead.Business:
+                return ProductTier.Business
+            case ProductTierRead.Enterprise:
+                return ProductTier.Enterprise
+
+    @staticmethod
+    def from_tier(tier: ProductTier) -> "ProductTierRead":
+        match tier:
+            case ProductTier.Free:
+                return ProductTierRead.Free
+            case ProductTier.Plus:
+                return ProductTierRead.Plus
+            case ProductTier.Business:
+                return ProductTierRead.Business
+            case ProductTier.Enterprise:
+                return ProductTierRead.Enterprise
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
     workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
     available_payment_methods: List[PaymentMethod] = Field(description="The payment methods available for workspace")
-    security_tier: ProductTier = Field(description="The security tier of this workspace")
+    product_tier: ProductTierRead = Field(description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -94,7 +118,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
                             "method": "none",
                         },
                     ],
-                    "security_tier": "free",
+                    "product_tier": "Free",
                 }
             ]
         }
@@ -105,14 +129,6 @@ class WorkspaceBillingSettingsRead(BaseModel):
         workspace: Workspace,
         payment_methods: WorkspacePaymentMethods,
     ) -> "WorkspaceBillingSettingsRead":
-        def tier(workspace: Workspace) -> ProductTier:
-            match workspace.security_tier:
-                case SecurityTier.Free:
-                    return ProductTier.free
-                case SecurityTier.Foundational:
-                    return ProductTier.foundational
-                case SecurityTier.HighSecurity:
-                    return ProductTier.high_security
 
         def payment(payment_method: models.PaymentMethod) -> PaymentMethod:
             match payment_method:
@@ -124,13 +140,13 @@ class WorkspaceBillingSettingsRead(BaseModel):
         return WorkspaceBillingSettingsRead(
             workspace_payment_method=payment(payment_methods.current),
             available_payment_methods=[payment(method) for method in payment_methods.available],
-            security_tier=tier(workspace),
+            product_tier=ProductTierRead.from_tier(workspace.product_tier),
         )
 
 
 class WorkspaceBillingSettingsUpdate(BaseModel):
     workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
-    security_tier: ProductTier = Field(description="The security tier of this workspace")
+    product_tier: ProductTierRead = Field(description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -141,7 +157,7 @@ class WorkspaceBillingSettingsUpdate(BaseModel):
                         "method": "aws_marketplace",
                         "subscription_id": "00000000-0000-0000-0000-000000000000",
                     },
-                    "security_tier": "free",
+                    "product_tier": "Free",
                 }
             ]
         }

@@ -16,12 +16,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from fixbackend.ids import SecurityTier, WorkspaceId, CloudAccountId
+from fixbackend.ids import ProductTier, WorkspaceId, CloudAccountId
 from fixbackend.metering import MeteringRecord, MeteringSummary
 from fixbackend.metering.metering_repository import MeteringRepository
 
 
-def create_metering_record(workspace_id: WorkspaceId, account_id: str, security_tier: SecurityTier) -> MeteringRecord:
+def create_metering_record(workspace_id: WorkspaceId, account_id: str, product_tier: ProductTier) -> MeteringRecord:
     ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     return MeteringRecord(
         id=uuid.uuid1(),
@@ -36,13 +36,13 @@ def create_metering_record(workspace_id: WorkspaceId, account_id: str, security_
         nr_of_error_messages=1,
         started_at=ts,
         duration=1,
-        security_tier=security_tier,
+        product_tier=product_tier,
     )
 
 
 @pytest.fixture
 def metering_record() -> MeteringRecord:
-    return create_metering_record(WorkspaceId(uuid.uuid1()), "123456789012", SecurityTier.HighSecurity)
+    return create_metering_record(WorkspaceId(uuid.uuid1()), "123456789012", ProductTier.Business)
 
 
 @pytest.mark.asyncio
@@ -55,7 +55,7 @@ async def test_create_load(metering_repository: MeteringRepository, metering_rec
     assert [e async for e in metering_repository.list(ws_id)] == [metering_record]
     # collect summary
     assert [e async for e in metering_repository.collect_summary(ws_id)] == [
-        MeteringSummary("123456789012", "test", 1, SecurityTier.HighSecurity)
+        MeteringSummary("123456789012", "test", 1, ProductTier.Business)
     ]
 
     more = metering_record.nr_of_resources_collected + 1

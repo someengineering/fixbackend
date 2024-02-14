@@ -124,10 +124,10 @@ class AEUserJoinedWorkspace(AnalyticsEvent):
 
 
 @frozen
-class AESecurityTierUpdated(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_security_tier_updated"
+class AEProductTierUpdated(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_product_tier_updated"
     workspace_id: WorkspaceId
-    security_tier: str
+    product_tier: str
 
 
 @frozen
@@ -154,5 +154,5 @@ class AEFailingBenchmarkChecksAlertSend(AnalyticsEvent):
 class AEBillingEntryCreated(AnalyticsEvent):
     kind: ClassVar[str] = "fix_billing_entry_created"
     workspace_id: WorkspaceId
-    security_tier: str
+    product_tier: str
     usage: int

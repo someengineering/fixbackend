@@ -26,7 +26,7 @@ from typing import Dict, Any, List, Tuple
 from attr import evolve
 
 from fixbackend.auth.models import User
-from fixbackend.ids import SecurityTier
+from fixbackend.ids import ProductTier
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -69,16 +69,16 @@ async def test_create_billing_entry(
     }
     # factories to create metering records
     mr1free = partial(
-        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.Free
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
     )
-    mr1high = partial(
-        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
+    mr1enterprise = partial(
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Enterprise
     )
 
-    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", security_tier=SecurityTier.Free)
+    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", product_tier=ProductTier.Free)
     # create 3 metering records for acc1 and acc2, each with more than 100 resource collected
     await metering_repository.add(
-        [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
+        [mr1free(), mr1free(), mr1free(), mr1enterprise(), mr1enterprise(), mr1enterprise(), mr2(), mr2(), mr2()]
     )
     # create billing entry
     billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
@@ -87,7 +87,7 @@ async def test_create_billing_entry(
     assert billing.period_end == datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.nr_of_accounts_charged == 2
     assert billing.reported is False
-    assert billing.tier == SecurityTier.HighSecurity
+    assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 1
     assert len(boto_requests) == 0
@@ -96,7 +96,7 @@ async def test_create_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "HighSecurityAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
@@ -122,13 +122,13 @@ async def test_create_daily_billing_entry(
     }
     # factories to create metering records
     mr1free = partial(
-        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.Free
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
     )
     mr1high = partial(
-        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Enterprise
     )
 
-    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", security_tier=SecurityTier.Free)
+    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", product_tier=ProductTier.Free)
     # create 3 metering records for acc1 and acc2, each with more than 100 resource collected
     await metering_repository.add(
         [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
@@ -140,7 +140,7 @@ async def test_create_daily_billing_entry(
     assert billing.period_end == datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.nr_of_accounts_charged == 2
     assert billing.reported is False
-    assert billing.tier == SecurityTier.HighSecurity
+    assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 1
     assert len(boto_requests) == 0
@@ -149,7 +149,7 @@ async def test_create_daily_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "HighSecurityAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
@@ -172,10 +172,10 @@ async def test_create_free_tier_billing_entry(
     }
     # factories to create metering records
     mr1free = partial(
-        create_metering_record, workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.Free
+        create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
     )
 
-    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", security_tier=SecurityTier.Free)
+    mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", product_tier=ProductTier.Free)
     # create 3 metering records for acc1 and acc2, all with free tiers
     await metering_repository.add([mr1free(), mr1free(), mr1free(), mr2(), mr2(), mr2()])
     # billing entry is not created for free tier accounts because we have a job that reports dummy zero usage for such cases

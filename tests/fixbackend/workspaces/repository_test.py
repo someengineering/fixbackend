@@ -18,7 +18,7 @@ import pytest
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
-from fixbackend.ids import WorkspaceId, UserId, SecurityTier
+from fixbackend.ids import WorkspaceId, UserId, ProductTier
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -49,7 +49,7 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
     for owner in organization.owners:
         assert owner == user.id
 
-    assert organization.security_tier == SecurityTier.Free
+    assert organization.product_tier == ProductTier.Free
 
     assert len(organization.members) == 0
 
@@ -151,13 +151,13 @@ async def test_update_security_tier(
     workspace: Workspace,
     subscription: AwsMarketplaceSubscription,
 ) -> None:
-    current_tier = workspace.security_tier
-    assert current_tier == SecurityTier.Free
+    current_tier = workspace.product_tier
+    assert current_tier == ProductTier.Free
 
-    updated = await workspace_repository.update_security_tier(user, workspace.id, SecurityTier.HighSecurity)
-    assert updated.security_tier == SecurityTier.HighSecurity
+    updated = await workspace_repository.update_security_tier(user, workspace.id, ProductTier.Enterprise)
+    assert updated.product_tier == ProductTier.Enterprise
 
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace("not_subscribed", "not_subscribed", user)
     with pytest.raises(Exception):
-        await workspace_repository.update_security_tier(user, without_subscription.id, SecurityTier.HighSecurity)
+        await workspace_repository.update_security_tier(user, without_subscription.id, ProductTier.Enterprise)

@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import Dict, Any, List, Tuple
-from fixbackend.ids import SecurityTier
+from fixbackend.ids import ProductTier
 
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.subscription.billing import BillingService
@@ -23,9 +23,7 @@ async def test_report_usage(
     assert len([n async for n in subscription_repository.unreported_billing_entries()]) == 0
     await metering_repository.add(
         [
-            create_metering_record(
-                workspace_id=workspace.id, account_id="acc1", security_tier=SecurityTier.HighSecurity
-            )
+            create_metering_record(workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Enterprise)
             for _ in range(4)
         ]
     )

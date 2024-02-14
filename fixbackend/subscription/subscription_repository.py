@@ -32,7 +32,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import SecurityTier, WorkspaceId, UserId, SubscriptionId, BillingId
+from fixbackend.ids import ProductTier, WorkspaceId, UserId, SubscriptionId, BillingId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
 from fixbackend.types import AsyncSessionMaker
@@ -97,7 +97,7 @@ class BillingEntity(CreatedUpdatedMixin, Base):
             id=self.id,
             workspace_id=self.workspace_id,
             subscription_id=self.subscription_id,
-            tier=SecurityTier(self.tier),
+            tier=ProductTier(self.tier),
             nr_of_accounts_charged=self.nr_of_accounts_charged,
             period_start=self.period_start,
             period_end=self.period_end,
@@ -204,7 +204,7 @@ class SubscriptionRepository:
         self,
         sid: SubscriptionId,
         workspace_id: WorkspaceId,
-        tier: SecurityTier,
+        tier: ProductTier,
         nr_of_accounts_charged: int,
         last_charge_timestamp: datetime,
         now: datetime,

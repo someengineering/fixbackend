@@ -14,7 +14,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urlparse, parse_qs, urlencode
 from fastapi_users.authentication.authenticator import Authenticator
 
 import jwt
@@ -269,9 +269,13 @@ def get_oauth_associate_router(
     ) -> Response:
         token, state = access_token_state
 
-        def redirect_to_root() -> Response:
+        def redirect_with_error(url: str, error: str) -> Response:
             response = Response()
-            response.headers["location"] = "/"
+            parsed = urlparse(url)
+            existing_params = parse_qs(parsed.query)
+            error_params = {"oauth_associate_error": [error]}
+            existing_params.update(error_params)
+            response.headers["location"] = parsed._replace(query=urlencode(existing_params, doseq=True)).geturl()
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
 
@@ -279,7 +283,13 @@ def get_oauth_associate_router(
             state_data = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
             log.info(f"OAuth callback: invalid state token: {state}, {ex}")
-            return redirect_to_root()
+            return redirect_with_error("/", "invalid_state_token")
+
+        redirect_url = state_data.get("redirect_url", "/")
+
+        if account_email is None:
+            log.info("OAuth callback: no email address returned by OAuth provider")
+            return redirect_with_error(redirect_url, "no_email_returned_by_provider")
 
         account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
@@ -288,7 +298,7 @@ def get_oauth_associate_router(
             return redirect_to_root()
 
         if state_data.get("sub") != str(user.id):
-            return redirect_to_root()
+            return redirect_with_error(redirect_url, "invalid_user")
 
         try:
             user = await user_manager.oauth_associate_callback(
@@ -303,7 +313,7 @@ def get_oauth_associate_router(
             )
         except UserAlreadyExists:
             log.info(f"OAuth callback: user already exists: {account_email}, {state}")
-            # ignore the error and redirect to the redirect_url
+            return redirect_with_error(redirect_url, "account_already_associated")
 
         # replace the redirect url with the one from the JWT token
         response = Response(status_code=status.HTTP_303_SEE_OTHER)
