@@ -177,6 +177,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
             member_relationship = orm.OrganizationMembers(user_id=user_id, organization_id=workspace_id)
             session.add(member_relationship)
+            await self.role_repository.add_roles(user_id, workspace_id, RoleName.workspace_member, session=session)
             try:
                 await session.commit()
             except IntegrityError:
