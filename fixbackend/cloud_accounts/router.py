@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import WorkspacePermission
-from fixbackend.auth.permission_checker import WorkspacePermissionChecker
+from fixbackend.permissions.models import WorkspacePermission
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (

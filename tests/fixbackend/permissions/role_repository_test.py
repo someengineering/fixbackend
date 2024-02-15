@@ -16,8 +16,9 @@
 import uuid
 import pytest
 
-from fixbackend.auth.models import RoleName, User
-from fixbackend.auth.role_repository import RoleRepositoryImpl
+from fixbackend.auth.models import User
+from fixbackend.permissions.models import RoleName
+from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.models import Workspace
 

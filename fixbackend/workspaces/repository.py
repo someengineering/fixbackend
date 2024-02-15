@@ -24,8 +24,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fixbackend.auth.models import RoleName, User
-from fixbackend.auth.role_repository import RoleRepository
+from fixbackend.auth.models import User
+from fixbackend.permissions.models import RoleName
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher

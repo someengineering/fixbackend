@@ -18,8 +18,8 @@ from typing import List
 from fastapi import APIRouter, Depends
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import WorkspacePermission
-from fixbackend.auth.permission_checker import WorkspacePermissionChecker
+from fixbackend.permissions.models import WorkspacePermission
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.billing_information import schemas
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods
 from fixbackend.billing_information.schemas import (

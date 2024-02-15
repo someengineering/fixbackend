@@ -18,13 +18,14 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.auth.models import RoleName, User, UserRoles
+from fixbackend.permissions.models import RoleName, UserRole
+from fixbackend.auth.models import User
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
-from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, UserRoleId, WorkspaceId
+from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
 from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
@@ -47,7 +48,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
-    roles=[UserRoles(UserRoleId(uuid.uuid4()), user_id, workspace_id, RoleName.workspace_billing)],
+    roles=[UserRole(user_id, workspace_id, RoleName.workspace_billing_admin)],
 )
 
 now = utc().replace(microsecond=0)

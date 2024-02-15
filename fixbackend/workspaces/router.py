@@ -19,8 +19,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import User, WorkspacePermission
-from fixbackend.auth.permission_checker import WorkspacePermissionChecker
+from fixbackend.auth.models import User
+from fixbackend.permissions.models import WorkspacePermission
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
