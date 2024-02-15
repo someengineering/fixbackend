@@ -35,12 +35,15 @@ class WorkspacePermission(IntFlag):
     read_settings = 2**6
     update_settings = 2**7
     update_cloud_accounts = 2**8
+    read_billing = 2**9
+    update_billing = 2**10
 
 
 class RoleName(IntFlag):
     workspace_member = 2**0
     workspace_admin = 2**1
     workspace_owner = 2**2
+    workspace_billing = 2**3
 
 
 workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
@@ -53,12 +56,16 @@ workspace_admin_permissions = (
     | WorkspacePermission.update_settings
     | WorkspacePermission.update_cloud_accounts
 )
-workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
+workspace_billing_permissions = (
+    workspace_member_permissions | WorkspacePermission.read_billing | WorkspacePermission.update_billing
+)
+workspace_owner_permissions = workspace_admin_permissions | workspace_billing_permissions | WorkspacePermission.delete
 
 roles_to_permissions: Dict[RoleName, WorkspacePermission] = {
     RoleName.workspace_member: workspace_member_permissions,
     RoleName.workspace_admin: workspace_admin_permissions,
     RoleName.workspace_owner: workspace_owner_permissions,
+    RoleName.workspace_billing: workspace_billing_permissions,
 }
 
 

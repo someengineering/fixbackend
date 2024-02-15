@@ -18,13 +18,13 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.auth.models import User
+from fixbackend.auth.models import RoleName, User, UserRoles
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
-from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
+from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, UserRoleId, WorkspaceId
 from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
@@ -47,7 +47,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
-    roles=[],
+    roles=[UserRoles(UserRoleId(uuid.uuid4()), user_id, workspace_id, RoleName.workspace_billing)],
 )
 
 now = utc().replace(microsecond=0)
@@ -147,7 +147,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 
 @pytest.mark.asyncio
 async def test_list_billing_entries(client: AsyncClient) -> None:
-    response = await client.get("/api/workspaces/{workspace_id}/billing_entries/")
+    response = await client.get(f"/api/workspaces/{workspace_id}/billing_entries/")
     assert response.status_code == 200
     assert len(response.json()) == 1
     json_billing_entry = response.json()[0]
