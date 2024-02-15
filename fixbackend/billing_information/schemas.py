@@ -62,7 +62,7 @@ PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 
 
 class ProductTierRead(str, Enum):
-    Free = "Free"
+    Free = "free"  # todo: change to "Free" once the FE is updated
     Plus = "Plus"
     Business = "Business"
     Enterprise = "Enterprise"

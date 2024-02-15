@@ -176,7 +176,7 @@ async def test_get_billing(client: AsyncClient) -> None:
         },
         {"method": "none"},
     ]
-    assert response.json().get("product_tier") == "Free"
+    assert response.json().get("product_tier") == "free"
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_update_billing(client: AsyncClient) -> None:
                 "method": "aws_marketplace",
                 "subscription_id": str(sub_id),
             },
-            "product_tier": "Free",
+            "product_tier": "free",
         },
     )
 
@@ -200,7 +200,7 @@ async def test_update_billing(client: AsyncClient) -> None:
         "method": "aws_marketplace",
         "subscription_id": str(sub_id),
     }
-    assert json.get("product_tier") == "Free"
+    assert json.get("product_tier") == "free"
 
 
 @pytest.mark.asyncio
