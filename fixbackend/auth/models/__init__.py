@@ -32,6 +32,9 @@ class WorkspacePermission(IntFlag):
     delete = 2**3
     invite_to = 2**4
     remove_from = 2**5
+    read_settings = 2**6
+    update_settings = 2**7
+    update_cloud_accounts = 2**8
 
 
 class RoleName(IntFlag):
@@ -46,6 +49,9 @@ workspace_admin_permissions = (
     | WorkspacePermission.invite_to
     | WorkspacePermission.remove_from
     | WorkspacePermission.update
+    | WorkspacePermission.read_settings
+    | WorkspacePermission.update_settings
+    | WorkspacePermission.update_cloud_accounts
 )
 workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
 
@@ -80,6 +86,7 @@ class OAuthAccount(OAuthAccountProtocol[UUID]):
     refresh_token: Optional[str]
     account_id: str
     account_email: str
+    username: Optional[str]
 
 
 @frozen

@@ -18,7 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router.oauth import generate_state_token
-from httpx_oauth.clients.github import GitHubOAuth2
+from fixbackend.auth.oauth_clients import GithubOauthClient
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 from starlette.routing import Route
@@ -63,7 +63,7 @@ async def get_associate_url(
     return await client.get_authorization_url(callback_url, state)
 
 
-def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitHubOAuth2) -> APIRouter:
+def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GithubOauthClient) -> APIRouter:
     router = APIRouter()
 
     auth_backend = get_auth_backend(config)
@@ -212,7 +212,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GitH
                 OAuthProviderAssociateUrl(
                     name=oauth_account.oauth_name,
                     associated=True,
-                    account_email=oauth_account.account_email,
+                    account_email=oauth_account.username or oauth_account.account_email,
                     account_id=oauth_account.id,
                     authUrl=auth_url,
                 )
