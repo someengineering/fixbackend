@@ -67,5 +67,12 @@ class ProductTier(str, Enum):
 
 
 _product_tier_order = defaultdict(
-    lambda: 0, {ProductTier.Free: 1, ProductTier.Plus: 2, ProductTier.Business: 3, ProductTier.Enterprise: 4}
+    lambda: 0,
+    {
+        ProductTier.Trial: 0,
+        ProductTier.Free: 1,
+        ProductTier.Plus: 2,
+        ProductTier.Business: 3,
+        ProductTier.Enterprise: 4,
+    },
 )
