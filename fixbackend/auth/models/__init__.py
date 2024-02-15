@@ -46,9 +46,26 @@ class RoleName(IntFlag):
     workspace_billing = 2**3
 
 
-workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
+# todo: remove giving members all permissions after FE supports them.
+workspace_member_permissions = (
+    WorkspacePermission.create
+    | WorkspacePermission.read
+    | WorkspacePermission.update
+    | WorkspacePermission.delete
+    | WorkspacePermission.invite_to
+    | WorkspacePermission.remove_from
+    | WorkspacePermission.read_settings
+    | WorkspacePermission.update_settings
+    | WorkspacePermission.update_cloud_accounts
+    | WorkspacePermission.read_billing
+    | WorkspacePermission.update_billing
+)
+
+# workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
+workspace_billing_permissions = WorkspacePermission.read_billing | WorkspacePermission.update_billing
 workspace_admin_permissions = (
     workspace_member_permissions
+    | workspace_billing_permissions
     | WorkspacePermission.invite_to
     | WorkspacePermission.remove_from
     | WorkspacePermission.update
@@ -56,10 +73,7 @@ workspace_admin_permissions = (
     | WorkspacePermission.update_settings
     | WorkspacePermission.update_cloud_accounts
 )
-workspace_billing_permissions = (
-    workspace_member_permissions | WorkspacePermission.read_billing | WorkspacePermission.update_billing
-)
-workspace_owner_permissions = workspace_admin_permissions | workspace_billing_permissions | WorkspacePermission.delete
+workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
 
 roles_to_permissions: Dict[RoleName, WorkspacePermission] = {
     RoleName.workspace_member: workspace_member_permissions,
