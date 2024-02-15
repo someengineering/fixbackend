@@ -24,12 +24,12 @@ from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
 from fastapi_users.jwt import SecretType, decode_jwt, generate_jwt
 from fastapi_users.router.common import ErrorCode, ErrorModel
-from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallback
 from httpx_oauth.oauth2 import BaseOAuth2, OAuth2Token
 from pydantic import BaseModel
 from fixbackend.auth.models import User
+from fixbackend.auth.oauth_clients import GithubOauthClient
 from fixbackend.auth.schemas import UserRead
 
 from fixbackend.auth.user_manager import UserManagerDependency
@@ -43,8 +43,8 @@ def google_client(config: Config) -> GoogleOAuth2:
     return GoogleOAuth2(config.google_oauth_client_id, config.google_oauth_client_secret)
 
 
-def github_client(config: Config) -> GitHubOAuth2:
-    return GitHubOAuth2(config.github_oauth_client_id, config.github_oauth_client_secret)
+def github_client(config: Config) -> GithubOauthClient:
+    return GithubOauthClient(config.github_oauth_client_id, config.github_oauth_client_secret)
 
 
 STATE_TOKEN_AUDIENCE = "fastapi-users:oauth-state"
@@ -137,6 +137,12 @@ def get_oauth_router(
         strategy: Strategy[models.UP, models.ID] = Depends(backend.get_strategy),
     ) -> Response:
         token, state = access_token_state
+        match oauth_client:
+            case GithubOauthClient():
+                account_id, account_email, username = await oauth_client.get_id_email_username(token["access_token"])
+            case _:
+                account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+                username = None
 
         def redirect_to_root() -> Response:
             response = Response()
@@ -167,6 +173,7 @@ def get_oauth_router(
                 request,
                 associate_by_email=associate_by_email,
                 is_verified_by_default=is_verified_by_default,
+                username=username,
             )
         except UserAlreadyExists:
             log.info(f"OAuth callback: user already exists: {account_email}, {state}")
@@ -269,6 +276,12 @@ def get_oauth_associate_router(
     ) -> Response:
         token, state = access_token_state
 
+        match oauth_client:
+            case GithubOauthClient():
+                account_id, account_email, username = await oauth_client.get_id_email_username(token["access_token"])
+            case _:
+                username = None
+
         def redirect_with_error(url: str, error: str) -> Response:
             response = Response()
             parsed = urlparse(url)
@@ -306,6 +319,7 @@ def get_oauth_associate_router(
                 token.get("expires_at"),
                 token.get("refresh_token"),
                 request,
+                username=username,
             )
         except UserAlreadyExists:
             log.info(f"OAuth callback: user already exists: {account_email}, {state}")

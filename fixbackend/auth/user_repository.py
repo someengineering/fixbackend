@@ -106,8 +106,6 @@ class UserRepository(BaseUserDatabase[User, UserId]):
         """Create an OAuth account and add it to the user."""
 
         async with self.user_db() as db:
-            if db.oauth_account_table is None:
-                raise NotImplementedError()
 
             orm_user = await db.session.get(orm.User, user.id)
             if orm_user is None:
@@ -121,14 +119,14 @@ class UserRepository(BaseUserDatabase[User, UserId]):
                     # this oauth account is already linked to another user, do not let this happen
                     raise UserAlreadyExists(f"Account {create_dict['account_id']} already linked to another user")
 
-            oauth_account = db.oauth_account_table(**create_dict)
+            oauth_account = orm.OAuthAccount(**create_dict)
             db.session.add(oauth_account)
 
             if existing_account:
                 # remove the old oauth association
                 await db.session.delete(existing_account)
 
-            orm_user.oauth_accounts.append(oauth_account)  # type: ignore
+            orm_user.oauth_accounts.append(oauth_account)
             db.session.add(orm_user)
             await db.session.commit()
             await db.session.refresh(orm_user)

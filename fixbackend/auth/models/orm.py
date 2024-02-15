@@ -13,10 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import List
+from typing import List, Optional
 
-from fastapi_users_db_sqlalchemy import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
-from sqlalchemy.orm import Mapped, relationship
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
 from fixbackend.base_model import Base
@@ -24,6 +25,9 @@ from fixbackend.ids import UserId
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+
+    username: Mapped[Optional[str]] = mapped_column(String(length=320), nullable=True)
+
     def to_model(self) -> models.OAuthAccount:
         return models.OAuthAccount(
             id=self.id,
@@ -33,6 +37,7 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
             refresh_token=self.refresh_token,
             account_id=self.account_id,
             account_email=self.account_email,
+            username=self.username,
         )
 
     @staticmethod
