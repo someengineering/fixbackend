@@ -86,6 +86,7 @@ class OAuthAccount(OAuthAccountProtocol[UUID]):
     refresh_token: Optional[str]
     account_id: str
     account_email: str
+    username: Optional[str]
 
 
 @frozen
