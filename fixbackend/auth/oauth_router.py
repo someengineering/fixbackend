@@ -150,14 +150,16 @@ def get_oauth_router(
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
 
-        if account_email is None:
-            log.info("OAuth callback: no email address returned by OAuth provider")
-            return redirect_to_root()
-
         try:
             decoded_state = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
             log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return redirect_to_root()
+
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+
+        if account_email is None:
+            log.info("OAuth callback: no email address returned by OAuth provider")
             return redirect_to_root()
 
         try:
@@ -278,7 +280,6 @@ def get_oauth_associate_router(
             case GithubOauthClient():
                 account_id, account_email, username = await oauth_client.get_id_email_username(token["access_token"])
             case _:
-                account_id, account_email = await oauth_client.get_id_email(token["access_token"])
                 username = None
 
         def redirect_with_error(url: str, error: str) -> Response:
@@ -298,6 +299,8 @@ def get_oauth_associate_router(
             return redirect_with_error("/", "invalid_state_token")
 
         redirect_url = state_data.get("redirect_url", "/")
+
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
 
         if account_email is None:
             log.info("OAuth callback: no email address returned by OAuth provider")
