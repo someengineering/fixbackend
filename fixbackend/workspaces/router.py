@@ -179,11 +179,17 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
-        token: str, invitation_service: InvitationServiceDependency, request: Request
+        token: str, workspace_id: WorkspaceId, invitation_service: InvitationServiceDependency, request: Request
     ) -> Response:
         """Accept an invitation to the workspace."""
         invitation = await invitation_service.accept_invitation(token)
-        url = request.base_url.replace_query_params(message="invitation-accepted", workspace_id=invitation.workspace_id)
+        if invitation is None:
+            message = "invitation-not-found"
+        else:
+            message = "invitation-accepted"
+            workspace_id = invitation.workspace_id
+
+        url = request.base_url.replace_query_params(message=message, workspace_id=workspace_id)
         return RedirectResponse(url)
 
     @router.get("/{workspace_id}/cf_url")
