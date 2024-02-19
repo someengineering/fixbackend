@@ -155,7 +155,7 @@ class NotificationService(Service):
                     changed = True
             if changed:
                 await self.workspace_alert_repo.set_alerting_for_workspace(alerting)
-            await self.provider_config_repo.delete_messaging_config_for_workspace(workspace_id, provider)
+        await self.provider_config_repo.delete_messaging_config_for_workspace(workspace_id, provider)
 
     async def update_notification_provider_config(
         self, workspace_id: WorkspaceId, provider: NotificationProvider, name: str, config: Json
