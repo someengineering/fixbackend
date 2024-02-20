@@ -99,6 +99,7 @@ class CloudAccountStates:
         state_name: ClassVar[str] = "configured"
         access: CloudAccess
         enabled: bool  # is enabled for collection
+        scan: bool  # is enabled for security scanning
 
         def cloud_access(self) -> Optional[CloudAccess]:
             return self.access

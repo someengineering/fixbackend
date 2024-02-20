@@ -251,7 +251,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         account_id=account_id,
         workspace_id=workspace_id,
         cloud=CloudNames.AWS,
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
         account_name=CloudAccountName("foo"),
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
@@ -322,7 +322,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         assert data["api_account_name"] == account.account_name
         assert data["user_account_name"] == account.user_account_name
 
-    configured_state = CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+    configured_state = CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True)
 
     recent = add_account(utc(), configured_state)
     added = add_account(utc() - timedelta(days=2), configured_state)
@@ -366,7 +366,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         account_id=account_id,
         cloud=CloudNames.AWS,
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
         account_name=CloudAccountName("foo"),
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
@@ -413,7 +413,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         workspace_id=workspace_id,
         account_id=account_id,
         cloud=CloudNames.AWS,
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True),
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
         account_name=CloudAccountName("foo"),
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),

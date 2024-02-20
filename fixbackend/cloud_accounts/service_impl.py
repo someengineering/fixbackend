@@ -50,6 +50,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDegraded,
     CloudAccountNameChanged,
     CloudAccountActiveToggled,
+    CloudAccountScanToggled,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
@@ -459,7 +460,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             if isinstance(cloud_account.state, CloudAccountStates.Discovered):
                 return evolve(
                     cloud_account,
-                    state=CloudAccountStates.Configured(access, True),
+                    state=CloudAccountStates.Configured(access, True, True),
                     privileged=privileged,
                     state_updated_at=utc(),
                 )
@@ -666,8 +667,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         def update_state(cloud_account: CloudAccount) -> CloudAccount:
             match cloud_account.state:
-                case CloudAccountStates.Configured(access, _):
-                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled))
+                case CloudAccountStates.Configured(access, _, scan):
+                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
                 case _:
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
@@ -677,6 +678,33 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 tenant_id=workspace_id, cloud_account_id=cloud_account_id, account_id=result.account_id, enabled=enabled
             )
         )
+        return result
+
+    async def update_cloud_account_scan(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, scan: bool
+    ) -> CloudAccount:
+        # make sure access is possible
+        await self.get_cloud_account(cloud_account_id, workspace_id)
+        event: Optional[CloudAccountScanToggled] = None
+
+        def update_state(cloud_account: CloudAccount) -> CloudAccount:
+            nonlocal event
+            match cloud_account.state:
+                case CloudAccountStates.Configured(access, enabled, _):
+                    event = CloudAccountScanToggled(
+                        tenant_id=workspace_id,
+                        cloud_account_id=cloud_account_id,
+                        account_id=result.account_id,
+                        enabled=enabled,
+                        scan=scan,
+                    )
+                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
+                case _:
+                    raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
+
+        result = await self.cloud_account_repository.update(cloud_account_id, update_state)
+        if event:
+            await self.domain_events.publish(event)
         return result
 
     async def disable_cloud_account(
@@ -690,7 +718,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         def update_state(cloud_account: CloudAccount) -> CloudAccount:
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _):
-                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, False))
+                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, False, False))
                 case _:
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 

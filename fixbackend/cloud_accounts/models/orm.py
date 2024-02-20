@@ -63,6 +63,7 @@ class CloudAccount(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     state_updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    scan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
     __mapper_args__ = {"version_id_col": version_id}  # for optimistic locking
@@ -84,7 +85,9 @@ class CloudAccount(Base):
             match self.state:
                 case None:  # backwards compatibility when we didn't have a state
                     if self.is_configured:
-                        return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled)
+                        return models.CloudAccountStates.Configured(
+                            access=access(), enabled=self.enabled, scan=self.scan
+                        )
                     return models.CloudAccountStates.Discovered(access=access())
 
                 case models.CloudAccountStates.Detected.state_name:
@@ -92,7 +95,7 @@ class CloudAccount(Base):
                 case models.CloudAccountStates.Discovered.state_name:
                     return models.CloudAccountStates.Discovered(access=access())
                 case models.CloudAccountStates.Configured.state_name:
-                    return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled)
+                    return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled, scan=self.scan)
                 case models.CloudAccountStates.Degraded.state_name:
                     if self.error is None:
                         raise ValueError("Degraded account must have an error")

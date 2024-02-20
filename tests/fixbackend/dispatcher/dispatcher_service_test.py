@@ -78,6 +78,7 @@ async def test_receive_workspace_created(
                     AwsRoleName("test"),
                 ),
                 enabled=True,
+                scan=True,
             ),
             account_alias=CloudAccountAlias("foo_alias"),
             user_account_name=UserCloudAccountName("foo_user"),
@@ -120,7 +121,9 @@ async def test_receive_aws_account_configured(
         account_id=aws_account_id,
         cloud=CloudNames.AWS,
         account_name=CloudAccountName("foo"),
-        state=CloudAccountStates.Configured(AwsCloudAccess(workspace.external_id, AwsRoleName("test")), enabled=True),
+        state=CloudAccountStates.Configured(
+            AwsCloudAccess(workspace.external_id, AwsRoleName("test")), enabled=True, scan=True
+        ),
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
         privileged=False,
