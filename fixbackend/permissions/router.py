@@ -13,9 +13,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import List
-from fastapi import APIRouter
-from fixbackend.permissions.models import RoleName, UserRole
+from typing import Annotated, List
+from fastapi import APIRouter, Depends
+from fixbackend.permissions.models import RoleName, UserRole, WorkspacePermission
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.permissions.role_repository import RoleRepositoryDependency
 from fixbackend.permissions.schemas import UserRolesRead, UserRolesUpdate
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -26,7 +27,9 @@ def roles_router() -> APIRouter:
 
     @router.get("/{workspace_id}/roles")
     async def list_roles(
-        workspace: UserWorkspaceDependency, role_repository: RoleRepositoryDependency
+        workspace: UserWorkspaceDependency,
+        role_repository: RoleRepositoryDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_roles))],
     ) -> List[UserRolesRead]:
         roles = await role_repository.list_roles_by_workspace_id(workspace.id)
         workspace_users = workspace.all_users()
@@ -47,6 +50,7 @@ def roles_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         update: UserRolesUpdate,
         repository: RoleRepositoryDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_roles))],
     ) -> UserRolesRead:
         update_model = update.to_model(workspace.id)
         role = await repository.add_roles(update_model.user_id, workspace.id, update_model.role_names, replace=True)

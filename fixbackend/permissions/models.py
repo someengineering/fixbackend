@@ -33,6 +33,8 @@ class WorkspacePermission(IntFlag):
     update_cloud_accounts = 2**8
     read_billing = 2**9
     update_billing = 2**10
+    read_roles = 2**11
+    update_roles = 2**12
 
 
 class RoleName(IntFlag):
@@ -55,6 +57,8 @@ workspace_member_permissions = (
     | WorkspacePermission.update_cloud_accounts
     | WorkspacePermission.read_billing
     | WorkspacePermission.update_billing
+    | WorkspacePermission.read_roles
+    | WorkspacePermission.update_roles
 )
 
 # workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
@@ -68,6 +72,8 @@ workspace_admin_permissions = (
     | WorkspacePermission.read_settings
     | WorkspacePermission.update_settings
     | WorkspacePermission.update_cloud_accounts
+    | WorkspacePermission.read_roles
+    | WorkspacePermission.update_roles
 )
 workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
 
