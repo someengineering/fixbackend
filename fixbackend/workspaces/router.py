@@ -19,8 +19,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import User, WorkspacePermission
-from fixbackend.auth.permission_checker import WorkspacePermissionChecker
+from fixbackend.auth.models import User
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
@@ -61,7 +62,7 @@ def workspaces_router() -> APIRouter:
         workspace_id: WorkspaceId,
         user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read))],
     ) -> WorkspaceRead | None:
         """Get a workspace."""
         org = await workspace_repository.get_workspace(workspace_id)
@@ -76,7 +77,7 @@ def workspaces_router() -> APIRouter:
     @router.get("/{workspace_id}/settings")
     async def get_workspace_settings(
         workspace: UserWorkspaceDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read_settings))],
     ) -> WorkspaceSettingsRead:
         """Get a workspace."""
         return WorkspaceSettingsRead.from_model(workspace)
@@ -86,7 +87,7 @@ def workspaces_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         settings: WorkspaceSettingsUpdate,
         workspace_repository: WorkspaceRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> WorkspaceSettingsRead:
         """Update a workspace."""
         org = await workspace_repository.update_workspace(
@@ -116,7 +117,7 @@ def workspaces_router() -> APIRouter:
     async def list_invites(
         workspace: UserWorkspaceDependency,
         invitation_service: InvitationServiceDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read))],
     ) -> List[WorkspaceInviteRead]:
         invites = await invitation_service.list_invitations(workspace_id=workspace.id)
 
@@ -126,7 +127,7 @@ def workspaces_router() -> APIRouter:
     async def list_users(
         workspace: UserWorkspaceDependency,
         user_repository: UserRepositoryDependency,
-        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermission.read)),
+        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.read)),
     ) -> List[WorkspaceUserRead]:
         user_ids = workspace.all_users()
         users: List[Optional[User]] = await asyncio.gather(*[user_repository.get(user_id) for user_id in user_ids])
@@ -139,7 +140,7 @@ def workspaces_router() -> APIRouter:
         user_invite: UserInvite,
         invitation_service: InvitationServiceDependency,
         request: Request,
-        authorized: bool = Depends(WorkspacePermissionChecker(WorkspacePermission.invite_to)),
+        authorized: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.invite_to)),
     ) -> WorkspaceInviteRead:
         """Invite a user to the workspace."""
 
@@ -160,7 +161,7 @@ def workspaces_router() -> APIRouter:
         user_id: UserId,
         workspace_repository: WorkspaceRepositoryDependency,
         user_repository: UserRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.remove_from))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.remove_from))],
     ) -> None:
         """Delete a user from the workspace."""
         user = await user_repository.get(user_id)
@@ -173,7 +174,7 @@ def workspaces_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         invite_id: InvitationId,
         invitation_service: InvitationServiceDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update))],
     ) -> None:
         """Delete invite."""
         await invitation_service.revoke_invitation(invite_id)

@@ -11,32 +11,25 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU Affero General Public License for more details.
-#
-#  You should have received a copy of the GNU Affero General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import logging
 from datetime import datetime
-from typing import List, Optional, Annotated, Literal
+from typing import Annotated, List, Literal, Optional
 
-from fastapi import APIRouter, Query, Request, Depends, Form, Path, Body
-from fastapi.responses import StreamingResponse, JSONResponse, Response
+from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fixcloudutils.types import Json
 
 from fixbackend.dependencies import FixDependencies, FixDependency
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
 from fixbackend.inventory.schemas import (
-    ReportSummary,
-    SearchStartData,
     CompletePathRequest,
-    SearchRequest,
-    ReportConfig,
     HistoryChange,
+    ReportConfig,
+    ReportSummary,
+    SearchRequest,
+    SearchStartData,
 )
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency

@@ -20,20 +20,20 @@ from fastapi import Request, FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.models import UserRoles, RoleName, User, workspace_owner_permissions
-from fixbackend.auth.role_repository import RoleRepository, get_role_repository
+from fixbackend.auth.models import User
+from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
+from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
-from fixbackend.ids import InvitationId, UserRoleId, UserId, WorkspaceId
+from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
-import uuid
 
 
 class InMemoryVerifier(AuthEmailSender):
@@ -83,22 +83,33 @@ class InMemoryInvitationRepo(InvitationRepository):
 
 class InMemoryRoleRepository(RoleRepository):
     def __init__(self) -> None:
-        self.roles: List[UserRoles] = []
+        self.roles: List[UserRole] = []
 
     @override
-    async def list_roles(self, user_id: UserId) -> List[UserRoles]:
+    async def list_roles(self, user_id: UserId) -> List[UserRole]:
+        return self.roles
+
+    @override
+    async def list_roles_by_workspace_id(self, workspace_id: WorkspaceId) -> List[UserRole]:
         return self.roles
 
     @override
     async def add_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
-    ) -> None:
-        pass
-        self.roles.append(UserRoles(UserRoleId(uuid.uuid4()), user_id, workspace_id, roles))
+        self,
+        user_id: UserId,
+        workspace_id: WorkspaceId,
+        roles: Roles,
+        *,
+        session: Optional[AsyncSession] = None,
+        replace_existing: bool = False,
+    ) -> UserRole:
+        role = UserRole(user_id, workspace_id, roles)
+        self.roles.append(role)
+        return role
 
     @override
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
         pass
 
@@ -154,7 +165,7 @@ async def test_registration_flow(
     workspaces = await workspace_repository.list_workspaces(user.id)
     assert len(workspaces) == 1
     workspace = workspaces[0]
-    await role_repo.add_roles(user.id, workspace.id, RoleName.workspace_owner)
+    await role_repo.add_roles(user.id, workspace.id, Roles.workspace_owner)
 
     # verified can login
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
