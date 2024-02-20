@@ -21,7 +21,7 @@ from fixcloudutils.types import Json
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.permissions.models import WorkspacePermission
+from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
@@ -43,7 +43,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     @router.get("/{workspace_id}/notifications")
     async def notifications(
         workspace_id: WorkspaceId,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read_settings))],
     ) -> Dict[str, Json]:
         set_workspace_id(workspace_id)
         return await fix.service(
@@ -124,7 +124,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
         request: Request,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read_settings))],
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info(f"User {user.id} in workspace {workspace_id} wants to integrate slack notifications")
@@ -191,7 +191,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
         request: Request,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info("Add discord notifications requested.")
@@ -209,7 +209,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_pagerduty(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
         name: str = Query(),
         integration_key: str = Query(),
     ) -> Response:
@@ -227,7 +227,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_teams(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
         name: str = Query(),
         webhook_url: str = Query(),
     ) -> Response:
@@ -245,7 +245,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_email(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
         name: str = Query(),
         email: List[str] = Query(),
     ) -> Response:
@@ -269,7 +269,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def update_alerting_for(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
         setting: Dict[BenchmarkName, AlertingSetting] = Body(),
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
@@ -285,7 +285,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         _: AuthenticatedUser,
         workspace_id: WorkspaceId,
         channel: NotificationProvider,
-        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)
@@ -297,7 +297,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         _: AuthenticatedUser,
         workspace_id: WorkspaceId,
         channel: NotificationProvider,
-        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_settings))],
+        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)

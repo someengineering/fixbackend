@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.workspaces.dependencies import get_user_workspace
-from fixbackend.permissions.models import RoleName, UserRole
+from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
@@ -44,7 +44,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
-    roles=[UserRole(user_id, ws_id, RoleName.workspace_owner)],
+    roles=[UserRole(user_id, ws_id, Roles.workspace_owner)],
 )
 workspace = Workspace(
     id=ws_id,

@@ -26,7 +26,7 @@ from fixbackend.ids import UserRoleId, UserId, WorkspaceId
 from sqlalchemy import Integer, ForeignKey, UniqueConstraint, select, update
 from sqlalchemy.orm import Mapped, mapped_column
 
-from fixbackend.permissions.models import WorkspacePermission, UserRole, RoleName, roles_to_permissions
+from fixbackend.permissions.models import WorkspacePermissions, UserRole, Roles, roles_to_permissions
 from fixbackend.base_model import Base
 
 from fixbackend.types import AsyncSessionMaker
@@ -46,7 +46,7 @@ class UserRoleAssignmentEntity(Base):
         return UserRole(
             user_id=self.user_id,
             workspace_id=self.workspace_id,
-            role_names=RoleName(self.role_names),
+            role_names=Roles(self.role_names),
         )
 
     @staticmethod
@@ -73,7 +73,7 @@ class RoleRepository(ABC):
         self,
         user_id: UserId,
         workspace_id: WorkspaceId,
-        roles: RoleName,
+        roles: Roles,
         *,
         session: Optional[AsyncSession] = None,
         replace_existing: bool = False
@@ -82,7 +82,7 @@ class RoleRepository(ABC):
 
     @abstractmethod
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
         pass
 
@@ -90,7 +90,7 @@ class RoleRepository(ABC):
 class RoleRepositoryImpl(RoleRepository):
 
     def __init__(
-        self, session_maker: AsyncSessionMaker, permissions_dict: Dict[RoleName, WorkspacePermission] | None = None
+        self, session_maker: AsyncSessionMaker, permissions_dict: Dict[Roles, WorkspacePermissions] | None = None
     ) -> None:
         self.session_maker = session_maker
         if permissions_dict is None:
@@ -116,7 +116,7 @@ class RoleRepositoryImpl(RoleRepository):
         self,
         user_id: UserId,
         workspace_id: WorkspaceId,
-        roles: RoleName,
+        roles: Roles,
         *,
         session: Optional[AsyncSession] = None,
         replace_existing: bool = False
@@ -163,7 +163,7 @@ class RoleRepositoryImpl(RoleRepository):
 
     @override
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
 
         async def do_tx(session: AsyncSession) -> None:

@@ -21,7 +21,7 @@ from attrs import frozen
 
 
 # do not change the int
-class WorkspacePermission(IntFlag):
+class WorkspacePermissions(IntFlag):
     create = 2**0
     read = 2**1
     update = 2**2
@@ -37,7 +37,7 @@ class WorkspacePermission(IntFlag):
     update_roles = 2**12
 
 
-class RoleName(IntFlag):
+class Roles(IntFlag):
     workspace_member = 2**0
     workspace_admin = 2**1
     workspace_owner = 2**2
@@ -46,42 +46,42 @@ class RoleName(IntFlag):
 
 # todo: remove giving members all permissions after FE supports them.
 workspace_member_permissions = (
-    WorkspacePermission.create
-    | WorkspacePermission.read
-    | WorkspacePermission.update
-    | WorkspacePermission.delete
-    | WorkspacePermission.invite_to
-    | WorkspacePermission.remove_from
-    | WorkspacePermission.read_settings
-    | WorkspacePermission.update_settings
-    | WorkspacePermission.update_cloud_accounts
-    | WorkspacePermission.read_billing
-    | WorkspacePermission.update_billing
-    | WorkspacePermission.read_roles
-    | WorkspacePermission.update_roles
+    WorkspacePermissions.create
+    | WorkspacePermissions.read
+    | WorkspacePermissions.update
+    | WorkspacePermissions.delete
+    | WorkspacePermissions.invite_to
+    | WorkspacePermissions.remove_from
+    | WorkspacePermissions.read_settings
+    | WorkspacePermissions.update_settings
+    | WorkspacePermissions.update_cloud_accounts
+    | WorkspacePermissions.read_billing
+    | WorkspacePermissions.update_billing
+    | WorkspacePermissions.read_roles
+    | WorkspacePermissions.update_roles
 )
 
 # workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
-workspace_billing_admin_permissions = WorkspacePermission.read_billing | WorkspacePermission.update_billing
+workspace_billing_admin_permissions = WorkspacePermissions.read_billing | WorkspacePermissions.update_billing
 workspace_admin_permissions = (
     workspace_member_permissions
     | workspace_billing_admin_permissions
-    | WorkspacePermission.invite_to
-    | WorkspacePermission.remove_from
-    | WorkspacePermission.update
-    | WorkspacePermission.read_settings
-    | WorkspacePermission.update_settings
-    | WorkspacePermission.update_cloud_accounts
-    | WorkspacePermission.read_roles
-    | WorkspacePermission.update_roles
+    | WorkspacePermissions.invite_to
+    | WorkspacePermissions.remove_from
+    | WorkspacePermissions.update
+    | WorkspacePermissions.read_settings
+    | WorkspacePermissions.update_settings
+    | WorkspacePermissions.update_cloud_accounts
+    | WorkspacePermissions.read_roles
+    | WorkspacePermissions.update_roles
 )
-workspace_owner_permissions = workspace_admin_permissions | WorkspacePermission.delete
+workspace_owner_permissions = workspace_admin_permissions | WorkspacePermissions.delete
 
-roles_to_permissions: Dict[RoleName, WorkspacePermission] = {
-    RoleName.workspace_member: workspace_member_permissions,
-    RoleName.workspace_admin: workspace_admin_permissions,
-    RoleName.workspace_owner: workspace_owner_permissions,
-    RoleName.workspace_billing_admin: workspace_billing_admin_permissions,
+roles_to_permissions: Dict[Roles, WorkspacePermissions] = {
+    Roles.workspace_member: workspace_member_permissions,
+    Roles.workspace_admin: workspace_admin_permissions,
+    Roles.workspace_owner: workspace_owner_permissions,
+    Roles.workspace_billing_admin: workspace_billing_admin_permissions,
 }
 
 
@@ -89,11 +89,11 @@ roles_to_permissions: Dict[RoleName, WorkspacePermission] = {
 class UserRole:
     user_id: UserId
     workspace_id: WorkspaceId
-    role_names: RoleName
+    role_names: Roles
 
-    def permissions(self) -> WorkspacePermission:
+    def permissions(self) -> WorkspacePermissions:
         return reduce(
             lambda x, y: x | y,
             [roles_to_permissions[role] for role in self.role_names],
-            WorkspacePermission(0),
+            WorkspacePermissions(0),
         )

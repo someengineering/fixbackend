@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from fixbackend.auth.models import User
-from fixbackend.permissions.models import RoleName
+from fixbackend.permissions.models import Roles
 from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
@@ -107,7 +107,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
-            await self.role_repository.add_roles(owner.id, workspace_id, RoleName.workspace_owner, session=session)
+            await self.role_repository.add_roles(owner.id, workspace_id, Roles.workspace_owner, session=session)
             await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
 
             await session.commit()
@@ -178,7 +178,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
             member_relationship = orm.OrganizationMembers(user_id=user_id, organization_id=workspace_id)
             session.add(member_relationship)
-            await self.role_repository.add_roles(user_id, workspace_id, RoleName.workspace_member, session=session)
+            await self.role_repository.add_roles(user_id, workspace_id, Roles.workspace_member, session=session)
             try:
                 await session.commit()
             except IntegrityError:

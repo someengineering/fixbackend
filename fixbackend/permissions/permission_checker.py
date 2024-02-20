@@ -16,7 +16,7 @@
 from typing import Annotated
 from fastapi import HTTPException, Path
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.permissions.models import WorkspacePermission
+from fixbackend.permissions.models import WorkspacePermissions
 
 from logging import getLogger
 from fixbackend.ids import WorkspaceId
@@ -26,7 +26,7 @@ log = getLogger(__name__)
 
 
 class WorkspacePermissionChecker:
-    def __init__(self, required_permissions: WorkspacePermission):
+    def __init__(self, required_permissions: WorkspacePermissions):
         self.required_permissions = required_permissions
 
     async def __call__(

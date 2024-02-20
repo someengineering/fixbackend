@@ -21,7 +21,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import User
-from fixbackend.permissions.models import UserRole, RoleName, workspace_owner_permissions
+from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
 from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.auth.auth_backend import session_cookie_name
@@ -98,7 +98,7 @@ class InMemoryRoleRepository(RoleRepository):
         self,
         user_id: UserId,
         workspace_id: WorkspaceId,
-        roles: RoleName,
+        roles: Roles,
         *,
         session: Optional[AsyncSession] = None,
         replace_existing: bool = False,
@@ -109,7 +109,7 @@ class InMemoryRoleRepository(RoleRepository):
 
     @override
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
         pass
 
@@ -165,7 +165,7 @@ async def test_registration_flow(
     workspaces = await workspace_repository.list_workspaces(user.id)
     assert len(workspaces) == 1
     workspace = workspaces[0]
-    await role_repo.add_roles(user.id, workspace.id, RoleName.workspace_owner)
+    await role_repo.add_roles(user.id, workspace.id, Roles.workspace_owner)
 
     # verified can login
     response = await api_client.post("/api/auth/jwt/login", data=login_json)

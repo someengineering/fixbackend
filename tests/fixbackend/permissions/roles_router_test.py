@@ -25,7 +25,7 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
-from fixbackend.permissions.models import RoleName, UserRole
+from fixbackend.permissions.models import Roles, UserRole
 
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
@@ -46,7 +46,7 @@ async def client(
 ) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
 
-    admin_user = evolve(user, roles=[UserRole(user.id, workspace.id, role_names=RoleName.workspace_admin)])
+    admin_user = evolve(user, roles=[UserRole(user.id, workspace.id, role_names=Roles.workspace_admin)])
 
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config

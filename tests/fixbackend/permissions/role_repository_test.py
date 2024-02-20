@@ -17,7 +17,7 @@ import uuid
 import pytest
 
 from fixbackend.auth.models import User
-from fixbackend.permissions.models import RoleName
+from fixbackend.permissions.models import Roles
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.models import Workspace
@@ -33,43 +33,43 @@ async def test_role_repository(async_session_maker: AsyncSessionMaker, user: Use
     workspace_id_2 = WorkspaceId(uuid.uuid4())
 
     # owner by default
-    assert (await role_repository.list_roles(user.id))[0].role_names == RoleName.workspace_owner
+    assert (await role_repository.list_roles(user.id))[0].role_names == Roles.workspace_owner
 
     # adding roles works
-    await role_repository.add_roles(user.id, workspace.id, RoleName.workspace_member)
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_member)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 1
-    assert roles[0].role_names == RoleName.workspace_member | RoleName.workspace_owner
+    assert roles[0].role_names == Roles.workspace_member | Roles.workspace_owner
 
     # adding roles twice is idempotent
-    await role_repository.add_roles(user.id, workspace.id, RoleName.workspace_member)
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_member)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 1
-    assert roles[0].role_names == RoleName.workspace_member | RoleName.workspace_owner
+    assert roles[0].role_names == Roles.workspace_member | Roles.workspace_owner
 
     # adding multiple roles works
-    await role_repository.add_roles(user.id, workspace.id, RoleName.workspace_admin)
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_admin)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 1
-    assert roles[0].role_names == RoleName.workspace_admin | RoleName.workspace_member | RoleName.workspace_owner
+    assert roles[0].role_names == Roles.workspace_admin | Roles.workspace_member | Roles.workspace_owner
 
     # removing roles works
-    await role_repository.remove_roles(user.id, workspace.id, RoleName.workspace_member)
+    await role_repository.remove_roles(user.id, workspace.id, Roles.workspace_member)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 1
-    assert roles[0].role_names == RoleName.workspace_admin | RoleName.workspace_owner
+    assert roles[0].role_names == Roles.workspace_admin | Roles.workspace_owner
 
     # adding roles for different workspaces works
-    await role_repository.add_roles(user.id, workspace_id_2, RoleName.workspace_admin)
+    await role_repository.add_roles(user.id, workspace_id_2, Roles.workspace_admin)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 2
-    assert list(filter(lambda r: r.workspace_id != workspace.id, roles))[0].role_names == RoleName.workspace_admin
+    assert list(filter(lambda r: r.workspace_id != workspace.id, roles))[0].role_names == Roles.workspace_admin
 
     # removing roles works for different workspaces
-    await role_repository.remove_roles(user.id, workspace_id_2, RoleName.workspace_admin)
+    await role_repository.remove_roles(user.id, workspace_id_2, Roles.workspace_admin)
     roles = await role_repository.list_roles(user.id)
     assert len(roles) == 2
     assert {role.workspace_id: role.role_names for role in roles} == {
-        workspace.id: RoleName.workspace_admin | RoleName.workspace_owner,
-        workspace_id_2: RoleName(0),
+        workspace.id: Roles.workspace_admin | Roles.workspace_owner,
+        workspace_id_2: Roles(0),
     }

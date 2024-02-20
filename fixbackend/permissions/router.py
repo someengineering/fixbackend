@@ -15,7 +15,7 @@
 
 from typing import Annotated, List
 from fastapi import APIRouter, Depends
-from fixbackend.permissions.models import RoleName, UserRole, WorkspacePermission
+from fixbackend.permissions.models import Roles, UserRole, WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.permissions.role_repository import RoleRepositoryDependency
 from fixbackend.permissions.schemas import UserRolesRead, UserRolesUpdate
@@ -29,7 +29,7 @@ def roles_router() -> APIRouter:
     async def list_roles(
         workspace: UserWorkspaceDependency,
         role_repository: RoleRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.read_roles))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read_roles))],
     ) -> List[UserRolesRead]:
         roles = await role_repository.list_roles_by_workspace_id(workspace.id)
         workspace_users = workspace.all_users()
@@ -38,7 +38,7 @@ def roles_router() -> APIRouter:
         users_witout_roles = list(set(workspace_users) - set(users_with_roles))
 
         no_assigned_roles = [
-            UserRole(user_id=user, workspace_id=workspace.id, role_names=RoleName(0)) for user in users_witout_roles
+            UserRole(user_id=user, workspace_id=workspace.id, role_names=Roles(0)) for user in users_witout_roles
         ]
 
         roles = no_assigned_roles + roles
@@ -50,7 +50,7 @@ def roles_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         update: UserRolesUpdate,
         repository: RoleRepositoryDependency,
-        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_roles))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_roles))],
     ) -> UserRolesRead:
         update_model = update.to_model(workspace.id)
         role = await repository.add_roles(

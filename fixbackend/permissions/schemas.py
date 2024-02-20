@@ -19,7 +19,7 @@ from fixbackend.ids import (
     UserId,
     WorkspaceId,
 )
-from fixbackend.permissions.models import RoleName, UserRole
+from fixbackend.permissions.models import Roles, UserRole
 
 
 class UserRolesRead(BaseModel):
@@ -35,10 +35,10 @@ class UserRolesRead(BaseModel):
         return UserRolesRead(
             user_id=model.user_id,
             workspace_id=model.workspace_id,
-            member=RoleName.workspace_member in model.role_names,
-            admin=RoleName.workspace_admin in model.role_names,
-            owner=RoleName.workspace_owner in model.role_names,
-            billing_admin=RoleName.workspace_billing_admin in model.role_names,
+            member=Roles.workspace_member in model.role_names,
+            admin=Roles.workspace_admin in model.role_names,
+            owner=Roles.workspace_owner in model.role_names,
+            billing_admin=Roles.workspace_billing_admin in model.role_names,
         )
 
     model_config = {
@@ -65,15 +65,15 @@ class UserRolesUpdate(BaseModel):
     billing_admin: bool = Field(description="if user has billing role")
 
     def to_model(self, workspace_id: WorkspaceId) -> UserRole:
-        role_names = RoleName(0)
+        role_names = Roles(0)
         if self.member:
-            role_names |= RoleName.workspace_member
+            role_names |= Roles.workspace_member
         if self.admin:
-            role_names |= RoleName.workspace_admin
+            role_names |= Roles.workspace_admin
         if self.owner:
-            role_names |= RoleName.workspace_owner
+            role_names |= Roles.workspace_owner
         if self.billing_admin:
-            role_names |= RoleName.workspace_billing_admin
+            role_names |= Roles.workspace_billing_admin
 
         return UserRole(user_id=self.user_id, workspace_id=workspace_id, role_names=role_names)
 
