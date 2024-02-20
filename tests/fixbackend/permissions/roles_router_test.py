@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from attrs import evolve
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,7 @@ from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
+from fixbackend.permissions.models import RoleName, UserRole
 
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
@@ -44,10 +46,12 @@ async def client(
 ) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
 
+    admin_user = evolve(user, roles=[UserRole(user.id, workspace.id, role_names=RoleName.workspace_admin)])
+
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_current_active_verified_user] = lambda: user
+    app.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
     app.dependency_overrides[get_role_repository] = lambda: role_repository
     app.dependency_overrides[get_workspace_repository] = lambda: workspace_repository
 
