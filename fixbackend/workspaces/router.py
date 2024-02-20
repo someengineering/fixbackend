@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -25,8 +25,9 @@ from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.workspaces.invitation_service import InvitationServiceDependency
+from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
-from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency, WorkspaceError, get_optional_user_workspace
 from fixbackend.workspaces.schemas import (
     ExternalIdRead,
     UserInvite,
@@ -179,12 +180,20 @@ def workspaces_router() -> APIRouter:
 
     @router.get("/{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
-        token: str, workspace_id: WorkspaceId, invitation_service: InvitationServiceDependency, request: Request
+        token: str,
+        workspace_id: WorkspaceId,
+        invitation_service: InvitationServiceDependency,
+        request: Request,
+        maybe_workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
     ) -> Response:
         """Accept an invitation to the workspace."""
         invitation = await invitation_service.accept_invitation(token)
         if invitation is None:
-            message = "invitation-not-found"
+            if isinstance(maybe_workspace, Workspace):
+                workspace_id = maybe_workspace.id
+                message = "invitation-accepted"
+            else:
+                message = "invitation-not-found"
         else:
             message = "invitation-accepted"
             workspace_id = invitation.workspace_id
