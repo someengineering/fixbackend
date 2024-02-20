@@ -76,7 +76,7 @@ class RoleRepository(ABC):
         roles: RoleName,
         *,
         session: Optional[AsyncSession] = None,
-        replace: bool = False
+        replace_existing: bool = False
     ) -> UserRole:
         pass
 
@@ -119,7 +119,7 @@ class RoleRepositoryImpl(RoleRepository):
         roles: RoleName,
         *,
         session: Optional[AsyncSession] = None,
-        replace: bool = False
+        replace_existing: bool = False
     ) -> UserRole:
 
         async def do_tx(session: AsyncSession) -> UserRole:
@@ -133,7 +133,7 @@ class RoleRepositoryImpl(RoleRepository):
             ).scalar_one_or_none()
             if existing:
                 old = existing.to_model()
-                if replace:
+                if replace_existing:
                     new_roles = roles
                 else:
                     new_roles = old.role_names | roles

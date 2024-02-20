@@ -101,7 +101,7 @@ class InMemoryRoleRepository(RoleRepository):
         roles: RoleName,
         *,
         session: Optional[AsyncSession] = None,
-        replace: bool = False,
+        replace_existing: bool = False,
     ) -> UserRole:
         role = UserRole(user_id, workspace_id, roles)
         self.roles.append(role)

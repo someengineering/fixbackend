@@ -53,7 +53,9 @@ def roles_router() -> APIRouter:
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermission.update_roles))],
     ) -> UserRolesRead:
         update_model = update.to_model(workspace.id)
-        role = await repository.add_roles(update_model.user_id, workspace.id, update_model.role_names, replace=True)
+        role = await repository.add_roles(
+            update_model.user_id, workspace.id, update_model.role_names, replace_existing=True
+        )
         return UserRolesRead.from_model(role)
 
     return router
