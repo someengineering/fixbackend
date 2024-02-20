@@ -75,19 +75,8 @@ class CloudAccountService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def enable_cloud_account(
-        self,
-        workspace_id: WorkspaceId,
-        cloud_account_id: FixCloudAccountId,
+    async def update_cloud_account_enabled(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, enabled: bool
     ) -> CloudAccount:
         """Enable a cloud account."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def disable_cloud_account(
-        self,
-        workspace_id: WorkspaceId,
-        cloud_account_id: FixCloudAccountId,
-    ) -> CloudAccount:
-        """Disable a cloud account."""
         raise NotImplementedError

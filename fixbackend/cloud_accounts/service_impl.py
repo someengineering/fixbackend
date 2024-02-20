@@ -657,10 +657,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             )
             return result
 
-    async def enable_cloud_account(
-        self,
-        workspace_id: WorkspaceId,
-        cloud_account_id: FixCloudAccountId,
+    async def update_cloud_account_enabled(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, enabled: bool
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)
@@ -668,7 +666,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         def update_state(cloud_account: CloudAccount) -> CloudAccount:
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _):
-                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, True))
+                    return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled))
                 case _:
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 

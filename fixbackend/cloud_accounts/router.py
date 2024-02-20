@@ -104,7 +104,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
     ) -> CloudAccountRead:
-        updated = await service.enable_cloud_account(workspace.id, cloud_account_id)
+        updated = await service.update_cloud_account_enabled(workspace.id, cloud_account_id, enabled=True)
         return CloudAccountRead.from_model(updated)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/disable")
@@ -114,7 +114,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
     ) -> CloudAccountRead:
-        updated = await service.disable_cloud_account(workspace.id, cloud_account_id)
+        updated = await service.update_cloud_account_enabled(workspace.id, cloud_account_id, enabled=False)
         return CloudAccountRead.from_model(updated)
 
     @router.get("/{workspace_id}/cloud_accounts/last_scan")

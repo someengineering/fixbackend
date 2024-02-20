@@ -111,28 +111,13 @@ class InMemoryCloudAccountService(CloudAccountService):
         self.accounts[cloud_account_id] = account
         return account
 
-    async def enable_cloud_account(
-        self,
-        workspace_id: WorkspaceId,
-        cloud_account_id: FixCloudAccountId,
+    async def update_cloud_account_enabled(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, enabled: bool
     ) -> CloudAccount:
         account = self.accounts[cloud_account_id]
         match account.state:
             case CloudAccountStates.Configured():
-                account = evolve(account, state=evolve(account.state, enabled=True))
-
-        self.accounts[cloud_account_id] = account
-        return account
-
-    async def disable_cloud_account(
-        self,
-        workspace_id: WorkspaceId,
-        cloud_account_id: FixCloudAccountId,
-    ) -> CloudAccount:
-        account = self.accounts[cloud_account_id]
-        match account.state:
-            case CloudAccountStates.Configured():
-                account = evolve(account, state=evolve(account.state, enabled=False))
+                account = evolve(account, state=evolve(account.state, enabled=enabled))
 
         self.accounts[cloud_account_id] = account
         return account

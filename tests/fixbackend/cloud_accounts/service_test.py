@@ -749,7 +749,7 @@ async def test_enable_disable_cloud_account(
 
     # account is not configured, cannot be enabled
     with pytest.raises(Exception):
-        await service.enable_cloud_account(WorkspaceId(uuid.uuid4()), account.id)
+        await service.update_cloud_account_enabled(WorkspaceId(uuid.uuid4()), account.id, enabled=True)
 
     repository.accounts[account.id] = evolve(
         account,
@@ -758,20 +758,14 @@ async def test_enable_disable_cloud_account(
     )
 
     # success
-    updated = await service.enable_cloud_account(
-        test_workspace_id,
-        account.id,
-    )
+    updated = await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=True)
     assert isinstance(updated.state, CloudAccountStates.Configured)
     assert updated.state.access == AwsCloudAccess(external_id, role_name)
     assert updated.privileged is False
     assert updated.state.enabled is True
     assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Configured)
 
-    updated = await service.disable_cloud_account(
-        test_workspace_id,
-        account.id,
-    )
+    updated = await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=False)
     assert isinstance(updated.state, CloudAccountStates.Configured)
     assert updated.state.access == AwsCloudAccess(external_id, role_name)
     assert updated.privileged is False
@@ -785,10 +779,7 @@ async def test_enable_disable_cloud_account(
     )
 
     with pytest.raises(Exception):
-        await service.enable_cloud_account(
-            test_workspace_id,
-            account.id,
-        )
+        await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=True)
 
     # wrong tenant id
     with pytest.raises(Exception):
