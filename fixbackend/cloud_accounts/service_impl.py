@@ -49,6 +49,7 @@ from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     AwsAccountDegraded,
     CloudAccountNameChanged,
+    CloudAccountActiveToggled,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
@@ -671,6 +672,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         result = await self.cloud_account_repository.update(cloud_account_id, update_state)
+        await self.domain_events.publish(
+            CloudAccountActiveToggled(
+                tenant_id=workspace_id, cloud_account_id=cloud_account_id, account_id=result.account_id, enabled=enabled
+            )
+        )
         return result
 
     async def disable_cloud_account(
