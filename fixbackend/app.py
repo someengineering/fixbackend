@@ -36,6 +36,7 @@ from arq.connections import RedisSettings
 from async_lru import alru_cache
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -53,12 +54,11 @@ from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
-from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.auth.router import auth_router
-from fixbackend.auth.users_router import users_router
-from fixbackend.billing_information.service import BillingEntryService
-from fixbackend.notification.notification_router import notification_router
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.auth.users_router import users_router
+from fixbackend.billing_information.router import billing_info_router
+from fixbackend.billing_information.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
@@ -66,10 +66,6 @@ from fixbackend.cloud_accounts.router import (
     cloud_accounts_callback_router,
     cloud_accounts_router,
 )
-from fixbackend.billing_information.router import billing_info_router
-from fixbackend.notification.notification_service import NotificationService
-from fixbackend.permissions.router import roles_router
-from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
@@ -80,6 +76,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer, EmailOnSignupConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.errors import NotAllowed, ResourceNotFound, ClientError, WrongState
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -93,6 +90,11 @@ from fixbackend.logging_context import (
 )
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
+from fixbackend.notification.notification_router import notification_router
+from fixbackend.notification.notification_service import NotificationService
+from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.permissions.router import roles_router
+from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
@@ -100,7 +102,6 @@ from fixbackend.subscription.subscription_repository import SubscriptionReposito
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.router import workspaces_router
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -481,6 +482,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 return await call_next(request)
 
     app.add_middleware(RealIpMiddleware)  # type: ignore
+    app.add_middleware(GZipMiddleware, compresslevel=1)
 
     workspaces_prefix = f"{API_PREFIX}/workspaces"
 
