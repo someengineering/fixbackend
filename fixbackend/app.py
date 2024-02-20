@@ -482,7 +482,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 return await call_next(request)
 
     app.add_middleware(RealIpMiddleware)  # type: ignore
-    app.add_middleware(GZipMiddleware, compresslevel=1)
+    app.add_middleware(GZipMiddleware, compresslevel=4)
 
     workspaces_prefix = f"{API_PREFIX}/workspaces"
 
