@@ -24,7 +24,7 @@ from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.user_verifier import AuthEmailSender
-from fixbackend.auth.role_repository import RoleRepository
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.config import Config
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher

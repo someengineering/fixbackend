@@ -42,7 +42,7 @@ from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.analytics_event_sender import NoAnalyticsEventSender
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
-from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryImpl
+from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue

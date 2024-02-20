@@ -20,14 +20,13 @@ from abc import ABC, abstractmethod
 from fastapi import Depends
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.ids import UserRoleId, UserId, WorkspaceId
 from sqlalchemy import Integer, ForeignKey, UniqueConstraint, select, update
 from sqlalchemy.orm import Mapped, mapped_column
 
-from fixbackend.auth.models import WorkspacePermission, UserRoles, RoleName, roles_to_permissions
+from fixbackend.permissions.models import WorkspacePermissions, UserRole, Roles, roles_to_permissions
 from fixbackend.base_model import Base
 
 from fixbackend.types import AsyncSessionMaker
@@ -38,23 +37,22 @@ class UserRoleAssignmentEntity(Base):
 
     id: Mapped[UserRoleId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), nullable=False, index=True)
-    workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False)
+    workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, index=True)
     role_names: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (UniqueConstraint("user_id", "workspace_id"),)
 
-    def to_model(self) -> UserRoles:
-        return UserRoles(
-            id=self.id,
+    def to_model(self) -> UserRole:
+        return UserRole(
             user_id=self.user_id,
             workspace_id=self.workspace_id,
-            role_names=RoleName(self.role_names),
+            role_names=Roles(self.role_names),
         )
 
     @staticmethod
-    def from_model(model: UserRoles) -> "UserRoleAssignmentEntity":
+    def from_model(model: UserRole, id: UserRoleId) -> "UserRoleAssignmentEntity":
         return UserRoleAssignmentEntity(
-            id=model.id,
+            id=id,
             user_id=model.user_id,
             workspace_id=model.workspace_id,
             role_names=model.role_names.value,
@@ -63,18 +61,28 @@ class UserRoleAssignmentEntity(Base):
 
 class RoleRepository(ABC):
     @abstractmethod
-    async def list_roles(self, user_id: UserId) -> List[UserRoles]:
+    async def list_roles(self, user_id: UserId) -> List[UserRole]:
+        pass
+
+    @abstractmethod
+    async def list_roles_by_workspace_id(self, workspace_id: WorkspaceId) -> List[UserRole]:
         pass
 
     @abstractmethod
     async def add_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
-    ) -> None:
+        self,
+        user_id: UserId,
+        workspace_id: WorkspaceId,
+        roles: Roles,
+        *,
+        session: Optional[AsyncSession] = None,
+        replace_existing: bool = False
+    ) -> UserRole:
         pass
 
     @abstractmethod
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
         pass
 
@@ -82,7 +90,7 @@ class RoleRepository(ABC):
 class RoleRepositoryImpl(RoleRepository):
 
     def __init__(
-        self, session_maker: AsyncSessionMaker, permissions_dict: Dict[RoleName, WorkspacePermission] | None = None
+        self, session_maker: AsyncSessionMaker, permissions_dict: Dict[Roles, WorkspacePermissions] | None = None
     ) -> None:
         self.session_maker = session_maker
         if permissions_dict is None:
@@ -90,18 +98,31 @@ class RoleRepositoryImpl(RoleRepository):
         self.roles_to_permissions = permissions_dict
 
     @override
-    async def list_roles(self, user_id: UserId) -> List[UserRoles]:
+    async def list_roles(self, user_id: UserId) -> List[UserRole]:
         async with self.session_maker() as session:
             query = select(UserRoleAssignmentEntity).filter(UserRoleAssignmentEntity.user_id == user_id)
             results = await session.execute(query)
             return [elem.to_model() for elem in results.scalars().all()]
 
     @override
-    async def add_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
-    ) -> None:
+    async def list_roles_by_workspace_id(self, workspace_id: WorkspaceId) -> List[UserRole]:
+        async with self.session_maker() as session:
+            query = select(UserRoleAssignmentEntity).filter(UserRoleAssignmentEntity.workspace_id == workspace_id)
+            results = await session.execute(query)
+            return [elem.to_model() for elem in results.scalars().all()]
 
-        async def do_tx(session: AsyncSession) -> None:
+    @override
+    async def add_roles(
+        self,
+        user_id: UserId,
+        workspace_id: WorkspaceId,
+        roles: Roles,
+        *,
+        session: Optional[AsyncSession] = None,
+        replace_existing: bool = False
+    ) -> UserRole:
+
+        async def do_tx(session: AsyncSession) -> UserRole:
             existing = (
                 await session.execute(
                     select(UserRoleAssignmentEntity).where(
@@ -112,7 +133,10 @@ class RoleRepositoryImpl(RoleRepository):
             ).scalar_one_or_none()
             if existing:
                 old = existing.to_model()
-                new_roles = old.role_names | roles
+                if replace_existing:
+                    new_roles = roles
+                else:
+                    new_roles = old.role_names | roles
 
                 await session.execute(
                     update(UserRoleAssignmentEntity)
@@ -121,14 +145,15 @@ class RoleRepositoryImpl(RoleRepository):
                 )
 
                 await session.commit()
+                await session.refresh(existing)
+
+                return existing.to_model()
             else:
-                try:
-                    session.add(
-                        UserRoleAssignmentEntity(user_id=user_id, workspace_id=workspace_id, role_names=roles.value)
-                    )
-                    await session.commit()
-                except IntegrityError:
-                    await session.rollback()
+                entity = UserRoleAssignmentEntity(user_id=user_id, workspace_id=workspace_id, role_names=roles.value)
+                model = entity.to_model()
+                session.add(entity)
+                await session.commit()
+                return model
 
         if session:
             return await do_tx(session)
@@ -138,7 +163,7 @@ class RoleRepositoryImpl(RoleRepository):
 
     @override
     async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: RoleName, *, session: Optional[AsyncSession] = None
+        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
 
         async def do_tx(session: AsyncSession) -> None:

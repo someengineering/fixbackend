@@ -53,7 +53,7 @@ from fixbackend.analytics.domain_event_to_analytics import analytics
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
-from fixbackend.auth.role_repository import RoleRepositoryImpl
+from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.auth.router import auth_router
 from fixbackend.auth.users_router import users_router
 from fixbackend.billing_information.service import BillingEntryService
@@ -68,6 +68,7 @@ from fixbackend.cloud_accounts.router import (
 )
 from fixbackend.billing_information.router import billing_info_router
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.permissions.router import roles_router
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -594,6 +595,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(subscription_router(), tags=["billing"])
         api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing"])
         api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
+        api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
