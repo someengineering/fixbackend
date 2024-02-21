@@ -2,7 +2,7 @@
 
 Revision ID: 4f583cb5ec57
 Revises: 6a28d961d926
-Create Date: 2024-02-20 17:26:49.983252+00:00
+Create Date: 2024-02-21 17:26:49.983252+00:00
 
 """
 
@@ -14,7 +14,7 @@ from sqlalchemy.exc import OperationalError
 
 # revision identifiers, used by Alembic.
 revision: str = "4f583cb5ec57"
-down_revision: Union[str, None] = "6a28d961d926"
+down_revision: Union[str, None] = "894e2b7af974"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

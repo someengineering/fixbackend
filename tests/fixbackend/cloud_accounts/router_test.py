@@ -493,6 +493,7 @@ async def test_enable_disable_account_scan(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=None,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/disable")
