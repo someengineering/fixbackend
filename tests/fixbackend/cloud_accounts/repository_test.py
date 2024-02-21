@@ -78,6 +78,7 @@ async def test_create_cloud_account(
             created_at=utc().replace(microsecond=0),
             updated_at=utc().replace(microsecond=0),
             state_updated_at=utc().replace(microsecond=0),
+            cf_stack_version=0,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
