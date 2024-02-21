@@ -62,7 +62,7 @@ class CloudAccount(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     state_updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
-    cf_stack_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cf_stack_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)

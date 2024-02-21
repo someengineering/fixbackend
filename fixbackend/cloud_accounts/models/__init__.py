@@ -143,7 +143,7 @@ class CloudAccount:
     created_at: datetime
     updated_at: datetime
     state_updated_at: datetime
-    cf_stack_version: int
+    cf_stack_version: Optional[int]
 
     def aws_access(self) -> Optional[AwsCloudAccess]:
         if isinstance(access := self.state.cloud_access(), AwsCloudAccess):
