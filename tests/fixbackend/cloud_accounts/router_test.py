@@ -85,6 +85,7 @@ class InMemoryCloudAccountService(CloudAccountService):
             created_at=utc(),
             updated_at=utc(),
             state_updated_at=utc(),
+            cf_stack_version=0,
         )
         self.accounts[account.id] = account
         return account
@@ -167,6 +168,7 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
         "external_id": str(external_id),
         "role_name": role_name,
         "workspace_id": str(workspace_id),
+        "fix_stack_version": 1708513196,
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
     assert response.status_code == 200
@@ -207,6 +209,7 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=0,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -237,6 +240,7 @@ async def test_last_scan(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=0,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts/last_scan")
@@ -274,6 +278,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=42,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -293,6 +298,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["privileged"] is True
     assert data["last_scan_started_at"] == started_at.isoformat()
     assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
+    assert data["cf_stack_version"] == 42
 
 
 @pytest.mark.asyncio
@@ -319,6 +325,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
             created_at=created_at,
             updated_at=utc(),
             state_updated_at=utc(),
+            cf_stack_version=0,
         )
         cloud_account_service.accounts[cloud_account_id] = account
         return account
@@ -389,6 +396,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=0,
     )
 
     payload: Dict[str, Optional[str]] = {
@@ -436,6 +444,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
+        cf_stack_version=0,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")
