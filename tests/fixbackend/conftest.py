@@ -171,6 +171,7 @@ def default_config() -> Config:
         slack_oauth_client_id="",
         slack_oauth_client_secret="",
         service_base_url="http://localhost:8000",
+        push_gateway_url=None,
     )
 
 
@@ -711,8 +712,9 @@ async def billing_service(
     aws_marketplace_handler: AwsMarketplaceHandler,
     subscription_repository: SubscriptionRepository,
     workspace_repository: WorkspaceRepository,
+    default_config: Config,
 ) -> BillingService:
-    return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository)
+    return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository, default_config)
 
 
 @frozen

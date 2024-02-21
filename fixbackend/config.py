@@ -75,6 +75,7 @@ class Config(BaseSettings):
     slack_oauth_client_id: str
     slack_oauth_client_secret: str
     service_base_url: str
+    push_gateway_url: Optional[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -177,6 +178,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         choices=["month", "day"],
         default=os.environ.get("BILLING_PERIOD", "month"),
     )
+    parser.add_argument("--push-gateway-url", default=os.environ.get("PUSH_GATEWAY_URL"))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

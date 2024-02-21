@@ -20,6 +20,7 @@ from typing import Any, Optional, AsyncIterator, List, Tuple
 from fixcloudutils.asyncio import stop_running_task
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
+import prometheus_client
 
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
@@ -27,6 +28,7 @@ from fixbackend.subscription.models import SubscriptionMethod, BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -37,11 +39,13 @@ class BillingService(Service):
         aws_marketplace: AwsMarketplaceHandler,
         subscription_repository: SubscriptionRepository,
         workspace_repository: WorkspaceRepository,
+        config: Config,
     ) -> None:
         self.aws_marketplace = aws_marketplace
         self.subscription_repository = subscription_repository
         self.workspace_repository = workspace_repository
         self.handler: Optional[Task[Any]] = None
+        self.config = config
 
     async def start(self) -> Any:
         self.handler = asyncio.create_task(self.handle_outstanding_subscriptions())
@@ -62,8 +66,18 @@ class BillingService(Service):
             await self.aws_marketplace.report_unreported_usages()
             log.info("Report no usage for all active subscriptions")
             await self.report_no_usage_for_active_subscriptions(now, parallel_requests)
+            await self.push_metrics()
         finally:
             kill_running_process()
+
+    async def push_metrics(self) -> None:
+        if gateway := self.config.push_gateway_url:
+            await asyncio.to_thread(
+                lambda: prometheus_client.push_to_gateway(
+                    gateway=gateway, job="fixbackend-billing-hourly", registry=prometheus_client.REGISTRY
+                )
+            )
+            log.info("Metrics pushed to gateway")
 
     async def create_overdue_billing_entries(self, now: datetime, parallel_requests: int) -> None:
         semaphore = asyncio.Semaphore(parallel_requests)

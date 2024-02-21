@@ -442,7 +442,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg.billing_period,
             ),
         )
-        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo, workspace_repo))
+        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo, workspace_repo, cfg))
 
         async with deps:
             log.info("Application services started.")
