@@ -19,12 +19,12 @@ from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
 from attrs import evolve
+from fixcloudutils.util import utc
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
 from fixbackend.cloud_accounts.models import (
@@ -49,9 +49,9 @@ from fixbackend.ids import (
     WorkspaceId,
     ProductTier,
 )
+from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixcloudutils.util import utc, utc_str
 
 
 class InMemoryCloudAccountService(CloudAccountService):

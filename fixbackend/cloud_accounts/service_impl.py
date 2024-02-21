@@ -693,8 +693,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case CloudAccountStates.Configured(access, enabled, _):
                     event = CloudAccountScanToggled(
                         tenant_id=workspace_id,
-                        cloud_account_id=cloud_account_id,
-                        account_id=result.account_id,
+                        cloud_account_id=cloud_account.id,
+                        account_id=cloud_account.account_id,
                         enabled=enabled,
                         scan=scan,
                     )
