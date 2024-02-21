@@ -29,4 +29,4 @@ from fixbackend.subscription.subscription_repository import SubscriptionEntity, 
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertConfigEntry  # noqa
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigEntity  # noqa
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity  # noqa
-from fixbackend.auth.role_repository import UserRoleAssignmentEntity  # noqa
+from fixbackend.permissions.role_repository import UserRoleAssignmentEntity  # noqa

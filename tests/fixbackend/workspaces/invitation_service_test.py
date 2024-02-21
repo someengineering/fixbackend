@@ -126,6 +126,9 @@ async def test_invite_accept_user(
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
     assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
 
+    # accepting the invite again returns None
+    assert await service.accept_invitation(token) is None
+
     # invite can be revoked
     await service.revoke_invitation(invite.id)
     assert await service.list_invitations(workspace.id) == []

@@ -15,9 +15,11 @@
 
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.billing_information import schemas
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods
 from fixbackend.billing_information.schemas import (
@@ -37,7 +39,9 @@ def billing_info_router() -> APIRouter:
 
     @router.get("/{workspace_id}/billing_entries/")
     async def list_billing_enties(
-        workspace: UserWorkspaceDependency, billing_info_service: BillingEntryServiceDependency
+        workspace: UserWorkspaceDependency,
+        billing_info_service: BillingEntryServiceDependency,
+        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.read_billing)),
     ) -> List[BillingEntryRead]:
         """List all workspaces."""
         entries = await billing_info_service.list_billing_info(workspace.id)
@@ -46,7 +50,10 @@ def billing_info_router() -> APIRouter:
 
     @router.get("/{workspace_id}/billing")
     async def get_billing(
-        user: AuthenticatedUser, workspace: UserWorkspaceDependency, billing_info_service: BillingEntryServiceDependency
+        user: AuthenticatedUser,
+        workspace: UserWorkspaceDependency,
+        billing_info_service: BillingEntryServiceDependency,
+        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.read_billing)),
     ) -> WorkspaceBillingSettingsRead:
         """Get a workspace billing."""
         payment_method = await billing_info_service.get_payment_methods(workspace, user.id)
@@ -58,6 +65,7 @@ def billing_info_router() -> APIRouter:
         user: AuthenticatedUser,
         billing_info_service: BillingEntryServiceDependency,
         billing: WorkspaceBillingSettingsUpdate,
+        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.update_billing)),
     ) -> WorkspaceBillingSettingsRead:
         """Update a workspace billing."""
 
@@ -69,7 +77,7 @@ def billing_info_router() -> APIRouter:
                     return PaymentMethods.AwsSubscription(method.subscription_id)
 
         ws = await billing_info_service.update_billing(
-            user, workspace, billing.product_tier.to_tier(), payment_method(billing.workspace_payment_method)
+            user, workspace, billing.security_tier.to_tier(), payment_method(billing.workspace_payment_method)
         )
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
 
@@ -81,6 +89,7 @@ def billing_info_router() -> APIRouter:
         user: AuthenticatedUser,
         subscription_repository: SubscriptionRepositoryDependency,
         subscription_id: SubscriptionId,
+        _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.update_billing)),
     ) -> None:
         """Assign a subscription to a workspace."""
         if not await subscription_repository.user_has_subscription(user.id, subscription_id):

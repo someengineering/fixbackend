@@ -16,7 +16,7 @@
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from logging import getLogger
-from typing import Annotated, Dict, Sequence, Tuple
+from typing import Annotated, Dict, Optional, Sequence, Tuple
 
 import jwt
 from attrs import evolve
@@ -63,7 +63,7 @@ class InvitationService(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    async def accept_invitation(self, token: str) -> WorkspaceInvitation:
+    async def accept_invitation(self, token: str) -> Optional[WorkspaceInvitation]:
         """Accept an invitation to a workspace."""
         raise NotImplementedError()
 
@@ -113,7 +113,7 @@ class InvitationServiceImpl(InvitationService):
     async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
         return await self.invitation_repository.list_invitations(workspace_id)
 
-    async def accept_invitation(self, token: str) -> WorkspaceInvitation:
+    async def accept_invitation(self, token: str) -> Optional[WorkspaceInvitation]:
         try:
             decoded_state = decode_jwt(token, self.config.secret, [STATE_TOKEN_AUDIENCE])
         except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
@@ -123,7 +123,7 @@ class InvitationServiceImpl(InvitationService):
         invitation_id = decoded_state["invitation_id"]
         invitation = await self.invitation_repository.get_invitation(invitation_id)
         if invitation is None:
-            raise ResourceNotFound(f"Invitation {invitation_id} does not exist.")
+            return None
 
         updated = await self.invitation_repository.update_invitation(
             invitation_id, lambda invite: evolve(invite, accepted_at=utc())

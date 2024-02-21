@@ -18,6 +18,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
+from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
@@ -47,7 +48,7 @@ user = User(
     is_active=True,
     is_superuser=False,
     oauth_accounts=[],
-    roles=[],
+    roles=[UserRole(user_id, workspace_id, Roles.workspace_billing_admin)],
 )
 
 now = utc().replace(microsecond=0)
@@ -147,7 +148,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 
 @pytest.mark.asyncio
 async def test_list_billing_entries(client: AsyncClient) -> None:
-    response = await client.get("/api/workspaces/{workspace_id}/billing_entries/")
+    response = await client.get(f"/api/workspaces/{workspace_id}/billing_entries/")
     assert response.status_code == 200
     assert len(response.json()) == 1
     json_billing_entry = response.json()[0]
@@ -176,7 +177,7 @@ async def test_get_billing(client: AsyncClient) -> None:
         },
         {"method": "none"},
     ]
-    assert response.json().get("product_tier") == "Free"
+    assert response.json().get("security_tier") == "free"
 
 
 @pytest.mark.asyncio
@@ -189,7 +190,7 @@ async def test_update_billing(client: AsyncClient) -> None:
                 "method": "aws_marketplace",
                 "subscription_id": str(sub_id),
             },
-            "product_tier": "Free",
+            "security_tier": "free",
         },
     )
 
@@ -200,7 +201,7 @@ async def test_update_billing(client: AsyncClient) -> None:
         "method": "aws_marketplace",
         "subscription_id": str(sub_id),
     }
-    assert json.get("product_tier") == "Free"
+    assert json.get("security_tier") == "free"
 
 
 @pytest.mark.asyncio

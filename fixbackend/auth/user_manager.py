@@ -23,7 +23,7 @@ from fastapi_users.password import PasswordHelperProtocol
 from starlette.responses import Response
 
 from fixbackend.auth.models import User
-from fixbackend.auth.role_repository import RoleRepository, RoleRepositoryDependency
+from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryDependency
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
 from fixbackend.config import Config, ConfigDependency
