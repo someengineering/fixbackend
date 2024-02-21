@@ -11,13 +11,15 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import json
+from datetime import timedelta
 import logging
 from typing import Annotated, Dict, List, Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request, Response, Query, HTTPException, Body
+from fastapi_users.jwt import decode_jwt, generate_jwt
 from fixcloudutils.types import Json
+
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
@@ -28,17 +30,23 @@ from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
+import jwt
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
 AddDiscord = "notification_add_discord"
 
-State = "add-notification-channel"
+
+STATE_TOKEN_AUDIENCE = "fix:notification-state"
 
 
 def notification_router(fix: FixDependencies) -> APIRouter:
     router = APIRouter()
     cfg = fix.config
+
+    def generate_state_token(data: Dict[str, str]) -> str:
+        data["aud"] = STATE_TOKEN_AUDIENCE
+        return generate_jwt(data, fix.config.secret, int(timedelta(minutes=30).total_seconds()))
 
     @router.get("/{workspace_id}/notifications")
     async def notifications(
@@ -50,28 +58,35 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             ServiceNames.notification_service, NotificationService
         ).list_notification_provider_configs(workspace_id)
 
-    @router.get(
-        "/{workspace_id}/notification/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None
-    )
+    @router.get("/notification/add/slack/confirm", name=AddSlack, include_in_schema=False, response_model=None)
     async def add_slack_confirm(
-        workspace_id: WorkspaceId,
         request: Request,
         code: Optional[str] = Query(default=None),
         state: Optional[str] = Query(default=None),
         error: Optional[str] = Query(default=None),
         error_description: Optional[str] = Query(default=None),
     ) -> Response:
-        set_workspace_id(workspace_id)
+        error_redirect = RedirectResponse("/workspace-settings?message=slack_added&outcome=error")
         if error is not None:
             log.info(f"Add slack oauth confirmation: received error: {error}. description: {error_description}")
-            return RedirectResponse("/workspace-settings?message=slack_added&outcome=error")
+            return error_redirect
         if state is None or code is None:
             log.info(f"Add slack oauth confirmation: received no state or code: {state}, {code}")
-            return RedirectResponse("/workspace-settings?message=slack_added&outcome=error")
+            return error_redirect
         # if the state is not the same as the one we sent, it means that the user did not come from our page
-        if state != State:
-            return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=error#{workspace_id}")
+        try:
+            decoded_state = decode_jwt(state, fix.config.secret, [STATE_TOKEN_AUDIENCE])
+        except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
+            log.info(f"OAuth callback: invalid state token: {state}, {ex}")
+            return error_redirect
 
+        if not (workspace_id := decoded_state.get("workspace_id")):
+            log.info(f"OAuth callback: invalid workspace_id in state token: {decoded_state.get('workspace_id')}")
+            return error_redirect
+
+        workspace_id = WorkspaceId(workspace_id)
+
+        set_workspace_id(workspace_id)
         # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
             client_id=cfg.slack_oauth_client_id,
@@ -128,12 +143,16 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info(f"User {user.id} in workspace {workspace_id} wants to integrate slack notifications")
+        data = {
+            "workspace_id": str(workspace_id),
+        }
+        state = generate_state_token(data)
         params = dict(
             client_id=cfg.slack_oauth_client_id,
             response_type="code",
             scope="incoming-webhook",
-            state=State,
-            redirect_uri=str(request.url_for(AddSlack, workspace_id=workspace_id)),
+            state=state,
+            redirect_uri=str(request.url_for(AddSlack)),
         )
         log.debug("Add slack called with params: %s", params)
         return RedirectResponse("https://slack.com/oauth/v2/authorize?" + urlencode(params))
@@ -146,17 +165,22 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         error: Optional[str] = Query(default=None),
         error_description: Optional[str] = Query(default=None),
     ) -> Response:
+
+        error_response = RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
         if error is not None:
             log.info(f"Add discord oauth confirmation: received error: {error}. description: {error_description}")
-            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
+            return error_response
         if state is None or code is None:
             log.info(f"Add discord oauth confirmation: received no state or code: {state}, {code}")
-            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
-        state_obj = json.loads(state)
+            return error_response
+
         # if the state is not the same as the one we sent, it means that the user did not come from our page
-        if state_obj.get("state") != State or not isinstance(state_obj.get("workspace_id"), str):
-            log.info(f"Add discord oauth confirmation: received Invalid state: {state_obj}")
-            return RedirectResponse("/workspace-settings?message=discord_added&outcome=error")
+        try:
+            state_obj = decode_jwt(state, fix.config.secret, [STATE_TOKEN_AUDIENCE])
+        except (jwt.ExpiredSignatureError, jwt.DecodeError) as ex:
+            log.info(f"Add discord oauth confirmation: received Invalid state: {state}", ex)
+            return error_response
+
         workspace_id = WorkspaceId(state_obj["workspace_id"])
         set_workspace_id(workspace_id)
 
@@ -195,11 +219,15 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info("Add discord notifications requested.")
+        data = {
+            "workspace_id": str(workspace_id),
+        }
+        state = generate_state_token(data)
         params = dict(
             client_id=cfg.discord_oauth_client_id,
             response_type="code",
             scope="webhook.incoming",
-            state=json.dumps(dict(state=State, workspace_id=str(workspace_id))),
+            state=state,
             redirect_uri=str(request.url_for(AddDiscord)),
             workspace_id=str(workspace_id),
         )
