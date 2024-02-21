@@ -282,7 +282,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         created_at=utc(),
         updated_at=utc(),
         state_updated_at=utc(),
-        cf_stack_version=0,
+        cf_stack_version=42,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -302,6 +302,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     assert data["privileged"] is True
     assert data["last_scan_started_at"] == started_at.isoformat()
     assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
+    assert data["cf_stack_version"] == 42
 
 
 @pytest.mark.asyncio

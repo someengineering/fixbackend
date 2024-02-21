@@ -73,6 +73,7 @@ class CloudAccountRead(BaseModel):
     privileged: bool = Field(description="If privileged, the account can do some administrative tasks")
     last_scan_started_at: Optional[datetime] = Field(description="The time when the last scan started")
     last_scan_finished_at: Optional[datetime] = Field(description="The time when the last scan finished")
+    cf_stack_version: int = Field(description="The version of the corresponting CF stack")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -102,6 +103,7 @@ class CloudAccountRead(BaseModel):
             privileged=model.privileged,
             last_scan_started_at=model.last_scan_started_at,
             last_scan_finished_at=last_scan_finished,
+            cf_stack_version=model.cf_stack_version,
         )
 
 
