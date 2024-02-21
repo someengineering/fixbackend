@@ -35,6 +35,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
     external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: CloudAccountId = Field(description="AWS account ID", pattern=r"^\d{12}$")
     role_name: AwsRoleName = Field(description="AWS role name", max_length=2048)
+    fix_stack_version: int = Field(description="The version of the FIX stack")
 
     model_config = {
         "json_schema_extra": {
@@ -44,6 +45,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
                     "external_id": "00000000-0000-0000-0000-000000000000",
                     "account_id": "123456789012",
                     "role_name": "FooBarRole",
+                    "fix_stack_version": 1708513196,
                 }
             ]
         }

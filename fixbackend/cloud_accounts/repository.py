@@ -123,6 +123,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 created_at=cloud_account.created_at,
                 updated_at=cloud_account.updated_at,
                 state_updated_at=cloud_account.state_updated_at,
+                cf_stack_version=cloud_account.cf_stack_version,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
@@ -171,6 +172,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 stored_account.created_at = cloud_account.created_at
                 stored_account.updated_at = utc()
                 stored_account.state_updated_at = cloud_account.state_updated_at
+                stored_account.cf_stack_version = cloud_account.cf_stack_version
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
                 await session.commit()

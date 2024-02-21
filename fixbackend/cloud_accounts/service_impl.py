@@ -574,6 +574,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 created_at=created_at,
                 updated_at=created_at,
                 state_updated_at=created_at,
+                cf_stack_version=0,
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
