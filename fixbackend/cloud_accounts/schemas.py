@@ -55,6 +55,7 @@ class CloudAccountRead(BaseModel):
     cloud: str = Field(description="Cloud provider")
     account_id: CloudAccountId = Field(description="Cloud account ID, as defined by the cloud provider")
     enabled: bool = Field(description="Whether the cloud account is enabled for collection")
+    scan: bool = Field(description="Whether the cloud account should be scanned for resources")
     is_configured: bool = Field(description="Is account correctly configured")
     resources: Optional[int] = Field(description="Number of resources in the account")
     next_scan: Optional[datetime] = Field(description="Next scheduled scan")
@@ -76,9 +77,11 @@ class CloudAccountRead(BaseModel):
     def from_model(model: CloudAccount) -> "CloudAccountRead":
         enabled = False
         is_configured = False
+        scan = False
         match model.state:
             case CloudAccountStates.Configured():
                 enabled = model.state.enabled
+                scan = model.state.scan
                 is_configured = True
 
         last_scan_finished = None
@@ -91,6 +94,7 @@ class CloudAccountRead(BaseModel):
             account_id=model.account_id,
             user_account_name=model.user_account_name,
             enabled=enabled,
+            scan=scan,
             is_configured=is_configured,
             resources=model.last_scan_resources_scanned,
             next_scan=model.next_scan,

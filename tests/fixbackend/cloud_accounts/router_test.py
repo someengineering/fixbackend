@@ -51,7 +51,7 @@ from fixbackend.ids import (
 )
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixcloudutils.util import utc
+from fixcloudutils.util import utc, utc_str
 
 
 class InMemoryCloudAccountService(CloudAccountService):
@@ -118,6 +118,17 @@ class InMemoryCloudAccountService(CloudAccountService):
         match account.state:
             case CloudAccountStates.Configured():
                 account = evolve(account, state=evolve(account.state, enabled=enabled))
+
+        self.accounts[cloud_account_id] = account
+        return account
+
+    async def update_cloud_account_scan_enabled(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, scan: bool
+    ) -> CloudAccount:
+        account = self.accounts[cloud_account_id]
+        match account.state:
+            case CloudAccountStates.Configured():
+                account = evolve(account, state=evolve(account.state, scan=scan))
 
         self.accounts[cloud_account_id] = account
         return account
@@ -420,7 +431,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         privileged=True,
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
-        last_scan_started_at=datetime.utcnow(),
+        last_scan_started_at=utc(),
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -450,3 +461,37 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["is_configured"] is True
     assert data["resources"] == 100
     assert data["next_scan"] == next_scan.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_enable_disable_account_scan(client: AsyncClient) -> None:
+    cloud_account_service.accounts = {}
+    cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    cloud_account_service.accounts[cloud_account_id] = CloudAccount(
+        id=cloud_account_id,
+        workspace_id=workspace_id,
+        account_id=account_id,
+        cloud=CloudNames.AWS,
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
+        privileged=True,
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=utc(),
+        next_scan=utc(),
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
+    )
+
+    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/disable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scan"] is False
+
+    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/enable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scan"] is True

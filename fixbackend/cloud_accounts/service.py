@@ -80,3 +80,10 @@ class CloudAccountService(ABC):
     ) -> CloudAccount:
         """Enable a cloud account."""
         raise NotImplementedError
+
+    @abstractmethod
+    async def update_cloud_account_scan_enabled(
+        self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, scan: bool
+    ) -> CloudAccount:
+        """Enable a cloud account."""
+        raise NotImplementedError

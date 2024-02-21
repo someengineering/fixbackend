@@ -680,7 +680,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         )
         return result
 
-    async def update_cloud_account_scan(
+    async def update_cloud_account_scan_enabled(
         self, workspace_id: WorkspaceId, cloud_account_id: FixCloudAccountId, scan: bool
     ) -> CloudAccount:
         # make sure access is possible
