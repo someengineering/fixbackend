@@ -35,6 +35,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
     external_id: ExternalId = Field(description="Your FIX-assigned External ID")
     account_id: CloudAccountId = Field(description="AWS account ID", pattern=r"^\d{12}$")
     role_name: AwsRoleName = Field(description="AWS role name", max_length=2048)
+    fix_stack_version: int = Field(description="The version of the FIX stack")
 
     model_config = {
         "json_schema_extra": {
@@ -44,6 +45,7 @@ class AwsCloudFormationLambdaCallbackParameters(BaseModel):
                     "external_id": "00000000-0000-0000-0000-000000000000",
                     "account_id": "123456789012",
                     "role_name": "FooBarRole",
+                    "fix_stack_version": 1708513196,
                 }
             ]
         }
@@ -71,6 +73,7 @@ class CloudAccountRead(BaseModel):
     privileged: bool = Field(description="If privileged, the account can do some administrative tasks")
     last_scan_started_at: Optional[datetime] = Field(description="The time when the last scan started")
     last_scan_finished_at: Optional[datetime] = Field(description="The time when the last scan finished")
+    cf_stack_version: Optional[int] = Field(description="The version of the corresponting CF stack")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -100,6 +103,7 @@ class CloudAccountRead(BaseModel):
             privileged=model.privileged,
             last_scan_started_at=model.last_scan_started_at,
             last_scan_finished_at=last_scan_finished,
+            cf_stack_version=model.cf_stack_version,
         )
 
 
