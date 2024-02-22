@@ -25,7 +25,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 from itertools import islice
-from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
+from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping, Union
 
 from fixcloudutils.asyncio.timed import timed
 from fixcloudutils.redis.cache import RedisCache
@@ -34,11 +34,14 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     TenantAccountsCollected,
     CloudAccountNameChanged,
     WorkspaceCreated,
+    CloudAccountScanToggled,
+    CloudAccountActiveToggled,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -100,18 +103,22 @@ class InventoryService(Service):
         self,
         client: InventoryClient,
         db_access_manager: GraphDatabaseAccessManager,
+        cloud_account_repository: CloudAccountRepository,
         domain_event_subscriber: Optional[DomainEventSubscriber],
         redis: Redis,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
+        self.cloud_account_repository = cloud_account_repository
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
         if sub := domain_event_subscriber:
             sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
             sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
             sub.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
             sub.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
+            sub.subscribe(CloudAccountScanToggled, self._configure_disabled_accounts, Inventory)
+            sub.subscribe(CloudAccountActiveToggled, self._configure_disabled_accounts, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()
@@ -149,6 +156,17 @@ class InventoryService(Service):
         if access:
             log.info(f"Workspace created: {event.workspace_id}. Create related database.")
             await self.client.create_database(access)
+
+    async def _configure_disabled_accounts(
+        self, event: Union[CloudAccountScanToggled, CloudAccountActiveToggled]
+    ) -> None:
+        if db := await self.db_access_manager.get_database_access(event.tenant_id):
+            acs = await self.cloud_account_repository.list_by_workspace_id(event.tenant_id, ready_for_collection=True)
+            disabled = [a.account_id for a in acs if not a.enabled_for_scanning()]
+            log.info(f"Cloud account scan toggled. Following accounts are disabled: {disabled}.")
+            await self.client.update_config(
+                db, "resoto.report.config", {"report_config": {"ignore_accounts": disabled}}, patch=True
+            )
 
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
         # evict the cache for the tenant in the cluster
