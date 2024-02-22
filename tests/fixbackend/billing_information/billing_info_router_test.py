@@ -124,9 +124,7 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
             new_external_id = workspace.external_id
         return evolve(workspace, name=name, external_id=new_external_id)
 
-    async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
-    ) -> Workspace:
+    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier) -> Workspace:
         return evolve(workspace, product_tier=security_tier)
 
 

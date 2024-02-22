@@ -85,7 +85,7 @@ async def test_list_payment_methods(
 
     # on paid tier we can't get the no payment method
     assert workspace.product_tier == ProductTier.Free
-    workspace = await workspace_repository.update_security_tier(user, workspace.id, ProductTier.Plus)
+    workspace = await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Plus)
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):

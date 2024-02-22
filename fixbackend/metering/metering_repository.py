@@ -43,7 +43,7 @@ class MeteringRecordEntity(Base):
     nr_of_error_messages: Mapped[int] = mapped_column(INT, nullable=False)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     duration: Mapped[int] = mapped_column(INT, nullable=False)
-    security_tier: Mapped[str] = mapped_column(String(64), nullable=False)
+    tier: Mapped[str] = mapped_column(String(64), nullable=False)
 
     @staticmethod
     def from_model(model: MeteringRecord) -> MeteringRecordEntity:
@@ -60,7 +60,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=model.nr_of_error_messages,
             started_at=model.started_at,
             duration=model.duration,
-            security_tier=model.product_tier.value,
+            tier=model.product_tier.value,
         )
 
     def to_model(self) -> MeteringRecord:
@@ -77,7 +77,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=self.nr_of_error_messages,
             started_at=self.started_at,
             duration=self.duration,
-            product_tier=ProductTier.from_str(self.security_tier),
+            product_tier=ProductTier.from_str(self.tier),
         )
 
 
@@ -107,7 +107,7 @@ class MeteringRepository:
                 MeteringRecordEntity.account_id,
                 MeteringRecordEntity.account_name,
                 func.count().label("num_records"),
-                func.group_concat(func.distinct(MeteringRecordEntity.security_tier)).label("security_tiers"),
+                func.group_concat(func.distinct(MeteringRecordEntity.tier)).label("tiers"),
             )
             .where(
                 (MeteringRecordEntity.tenant_id == workspace_id)

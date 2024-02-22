@@ -74,9 +74,7 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
-    ) -> Workspace:
+    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
 
@@ -101,7 +99,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
-            organization = orm.Organization(id=workspace_id, name=name, slug=slug, security_tier=ProductTier.Free.value)
+            organization = orm.Organization(id=workspace_id, name=name, slug=slug, tier=ProductTier.Free.value)
             owner_relationship = orm.OrganizationOwners(user_id=owner.id)
             organization.owners.append(owner_relationship)
             session.add(organization)
@@ -198,9 +196,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.delete(membership)
             await session.commit()
 
-    async def update_security_tier(
-        self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier
-    ) -> Workspace:
+    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         async with self.session_maker() as session:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
@@ -214,7 +210,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if subscription is None:
                 raise NotAllowed("Organization must have a subscription to change the security tier")
 
-            org.security_tier = security_tier.value
+            org.tier = tier.value
             await session.commit()
             await session.refresh(org)
 
