@@ -142,6 +142,35 @@ class CloudAccountNameChanged(Event):
 
 
 @frozen
+class CloudAccountActiveToggled(Event):
+    """
+    This event is emitted when a cloud account is marked active/non-active.
+    """
+
+    kind: ClassVar[str] = "cloud_account_active_toggled"
+
+    tenant_id: WorkspaceId
+    cloud_account_id: FixCloudAccountId
+    account_id: CloudAccountId
+    enabled: bool
+
+
+@frozen
+class CloudAccountScanToggled(Event):
+    """
+    This event is emitted when a cloud account is maarked active/non-active for scanning vulnerabilities.
+    """
+
+    kind: ClassVar[str] = "cloud_account_scan_toggled"
+
+    tenant_id: WorkspaceId
+    cloud_account_id: FixCloudAccountId
+    account_id: CloudAccountId
+    enabled: bool
+    scan: bool
+
+
+@frozen
 class CloudAccountCollectInfo:
     account_id: CloudAccountId
     scanned_resources: int

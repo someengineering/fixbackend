@@ -25,7 +25,6 @@ from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.types import AsyncSessionMaker
 
 
@@ -85,10 +84,6 @@ class FixDependencies(Dependencies):
     @property
     def session_maker(self) -> AsyncSessionMaker:
         return cast(AsyncSessionMaker, self.lookup[ServiceNames.session_maker])
-
-    @property
-    def inventory(self) -> InventoryService:
-        return self.service(ServiceNames.inventory, InventoryService)
 
     @property
     def readonly_redis(self) -> Redis:
