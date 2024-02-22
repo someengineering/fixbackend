@@ -65,6 +65,17 @@ class ProductTier(str, Enum):
             return _product_tier_order[self] >= _product_tier_order[other]
         return NotImplemented
 
+    @staticmethod
+    def from_str(value: str) -> "ProductTier":
+        match value:
+            # for backwards compatibility
+            case "FreeAccount":
+                return ProductTier.Free
+            case "EnterpriseAccount":
+                return ProductTier.Enterprise
+            case _:
+                return ProductTier(value)
+
 
 _product_tier_order = defaultdict(
     lambda: 0,

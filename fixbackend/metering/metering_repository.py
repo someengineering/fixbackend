@@ -77,7 +77,7 @@ class MeteringRecordEntity(Base):
             nr_of_error_messages=self.nr_of_error_messages,
             started_at=self.started_at,
             duration=self.duration,
-            product_tier=ProductTier(self.security_tier),
+            product_tier=ProductTier.from_str(self.security_tier),
         )
 
 
@@ -122,7 +122,7 @@ class MeteringRepository:
         async with self.session_maker() as session:
             async for account_id, account_name, count, tiers in await session.stream(query):
                 if count >= min_nr_of_collects:
-                    tiers = [ProductTier(t) for t in tiers.split(",")]
+                    tiers = [ProductTier.from_str(t) for t in tiers.split(",")]
 
                     max_tier = max(tiers, default=ProductTier.Free)
 

@@ -97,7 +97,7 @@ class BillingEntity(CreatedUpdatedMixin, Base):
             id=self.id,
             workspace_id=self.workspace_id,
             subscription_id=self.subscription_id,
-            tier=ProductTier(self.tier),
+            tier=ProductTier.from_str(self.tier),
             nr_of_accounts_charged=self.nr_of_accounts_charged,
             period_start=self.period_start,
             period_end=self.period_end,
