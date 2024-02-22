@@ -27,40 +27,6 @@ from enum import Enum
 from fixbackend.workspaces.models import Workspace
 
 
-class BillingEntryRead(BaseModel):
-    id: BillingId = Field(description="Id of the billing entry")
-    workspace_id: WorkspaceId = Field(description="The workspace's unique identifier")
-    subscription_id: SubscriptionId = Field(description="The subscription's unique identifier")
-    tier: ProductTier = Field(description="Product tier during the billing period")
-    period_start: datetime = Field(description="The start of the billing period")
-    period_end: datetime = Field(description="The end of the billing period")
-    nr_of_accounts_charged: int = Field(description="The number of accounts charged during the billing period")
-
-    @staticmethod
-    def from_model(billing_entry: BillingEntry) -> "BillingEntryRead":
-        return BillingEntryRead(
-            id=billing_entry.id,
-            workspace_id=billing_entry.workspace_id,
-            subscription_id=billing_entry.subscription_id,
-            tier=ProductTier(billing_entry.tier),
-            period_start=billing_entry.period_start,
-            period_end=billing_entry.period_end,
-            nr_of_accounts_charged=billing_entry.nr_of_accounts_charged,
-        )
-
-
-class AwsSubscription(BaseModel):
-    method: Literal["aws_marketplace"]
-    subscription_id: SubscriptionId = Field(description="AWS Marketplace subscription identifier")
-
-
-class NoPaymentMethod(BaseModel):
-    method: Literal["none"]
-
-
-PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
-
-
 class ProductTierRead(str, Enum):
     Trial = "Trial"
     Free = "free"  # todo: change to "Free" once the FE is updated
@@ -94,6 +60,40 @@ class ProductTierRead(str, Enum):
                 return ProductTierRead.Business
             case ProductTier.Enterprise:
                 return ProductTierRead.Enterprise
+
+
+class BillingEntryRead(BaseModel):
+    id: BillingId = Field(description="Id of the billing entry")
+    workspace_id: WorkspaceId = Field(description="The workspace's unique identifier")
+    subscription_id: SubscriptionId = Field(description="The subscription's unique identifier")
+    tier: ProductTierRead = Field(description="Product tier during the billing period")
+    period_start: datetime = Field(description="The start of the billing period")
+    period_end: datetime = Field(description="The end of the billing period")
+    nr_of_accounts_charged: int = Field(description="The number of accounts charged during the billing period")
+
+    @staticmethod
+    def from_model(billing_entry: BillingEntry) -> "BillingEntryRead":
+        return BillingEntryRead(
+            id=billing_entry.id,
+            workspace_id=billing_entry.workspace_id,
+            subscription_id=billing_entry.subscription_id,
+            tier=ProductTierRead.from_tier(billing_entry.tier),
+            period_start=billing_entry.period_start,
+            period_end=billing_entry.period_end,
+            nr_of_accounts_charged=billing_entry.nr_of_accounts_charged,
+        )
+
+
+class AwsSubscription(BaseModel):
+    method: Literal["aws_marketplace"]
+    subscription_id: SubscriptionId = Field(description="AWS Marketplace subscription identifier")
+
+
+class NoPaymentMethod(BaseModel):
+    method: Literal["none"]
+
+
+PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
