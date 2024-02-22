@@ -287,7 +287,9 @@ class InventoryService(Service):
             # strip null values from the result
             '| walk(if type == "object" then with_entries(select(.value != null)) else . end)'
         )
-        cmd = f"""search --with-edges id("{resource_id}") <-[0:2]-> | jq --no-rewrite '{jq_arg}'"""
+        cmd = (
+            f"""search --with-edges id("{resource_id}") <-[0:2]-> | refine-resource-data | jq --no-rewrite '{jq_arg}'"""
+        )
         resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
