@@ -23,7 +23,7 @@ BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
 
 
-NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams"]
+NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams", "opsgenie"]
 ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 
 

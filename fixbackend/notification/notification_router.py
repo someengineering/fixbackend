@@ -11,26 +11,25 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import timedelta
 import logging
-from typing import Annotated, Dict, List, Optional
+from datetime import timedelta
+from typing import Annotated, Dict, Optional, List
 from urllib.parse import urlencode
 
+import jwt
 from fastapi import APIRouter, Depends, Request, Response, Query, HTTPException, Body
 from fastapi_users.jwt import decode_jwt, generate_jwt
 from fixcloudutils.types import Json
-
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.permissions.models import WorkspacePermissions
-from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
-import jwt
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
@@ -237,9 +236,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_pagerduty(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
+        name: Annotated[str, Query()],
+        integration_key: Annotated[str, Query()],
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
-        name: str = Query(),
-        integration_key: str = Query(),
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         if not name or not integration_key:
@@ -251,13 +250,31 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         log.info("Pagerduty integration added successfully")
         return Response(status_code=204)
 
+    @router.put("/{workspace_id}/notification/add/opsgenie")
+    async def add_opsgenie(
+        user: AuthenticatedUser,
+        workspace_id: WorkspaceId,
+        name: Annotated[str, Query()],
+        api_key: Annotated[str, Query()],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
+    ) -> Response:
+        set_context(workspace_id=workspace_id, user_id=user.id)
+        if not name or not api_key:
+            raise HTTPException(status_code=400, detail="Missing api key")
+        config = dict(api_key=api_key)
+        # store token and webhook url
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_notification_provider_config(workspace_id, "opsgenie", name, config)
+        log.info("Opsgenie integration added successfully")
+        return Response(status_code=204)
+
     @router.put("/{workspace_id}/notification/add/teams")
     async def add_teams(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
+        name: Annotated[str, Query()],
+        webhook_url: Annotated[str, Query()],
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
-        name: str = Query(),
-        webhook_url: str = Query(),
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         if not name or not webhook_url:
@@ -273,9 +290,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def add_email(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
+        name: Annotated[str, Query()],
+        email: Annotated[List[str], Query()],
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
-        name: str = Query(),
-        email: List[str] = Query(),
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         if not name or not email:
@@ -297,8 +314,8 @@ def notification_router(fix: FixDependencies) -> APIRouter:
     async def update_alerting_for(
         user: AuthenticatedUser,
         workspace_id: WorkspaceId,
+        setting: Annotated[Dict[BenchmarkName, AlertingSetting], Body()],
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
-        setting: Dict[BenchmarkName, AlertingSetting] = Body(),
     ) -> Response:
         set_context(workspace_id=workspace_id, user_id=user.id)
         try:
@@ -310,10 +327,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
     @router.delete("/{workspace_id}/notification/{channel}")
     async def delete_channel(
-        _: AuthenticatedUser,
         workspace_id: WorkspaceId,
         channel: NotificationProvider,
-        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)
@@ -322,10 +338,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
 
     @router.post("/{workspace_id}/notification/{channel}/test")
     async def send_test_alert(
-        _: AuthenticatedUser,
         workspace_id: WorkspaceId,
         channel: NotificationProvider,
-        authorized: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
     ) -> Response:
         set_workspace_id(workspace_id=workspace_id)
         ns = fix.service(ServiceNames.notification_service, NotificationService)

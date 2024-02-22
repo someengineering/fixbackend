@@ -54,6 +54,7 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
 )
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigRepository
+from fixbackend.notification.opsgenie.opsgenie_notification import OpsgenieNotificationSender
 from fixbackend.notification.pagerduty.pagerduty_notification import PagerDutyNotificationSender
 from fixbackend.notification.slack.slack_notification import SlackNotificationSender
 from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
@@ -105,6 +106,7 @@ class NotificationService(Service):
             "teams": TeamsNotificationSender(http_client),
             "pagerduty": PagerDutyNotificationSender(http_client),
             "email": EmailNotificationSender(self.email_sender),
+            "opsgenie": OpsgenieNotificationSender(http_client),
         }
         self.handle_events = handle_events
         self.domain_event_sender = domain_event_sender
