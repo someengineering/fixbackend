@@ -24,7 +24,7 @@ from fixbackend.billing_information.models import (
     WorkspacePaymentMethods,
 )
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import ProductTierUpdated
+from fixbackend.domain_events.events import ProductTierChanged
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier, UserId, WorkspaceId
@@ -101,13 +101,13 @@ class BillingEntryService:
             workspace = await self.workspace_repository.update_security_tier(
                 user=user, workspace_id=workspace.id, security_tier=new_product_tier
             )
-            event = ProductTierUpdated(
+            event = ProductTierChanged(
                 workspace.id,
                 user.id,
-                new_product_tier.value,
+                new_product_tier,
                 new_product_tier.paid,
                 new_product_tier > current_tier,
-                current_tier.value,
+                current_tier,
             )
             await self.domain_event_sender.publish(event)
 

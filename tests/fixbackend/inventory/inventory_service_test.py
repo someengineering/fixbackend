@@ -19,7 +19,9 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import uuid
+from datetime import timedelta
 from typing import List
 from uuid import uuid4
 
@@ -30,11 +32,25 @@ from redis.asyncio import Redis
 
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.domain_events.events import AwsAccountDeleted, CloudAccountNameChanged, WorkspaceCreated
+from fixbackend.domain_events.events import (
+    AwsAccountDeleted,
+    CloudAccountNameChanged,
+    WorkspaceCreated,
+    ProductTierChanged,
+)
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, NodeId, WorkspaceId, UserCloudAccountName, CloudName
+from fixbackend.ids import (
+    CloudAccountId,
+    FixCloudAccountId,
+    NodeId,
+    WorkspaceId,
+    UserCloudAccountName,
+    CloudName,
+    UserId,
+    ProductTier,
+)
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import (
@@ -49,6 +65,7 @@ from fixbackend.inventory.schemas import (
     ReportConfig,
     SortOrder,
 )
+from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
 
@@ -135,6 +152,8 @@ def mocked_answers(
                     ignore_benchmarks=["b1"],
                 )
             )
+        elif request.url.path == "/config/resoto.core":
+            return json_response(json.loads(request.content))
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
 
@@ -330,11 +349,13 @@ async def test_workspace_created(
         if request.url.path == "/graph/resoto":
             assert request.headers["FixGraphDbCreateDatabase"] == "true"
             return json_response({"id": "root", "reported": {"kind": "graph_root", "name": "root"}})
+        elif request.url.path == "/config/resoto.core":
+            return json_response(json.loads(request.content))
         raise ValueError(f"Unexpected request: {request.url}: {content}")
 
     request_handler_mock.append(inventory_call)
     await inventory_service._process_workspace_created(WorkspaceCreated(workspace.id, user.id))
-    assert len(inventory_requests) == 1
+    assert len(inventory_requests) == 2
 
 
 @pytest.mark.asyncio
@@ -375,4 +396,16 @@ async def test_config(
     )
     assert await inventory_service.report_config(graph_db_access) == ReportConfig(
         ignore_checks=["a", "b"], ignore_benchmarks=["b1"], override_values={"foo": "bla"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_retention_period(
+    inventory_service: InventoryService,
+    mocked_answers: RequestHandlerMock,
+    workspace: Workspace,
+) -> None:
+    await inventory_service.change_db_retention_period(workspace.id, timedelta(days=10))
+    await inventory_service._process_product_tier_changed(
+        ProductTierChanged(workspace.id, UserId(uid()), ProductTier.Enterprise, True, True, ProductTier.Plus)
     )
