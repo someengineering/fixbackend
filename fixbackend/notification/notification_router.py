@@ -251,6 +251,24 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         log.info("Pagerduty integration added successfully")
         return Response(status_code=204)
 
+    @router.put("/{workspace_id}/notification/add/opsgenie")
+    async def add_opsgenie(
+        user: AuthenticatedUser,
+        workspace_id: WorkspaceId,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_settings))],
+        name: str = Query(),
+        api_key: str = Query(),
+    ) -> Response:
+        set_context(workspace_id=workspace_id, user_id=user.id)
+        if not name or not api_key:
+            raise HTTPException(status_code=400, detail="Missing api key")
+        config = dict(api_key=api_key)
+        # store token and webhook url
+        ns = fix.service(ServiceNames.notification_service, NotificationService)
+        await ns.update_notification_provider_config(workspace_id, "opsgenie", name, config)
+        log.info("Opsgenie integration added successfully")
+        return Response(status_code=204)
+
     @router.put("/{workspace_id}/notification/add/teams")
     async def add_teams(
         user: AuthenticatedUser,
