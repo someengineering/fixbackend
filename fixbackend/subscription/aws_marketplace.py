@@ -176,9 +176,10 @@ class AwsMarketplaceHandler(Service):
                         ws_id, start=last_charged, end=billing_time, min_resources_collected=100, min_nr_of_collects=3
                     )
                 ]
+
                 tiers = [summary.product_tier for summary in summaries]
                 # highest recorded tier
-                product_tier = max(tiers)
+                product_tier = max(tiers, default=ProductTier.Free)
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
                 if product_tier == ProductTier.Free or usage == 0:
@@ -186,6 +187,7 @@ class AwsMarketplaceHandler(Service):
                     # move the charge timestamp tp
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
+
                 log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
                 AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
                 billing_entry = await self.subscription_repo.add_billing_entry(
