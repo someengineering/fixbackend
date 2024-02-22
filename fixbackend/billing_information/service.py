@@ -98,8 +98,8 @@ class BillingEntryService:
                     )
 
         if new_product_tier:
-            workspace = await self.workspace_repository.update_security_tier(
-                user=user, workspace_id=workspace.id, security_tier=new_product_tier
+            workspace = await self.workspace_repository.update_product_tier(
+                user=user, workspace_id=workspace.id, tier=new_product_tier
             )
             event = ProductTierChanged(
                 workspace.id,

@@ -35,7 +35,7 @@ class Organization(Base):
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization", lazy="joined")
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
-    security_tier: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    tier: Mapped[str] = mapped_column(String(length=64), nullable=False)
 
     def to_model(self) -> models.Workspace:
         return models.Workspace(
@@ -45,7 +45,7 @@ class Organization(Base):
             external_id=self.external_id,
             owners=[UserId(owner.user_id) for owner in self.owners],
             members=[UserId(member.user_id) for member in self.members],
-            product_tier=ProductTier.from_str(self.security_tier),
+            product_tier=ProductTier.from_str(self.tier),
         )
 
 

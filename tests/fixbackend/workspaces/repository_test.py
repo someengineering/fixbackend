@@ -154,10 +154,10 @@ async def test_update_security_tier(
     current_tier = workspace.product_tier
     assert current_tier == ProductTier.Free
 
-    updated = await workspace_repository.update_security_tier(user, workspace.id, ProductTier.Enterprise)
+    updated = await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Enterprise)
     assert updated.product_tier == ProductTier.Enterprise
 
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace("not_subscribed", "not_subscribed", user)
     with pytest.raises(Exception):
-        await workspace_repository.update_security_tier(user, without_subscription.id, ProductTier.Enterprise)
+        await workspace_repository.update_product_tier(user, without_subscription.id, ProductTier.Enterprise)
