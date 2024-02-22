@@ -41,6 +41,7 @@ from fixbackend.ids import (
     BenchmarkName,
     ReportSeverity,
     NotificationProvider,
+    ProductTier,
 )
 
 T = TypeVar("T")
@@ -142,6 +143,35 @@ class CloudAccountNameChanged(Event):
 
 
 @frozen
+class CloudAccountActiveToggled(Event):
+    """
+    This event is emitted when a cloud account is marked active/non-active.
+    """
+
+    kind: ClassVar[str] = "cloud_account_active_toggled"
+
+    tenant_id: WorkspaceId
+    cloud_account_id: FixCloudAccountId
+    account_id: CloudAccountId
+    enabled: bool
+
+
+@frozen
+class CloudAccountScanToggled(Event):
+    """
+    This event is emitted when a cloud account is maarked active/non-active for scanning vulnerabilities.
+    """
+
+    kind: ClassVar[str] = "cloud_account_scan_toggled"
+
+    tenant_id: WorkspaceId
+    cloud_account_id: FixCloudAccountId
+    account_id: CloudAccountId
+    enabled: bool
+    scan: bool
+
+
+@frozen
 class CloudAccountCollectInfo:
     account_id: CloudAccountId
     scanned_resources: int
@@ -185,15 +215,15 @@ class UserJoinedWorkspace(Event):
 
 
 @frozen
-class ProductTierUpdated(Event):
-    kind: ClassVar[str] = "product_tier_updated"
+class ProductTierChanged(Event):
+    kind: ClassVar[str] = "product_tier_changed"
 
     workspace_id: WorkspaceId
     user_id: UserId
-    product_tier: str
+    product_tier: ProductTier
     is_paid_tier: bool
     is_higher_tier: bool
-    previous_tier: str
+    previous_tier: ProductTier
 
 
 @frozen

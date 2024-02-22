@@ -645,7 +645,9 @@ async def test_handle_account_discovered_assume_role_failure(
 
     assert after_configured is not None
     assert after_configured.privileged is False
-    assert after_configured.state == CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+    assert after_configured.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), enabled=True, scan=True
+    )
     assert after_configured.workspace_id == account.workspace_id
     assert after_configured.account_name == account.account_name
     assert after_configured.id == account.id
@@ -689,7 +691,9 @@ async def test_handle_account_discovered_list_accounts_success(
     assert after_discovered.account_id == account.account_id
     assert after_discovered.privileged is True
 
-    assert after_discovered.state == CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+    assert after_discovered.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), enabled=True, scan=True
+    )
 
 
 @pytest.mark.asyncio
@@ -731,7 +735,9 @@ async def test_handle_account_discovered_list_aliases_success(
     assert after_discovered.id == account.id
     assert after_discovered.account_id == account.account_id
     assert after_discovered.privileged is False
-    assert after_discovered.state == CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+    assert after_discovered.state == CloudAccountStates.Configured(
+        AwsCloudAccess(external_id, role_name), enabled=True, scan=True
+    )
 
 
 @pytest.mark.asyncio
@@ -749,29 +755,23 @@ async def test_enable_disable_cloud_account(
 
     # account is not configured, cannot be enabled
     with pytest.raises(Exception):
-        await service.enable_cloud_account(WorkspaceId(uuid.uuid4()), account.id)
+        await service.update_cloud_account_enabled(WorkspaceId(uuid.uuid4()), account.id, enabled=True)
 
     repository.accounts[account.id] = evolve(
         account,
-        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=False),
+        state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=False, scan=False),
         privileged=False,
     )
 
     # success
-    updated = await service.enable_cloud_account(
-        test_workspace_id,
-        account.id,
-    )
+    updated = await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=True)
     assert isinstance(updated.state, CloudAccountStates.Configured)
     assert updated.state.access == AwsCloudAccess(external_id, role_name)
     assert updated.privileged is False
     assert updated.state.enabled is True
     assert isinstance(repository.accounts[account.id].state, CloudAccountStates.Configured)
 
-    updated = await service.disable_cloud_account(
-        test_workspace_id,
-        account.id,
-    )
+    updated = await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=False)
     assert isinstance(updated.state, CloudAccountStates.Configured)
     assert updated.state.access == AwsCloudAccess(external_id, role_name)
     assert updated.privileged is False
@@ -785,10 +785,7 @@ async def test_enable_disable_cloud_account(
     )
 
     with pytest.raises(Exception):
-        await service.enable_cloud_account(
-            test_workspace_id,
-            account.id,
-        )
+        await service.update_cloud_account_enabled(test_workspace_id, account.id, enabled=True)
 
     # wrong tenant id
     with pytest.raises(Exception):
@@ -906,7 +903,7 @@ async def test_handle_cf_sqs_message(
 
     # Handle Delete Message
     repository.accounts[account.id] = evolve(
-        account, state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True)
+        account, state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True)
     )
     account = await service.process_cf_stack_event(notification("Delete", str(account.id)))
     assert account is not None

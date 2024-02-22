@@ -124,8 +124,8 @@ class AEUserJoinedWorkspace(AnalyticsEvent):
 
 
 @frozen
-class AEProductTierUpdated(AnalyticsEvent):
-    kind: ClassVar[str] = "fix_product_tier_updated"
+class AEProductTierChanged(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_product_tier_changed"
     workspace_id: WorkspaceId
     product_tier: str
 

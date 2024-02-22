@@ -68,6 +68,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         role_name: Optional[AwsRoleName] = None
         external_id: Optional[ExternalId] = None
         enabled = False
+        scan = False
         error: Optional[str] = None
         state: Optional[str] = None
         match account_state:
@@ -79,9 +80,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 external_id = external_id
                 state = CloudAccountStates.Discovered.state_name
 
-            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled):
+            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), ex_enabled, ex_scan):
                 external_id = external_id
-                enabled = enabled
+                enabled = ex_enabled
+                scan = ex_scan
                 state = CloudAccountStates.Configured.state_name
 
             case CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), error):
@@ -103,6 +105,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         orm_cloud_account.state = state
         orm_cloud_account.error = error
         orm_cloud_account.enabled = enabled
+        orm_cloud_account.scan = scan
 
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         """Create a cloud account."""

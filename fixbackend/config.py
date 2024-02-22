@@ -15,11 +15,17 @@
 import os
 import sys
 from argparse import ArgumentParser, Namespace
+from collections import defaultdict
+from datetime import timedelta
 from typing import Annotated, Literal, Optional, Sequence, List, Tuple
 from pathlib import Path
+
+from attr import frozen
 from fastapi import Depends
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from fixbackend.ids import ProductTier
 
 
 class Config(BaseSettings):
@@ -194,3 +200,26 @@ def config() -> Config:
 
 
 ConfigDependency = Annotated[Config, Depends(config)]
+
+
+@frozen
+class ProductTierSetting:
+    retention_period: timedelta
+    seats_included: int
+    seats_max: Optional[int]
+
+
+Free = ProductTierSetting(retention_period=timedelta(days=31), seats_included=1, seats_max=1)
+Trial = ProductTierSetting(retention_period=timedelta(days=183), seats_included=1, seats_max=1)
+ProductTierSettings = defaultdict(
+    lambda: Free,
+    {
+        ProductTier.Free: Free,
+        ProductTier.Trial: Trial,
+        ProductTier.Plus: ProductTierSetting(retention_period=timedelta(days=92), seats_included=2, seats_max=20),
+        ProductTier.Business: ProductTierSetting(retention_period=timedelta(days=183), seats_included=5, seats_max=50),
+        ProductTier.Enterprise: ProductTierSetting(
+            retention_period=timedelta(days=549), seats_included=20, seats_max=None
+        ),
+    },
+)
