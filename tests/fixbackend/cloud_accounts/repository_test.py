@@ -53,7 +53,7 @@ async def test_create_cloud_account(
     account_states: List[CloudAccountState] = [
         CloudAccountStates.Detected(),
         CloudAccountStates.Discovered(cloud_access),
-        CloudAccountStates.Configured(cloud_access, enabled=True),
+        CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
         CloudAccountStates.Deleted(),
     ]

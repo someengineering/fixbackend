@@ -527,10 +527,11 @@ async def inventory_service(
     inventory_client: InventoryClient,
     graph_database_access_manager: GraphDatabaseAccessManager,
     domain_event_subscriber: DomainEventSubscriber,
+    cloud_account_repository: CloudAccountRepository,
     redis: Redis,
 ) -> AsyncIterator[InventoryService]:
     async with InventoryService(
-        inventory_client, graph_database_access_manager, domain_event_subscriber, redis
+        inventory_client, graph_database_access_manager, cloud_account_repository, domain_event_subscriber, redis
     ) as service:
         yield service
 

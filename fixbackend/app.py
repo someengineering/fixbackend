@@ -159,7 +159,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.domain_event_subscriber,
             DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
         )
-        deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+        cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
@@ -167,7 +167,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
         inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
         inventory_service = deps.add(
             SN.inventory,
-            InventoryService(inventory_client, graph_db_access, domain_event_subscriber, temp_store_redis),
+            InventoryService(
+                inventory_client, graph_db_access, cloud_account_repo, domain_event_subscriber, temp_store_redis
+            ),
         )
         fixbackend_events = deps.add(
             SN.domain_event_redis_stream_publisher,
@@ -292,7 +294,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             DomainEventSubscriber(readwrite_redis, cfg, "dispatching"),
         )
         temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url))
-        cloud_accounts = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+        cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
         next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
@@ -336,7 +338,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         # in dispatching we do not want to handle domain events: leave it to the app
         inventory_service = deps.add(
             SN.inventory,
-            InventoryService(inventory_client, graph_db_access, None, temp_store_redis),
+            InventoryService(inventory_client, graph_db_access, cloud_account_repo, None, temp_store_redis),
         )
         notification_service = deps.add(
             SN.notification_service,
@@ -379,7 +381,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.dispatching,
             DispatcherService(
                 readwrite_redis,
-                cloud_accounts,
+                cloud_account_repo,
                 next_run_repo,
                 metering_repo,
                 collect_queue,

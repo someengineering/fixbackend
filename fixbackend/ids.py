@@ -34,11 +34,12 @@ class CloudNames:
 
 class ProductTier(str, Enum):
     # do not change the values of these enums, or things will break
-    Free = "FreeAccount"
+    Trial = "Trial"
+    Free = "Free"
     # Paid Tiers
-    Plus = "PlusAccount"
-    Business = "BusinessAccount"
-    Enterprise = "EnterpriseAccount"
+    Plus = "Plus"
+    Business = "Business"
+    Enterprise = "Enterprise"
 
     @property
     def paid(self) -> bool:
@@ -66,5 +67,12 @@ class ProductTier(str, Enum):
 
 
 _product_tier_order = defaultdict(
-    lambda: 0, {ProductTier.Free: 1, ProductTier.Plus: 2, ProductTier.Business: 3, ProductTier.Enterprise: 4}
+    lambda: 0,
+    {
+        ProductTier.Trial: 0,
+        ProductTier.Free: 1,
+        ProductTier.Plus: 2,
+        ProductTier.Business: 3,
+        ProductTier.Enterprise: 4,
+    },
 )

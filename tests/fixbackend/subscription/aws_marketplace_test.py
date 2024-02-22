@@ -96,7 +96,7 @@ async def test_create_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "Enterprise", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
@@ -149,7 +149,7 @@ async def test_create_daily_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "Enterprise", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
