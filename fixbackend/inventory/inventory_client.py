@@ -499,7 +499,6 @@ class InventoryClient(Service):
     async def update_config(
         self, access: GraphDatabaseAccess, config_id: str, update: Json, *, patch: bool = False
     ) -> Json:
-
         response = await self._perform(
             "PATCH" if patch else "PUT",
             f"/config/{config_id}",

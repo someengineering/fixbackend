@@ -31,6 +31,7 @@ from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 
 from fixbackend.auth.models import User
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     CloudAccountNameChanged,
@@ -220,6 +221,7 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
 async def test_no_graph_db_access(
     domain_event_subscriber: DomainEventSubscriber,
     graph_database_access_manager: GraphDatabaseAccessManager,
+    cloud_account_repository: CloudAccountRepository,
     redis: Redis,
 ) -> None:
     async def app(_: Request) -> Response:
@@ -227,7 +229,9 @@ async def test_no_graph_db_access(
 
     async_client = AsyncClient(transport=MockTransport(app))
     async with InventoryClient("http://localhost:8980", client=async_client) as client:
-        service = InventoryService(client, graph_database_access_manager, domain_event_subscriber, redis)
+        service = InventoryService(
+            client, graph_database_access_manager, cloud_account_repository, domain_event_subscriber, redis
+        )
         empty = CheckSummary(
             available_checks=0,
             failed_checks=0,

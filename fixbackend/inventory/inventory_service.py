@@ -25,7 +25,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 from itertools import islice
-from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping
+from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping, Union
 
 from fixcloudutils.asyncio.timed import timed
 from fixcloudutils.redis.cache import RedisCache
@@ -35,12 +35,15 @@ from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
 from fixbackend.config import ProductTierSettings, Trial
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     TenantAccountsCollected,
     CloudAccountNameChanged,
     WorkspaceCreated,
     ProductTierChanged,
+    CloudAccountScanToggled,
+    CloudAccountActiveToggled,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -102,12 +105,14 @@ class InventoryService(Service):
         self,
         client: InventoryClient,
         db_access_manager: GraphDatabaseAccessManager,
+        cloud_account_repository: CloudAccountRepository,
         domain_event_subscriber: Optional[DomainEventSubscriber],
         redis: Redis,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
+        self.cloud_account_repository = cloud_account_repository
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
         if sub := domain_event_subscriber:
             sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
@@ -115,6 +120,8 @@ class InventoryService(Service):
             sub.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
             sub.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
             sub.subscribe(ProductTierChanged, self._process_product_tier_changed, Inventory)
+            sub.subscribe(CloudAccountScanToggled, self._configure_disabled_accounts, Inventory)
+            sub.subscribe(CloudAccountActiveToggled, self._configure_disabled_accounts, Inventory)
 
     async def start(self) -> Any:
         await self.cache.start()
@@ -168,6 +175,17 @@ class InventoryService(Service):
                 "resoto.core",
                 {"resotocore": {"graph_update": {"keep_history_for_days": retention_period.days}}},
                 patch=True,
+            )
+
+    async def _configure_disabled_accounts(
+        self, event: Union[CloudAccountScanToggled, CloudAccountActiveToggled]
+    ) -> None:
+        if db := await self.db_access_manager.get_database_access(event.tenant_id):
+            acs = await self.cloud_account_repository.list_by_workspace_id(event.tenant_id, ready_for_collection=True)
+            disabled = [a.account_id for a in acs if not a.enabled_for_scanning()]
+            log.info(f"Cloud account scan toggled. Following accounts are disabled: {disabled}.")
+            await self.client.update_config(
+                db, "resoto.report.config", {"report_config": {"ignore_accounts": disabled}}, patch=True
             )
 
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
@@ -289,7 +307,9 @@ class InventoryService(Service):
             # strip null values from the result
             '| walk(if type == "object" then with_entries(select(.value != null)) else . end)'
         )
-        cmd = f"""search --with-edges id("{resource_id}") <-[0:2]-> | jq --no-rewrite '{jq_arg}'"""
+        cmd = (
+            f"""search --with-edges id("{resource_id}") <-[0:2]-> | refine-resource-data | jq --no-rewrite '{jq_arg}'"""
+        )
         resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []

@@ -49,6 +49,7 @@ class GcpCloudAccess(CloudAccess):
     cloud: ClassVar[CloudName] = CloudNames.GCP
 
 
+@frozen
 class CloudAccountState(ABC):
     state_name: ClassVar[str]
 
@@ -99,6 +100,7 @@ class CloudAccountStates:
         state_name: ClassVar[str] = "configured"
         access: CloudAccess
         enabled: bool  # is enabled for collection
+        scan: bool  # is enabled for security scanning
 
         def cloud_access(self) -> Optional[CloudAccess]:
             return self.access
@@ -152,3 +154,6 @@ class CloudAccount:
 
     def final_name(self) -> Optional[str]:
         return self.user_account_name or self.account_name or self.account_alias
+
+    def enabled_for_scanning(self) -> bool:
+        return self.state.scan if isinstance(self.state, CloudAccountStates.Configured) else False
