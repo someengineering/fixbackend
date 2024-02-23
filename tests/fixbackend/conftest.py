@@ -42,7 +42,6 @@ from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.analytics_event_sender import NoAnalyticsEventSender
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
-from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -64,6 +63,7 @@ from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
+from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
