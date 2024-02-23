@@ -132,7 +132,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     message_processor=self.process_cf_stack_event,
                     consider_failed_after=timedelta(minutes=5),
                     max_nr_of_messages_in_one_batch=1,
-                    wait_for_new_messages_to_arrive=timedelta(seconds=10),
+                    wait_for_new_messages_to_arrive=timedelta(seconds=20),
                 )
                 if cf_stack_queue_url
                 else None
