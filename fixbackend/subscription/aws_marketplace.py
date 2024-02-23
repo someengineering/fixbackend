@@ -67,6 +67,11 @@ def compute_billing_period_factor(
 
 
 AccountsCharged = Counter("aws_marketplace_accounts_charged", "Accounts charged by security tier", ["product_tier"])
+ProductTierToMarketplaceDimension = {
+    ProductTier.Plus: "PlusAccount",
+    ProductTier.Business: "BusinessAccount",
+    ProductTier.Enterprise: "EnterpriseAccount",
+}
 
 
 class AwsMarketplaceHandler(Service):
@@ -219,11 +224,13 @@ class AwsMarketplaceHandler(Service):
             UsageRecords=[
                 dict(
                     CustomerIdentifier=subscription.customer_identifier,
-                    Dimension=entry.tier.value,
+                    Dimension=dimension,
                     Quantity=entry.nr_of_accounts_charged,
                     Timestamp=utc_str(entry.period_end),
                 )
                 for subscription, entry in entries
+                # only report to AWS with a valid dimension
+                if (dimension := ProductTierToMarketplaceDimension.get(entry.tier))
             ],
         )
         if len(result.get("UnprocessedRecords", [])) > 0:

@@ -1,5 +1,7 @@
 from datetime import timedelta
 from typing import Dict, Any, List, Tuple
+
+from fixbackend.auth.models import User
 from fixbackend.ids import ProductTier
 
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -7,6 +9,7 @@ from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.metering.metering_repository_test import create_metering_record
 
 
@@ -40,12 +43,17 @@ async def test_report_no_usage(
     billing_service: BillingService,
     boto_answers: Dict[str, Any],
     boto_requests: List[Tuple[str, Any]],
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+    user: User,
 ) -> None:
     # BatchMeterUsage request is successful
     boto_answers["BatchMeterUsage"] = {
         "Results": [{"MeteringRecordId": "123", "Status": "Success"}],
         "UnprocessedRecords": [],
     }
+    # define a paid tier: otherwise nothing will be reported to AWS
+    await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Business)
     assert subscription.next_charge_timestamp
     before_next_charge = subscription.next_charge_timestamp - timedelta(days=1)
     after_next_charge = subscription.next_charge_timestamp + timedelta(days=1)
