@@ -73,9 +73,9 @@ class SQSRawListener(Service):
         self.queue_url = queue_url
         self.message_processor = message_processor
         self.consider_failed_after = int(consider_failed_after.total_seconds()) if consider_failed_after else 30
-        self.max_nr_of_messages_in_one_batch = max_nr_of_messages_in_one_batch or 10
+        self.max_nr_of_messages_in_one_batch = max_nr_of_messages_in_one_batch or 1
         self.wait_for_new_messages_to_arrive = (
-            int(wait_for_new_messages_to_arrive.total_seconds()) if wait_for_new_messages_to_arrive else 1
+            int(wait_for_new_messages_to_arrive.total_seconds()) if wait_for_new_messages_to_arrive else 20
         )
         self.do_not_retry_message_more_than = do_not_retry_message_more_than
         self.backoff = backoff or NoBackoff
