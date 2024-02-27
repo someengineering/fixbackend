@@ -157,3 +157,8 @@ async def test_search_history(mocked_inventory_client: InventoryClient) -> None:
     )
     result = [n async for n in response]
     assert len(result) == 1
+
+
+async def test_call_json(mocked_inventory_client: InventoryClient) -> None:
+    response = await mocked_inventory_client.call_json(db_access, "GET", "/graph/fix/node/some_node_id")
+    assert isinstance(response, dict)
