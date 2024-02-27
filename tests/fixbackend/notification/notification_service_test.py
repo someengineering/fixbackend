@@ -114,7 +114,7 @@ async def test_example_alert(notification_service: NotificationService) -> None:
     now = utc()
     one_year_ago = now - timedelta(days=365)
     ws_id = WorkspaceId(uid())
-    access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "resoto", "", "resoto")
+    access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "fix", "", "fix")
     result = await notification_service._load_alert(
         access,
         BenchmarkName("aws_cis_2_0"),
@@ -160,7 +160,7 @@ async def test_send_alert(
             return json_response(["aws_cis_2_0"])
         elif request.url.path == "/report/checks":
             return json_response([example_check])
-        elif request.url.path == "/graph/resoto/search/history/list":
+        elif request.url.path == "/graph/fix/search/history/list":
             return nd_json_response(
                 [dict(count=123, group=dict(check="aws_c1", severity="high", benchmark="aws_cis_2_0"))]
             )

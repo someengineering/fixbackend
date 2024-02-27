@@ -117,20 +117,20 @@ def mocked_answers(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
                  {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
+        elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
             return nd_json_response(
                 [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "medium"}, "count": 50000},  # fmt: skip
                  {"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "high"}, "count": 4321},  # fmt: skip
                  {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp", "severity": "medium"}, "count": 12345}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
+        elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
             return nd_json_response(
                 [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "count": 8},  # fmt: skip
                  {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "count": 2}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/node/some_node_id":
+        elif request.url.path == "/graph/fix/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
-        elif request.url.path == "/graph/resoto/model":
+        elif request.url.path == "/graph/fix/model":
             return json_response([{"fqn": "123", "metadata": {"name": "Some name"}}])
         elif request.url.path == "/timeseries/infected_resources":
             return nd_json_response(
@@ -145,14 +145,14 @@ def mocked_answers(
                     {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
                 ]
             )
-        elif request.url.path == "/config/resoto.report.config":
+        elif request.url.path == "/config/fix.report.config":
             return json_response(
                 dict(
                     report_config=dict(ignore_checks=["a", "b"], override_values={"foo": "bla"}),
                     ignore_benchmarks=["b1"],
                 )
             )
-        elif request.url.path == "/config/resoto.core":
+        elif request.url.path == "/config/fix.core":
             return json_response(json.loads(request.content))
         else:
             raise AttributeError(f"Unexpected request: {request.url.path} with content {content}")
@@ -321,9 +321,9 @@ async def test_account_deleted(
     user: User,
 ) -> None:
     async def inventory_call(request: Request) -> Response:
-        if request.url.path == "/graph/resoto/search/list":
+        if request.url.path == "/graph/fix/search/list":
             return nd_json_response([{"id": "123", "reported": {}}])
-        elif request.url.path == "/graph/resoto/node/123":
+        elif request.url.path == "/graph/fix/node/123":
             return json_response({})
         raise ValueError(f"Unexpected request: {request.url}")
 
@@ -346,10 +346,10 @@ async def test_workspace_created(
 ) -> None:
     async def inventory_call(request: Request) -> Response:
         content = request.content.decode("utf-8")
-        if request.url.path == "/graph/resoto":
+        if request.url.path == "/graph/fix":
             assert request.headers["FixGraphDbCreateDatabase"] == "true"
             return json_response({"id": "root", "reported": {"kind": "graph_root", "name": "root"}})
-        elif request.url.path == "/config/resoto.core":
+        elif request.url.path == "/config/fix.core":
             return json_response(json.loads(request.content))
         raise ValueError(f"Unexpected request: {request.url}: {content}")
 
@@ -366,9 +366,9 @@ async def test_process_account_name(
     inventory_requests: List[Request],
 ) -> None:
     async def inventory_call(request: Request) -> Response:
-        if request.url.path == "/graph/resoto/search/list":
+        if request.url.path == "/graph/fix/search/list":
             return nd_json_response([{"id": "123", "reported": {}}])
-        elif request.url.path == "/graph/resoto/node/123":
+        elif request.url.path == "/graph/fix/node/123":
             return json_response({})
         raise ValueError(f"Unexpected request: {request.url}")
 
