@@ -16,7 +16,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
 from fixbackend.billing_information import models
 
@@ -150,8 +150,8 @@ class WorkspaceBillingSettingsRead(BaseModel):
 
 
 class WorkspaceBillingSettingsUpdate(BaseModel):
-    workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
-    security_tier: ProductTierRead = Field(description="The product tier of this workspace")
+    workspace_payment_method: Optional[PaymentMethod] = Field(description="The payment method selected for workspace")
+    security_tier: Optional[ProductTierRead] = Field(description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {

@@ -75,17 +75,33 @@ class BillingEntryService:
         new_product_tier: Optional[ProductTier] = None,
         new_payment_method: Optional[PaymentMethod] = None,
     ) -> Workspace:
-        if new_product_tier is not None:
-            if new_product_tier != ProductTier.Free and new_payment_method is PaymentMethods.NoPaymentMethod():
-                raise NotAllowed("Payment method is required for non-free tiers")
-
         current_tier = workspace.product_tier
-        if current_tier != ProductTier.Free and new_payment_method is not None:
-            # at this point we could silently downgrade the security tier to free,
-            # but explicit is better than implicit so the user must move to the free tier first
-            if new_payment_method == PaymentMethods.NoPaymentMethod():
-                raise NotAllowed("Cannot remove payment method for non-free tiers")
+        current_payment_methods = await self.get_payment_methods(workspace, user.id)
 
+        def payment_method_available() -> bool:
+            new_payment_method_provided = (
+                new_payment_method is not None and new_payment_method is not PaymentMethods.NoPaymentMethod()
+            )
+            has_existing_payment_method = current_payment_methods.current is not PaymentMethods.NoPaymentMethod()
+            return new_payment_method_provided or has_existing_payment_method
+
+        # validate the product tier update
+        if new_product_tier is not None:
+            # non-free tiers require a valid payment method
+            if new_product_tier != ProductTier.Free and not payment_method_available():
+                raise NotAllowed("You must have a payment method to use non-free tiers")
+
+        # validate the payment method update
+        if new_payment_method is not None:
+            # the payment method must be assigned to the workspace
+            if new_payment_method not in current_payment_methods.available:
+                raise NotAllowed("The payment method is not available for this workspace")
+
+            # removing the payment method is not allowed for non-free tiers
+            if new_payment_method is PaymentMethods.NoPaymentMethod() and current_tier != ProductTier.Free:
+                raise NotAllowed("Cannot remove payment method for non-free tiers, downgrade the tier first")
+
+        # update the payment method
         if new_payment_method:
             match new_payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
@@ -97,6 +113,7 @@ class BillingEntryService:
                         workspace_id=workspace.id, subscription_id=None
                     )
 
+        # update the product tier
         if new_product_tier:
             workspace = await self.workspace_repository.update_product_tier(
                 user=user, workspace_id=workspace.id, tier=new_product_tier
