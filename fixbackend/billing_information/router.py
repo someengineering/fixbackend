@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 
@@ -29,7 +29,7 @@ from fixbackend.billing_information.schemas import (
 )
 from fixbackend.billing_information.service import BillingEntryServiceDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import SubscriptionId
+from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
@@ -69,16 +69,21 @@ def billing_info_router() -> APIRouter:
     ) -> WorkspaceBillingSettingsRead:
         """Update a workspace billing."""
 
-        def payment_method(method: schemas.PaymentMethod) -> PaymentMethod:
-            match method:
+        def payment_method(billing: WorkspaceBillingSettingsUpdate) -> Optional[PaymentMethod]:
+            match billing.workspace_payment_method:
                 case schemas.NoPaymentMethod():
                     return PaymentMethods.NoPaymentMethod()
                 case schemas.AwsSubscription():
-                    return PaymentMethods.AwsSubscription(method.subscription_id)
+                    return PaymentMethods.AwsSubscription(billing.workspace_payment_method.subscription_id)
+                case None:
+                    return None
 
-        ws = await billing_info_service.update_billing(
-            user, workspace, billing.security_tier.to_tier(), payment_method(billing.workspace_payment_method)
-        )
+        def product_tier(billing: WorkspaceBillingSettingsUpdate) -> Optional[ProductTier]:
+            if billing.security_tier is None:
+                return None
+            return billing.security_tier.to_tier()
+
+        ws = await billing_info_service.update_billing(user, workspace, product_tier(billing), payment_method(billing))
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
 
         return WorkspaceBillingSettingsRead.from_model(ws, payment_methods)
