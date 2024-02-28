@@ -88,7 +88,7 @@ class BillingEntryService:
         # validate the product tier update
         if new_product_tier is not None:
             # non-free tiers require a valid payment method
-            if new_product_tier != ProductTier.Free and not payment_method_available():
+            if ProductTier.paid and not payment_method_available():
                 raise NotAllowed("You must have a payment method to use non-free tiers")
 
         # validate the payment method update
@@ -98,7 +98,7 @@ class BillingEntryService:
                 raise NotAllowed("The payment method is not available for this workspace")
 
             # removing the payment method is not allowed for non-free tiers
-            if new_payment_method is PaymentMethods.NoPaymentMethod() and current_tier != ProductTier.Free:
+            if new_payment_method is PaymentMethods.NoPaymentMethod() and current_tier.paid:
                 raise NotAllowed("Cannot remove payment method for non-free tiers, downgrade the tier first")
 
         # update the payment method
