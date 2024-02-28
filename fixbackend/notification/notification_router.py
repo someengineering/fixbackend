@@ -118,7 +118,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         #   "incoming_webhook": {
         #     "channel": "#name",
         #     "channel_id": "xxx",
-        #     "configuration_url": "https://resoto.slack.com/services/xxxx",
+        #     "configuration_url": "https://fix.slack.com/services/xxxx",
         #     "url": "https://hooks.slack.com/services/xxxx/xxxx"
         # }}
         log.debug("Slack confirm: got this data from oauth.v2.access: %s", data)

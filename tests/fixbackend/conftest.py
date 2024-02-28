@@ -361,11 +361,11 @@ def benchmark_json() -> List[Json]:
 def example_check() -> Json:
     return {
         "categories": [],
-        "detect": {"resoto": "is(aws_s3_bucket)"},
+        "detect": {"fix": "is(aws_s3_bucket)"},
         "id": "aws_c1",
         "provider": "aws",
         "remediation": {
-            "kind": "resoto_core_report_check_remediation",
+            "kind": "fix_core_report_check_remediation",
             "text": "You can enable Public Access Block at the account level to prevent the exposure of your data stored in S3.",
             "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
         },
