@@ -150,14 +150,15 @@ class WorkspaceBillingSettingsRead(BaseModel):
 
 
 class WorkspaceBillingSettingsUpdate(BaseModel):
-    workspace_payment_method: Optional[PaymentMethod] = Field(description="The payment method selected for workspace")
-    security_tier: Optional[ProductTierRead] = Field(description="The product tier of this workspace")
+    workspace_payment_method: Optional[PaymentMethod] = Field(
+        default=None, description="The payment method selected for workspace"
+    )
+    security_tier: Optional[ProductTierRead] = Field(default=None, description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "payment_method": "aws_marketplace",
                     "workspace_payment_method": {
                         "method": "aws_marketplace",
                         "subscription_id": "00000000-0000-0000-0000-000000000000",
