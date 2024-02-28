@@ -46,7 +46,6 @@ from fixbackend.notification.email.email_sender import (
 )
 from fixbackend.notification.model import (
     WorkspaceAlert,
-    AllowedNotificationProvider,
     AlertSender,
     AlertOnChannel,
     FailingBenchmarkChecksDetected,
@@ -101,12 +100,12 @@ class NotificationService(Service):
         self.provider_config_repo = NotificationProviderConfigRepository(session_maker)
         self.workspace_alert_repo = WorkspaceAlertRepository(session_maker)
         self.alert_sender: Dict[NotificationProvider, AlertSender] = {
-            "discord": DiscordNotificationSender(http_client),
-            "slack": SlackNotificationSender(http_client),
-            "teams": TeamsNotificationSender(http_client),
-            "pagerduty": PagerDutyNotificationSender(http_client),
-            "email": EmailNotificationSender(self.email_sender),
-            "opsgenie": OpsgenieNotificationSender(http_client),
+            NotificationProvider.discord: DiscordNotificationSender(http_client),
+            NotificationProvider.slack: SlackNotificationSender(http_client),
+            NotificationProvider.teams: TeamsNotificationSender(http_client),
+            NotificationProvider.pagerduty: PagerDutyNotificationSender(http_client),
+            NotificationProvider.email: EmailNotificationSender(self.email_sender),
+            NotificationProvider.opsgenie: OpsgenieNotificationSender(http_client),
         }
         self.handle_events = handle_events
         self.domain_event_sender = domain_event_sender
@@ -177,7 +176,7 @@ class NotificationService(Service):
                 if benchmark not in benchmark_ids:
                     raise ValueError(f"Benchmark {benchmark} not found")
                 for channel in setting.channels:
-                    if channel not in AllowedNotificationProvider:
+                    if channel not in NotificationProvider:
                         raise ValueError(f"Unknown channel {channel}")
             return await self.workspace_alert_repo.set_alerting_for_workspace(alert)
         raise ValueError(f"Workspace {alert.workspace_id} does not have GraphDbAccess?")

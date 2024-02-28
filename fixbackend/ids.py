@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import NewType, Any, Literal
 from uuid import UUID
 
@@ -23,7 +23,15 @@ BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
 
 
-NotificationProvider = Literal["email", "slack", "discord", "pagerduty", "teams", "opsgenie"]
+class NotificationProvider(StrEnum):
+    email = "email"
+    slack = "slack"
+    discord = "discord"
+    pagerduty = "pagerduty"
+    teams = "teams"
+    opsgenie = "opsgenie"
+
+
 ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 
 
