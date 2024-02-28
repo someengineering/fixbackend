@@ -88,7 +88,7 @@ class BillingEntryService:
         # validate the product tier update
         if new_product_tier is not None:
             # non-free tiers require a valid payment method
-            if ProductTier.paid and not payment_method_available():
+            if new_product_tier.paid and not payment_method_available():
                 raise NotAllowed("You must have a payment method to use non-free tiers")
 
         # validate the payment method update
