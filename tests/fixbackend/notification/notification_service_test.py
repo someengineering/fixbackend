@@ -24,7 +24,15 @@ from httpx import AsyncClient, Request, Response
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId, TaskId, FixCloudAccountId, CloudAccountId, NodeId, BenchmarkName
+from fixbackend.ids import (
+    NotificationProvider as NP,
+    WorkspaceId,
+    TaskId,
+    FixCloudAccountId,
+    CloudAccountId,
+    NodeId,
+    BenchmarkName,
+)
 from fixbackend.notification.email.email_messages import SecurityScanFinished
 from fixbackend.notification.model import (
     WorkspaceAlert,
@@ -33,7 +41,6 @@ from fixbackend.notification.model import (
     FailedBenchmarkCheck,
     VulnerableResource,
     AlertOnChannel,
-    AllowedNotificationProvider,
 )
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.utils import uid
@@ -114,7 +121,7 @@ async def test_example_alert(notification_service: NotificationService) -> None:
     now = utc()
     one_year_ago = now - timedelta(days=365)
     ws_id = WorkspaceId(uid())
-    access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "resoto", "", "resoto")
+    access = GraphDatabaseAccess(ws_id, "http://localhost:8529", "fix", "", "fix")
     result = await notification_service._load_alert(
         access,
         BenchmarkName("aws_cis_2_0"),
@@ -138,7 +145,7 @@ async def test_marshal_unmarshal_alerts() -> None:
         examples=[FailedBenchmarkCheck("test", "Some title", "high", 23, [resource, resource])],
         ui_link="https://foo.com",
     )
-    on_channel = AlertOnChannel(alert, "email")
+    on_channel = AlertOnChannel(alert, NP.email)
     js = on_channel.to_json()
     json.dumps(js)  # check that it is json serializable
     again = AlertOnChannel.from_json(js)
@@ -160,7 +167,7 @@ async def test_send_alert(
             return json_response(["aws_cis_2_0"])
         elif request.url.path == "/report/checks":
             return json_response([example_check])
-        elif request.url.path == "/graph/resoto/search/history/list":
+        elif request.url.path == "/graph/fix/search/history/list":
             return nd_json_response(
                 [dict(count=123, group=dict(check="aws_c1", severity="high", benchmark="aws_cis_2_0"))]
             )
@@ -185,9 +192,9 @@ async def test_send_alert(
     ws_id = graph_db_access.workspace_id
     mocked_answers.insert(0, request_handler)
     await notification_service.update_notification_provider_config(
-        ws_id, "discord", "test", {"webhook_url": "https://discord.com/webhook_example"}
+        ws_id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
     )
-    setting = AlertingSetting(severity="high", channels=["discord"])
+    setting = AlertingSetting(severity="high", channels=[NP.discord])
     aws_cis_2_0 = BenchmarkName("aws_cis_2_0")
     await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={aws_cis_2_0: setting}))
     event = TenantAccountsCollected(
@@ -227,32 +234,30 @@ async def test_alert_settings(notification_service: NotificationService, workspa
     # insert provider configs
     repo = notification_service.provider_config_repo
     ws_id = workspace.id
-    await repo.update_messaging_config_for_workspace(ws_id, "email", "test", {"test": "test"})
-    await repo.update_messaging_config_for_workspace(ws_id, "discord", "test", {"test": "test"})
-    await repo.update_messaging_config_for_workspace(ws_id, "slack", "test", {"test": "test"})
-    await repo.update_messaging_config_for_workspace(ws_id, "pagerduty", "test", {"test": "test"})
-    await repo.update_messaging_config_for_workspace(ws_id, "teams", "test", {"test": "test"})
+    for np in NP:
+        await repo.update_messaging_config_for_workspace(ws_id, np, "test", {"test": "test"})
     # define alert settings
     alerting = WorkspaceAlert(
         workspace_id=ws_id,
         alerts={
-            BenchmarkName("foo"): AlertingSetting(severity="high", channels=list(AllowedNotificationProvider)),
-            BenchmarkName("bla"): AlertingSetting(severity="critical", channels=list(AllowedNotificationProvider)),
-            BenchmarkName("bar"): AlertingSetting(severity="info", channels=list(AllowedNotificationProvider)),
+            BenchmarkName("foo"): AlertingSetting(severity="high", channels=list(NP)),
+            BenchmarkName("bla"): AlertingSetting(severity="critical", channels=list(NP)),
+            BenchmarkName("bar"): AlertingSetting(severity="info", channels=list(NP)),
         },
     )
     await notification_service.workspace_alert_repo.set_alerting_for_workspace(alerting)
     # remove provider configs
-    await notification_service.delete_notification_provider_config(ws_id, "email")
-    await notification_service.delete_notification_provider_config(ws_id, "discord")
-    await notification_service.delete_notification_provider_config(ws_id, "slack")
+    await notification_service.delete_notification_provider_config(ws_id, NP.email)
+    await notification_service.delete_notification_provider_config(ws_id, NP.discord)
+    await notification_service.delete_notification_provider_config(ws_id, NP.slack)
     # check that alert settings are still there
     alerting = await notification_service.workspace_alert_repo.alerting_for(ws_id)  # type: ignore
+    assert alerting is not None
     for setting in alerting.alerts.values():
-        assert set(setting.channels) == {"pagerduty", "teams"}
+        assert set(setting.channels) == {NP.pagerduty, NP.teams, NP.opsgenie}
     # get config
     config = await notification_service.list_notification_provider_configs(ws_id)
-    assert set(config.keys()) == {"pagerduty", "teams"}
+    assert set(config.keys()) == {NP.pagerduty, NP.teams, NP.opsgenie}
 
 
 @pytest.mark.asyncio
@@ -265,10 +270,10 @@ async def test_send_test_alert(
     # setup
     ws_id = graph_db_access.workspace_id
     await notification_service.update_notification_provider_config(
-        ws_id, "discord", "test", {"webhook_url": "https://discord.com/webhook_example"}
+        ws_id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
     )
     # test alert
-    await notification_service.send_test_alert(ws_id, "discord")
+    await notification_service.send_test_alert(ws_id, NP.discord)
     # ensure that an alert was created
     assert len(inventory_requests) == 1
     assert str(inventory_requests[0].url) == "https://discord.com/webhook_example"

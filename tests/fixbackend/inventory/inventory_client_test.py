@@ -53,25 +53,25 @@ def mocked_inventory_client(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
                  {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
-        elif request.url.path == "/graph/resoto/search/list":
+        elif request.url.path == "/graph/fix/search/list":
             return nd_json_response([dict(id="123", reported={})])
-        elif request.url.path == "/graph/resoto/search/history/list":
+        elif request.url.path == "/graph/fix/search/history/list":
             return nd_json_response([dict(id="123", reported={})])
-        elif request.method == "DELETE" and request.url.path == "/graph/resoto/node/123":
+        elif request.method == "DELETE" and request.url.path == "/graph/fix/node/123":
             return nd_json_response([dict(id="123", reported={})])
-        elif request.url.path == "/graph/resoto/property/attributes":
+        elif request.url.path == "/graph/fix/property/attributes":
             return nd_json_response(["prop_a", "prop_b", "prop_c"])
-        elif request.url.path == "/graph/resoto/property/values":
+        elif request.url.path == "/graph/fix/property/values":
             return nd_json_response(["val_a", "val_b", "val_c"])
-        elif request.url.path == "/graph/resoto/property/path/complete":
+        elif request.url.path == "/graph/fix/property/path/complete":
             cpl = CompletePathRequest.model_validate_json(request.content)
             assert cpl == CompletePathRequest(path="test", prop="bla", fuzzy=True, limit=1, skip=2, kinds=["a"])
             return json_response({"a": "string", "b": "int32", "c": "boolean"}, {"Total-Count": "12"})
-        elif request.url.path == "/graph/resoto/model":
+        elif request.url.path == "/graph/fix/model":
             return json_response([aws_ec2_model_json])
-        elif request.method == "GET" and request.url.path == "/graph/resoto/node/some_node_id":
+        elif request.method == "GET" and request.url.path == "/graph/fix/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
-        elif request.method == "PATCH" and request.url.path == "/graph/resoto/node/some_node_id":
+        elif request.method == "PATCH" and request.url.path == "/graph/fix/node/some_node_id":
             js = json.loads(request.content)
             azure_virtual_machine_resource_json["reported"] = azure_virtual_machine_resource_json["reported"] | js
             return json_response(azure_virtual_machine_resource_json)
@@ -157,3 +157,8 @@ async def test_search_history(mocked_inventory_client: InventoryClient) -> None:
     )
     result = [n async for n in response]
     assert len(result) == 1
+
+
+async def test_call_json(mocked_inventory_client: InventoryClient) -> None:
+    response = await mocked_inventory_client.call_json(db_access, "GET", "/graph/fix/node/some_node_id")
+    assert isinstance(response, dict)

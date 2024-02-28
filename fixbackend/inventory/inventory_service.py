@@ -172,8 +172,8 @@ class InventoryService(Service):
             log.info(f"Change retention period for database: {workspace_id}: {retention_period}")
             await self.client.update_config(
                 access,
-                "resoto.core",
-                {"resotocore": {"graph_update": {"keep_history_for_days": retention_period.days}}},
+                "fix.core",
+                {"fixcore": {"graph_update": {"keep_history_for_days": retention_period.days}}},
                 patch=True,
             )
 
@@ -185,7 +185,7 @@ class InventoryService(Service):
             disabled = [a.account_id for a in acs if not a.enabled_for_scanning()]
             log.info(f"Cloud account scan toggled. Following accounts are disabled: {disabled}.")
             await self.client.update_config(
-                db, "resoto.report.config", {"report_config": {"ignore_accounts": disabled}}, patch=True
+                db, "fix.report.config", {"report_config": {"ignore_accounts": disabled}}, patch=True
             )
 
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
@@ -204,7 +204,7 @@ class InventoryService(Service):
 
     @timed("fixbackend", "report_config")
     async def report_config(self, db: GraphDatabaseAccess) -> ReportConfig:
-        js = await self.client.config(db, "resoto.report.config")
+        js = await self.client.config(db, "fix.report.config")
         v = js.get("report_config", {})
         v["ignore_benchmarks"] = js.get("ignore_benchmarks", [])
         return ReportConfig.model_validate(v)
@@ -213,7 +213,7 @@ class InventoryService(Service):
     async def update_report_config(self, db: GraphDatabaseAccess, config: ReportConfig) -> None:
         js = config.model_dump()
         update = dict(ignore_benchmarks=js.pop("ignore_benchmarks", None), report_config=js)
-        await self.client.update_config(db, "resoto.report.config", update)
+        await self.client.update_config(db, "fix.report.config", update)
 
     @timed("fixbackend", "benchmark")
     async def benchmark(

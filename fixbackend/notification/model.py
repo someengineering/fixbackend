@@ -17,7 +17,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache, partial
-from typing import Dict, List, Optional, cast, Set
+from typing import Dict, List, Optional, cast
 from uuid import UUID
 
 from attr import frozen, define
@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 
 from fixbackend.ids import WorkspaceId, NodeId, BenchmarkName, NotificationProvider, ReportSeverity
 
-AllowedNotificationProvider: Set[NotificationProvider] = {"email", "slack", "discord", "pagerduty", "teams"}
 SeverityEmoji = defaultdict(lambda: "⚠️", {"info": "ℹ️", "low": "🌱", "medium": "⚠️", "high": "🔥", "critical": "💥"})
 
 

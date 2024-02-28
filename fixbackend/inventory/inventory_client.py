@@ -55,7 +55,8 @@ MediaTypeText = "text/plain"
 MediaTypeJson = "application/json"
 MediaTypeNdJson = "application/ndjson"
 ExpectMediaTypeNdJson = {"application/x-ndjson", MediaTypeNdJson}
-
+DefaultGraph = "fix"
+DefaultSection = "reported"
 log = logging.getLogger(__name__)
 
 
@@ -143,7 +144,7 @@ class InventoryClient(Service):
                 assert media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}"
             return response
 
-    async def create_database(self, access: GraphDatabaseAccess, *, graph: str = "resoto") -> None:
+    async def create_database(self, access: GraphDatabaseAccess, *, graph: str = DefaultGraph) -> None:
         log.info(f"Create new database for tenant: {access.workspace_id}")
         # Create a new database and an empty graph
         await self._perform(
@@ -172,8 +173,8 @@ class InventoryClient(Service):
         access: GraphDatabaseAccess,
         query: str,
         *,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Search list with query: {query}")
         response = await self._perform(
@@ -194,8 +195,8 @@ class InventoryClient(Service):
         before: Optional[datetime] = None,
         after: Optional[datetime] = None,
         change: Optional[List[HistoryChange]] = None,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Search list with query: {query}")
         params: Dict[str, str] = {"section": section}
@@ -220,8 +221,8 @@ class InventoryClient(Service):
         access: GraphDatabaseAccess,
         query: str,
         *,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> AsyncIteratorWithContext[Json]:
         log.info(f"Aggregate with query: {query}")
         response = await self._perform(
@@ -310,7 +311,7 @@ class InventoryClient(Service):
         *,
         cloud: str,
         account_id: CloudAccountId,
-        graph: str = "resoto",
+        graph: str = DefaultGraph,
     ) -> None:
         log.info(f"Delete account {account_id} from cloud {cloud}")
         query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
@@ -323,8 +324,8 @@ class InventoryClient(Service):
         access: GraphDatabaseAccess,
         *,
         request: CompletePathRequest,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> Tuple[int, Dict[str, str]]:
         log.info(
             f"Complete property path path={request.path}, prop={request.prop}, kinds={len(request.kinds or [])}, "
@@ -352,8 +353,8 @@ class InventoryClient(Service):
         limit: int = 10,
         skip: int = 0,
         count: bool = False,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> AsyncIteratorWithContext[JsonElement]:
         log.info(f"Get possible values with query: {query}, prop_or_predicate: {prop_or_predicate} on detail: {detail}")
         params = {
@@ -374,7 +375,7 @@ class InventoryClient(Service):
         )
         return AsyncIteratorWithContext(response)
 
-    async def resource(self, access: GraphDatabaseAccess, *, id: NodeId, graph: str = "resoto") -> Optional[Json]:
+    async def resource(self, access: GraphDatabaseAccess, *, id: NodeId, graph: str = DefaultGraph) -> Optional[Json]:
         log.info(f"Get resource with id: {id}")
         headers = self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeText)
         response = await self._perform(
@@ -403,7 +404,7 @@ class InventoryClient(Service):
         with_properties: bool = True,
         with_relatives: bool = True,
         with_metadata: bool = True,
-        graph: str = "resoto",
+        graph: str = DefaultGraph,
     ) -> List[Json]:
         log.info(f"Get model with flat={flat}, with_bases={with_bases}, with_property_kinds={with_property_kinds}")
         params = {
@@ -471,8 +472,8 @@ class InventoryClient(Service):
         node_id: NodeId,
         patch: Json,
         *,
-        graph: str = "resoto",
-        section: str = "reported",
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
     ) -> Json:
         log.info(f"Update node with id: {id}")
         response = await self._perform(

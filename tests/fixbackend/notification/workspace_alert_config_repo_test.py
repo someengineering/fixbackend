@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pytest
 
-from fixbackend.ids import WorkspaceId, BenchmarkName
+from fixbackend.ids import NotificationProvider, WorkspaceId, BenchmarkName
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
@@ -26,8 +26,8 @@ async def test_alerting_rule_repo(async_session_maker: AsyncSessionMaker) -> Non
     ws1 = WorkspaceId(uid())
     alert = await repo.alerting_for(ws1)
     assert alert is None
-    slack = AlertingSetting(severity="info", channels=["slack"])
-    pd = AlertingSetting(severity="critical", channels=["pagerduty"])
+    slack = AlertingSetting(severity="info", channels=[NotificationProvider.slack])
+    pd = AlertingSetting(severity="critical", channels=[NotificationProvider.pagerduty])
     a = BenchmarkName("a")
     b = BenchmarkName("b")
     c = BenchmarkName("c")
