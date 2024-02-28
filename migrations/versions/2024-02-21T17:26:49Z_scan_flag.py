@@ -25,6 +25,6 @@ def upgrade() -> None:
     except OperationalError:
         pass  # column already exists
     # all existing configured and enabled accounts should be scanned
-    op.execute("UPDATE cloud_account SET scan = true WHERE is_configured = true and enabled = true and scan is null")
+    op.execute("UPDATE cloud_account SET scan = true WHERE state='configured' and enabled = true")
     # everything else should not be scanned
     op.execute("UPDATE cloud_account SET scan = false WHERE scan is null")
