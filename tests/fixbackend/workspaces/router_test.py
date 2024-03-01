@@ -43,6 +43,8 @@ user = User(
     is_verified=True,
     is_active=True,
     is_superuser=False,
+    is_mfa_active=False,
+    otp_secret=None,
     oauth_accounts=[],
     roles=[UserRole(user_id, ws_id, Roles.workspace_owner)],
 )

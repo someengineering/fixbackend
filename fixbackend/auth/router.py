@@ -184,7 +184,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         credentials: OAuth2PasswordRequestForm = Depends(),
         user_manager: UserManager = Depends(get_user_manager),
         strategy: FixJWTStrategy = Depends(auth_backend.get_strategy),
-    ):
+    ) -> Response:
         user = await user_manager.authenticate(credentials)
 
         if user is None or not user.is_active:
@@ -198,7 +198,11 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 detail=ErrorCode.LOGIN_USER_NOT_VERIFIED,
             )
         if user.is_mfa_active:
-            if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(credentials.client_secret):
+            if (
+                (otp_secret := user.otp_secret) is None
+                or (client_secret := credentials.client_secret) is None
+                or not pyotp.TOTP(otp_secret).verify(client_secret)
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
                     detail="MFA_NOT_PROVIDED_OR_INVALID",

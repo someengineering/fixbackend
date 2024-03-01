@@ -18,9 +18,11 @@ import jwt
 import pytest
 from fastapi import Request, FastAPI
 from httpx import AsyncClient
+from pyotp import TOTP
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import User
+from fixbackend.auth.user_repository import UserRepository
 from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
 from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
@@ -120,6 +122,7 @@ async def test_registration_flow(
     fast_api: FastAPI,
     domain_event_sender: InMemoryDomainEventPublisher,
     workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
@@ -199,3 +202,39 @@ async def test_registration_flow(
     event1 = domain_event_sender.events[0]
     assert isinstance(event1, WorkspaceCreated)
     assert str(event1.workspace_id) == workspace_json["id"]
+
+    # mfa can be added and enabled
+    response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "image/svg+xml"
+    usr = await user_repository.get(user.id)
+    assert usr and usr.otp_secret, "otp secret is not set!"
+    totp = TOTP(usr.otp_secret)
+    response = await api_client.post(
+        "/api/auth/mfa/enable", data={"client_secret": totp.now()}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 204
+
+    # login now requires mfa
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 428
+
+    # login with secret works
+    response = await api_client.post("/api/auth/jwt/login", data=login_json | {"client_secret": totp.now()})
+    assert response.status_code == 204
+
+    # mfa can-not be disabled without secret
+    response = await api_client.post(
+        "/api/auth/mfa/disable", data={"client_secret": "t"}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 428
+
+    # mfa can be disabled with secret
+    response = await api_client.post(
+        "/api/auth/mfa/disable", data={"client_secret": totp.now()}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 204
+
+    # login without mfa works
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 204
