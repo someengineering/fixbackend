@@ -11,13 +11,14 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+from io import BytesIO
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import pyotp
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import segno
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router import ErrorCode
@@ -36,6 +37,8 @@ from fixbackend.config import Config
 from fixbackend.ids import UserId
 
 log = getLogger(__name__)
+
+OTP_Logo_URL = "https://cdn.some.engineering/assets/fix-logos/fix-logo-512.png"
 
 
 async def get_auth_url(
@@ -122,6 +125,59 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         include_in_schema=False,
     )
 
+    @router.post("/mfa/add")
+    async def add_mfa(user: AuthenticatedUser, user_manager: UserManager = Depends(get_user_manager)) -> Response:
+        if user.is_mfa_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA already enabled",
+            )
+        # create a new one-time password
+        user_secret = pyotp.random_base32()
+        totp = pyotp.totp.TOTP(user_secret)
+        # create QR code
+        totp_url = totp.provisioning_uri(name=user.email, issuer_name="Fix", image=OTP_Logo_URL)
+        qr_code = segno.make_qr(totp_url)
+        buffer = BytesIO()
+        qr_code.save(buffer, kind="svg")
+        buffer.seek(0)
+        qr_svg = buffer.read().decode()
+        # store the secret
+        await user_manager.user_repository.update(user, {"otp_secret": user_secret, "is_mfa_active": False})
+        # return the qr code
+        return Response(content=qr_svg, media_type="image/svg+xml")
+
+    @router.post("/mfa/enable")
+    async def enable_mfa(
+        user: AuthenticatedUser, client_secret: str = Form(), user_manager: UserManager = Depends(get_user_manager)
+    ) -> Response:
+        if user.is_mfa_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA already enabled",
+            )
+        if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(client_secret):
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail="MFA_NOT_PROVIDED_OR_INVALID",
+            )
+        await user_manager.user_repository.update(user, {"is_mfa_active": True})
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.post("/mfa/disable")
+    async def disable_mfa(
+        user: AuthenticatedUser, client_secret: str = Form(), user_manager: UserManager = Depends(get_user_manager)
+    ) -> Response:
+        if user.is_mfa_active:
+            if (secret := user.otp_secret) is not None and not pyotp.TOTP(secret).verify(client_secret):
+                raise HTTPException(
+                    status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                    detail="MFA_NOT_PROVIDED_OR_INVALID",
+                )
+            await user_manager.user_repository.update(user, {"is_mfa_active": False, "otp_secret": None})
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # TODO: remove jwt from path
     @router.post("/jwt/login", name=f"auth:{auth_backend.name}.login")
     async def login(
         request: Request,
@@ -141,16 +197,17 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.LOGIN_USER_NOT_VERIFIED,
             )
-        if user.mfa_active:
+        if user.is_mfa_active:
             if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(credentials.client_secret):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                    detail="2FA_NOT_PROVIDED_OR_INVALID",
+                    detail="MFA_NOT_PROVIDED_OR_INVALID",
                 )
         response = await auth_backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)
         return response
 
+    # TODO: remove jwt from path
     @router.post("/jwt/logout", name=f"auth:{auth_backend.name}.logout")
     async def logout(
         user_token: Tuple[Optional[User], Optional[str]] = Depends(

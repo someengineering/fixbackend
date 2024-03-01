@@ -55,7 +55,7 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
     otp_secret: Mapped[str] = mapped_column(String(length=64), nullable=True)
-    mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    is_mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
 
     def to_model(self) -> models.User:
@@ -68,7 +68,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_verified=self.is_verified,
             oauth_accounts=[acc.to_model() for acc in self.oauth_accounts],
             otp_secret=self.otp_secret,
-            mfa_active=self.mfa_active,
+            is_mfa_active=self.is_mfa_active,
             roles=[],
         )
 
@@ -82,6 +82,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_superuser=user.is_superuser,
             is_verified=user.is_verified,
             otp_secret=user.otp_secret,
-            mfa_active=user.mfa_active,
+            is_mfa_active=user.is_mfa_active,
             oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
         )

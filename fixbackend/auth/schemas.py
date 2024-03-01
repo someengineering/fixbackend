@@ -21,7 +21,7 @@ from fixbackend.notification.user_notification_repo import UserNotificationSetti
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
-    pass
+    is_mfa_active: bool = Field(description="Whether MFA is active")
 
 
 class UserCreate(schemas.BaseUserCreate):

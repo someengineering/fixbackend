@@ -43,7 +43,7 @@ class User(UserOAuthProtocol[UserId, OAuthAccount]):
     is_active: bool
     is_superuser: bool
     is_verified: bool
-    mfa_active: bool
+    is_mfa_active: bool
     otp_secret: Optional[str]
     oauth_accounts: List[OAuthAccount]
     roles: List[UserRole]

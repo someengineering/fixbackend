@@ -23,6 +23,6 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     try:
         op.add_column("user", sa.Column("otp_secret", sa.String(length=64), nullable=True))
-        op.add_column("user", sa.Column("mfa_active", sa.Boolean(), server_default=sa.false(), nullable=False))
+        op.add_column("user", sa.Column("is_mfa_active", sa.Boolean(), server_default=sa.false(), nullable=False))
     except Exception:
         logging.warning("Could not add column otp_secret to user table")
