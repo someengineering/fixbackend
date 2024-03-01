@@ -54,7 +54,7 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
-    otp_secret: Mapped[str] = mapped_column(String(length=64), nullable=True)
+    otp_secret: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     is_mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
 
