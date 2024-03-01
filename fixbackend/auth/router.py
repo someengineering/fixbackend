@@ -12,27 +12,26 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.authentication import AuthenticationBackend, Strategy
+from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
-from fixbackend.auth.oauth_clients import GithubOauthClient
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
-from starlette.routing import Route
-from fixbackend.auth.models import User
-from fixbackend.auth.user_manager import UserManagerDependency
 
-from fixbackend.auth.auth_backend import get_auth_backend
+from fixbackend.auth.auth_backend import get_auth_backend, FixJWTStrategy
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
+from fixbackend.auth.models import User
+from fixbackend.auth.oauth_clients import GithubOauthClient
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
 from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead
+from fixbackend.auth.user_manager import UserManagerDependency, UserManager, get_user_manager
 from fixbackend.config import Config
-
-from logging import getLogger
-
 from fixbackend.ids import UserId
 
 log = getLogger(__name__)
@@ -123,13 +122,31 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
     )
 
     logout_route_name = f"auth:{auth_backend.name}.logout"
-    auth_router = fastapi_users.get_auth_router(auth_backend, requires_verification=True)
-    # remove the logout route, as we have our own
-    auth_router.routes = list(
-        filter(lambda route: not (isinstance(route, Route) and route.name == logout_route_name), auth_router.routes)
-    )
 
-    @auth_router.post("/logout", name=logout_route_name)
+    @router.post("/jwt/login", name=f"auth:{auth_backend.name}.login")
+    async def login(
+        request: Request,
+        credentials: OAuth2PasswordRequestForm = Depends(),
+        user_manager: UserManager = Depends(get_user_manager),
+        strategy: FixJWTStrategy = Depends(auth_backend.get_strategy),
+    ):
+        user = await user_manager.authenticate(credentials)
+
+        if user is None or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
+            )
+        if not user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.LOGIN_USER_NOT_VERIFIED,
+            )
+        response = await auth_backend.login(strategy, user)
+        await user_manager.on_after_login(user, request, response)
+        return response
+
+    @router.post("/jwt/logout", name=logout_route_name)
     async def logout(
         user_token: Tuple[Optional[User], Optional[str]] = Depends(
             fastapi_users.authenticator.current_user_token(optional=True, active=True, verified=True)
@@ -142,12 +159,6 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
         return await auth_backend.logout(strategy, user, token)
-
-    router.include_router(
-        auth_router,
-        prefix="/jwt",
-        tags=["auth"],
-    )
 
     router.include_router(
         fastapi_users.get_register_router(user_schema=UserRead, user_create_schema=UserCreate),
