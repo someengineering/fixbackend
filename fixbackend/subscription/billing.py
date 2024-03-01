@@ -105,23 +105,22 @@ class BillingService(Service):
             async for subscription in self.subscription_repository.subscriptions(
                 active=True, next_charge_timestamp_after=now
             ):
-                if workspace_id := subscription.workspace_id:
-                    if workspace := await self.workspace_repository.get_workspace(workspace_id):
-                        # create a dummy billing entry with no usage
-                        entry = BillingEntry(
-                            id=BillingId(uid()),
-                            workspace_id=workspace_id,
-                            subscription_id=subscription.id,
-                            tier=workspace.product_tier,
-                            nr_of_accounts_charged=0,
-                            period_start=now,
-                            period_end=now,
-                            reported=False,
-                        )
-                        chunk.append((subscription, entry))
-                        if len(chunk) >= size:
-                            yield chunk
-                            chunk = []
+                for workspace in await self.workspace_repository.list_workspaces_by_subscription_id(subscription.id):
+                    # create a dummy billing entry with no usage
+                    entry = BillingEntry(
+                        id=BillingId(uid()),
+                        workspace_id=workspace.id,
+                        subscription_id=subscription.id,
+                        tier=workspace.product_tier,
+                        nr_of_accounts_charged=0,
+                        period_start=now,
+                        period_end=now,
+                        reported=False,
+                    )
+                    chunk.append((subscription, entry))
+                    if len(chunk) >= size:
+                        yield chunk
+                        chunk = []
             if len(chunk) > 0:
                 yield chunk
 

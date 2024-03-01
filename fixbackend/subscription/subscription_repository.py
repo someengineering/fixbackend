@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, List, Optional, Tuple, AsyncIterator
+from typing import Annotated, Optional, Tuple, AsyncIterator
 from fastapi import Depends
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -45,7 +45,6 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
 
     id: Mapped[SubscriptionId] = mapped_column(GUID, primary_key=True)
     user_id: Mapped[Optional[UserId]] = mapped_column(GUID, nullable=True, index=True)
-    workspace_id: Mapped[Optional[WorkspaceId]] = mapped_column(GUID, nullable=True, index=True, unique=True)
     aws_customer_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     aws_customer_account_id: Mapped[str] = mapped_column(String(128), nullable=True, default="")
     aws_product_code: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -57,7 +56,6 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         return AwsMarketplaceSubscription(
             id=self.id,
             user_id=self.user_id,
-            workspace_id=self.workspace_id,
             customer_identifier=self.aws_customer_identifier,
             customer_aws_account_id=self.aws_customer_account_id,
             product_code=self.aws_product_code,
@@ -71,7 +69,6 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         return SubscriptionEntity(
             id=subscription.id,
             user_id=subscription.user_id,
-            workspace_id=subscription.workspace_id,
             aws_customer_identifier=subscription.customer_identifier,
             aws_customer_account_id=subscription.customer_aws_account_id,
             aws_product_code=subscription.product_code,
@@ -144,12 +141,19 @@ class SubscriptionRepository:
             )
             return result.rowcount  # noqa
 
+    async def get_subscription(self, subscription_id: SubscriptionId) -> Optional[AwsMarketplaceSubscription]:
+        async with self.session_maker() as session:
+            stmt = select(SubscriptionEntity).where(SubscriptionEntity.id == subscription_id)
+            if result := (await session.execute(stmt)).scalar_one_or_none():
+                return result.to_model()
+            else:
+                return None
+
     async def subscriptions(
         self,
         *,
         user_id: Optional[UserId] = None,
         aws_customer_identifier: Optional[str] = None,
-        workspace_id: Optional[WorkspaceId] = None,
         active: Optional[bool] = None,
         next_charge_timestamp_before: Optional[datetime] = None,
         next_charge_timestamp_after: Optional[datetime] = None,
@@ -160,8 +164,6 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.user_id == user_id)
         if aws_customer_identifier:
             query = query.where(SubscriptionEntity.aws_customer_identifier == aws_customer_identifier)
-        if workspace_id:
-            query = query.where(SubscriptionEntity.workspace_id == workspace_id)
         if active is not None:
             query = query.where(SubscriptionEntity.active == active)
         if next_charge_timestamp_before:
@@ -177,18 +179,18 @@ class SubscriptionRepository:
                 async for (subscription,) in await session.stream(query):
                     yield subscription.to_model()
 
-    async def not_assigned_subscriptions(self, user_id: UserId) -> List[AwsMarketplaceSubscription]:
-        query = (
-            select(SubscriptionEntity)
-            .where(SubscriptionEntity.user_id == user_id)
-            .where(SubscriptionEntity.workspace_id == None)  # noqa
-            .where(SubscriptionEntity.active == True)  # noqa
-        )
+    # async def not_assigned_subscriptions(self, user_id: UserId) -> List[AwsMarketplaceSubscription]:
+    #     query = (
+    #         select(SubscriptionEntity)
+    #         .where(SubscriptionEntity.user_id == user_id)
+    #         .where(SubscriptionEntity.workspace_id == None)  # noqa
+    #         .where(SubscriptionEntity.active == True)  # noqa
+    #     )
 
-        async with self.session_maker() as session:
-            results = await session.execute(query)
-            subs = results.scalars().all()
-            return [sub.to_model() for sub in subs]
+    #     async with self.session_maker() as session:
+    #         results = await session.execute(query)
+    #         subs = results.scalars().all()
+    #         return [sub.to_model() for sub in subs]
 
     async def unreported_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
         async with self.session_maker() as session:
@@ -276,24 +278,24 @@ class SubscriptionRepository:
             )
             return (await session.execute(stmt)).scalar_one_or_none() is not None
 
-    async def update_subscription_for_workspace(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
-    ) -> None:
-        async with self.session_maker() as session:
-            # remove the workspace from previous subscription
-            await session.execute(
-                update(SubscriptionEntity)
-                .where(SubscriptionEntity.workspace_id == workspace_id)
-                .values(workspace_id=None)
-            )
-            # assign the workspace to the new subscription
-            if subscription_id:
-                await session.execute(
-                    update(SubscriptionEntity)
-                    .where(SubscriptionEntity.id == subscription_id)
-                    .values(workspace_id=workspace_id)
-                )
-            await session.commit()
+    # async def update_subscription_for_workspace(
+    #     self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+    # ) -> None:
+    #     async with self.session_maker() as session:
+    #         # remove the workspace from previous subscription
+    #         await session.execute(
+    #             update(SubscriptionEntity)
+    #             .where(SubscriptionEntity.workspace_id == workspace_id)
+    #             .values(workspace_id=None)
+    #         )
+    #         # assign the workspace to the new subscription
+    #         if subscription_id:
+    #             await session.execute(
+    #                 update(SubscriptionEntity)
+    #                 .where(SubscriptionEntity.id == subscription_id)
+    #                 .values(workspace_id=workspace_id)
+    #             )
+    #         await session.commit()
 
     async def list_billing_for_workspace(
         self, workspace_id: WorkspaceId

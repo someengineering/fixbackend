@@ -14,7 +14,7 @@
 
 
 from types import SimpleNamespace
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Dict, Optional, Tuple, override
 import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,8 +64,9 @@ class AwsMarketplaceHandlerMock(AwsMarketplaceHandler):
     def __init__(self) -> None:
         self.subcriptions: Dict[UserId, SubscriptionMethod] = {user.id: subscription}  # type: ignore
 
-    async def subscribed(self, user: User, token: str) -> SubscriptionMethod:
-        return self.subcriptions[user.id]
+    @override
+    async def subscribed(self, user: User, token: str) -> Tuple[SubscriptionMethod, bool]:
+        return self.subcriptions[user.id], False
 
 
 handler = AwsMarketplaceHandlerMock()
@@ -87,7 +88,7 @@ async def client(session: AsyncSession, default_config: Config) -> AsyncIterator
 async def test_aws_marketplace_fulfillment_after_login(client: AsyncClient) -> None:
     response = await client.get("/api/subscriptions/aws/marketplace/add", cookies={"fix-aws-marketplace-token": "foo"})
     assert response.status_code == 307
-    assert response.headers["location"] == "/?message=aws-marketplace-subscribed"
+    assert response.headers["location"] == f"/subscription/choose-workspace?subscription_id={subscription.id}"
 
 
 @pytest.mark.asyncio
@@ -104,4 +105,4 @@ async def test_aws_marketplace_fulfillment_no_workspace_id(client: AsyncClient) 
     handler.subcriptions[user.id] = SimpleNamespace(id=subscription.id, workspace_id=None)  # type: ignore
     response = await client.get("/api/subscriptions/aws/marketplace/add", cookies={"fix-aws-marketplace-token": "foo"})
     assert response.status_code == 307
-    assert response.headers["location"] == f"/assign-subscription?id={subscription.id}"
+    assert response.headers["location"] == f"/subscription/choose-workspace?subscription_id={subscription.id}"

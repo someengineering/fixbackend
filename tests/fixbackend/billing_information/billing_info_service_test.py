@@ -68,8 +68,27 @@ async def test_list_payment_methods(
     user: User,
 ) -> None:
 
-    # we're on the free tier:
+    # we're on the free tier and have no subscription attached:
     assert workspace.product_tier == ProductTier.Free
+    available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
+    match available_methods.current:
+        case PaymentMethods.NoPaymentMethod():
+            assert True
+        case _:
+            assert False, "Expected no payment method available"
+    assert len(available_methods.available) == 2
+    assert available_methods.available[0] == PaymentMethods.NoPaymentMethod()
+    match available_methods.available[1]:
+        case PaymentMethods.AwsSubscription(subscription_id):
+            assert subscription_id == subscription.id
+        case _:
+            assert False, "Expected subscription to be available payment method"
+
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
+
+    # on paid tier we can't get the no payment method
+    assert workspace.product_tier == ProductTier.Free
+    workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.AwsSubscription(subscription_id):
@@ -77,22 +96,7 @@ async def test_list_payment_methods(
         case _:
             assert False, "Expected aws_marketplace payment method"
     assert len(available_methods.available) == 1
-    match available_methods.available[0]:
-        case PaymentMethods.NoPaymentMethod():
-            pass
-        case _:
-            assert False, "Expected no_payment_method payment method"
-
-    # on paid tier we can't get the no payment method
-    assert workspace.product_tier == ProductTier.Free
-    workspace = await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Plus)
-    available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
-    match available_methods.current:
-        case PaymentMethods.AwsSubscription(subscription_id):
-            assert subscription_id == subscription.id
-        case _:
-            assert False, "Expected aws_marketplace payment method"
-    assert len(available_methods.available) == 0
+    assert available_methods.available[0] == PaymentMethods.AwsSubscription(subscription.id)
 
 
 @pytest.mark.asyncio
@@ -100,11 +104,13 @@ async def test_update_billing(
     subscription: AwsMarketplaceSubscription,
     billing_entry_service: BillingEntryService,
     workspace: Workspace,
+    workspace_repository: WorkspaceRepository,
     user: User,
 ) -> None:
     # we're on the free tier:
     assert workspace.product_tier == ProductTier.Free
     # update to higher tier is possible if there is a payment method
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
     workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
     assert workspace.product_tier == ProductTier.Plus
 

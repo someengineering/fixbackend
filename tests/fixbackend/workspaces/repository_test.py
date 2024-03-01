@@ -13,12 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
+from attr import evolve
 
 import pytest
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ProductTier
+from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -108,9 +110,16 @@ async def test_list_workspaces(
     await workspace_repository.add_to_workspace(workspace_id=member_only_workspace.id, user_id=user.id)
 
     # the user should be the owner of the organization
-    workspaces = await workspace_repository.list_workspaces(user.id)
+    workspaces = await workspace_repository.list_workspaces(user)
     assert len(workspaces) == 3
     assert set([o.id for o in workspaces]) == {workspace1.id, workspace2.id, member_only_workspace.id}
+
+    owner_of_ws1 = evolve(
+        user, roles=[UserRole(user_id=user.id, workspace_id=workspace1.id, role_names=Roles.workspace_billing_admin)]
+    )
+    assignable_workspaces = await workspace_repository.list_workspaces(owner_of_ws1, can_assign_subscriptions=True)
+    assert len(assignable_workspaces) == 1
+    assert assignable_workspaces[0].id == workspace1.id
 
 
 @pytest.mark.asyncio
@@ -151,13 +160,37 @@ async def test_update_security_tier(
     workspace: Workspace,
     subscription: AwsMarketplaceSubscription,
 ) -> None:
+    billing_admin = evolve(
+        user, roles=[UserRole(user_id=user.id, workspace_id=workspace.id, role_names=Roles.workspace_billing_admin)]
+    )
+
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
+
     current_tier = workspace.product_tier
     assert current_tier == ProductTier.Free
 
-    updated = await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Enterprise)
+    updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Enterprise)
     assert updated.product_tier == ProductTier.Enterprise
 
     # we can't update the security tier of an organization without a subscription
-    without_subscription = await workspace_repository.create_workspace("not_subscribed", "not_subscribed", user)
+    without_subscription = await workspace_repository.create_workspace(
+        "not_subscribed", "not_subscribed", billing_admin
+    )
     with pytest.raises(Exception):
-        await workspace_repository.update_product_tier(user, without_subscription.id, ProductTier.Enterprise)
+        await workspace_repository.update_product_tier(without_subscription.id, ProductTier.Enterprise)
+
+
+@pytest.mark.asyncio
+async def test_assign_subscription(
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+    subscription: AwsMarketplaceSubscription,
+) -> None:
+    assert workspace.subscription_id is None
+
+    workspace = await workspace_repository.update_subscription(workspace.id, subscription.id)
+    assert workspace.subscription_id == subscription.id
+
+    with_subscription = await workspace_repository.list_workspaces_by_subscription_id(subscription.id)
+    assert len(with_subscription) == 1
+    assert with_subscription[0].id == workspace.id

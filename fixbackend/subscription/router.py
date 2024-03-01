@@ -57,9 +57,9 @@ def subscription_router() -> APIRouter:
             add_url = request.scope["router"].url_path_for(AddUrlName)
             return RedirectResponse(f"/auth/login?returnUrl={add_url}")
         elif (user := maybe_user) and fix_aws_marketplace_token is not None:  # logged in and token present
-            subscription = await marketplace_handler.subscribed(user, fix_aws_marketplace_token)
-            if subscription.workspace_id is None:  # no workspace yet
-                response = RedirectResponse(f"/assign-subscription?id={subscription.id}")
+            subscription, workspace_assigned = await marketplace_handler.subscribed(user, fix_aws_marketplace_token)
+            if not workspace_assigned:
+                response = RedirectResponse(f"/subscription/choose-workspace?subscription_id={subscription.id}")
                 return response
             # load the app and show a message
             response = RedirectResponse("/?message=aws-marketplace-subscribed")

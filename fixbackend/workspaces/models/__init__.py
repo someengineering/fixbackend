@@ -17,7 +17,7 @@ from typing import List, Optional
 
 from attrs import frozen
 
-from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId, ProductTier
+from fixbackend.ids import InvitationId, SubscriptionId, WorkspaceId, UserId, ExternalId, ProductTier
 
 
 @frozen
@@ -29,6 +29,7 @@ class Workspace:
     owners: List[UserId]
     members: List[UserId]
     product_tier: ProductTier
+    subscription_id: Optional[SubscriptionId] = None
 
     def all_users(self) -> List[UserId]:
         return self.owners + self.members

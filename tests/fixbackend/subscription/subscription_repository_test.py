@@ -40,7 +40,6 @@ async def test_crud_entry(subscription_repository: SubscriptionRepository, sessi
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
-        workspace_id=WorkspaceId(uuid4()),
         customer_identifier=cid,
         customer_aws_account_id="123",
         product_code="123",
@@ -77,7 +76,6 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
-        workspace_id=None,
         customer_identifier=cid,
         customer_aws_account_id="123",
         product_code="123",
@@ -91,15 +89,6 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
     # check no workspace_id
     subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)
     assert subscription is not None
-    assert subscription.workspace_id is None
-
-    # check not_assigned_subscriptions
-    not_assigned = await subscription_repository.not_assigned_subscriptions(user_id)
-    assert len(not_assigned) == 1
-    assert not_assigned[0] == subscription
-
-    # update workspace_id
-    await subscription_repository.update_subscription_for_workspace(workspace_id, subscription.id)
 
     # list billing entries
     await subscription_repository.add_billing_entry(
@@ -110,18 +99,6 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
     billing_entry = billing_entries[0][0]
     assert billing_entry.subscription_id == subscription.id
 
-    # check workspace_id
-    subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)
-    assert subscription is not None
-    assert subscription.workspace_id == workspace_id
-
-    # check not_assigned_subscriptions
-    not_assigned = await subscription_repository.not_assigned_subscriptions(user_id)
-    assert len(not_assigned) == 0
-
-    # remove subscription from workspace
-    await subscription_repository.update_subscription_for_workspace(workspace_id, None)
-
     # existing billing entries should stay
     billing_entries = [b async for b in subscription_repository.list_billing_for_workspace(workspace_id)]
     assert len(billing_entries) == 1
@@ -131,4 +108,3 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
     # check workspace_id
     subscription = await subscription_repository.aws_marketplace_subscription(user_id, cid)
     assert subscription is not None
-    assert subscription.workspace_id is None

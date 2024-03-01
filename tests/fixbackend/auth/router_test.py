@@ -162,7 +162,7 @@ async def test_registration_flow(
     assert response_json["id"] == str(user.id)
 
     # workspace is created
-    workspaces = await workspace_repository.list_workspaces(user.id)
+    workspaces = await workspace_repository.list_workspaces(user)
     assert len(workspaces) == 1
     workspace = workspaces[0]
     await role_repo.add_roles(user.id, workspace.id, Roles.workspace_owner)

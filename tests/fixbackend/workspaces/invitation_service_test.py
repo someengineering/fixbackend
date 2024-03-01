@@ -120,7 +120,7 @@ async def test_invite_accept_user(
     # when the existinng user accepts the invite, they should be added to the workspace automatically
     # and the invitation should be deleted
     await service.accept_invitation(token)
-    assert list(map(lambda w: w.id, await workspace_repository.list_workspaces(existing_user.id))) == [workspace.id]
+    assert list(map(lambda w: w.id, await workspace_repository.list_workspaces(existing_user))) == [workspace.id]
     assert await service.list_invitations(workspace.id) == [invite]
     assert len(domain_event_sender.events) == 3
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)

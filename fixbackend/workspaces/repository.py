@@ -25,14 +25,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from fixbackend.auth.models import User
-from fixbackend.permissions.models import Roles
+from fixbackend.permissions.models import Roles, WorkspacePermissions
+from fixbackend.permissions.validator import validate_workspace_permissions
 from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserJoinedWorkspace, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ExternalId, WorkspaceId, UserId, ProductTier
+from fixbackend.ids import ExternalId, SubscriptionId, WorkspaceId, UserId, ProductTier
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
@@ -54,7 +55,7 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
+    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
         """List all workspaces where the user is a member."""
         raise NotImplementedError
 
@@ -74,8 +75,20 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         """Update a workspace security tier."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_workspaces_by_subscription_id(self, subscription_id: SubscriptionId) -> Sequence[Workspace]:
+        """List all workspaces with the assigned subscription."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_subscription(
+        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+    ) -> Workspace:
+        """Assign a subscription to a workspace."""
         raise NotImplementedError
 
 
@@ -149,7 +162,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.refresh(org)
             return org.to_model()
 
-    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
+    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
         async with self.session_maker() as session:
             statement = (
                 select(orm.Organization)
@@ -161,11 +174,41 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                     orm.Organization.id == orm.OrganizationMembers.organization_id,
                     isouter=True,
                 )
-                .where(or_(orm.OrganizationOwners.user_id == user_id, orm.OrganizationMembers.user_id == user_id))
+                .where(or_(orm.OrganizationOwners.user_id == user.id, orm.OrganizationMembers.user_id == user.id))
             )
+            results = await session.execute(statement)
+            entities = results.unique().scalars().all()
+            workspaces = [entity.to_model() for entity in entities]
+
+            if can_assign_subscriptions:
+                result = []
+                for workspace in workspaces:
+                    if validate_workspace_permissions(user, workspace.id, WorkspacePermissions.update_billing) is None:
+                        result.append(workspace)
+                return result
+            else:
+                return workspaces
+
+    async def list_workspaces_by_subscription_id(self, subscription_id: SubscriptionId) -> Sequence[Workspace]:
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.subscription_id == subscription_id)
             results = await session.execute(statement)
             orgs = results.unique().scalars().all()
             return [org.to_model() for org in orgs]
+
+    async def update_subscription(
+        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+    ) -> Workspace:
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            workspace = results.unique().scalar_one_or_none()
+            if workspace is None:
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+            workspace.subscription_id = subscription_id
+            await session.commit()
+            await session.refresh(workspace)
+            return workspace.to_model()
 
     async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
         async with self.session_maker() as session:
@@ -196,25 +239,22 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.delete(membership)
             await session.commit()
 
-    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         async with self.session_maker() as session:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
-            org = results.unique().scalar_one_or_none()
-            if org is None:
+            workspace = results.unique().scalar_one_or_none()
+            if workspace is None:
                 raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
-            subscription = await anext(
-                self.subscription_repository.subscriptions(workspace_id=workspace_id, session=session), None
-            )
-            if subscription is None:
-                raise NotAllowed("Organization must have a subscription to change the security tier")
+            if workspace.subscription_id is None:
+                raise NotAllowed("Workspace must have a subscription to change the security tier")
 
-            org.tier = tier.value
+            workspace.tier = tier.value
             await session.commit()
-            await session.refresh(org)
+            await session.refresh(workspace)
 
-            return org.to_model()
+            return workspace.to_model()
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

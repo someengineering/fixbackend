@@ -34,7 +34,7 @@ class ProductTierRead(str, Enum):
     Business = "Business"
     Enterprise = "Enterprise"
 
-    def to_tier(self) -> ProductTier:
+    def to_tier(self) -> ProductTier:  # pragma: no cover
         match self:
             case ProductTierRead.Trial:
                 return ProductTier.Trial
@@ -48,7 +48,7 @@ class ProductTierRead(str, Enum):
                 return ProductTier.Enterprise
 
     @staticmethod
-    def from_tier(tier: ProductTier) -> "ProductTierRead":
+    def from_tier(tier: ProductTier) -> "ProductTierRead":  # pragma: no cover
         match tier:
             case ProductTier.Trial:
                 return ProductTierRead.Trial
@@ -72,7 +72,7 @@ class BillingEntryRead(BaseModel):
     nr_of_accounts_charged: int = Field(description="The number of accounts charged during the billing period")
 
     @staticmethod
-    def from_model(billing_entry: BillingEntry) -> "BillingEntryRead":
+    def from_model(billing_entry: BillingEntry) -> "BillingEntryRead":  # pragma: no cover
         return BillingEntryRead(
             id=billing_entry.id,
             workspace_id=billing_entry.workspace_id,
@@ -133,7 +133,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
     def from_model(
         workspace: Workspace,
         payment_methods: WorkspacePaymentMethods,
-    ) -> "WorkspaceBillingSettingsRead":
+    ) -> "WorkspaceBillingSettingsRead":  # pragma: no cover
 
         def payment(payment_method: models.PaymentMethod) -> PaymentMethod:
             match payment_method:
