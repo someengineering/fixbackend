@@ -16,6 +16,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.authentication import AuthenticationBackend, Strategy
@@ -121,8 +122,6 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         include_in_schema=False,
     )
 
-    logout_route_name = f"auth:{auth_backend.name}.logout"
-
     @router.post("/jwt/login", name=f"auth:{auth_backend.name}.login")
     async def login(
         request: Request,
@@ -142,11 +141,17 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.LOGIN_USER_NOT_VERIFIED,
             )
+        if user.mfa_active:
+            if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(credentials.client_secret):
+                raise HTTPException(
+                    status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                    detail="2FA_NOT_PROVIDED_OR_INVALID",
+                )
         response = await auth_backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)
         return response
 
-    @router.post("/jwt/logout", name=logout_route_name)
+    @router.post("/jwt/logout", name=f"auth:{auth_backend.name}.logout")
     async def logout(
         user_token: Tuple[Optional[User], Optional[str]] = Depends(
             fastapi_users.authenticator.current_user_token(optional=True, active=True, verified=True)
