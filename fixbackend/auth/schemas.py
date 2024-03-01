@@ -62,3 +62,7 @@ class UserNotificationSettingsRead(BaseModel):
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
         )
+
+
+class OTPConfig(BaseModel):
+    uri: str = Field(description="TOTP provisioning URL")

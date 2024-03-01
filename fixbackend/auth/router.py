@@ -11,13 +11,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from io import BytesIO
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import pyotp
-import segno
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.authentication import AuthenticationBackend, Strategy
@@ -31,7 +29,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.models import User
 from fixbackend.auth.oauth_clients import GithubOauthClient
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
-from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead
+from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead, OTPConfig
 from fixbackend.auth.user_manager import UserManagerDependency, UserManager, get_user_manager
 from fixbackend.config import Config
 from fixbackend.ids import UserId
@@ -126,7 +124,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
     )
 
     @router.post("/mfa/add")
-    async def add_mfa(user: AuthenticatedUser, user_manager: UserManager = Depends(get_user_manager)) -> Response:
+    async def add_mfa(user: AuthenticatedUser, user_manager: UserManager = Depends(get_user_manager)) -> OTPConfig:
         if user.is_mfa_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -135,17 +133,10 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         # create a new one-time password
         user_secret = pyotp.random_base32()
         totp = pyotp.totp.TOTP(user_secret)
-        # create QR code
-        totp_url = totp.provisioning_uri(name=user.email, issuer_name="Fix", image=OTP_Logo_URL)
-        qr_code = segno.make_qr(totp_url)
-        buffer = BytesIO()
-        qr_code.save(buffer, kind="svg")
-        buffer.seek(0)
-        qr_svg = buffer.read().decode()
         # store the secret
         await user_manager.user_repository.update(user, {"otp_secret": user_secret, "is_mfa_active": False})
-        # return the qr code
-        return Response(content=qr_svg, media_type="image/svg+xml")
+        # return the OTP Config
+        return OTPConfig(uri=totp.provisioning_uri(name=user.email, issuer_name="Fix", image=OTP_Logo_URL))
 
     @router.post("/mfa/enable")
     async def enable_mfa(

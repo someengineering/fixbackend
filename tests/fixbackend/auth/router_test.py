@@ -13,6 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Callable, List, Optional, Sequence, Tuple, override
+from urllib.parse import parse_qs, urlparse
+
 import jwt
 
 import pytest
@@ -22,6 +24,7 @@ from pyotp import TOTP
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import User
+from fixbackend.auth.schemas import OTPConfig
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
 from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
@@ -206,10 +209,9 @@ async def test_registration_flow(
     # mfa can be added and enabled
     response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
     assert response.status_code == 200
-    assert response.headers["Content-Type"] == "image/svg+xml"
-    usr = await user_repository.get(user.id)
-    assert usr and usr.otp_secret, "otp secret is not set!"
-    totp = TOTP(usr.otp_secret)
+    otp_config = OTPConfig.model_validate(response.json())
+    qp = parse_qs(urlparse(otp_config.uri).query)
+    totp = TOTP(qp["secret"][0])
     response = await api_client.post(
         "/api/auth/mfa/enable", data={"client_secret": totp.now()}, cookies={session_cookie_name: auth_cookie}
     )
