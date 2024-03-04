@@ -15,7 +15,6 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router import ErrorCode
@@ -41,8 +40,6 @@ from fixbackend.config import Config
 from fixbackend.ids import UserId
 
 log = getLogger(__name__)
-
-OTP_Logo_URL = "https://cdn.some.engineering/assets/fix-logos/fix-logo-512.png"
 
 
 async def get_auth_url(
@@ -136,13 +133,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="MFA already enabled",
             )
-        # create a new one-time password
-        user_secret = pyotp.random_base32()
-        totp = pyotp.totp.TOTP(user_secret)
-        # store the secret
-        await user_manager.user_repository.update(user, {"otp_secret": user_secret, "is_mfa_active": False})
-        # return the OTP Config
-        return OTPConfig(uri=totp.provisioning_uri(name=user.email, issuer_name="Fix", image=OTP_Logo_URL))
+        return await user_manager.recreate_mfa(user)
 
     @router.post("/mfa/enable")
     async def enable_mfa(
@@ -153,12 +144,11 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="MFA already enabled",
             )
-        if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(otp):
+        if not await user_manager.enable_mfa(user, otp):
             raise HTTPException(
                 status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                detail="MFA_NOT_PROVIDED_OR_INVALID",
+                detail="OTP_NOT_PROVIDED_OR_INVALID",
             )
-        await user_manager.user_repository.update(user, {"is_mfa_active": True})
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.post("/mfa/disable")
@@ -169,16 +159,11 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         user_manager: UserManager = Depends(get_user_manager),
     ) -> Response:
         if user.is_mfa_active:
-            if (otp is None and recovery_code is None) or (
-                (otp_defined := otp)
-                and (secret := user.otp_secret) is not None
-                and not pyotp.TOTP(secret).verify(otp_defined)
-            ):
+            if not await user_manager.disable_mfa(user, otp, recovery_code):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                    detail="MFA_NOT_PROVIDED_OR_INVALID",
+                    detail="OTP_NOT_PROVIDED_OR_INVALID",
                 )
-            await user_manager.user_repository.update(user, {"is_mfa_active": False, "otp_secret": None})
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # TODO: remove jwt from path
@@ -202,14 +187,10 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 detail=ErrorCode.LOGIN_USER_NOT_VERIFIED,
             )
         if user.is_mfa_active:
-            if (
-                (otp_secret := user.otp_secret) is None
-                or (otp := credentials.otp) is None
-                or not pyotp.TOTP(otp_secret).verify(otp)
-            ):
+            if not await user_manager.check_otp(user, credentials.otp, credentials.recovery_code):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                    detail="MFA_NOT_PROVIDED_OR_INVALID",
+                    detail="OTP_NOT_PROVIDED_OR_INVALID",
                 )
         response = await auth_backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)

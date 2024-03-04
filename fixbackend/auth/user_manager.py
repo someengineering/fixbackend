@@ -13,9 +13,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+import secrets
 from typing import Annotated, Any, AsyncIterator, Optional
 from uuid import UUID
 
+import pyotp
 from attrs import evolve
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, exceptions
@@ -23,6 +25,7 @@ from fastapi_users.password import PasswordHelperProtocol
 from starlette.responses import Response
 
 from fixbackend.auth.models import User
+from fixbackend.auth.schemas import OTPConfig
 from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryDependency
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
@@ -211,6 +214,41 @@ class UserManager(BaseUserManager[User, UserId]):
         await self.on_after_update(user, {}, request)
 
         return user
+
+    async def recreate_mfa(self, user: User) -> OTPConfig:
+        assert not user.is_mfa_active, "User already has MFA enabled."
+        user_secret = pyotp.random_base32()
+        # create recovery codes
+        recovery_codes = [secrets.token_hex(16) for _ in range(10)]
+        # create hashes of the recovery codes
+        hashes = [self.password_helper.hash(code) for code in recovery_codes]
+        await self.user_repository.recreate_otp_secret(user.id, user_secret, is_mfa_active=False, hashes=hashes)
+        # return the OTP Config
+        return OTPConfig(secret=user_secret, recovery_codes=recovery_codes)
+
+    async def enable_mfa(self, user: User, otp: str) -> bool:
+        assert not user.is_mfa_active, "User already has MFA enabled."
+        if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp):
+            return False
+        await self.user_repository.update(user, {"is_mfa_active": True})
+        return True
+
+    async def disable_mfa(self, user: User, otp: Optional[str], recovery_code: Optional[str]) -> bool:
+        if not user.is_mfa_active:
+            return True
+        if await self.check_otp(user, otp, recovery_code):
+            await self.user_repository.update(user, {"is_mfa_active": False, "otp_secret": None})
+            return True
+        return False
+
+    async def check_otp(self, user: User, otp: Optional[str], recovery_code: Optional[str]) -> bool:
+        if not user.is_mfa_active:
+            return True
+        if (secret := user.otp_secret) and (otp_defined := otp):
+            return pyotp.TOTP(secret).verify(otp_defined)
+        if recovery_code:
+            return await self.user_repository.delete_recovery_code(user.id, recovery_code, self.password_helper)
+        return False
 
 
 async def get_user_manager(

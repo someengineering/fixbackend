@@ -12,6 +12,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from fixbackend.sqlalechemy_extensions import GUID
 
 # revision identifiers, used by Alembic.
 revision: str = "56e928e9255b"
@@ -28,3 +29,13 @@ def upgrade() -> None:
         )
     except Exception:
         logging.warning("Could not add column otp_secret to user table")
+    try:
+        op.create_table(
+            "user_mfa_recovery_code",
+            sa.Column("user_id", GUID(), nullable=False),
+            sa.Column("code_hash", sa.String(length=64), nullable=False),
+            sa.ForeignKeyConstraint(["user_id"], ["user.id"]),
+            sa.PrimaryKeyConstraint("user_id", "code_hash"),
+        )
+    except Exception:
+        logging.warning("Could not create table user_mfa_recovery_code")

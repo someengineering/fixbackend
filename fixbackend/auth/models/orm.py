@@ -16,12 +16,13 @@
 from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
-from sqlalchemy import String, Boolean
+from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
 from fixbackend.base_model import Base
 from fixbackend.ids import UserId
+from fixbackend.sqlalechemy_extensions import GUID
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
@@ -53,10 +54,19 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
         )
 
 
+class UserMFARecoveryCode(Base):
+    __tablename__ = "user_mfa_recovery_code"
+    user_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(length=64), primary_key=True)
+
+
 class User(SQLAlchemyBaseUserTableUUID, Base):
     otp_secret: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     is_mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
+    mfa_recovery_codes: Mapped[List[UserMFARecoveryCode]] = relationship(
+        "UserMFARecoveryCode", backref="user", lazy="joined"
+    )
 
     def to_model(self) -> models.User:
         return models.User(

@@ -13,31 +13,28 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Callable, List, Optional, Sequence, Tuple, override
-from urllib.parse import parse_qs, urlparse
 
 import jwt
-
 import pytest
 from fastapi import Request, FastAPI
 from httpx import AsyncClient
 from pyotp import TOTP
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.auth.models import User
 from fixbackend.auth.schemas import OTPConfig
 from fixbackend.auth.user_repository import UserRepository
-from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
-from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
-from fixbackend.auth.auth_backend import session_cookie_name
-from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
+from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
+from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
-
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -211,8 +208,7 @@ async def test_registration_flow(
     response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
     assert response.status_code == 200
     otp_config = OTPConfig.model_validate(response.json())
-    qp = parse_qs(urlparse(otp_config.uri).query)
-    totp = TOTP(qp["secret"][0])
+    totp = TOTP(otp_config.secret)
     response = await api_client.post(
         "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
     )

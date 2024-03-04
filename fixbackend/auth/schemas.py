@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -94,4 +94,5 @@ class UserNotificationSettingsRead(BaseModel):
 
 
 class OTPConfig(BaseModel):
-    uri: str = Field(description="TOTP provisioning URL")
+    secret: str = Field(description="TOTP secret")
+    recovery_codes: List[str] = Field(description="List of recovery codes")
