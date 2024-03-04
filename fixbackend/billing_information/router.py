@@ -105,8 +105,8 @@ def billing_info_router(config: Config) -> APIRouter:
 
         await workspace_repository.update_subscription(workspace.id, subscription_id)
 
-    @router.get("/{workspace_id}/aws_marketplace_link")
-    async def get_aws_marketplace_link(
+    @router.get("/{workspace_id}/aws_marketplace_product")
+    async def redirect_to_aws_marketplace_product(
         workspace_id: WorkspaceId,
     ) -> Response:
         response = Response(
