@@ -13,15 +13,19 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from pydantic import BaseModel, Field
-from fastapi_users import schemas
-from fixbackend.ids import UserId
+from typing import Optional, List
 
+from fastapi import Form
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_users import schemas
+from pydantic import BaseModel, Field
+
+from fixbackend.ids import UserId
 from fixbackend.notification.user_notification_repo import UserNotificationSettings
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
-    pass
+    is_mfa_active: bool = Field(description="Whether MFA is active")
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -45,6 +49,31 @@ class OAuthProviderAssociateUrl(BaseModel):
     authUrl: str = Field(description="URL to initiate association flow")
 
 
+class OAuth2PasswordMFARequestForm(OAuth2PasswordRequestForm):
+    def __init__(
+        self,
+        *,
+        username: str = Form(description="The OAuth2 spec requires the exact field name"),
+        password: str = Form(description="The OAuth2 spec requires the exact field name"),
+        grant_type: Optional[str] = Form(default="password", pattern="password", description="Needs to be present"),
+        scope: str = Form(default="", description="A single string with actually several scopes separated by spaces."),
+        client_id: Optional[str] = Form(default=None, description="If available: send using HTTP Basic auth."),
+        client_secret: Optional[str] = Form(default=None, description="If available: send using HTTP Basic auth."),
+        otp: Optional[str] = Form(default=None, description="One time password"),
+        recovery_code: Optional[str] = Form(default=None, description="Recovery code")
+    ) -> None:
+        super().__init__(
+            grant_type=grant_type,
+            username=username,
+            password=password,
+            scope=scope,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+        self.otp = otp
+        self.recovery_code = recovery_code
+
+
 class UserNotificationSettingsRead(BaseModel):
     weekly_report: bool = Field(description="Whether to send a weekly report")
     inactivity_reminder: bool = Field(description="Whether to send a reminder for open incidents")
@@ -62,3 +91,8 @@ class UserNotificationSettingsRead(BaseModel):
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
         )
+
+
+class OTPConfig(BaseModel):
+    secret: str = Field(description="TOTP secret")
+    recovery_codes: List[str] = Field(description="List of recovery codes")

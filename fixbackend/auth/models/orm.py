@@ -16,12 +16,13 @@
 from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
-from sqlalchemy import String
+from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
 from fixbackend.base_model import Base
 from fixbackend.ids import UserId
+from fixbackend.sqlalechemy_extensions import GUID
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
@@ -53,8 +54,19 @@ class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
         )
 
 
+class UserMFARecoveryCode(Base):
+    __tablename__ = "user_mfa_recovery_code"
+    user_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(length=64), primary_key=True)
+
+
 class User(SQLAlchemyBaseUserTableUUID, Base):
+    otp_secret: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    is_mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
+    mfa_recovery_codes: Mapped[List[UserMFARecoveryCode]] = relationship(
+        "UserMFARecoveryCode", backref="user", lazy="joined"
+    )
 
     def to_model(self) -> models.User:
         return models.User(
@@ -65,6 +77,8 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_superuser=self.is_superuser,
             is_verified=self.is_verified,
             oauth_accounts=[acc.to_model() for acc in self.oauth_accounts],
+            otp_secret=self.otp_secret,
+            is_mfa_active=self.is_mfa_active,
             roles=[],
         )
 
@@ -77,5 +91,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             is_active=user.is_active,
             is_superuser=user.is_superuser,
             is_verified=user.is_verified,
+            otp_secret=user.otp_secret,
+            is_mfa_active=user.is_mfa_active,
             oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
         )

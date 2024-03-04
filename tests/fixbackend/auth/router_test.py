@@ -13,30 +13,33 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Callable, List, Optional, Sequence, Tuple, override
-import jwt
 
+import jwt
 import pytest
 from fastapi import Request, FastAPI
 from httpx import AsyncClient
+from pyotp import TOTP
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.models import User
-from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
-from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
-from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.auth.auth_backend import session_cookie_name
-from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.auth.models import User
+from fixbackend.auth.schemas import OTPConfig
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
+from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
+from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
+from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
-
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
 class InMemoryVerifier(AuthEmailSender):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         self.verification_requests: List[Tuple[User, str]] = []
 
@@ -120,6 +123,7 @@ async def test_registration_flow(
     fast_api: FastAPI,
     domain_event_sender: InMemoryDomainEventPublisher,
     workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
@@ -199,3 +203,116 @@ async def test_registration_flow(
     event1 = domain_event_sender.events[0]
     assert isinstance(event1, WorkspaceCreated)
     assert str(event1.workspace_id) == workspace_json["id"]
+
+
+@pytest.mark.asyncio
+async def test_mfa_flow(
+    api_client: AsyncClient,
+    fast_api: FastAPI,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
+) -> None:
+    verifier = InMemoryVerifier()
+    invitation_repo = InMemoryInvitationRepo()
+    role_repo = InMemoryRoleRepository()
+    fast_api.dependency_overrides[get_auth_email_sender] = lambda: verifier
+    fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
+    fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
+    fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
+
+    # register user
+    registration_json = {"email": "user2@example.com", "password": "changeme"}
+    response = await api_client.post("/api/auth/register", json=registration_json)
+    assert response.status_code == 201
+
+    # verify user
+    user, token = verifier.verification_requests[0]
+    response = await api_client.post("/api/auth/verify", json={"token": token})
+    assert response.status_code == 200
+
+    # login
+    login_json = {"username": registration_json["email"], "password": registration_json["password"]}
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 204
+    auth_cookie = response.cookies.get(session_cookie_name)
+    assert auth_cookie is not None
+
+    # mfa can be added and enabled
+    response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
+    assert response.status_code == 200
+    otp_config = OTPConfig.model_validate(response.json())
+    totp = TOTP(otp_config.secret)
+    response = await api_client.post(
+        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 204
+
+    # login now requires mfa
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 428
+
+    # login with otp works
+    response = await api_client.post("/api/auth/jwt/login", data=login_json | {"otp": totp.now()})
+    assert response.status_code == 204
+
+    # mfa can-not be disabled without valid otp
+    response = await api_client.post(
+        "/api/auth/mfa/disable", data={"otp": "wrong"}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 428
+
+    # mfa can be disabled with otp
+    response = await api_client.post(
+        "/api/auth/mfa/disable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 204
+
+    # login without mfa works
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 204
+
+    # enable mfa again
+    response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
+    assert response.status_code == 200
+    otp_config = OTPConfig.model_validate(response.json())
+    totp = TOTP(otp_config.secret)
+    response = await api_client.post(
+        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 204
+
+    # make sure only the new codes are stored
+    async with user_repository.user_db() as db:
+        orm_user = await db.get(user.id)  # type: ignore
+        assert len(orm_user.mfa_recovery_codes) == 10  # type: ignore
+
+    # login now requires mfa
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 428
+
+    # login without otp but with recovery code works
+    response = await api_client.post(
+        "/api/auth/jwt/login", data=login_json | {"recovery_code": otp_config.recovery_codes[0]}
+    )
+    assert response.status_code == 204
+
+    # login with the same code does not work
+    response = await api_client.post(
+        "/api/auth/jwt/login", data=login_json | {"recovery_code": otp_config.recovery_codes[0]}
+    )
+    assert response.status_code == 428
+
+    # mfa can-not be disabled without valid recovery code
+    response = await api_client.post(
+        "/api/auth/mfa/disable", data={"recovery_code": "wrong"}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 428
+
+    # mfa can be disabled with recovery code
+    response = await api_client.post(
+        "/api/auth/mfa/disable",
+        data={"recovery_code": otp_config.recovery_codes[1]},
+        cookies={session_cookie_name: auth_cookie},
+    )
+    assert response.status_code == 204
