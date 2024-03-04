@@ -137,7 +137,7 @@ class AwsMarketplaceHandler(Service):
         # only create a new subscription if there is no existing one
         if existing := await self.subscription_repo.aws_marketplace_subscription(user.id, customer_identifier):
             log.info(
-                f"AWS Marketplace user {user.email}: return existing subscription, user_id: {existing}, customer_identifier: {customer_identifier}"
+                f"AWS Marketplace user {user.email}: return existing subscription, customer_identifier: {customer_identifier}, user_id: {user.id}, existing: {existing}"
             )
             return existing, workspace_assigned
         else:
