@@ -20,7 +20,7 @@ from fastapi_users.db.base import BaseUserDatabase
 from fastapi_users.password import PasswordHelperProtocol
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import OAuthAccount, User, orm
@@ -173,8 +173,8 @@ class UserRepository(BaseUserDatabase[User, UserId]):
             orm_user = await db.session.get(orm.User, user_id)
             if orm_user is None:
                 raise ValueError(f"User {user_id} not found")
-            # delete all existing recovery codes of this user
-            orm_user.mfa_recovery_codes.clear()
+            # Delete all existing recovery codes of this user
+            await db.session.execute(delete(orm.UserMFARecoveryCode).where(orm.UserMFARecoveryCode.user_id == user_id))
             orm_user.otp_secret = otp_secret
             orm_user.is_mfa_active = is_mfa_active
             # add the new recovery codes
@@ -191,14 +191,14 @@ class UserRepository(BaseUserDatabase[User, UserId]):
                 select(orm.UserMFARecoveryCode).where(orm.UserMFARecoveryCode.user_id == user_id)
             )
             recovery_codes = result.scalars().all()
-        # Check each recovery code
-        for recovery_code in recovery_codes:
-            if pw_help.verify_and_update(code, recovery_code.code_hash):
-                # If the recovery code matches, delete it and return True
-                await db.session.delete(recovery_code)
-                await db.session.commit()
-                return True
-        return False
+            # Check each recovery code
+            for recovery_code in recovery_codes:
+                if pw_help.verify_and_update(code, recovery_code.code_hash)[0]:
+                    # If the recovery code matches, delete it and return True
+                    await db.session.delete(recovery_code)
+                    await db.session.commit()
+                    return True
+            return False
 
 
 async def get_user_repository(session_maker: AsyncSessionMakerDependency) -> AsyncIterator[UserRepository]:
