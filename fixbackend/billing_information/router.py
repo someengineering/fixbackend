@@ -81,9 +81,9 @@ def billing_info_router(config: Config) -> APIRouter:
                     return None
 
         def product_tier(billing: WorkspaceBillingSettingsUpdate) -> Optional[ProductTier]:
-            if billing.security_tier is None:
+            if billing.product_tier is None:
                 return None
-            return billing.security_tier.to_tier()
+            return billing.product_tier.to_tier()
 
         ws = await billing_info_service.update_billing(user, workspace, product_tier(billing), payment_method(billing))
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
