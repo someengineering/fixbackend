@@ -121,9 +121,9 @@ class AwsMarketplaceHandler(Service):
         customer_identifier = customer_data["CustomerIdentifier"]
         customer_aws_account_id = customer_data["CustomerAWSAccountId"]
 
-        # # get all workspaces of the user where the user can assign subscriptions
+        # get all workspaces of the user where the user can assign subscriptions
         # and use the first one if it is the only one
-        # # if more than one workspace exists, the user needs to define the workspace in a later step
+        # if more than one workspace exists, the user needs to define the workspace in a later step
         workspaces = await self.workspace_repo.list_workspaces(user, can_assign_subscriptions=True)
         if len(workspaces) == 1:
             workspace = workspaces[0]
