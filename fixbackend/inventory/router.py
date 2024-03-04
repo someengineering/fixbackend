@@ -211,7 +211,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         limit: int = Query(default=20, ge=1),
     ) -> StreamingResponse:
         result = await inventory().client.search_history(
-            graph_db, query=f"id({node_id}) limit {limit}", before=before, after=after, change=changes
+            graph_db,
+            query=f"id({node_id}) sort changed_at desc limit {limit}",
+            before=before,
+            after=after,
+            change=changes,
         )
         accept = request.headers.get("accept", "application/json")
         return streaming_response(accept, result, result.context)
