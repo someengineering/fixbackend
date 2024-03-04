@@ -17,7 +17,6 @@ from uuid import UUID
 
 import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
@@ -29,7 +28,14 @@ from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.models import User
 from fixbackend.auth.oauth_clients import GithubOauthClient
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
-from fixbackend.auth.schemas import OAuthProviderAssociateUrl, OAuthProviderAuthUrl, UserCreate, UserRead, OTPConfig
+from fixbackend.auth.schemas import (
+    OAuthProviderAssociateUrl,
+    OAuthProviderAuthUrl,
+    UserCreate,
+    UserRead,
+    OTPConfig,
+    OAuth2PasswordMFARequestForm,
+)
 from fixbackend.auth.user_manager import UserManagerDependency, UserManager, get_user_manager
 from fixbackend.config import Config
 from fixbackend.ids import UserId
@@ -140,14 +146,14 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
 
     @router.post("/mfa/enable")
     async def enable_mfa(
-        user: AuthenticatedUser, client_secret: str = Form(), user_manager: UserManager = Depends(get_user_manager)
+        user: AuthenticatedUser, otp: str = Form(), user_manager: UserManager = Depends(get_user_manager)
     ) -> Response:
         if user.is_mfa_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="MFA already enabled",
             )
-        if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(client_secret):
+        if (secret := user.otp_secret) is None or not pyotp.TOTP(secret).verify(otp):
             raise HTTPException(
                 status_code=status.HTTP_428_PRECONDITION_REQUIRED,
                 detail="MFA_NOT_PROVIDED_OR_INVALID",
@@ -157,10 +163,17 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
 
     @router.post("/mfa/disable")
     async def disable_mfa(
-        user: AuthenticatedUser, client_secret: str = Form(), user_manager: UserManager = Depends(get_user_manager)
+        user: AuthenticatedUser,
+        otp: Optional[str] = Form(default=None, description="One time password"),
+        recovery_code: Optional[str] = Form(default=None, description="Recovery code"),
+        user_manager: UserManager = Depends(get_user_manager),
     ) -> Response:
         if user.is_mfa_active:
-            if (secret := user.otp_secret) is not None and not pyotp.TOTP(secret).verify(client_secret):
+            if (otp is None and recovery_code is None) or (
+                (otp_defined := otp)
+                and (secret := user.otp_secret) is not None
+                and not pyotp.TOTP(secret).verify(otp_defined)
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
                     detail="MFA_NOT_PROVIDED_OR_INVALID",
@@ -172,7 +185,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
     @router.post("/jwt/login", name=f"auth:{auth_backend.name}.login")
     async def login(
         request: Request,
-        credentials: OAuth2PasswordRequestForm = Depends(),
+        credentials: OAuth2PasswordMFARequestForm = Depends(),
         user_manager: UserManager = Depends(get_user_manager),
         strategy: FixJWTStrategy = Depends(auth_backend.get_strategy),
     ) -> Response:
@@ -191,8 +204,8 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         if user.is_mfa_active:
             if (
                 (otp_secret := user.otp_secret) is None
-                or (client_secret := credentials.client_secret) is None
-                or not pyotp.TOTP(otp_secret).verify(client_secret)
+                or (otp := credentials.otp) is None
+                or not pyotp.TOTP(otp_secret).verify(otp)
             ):
                 raise HTTPException(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,

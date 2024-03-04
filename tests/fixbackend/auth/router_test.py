@@ -42,6 +42,7 @@ from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
 class InMemoryVerifier(AuthEmailSender):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         self.verification_requests: List[Tuple[User, str]] = []
 
@@ -213,7 +214,7 @@ async def test_registration_flow(
     qp = parse_qs(urlparse(otp_config.uri).query)
     totp = TOTP(qp["secret"][0])
     response = await api_client.post(
-        "/api/auth/mfa/enable", data={"client_secret": totp.now()}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
     )
     assert response.status_code == 204
 
@@ -221,19 +222,19 @@ async def test_registration_flow(
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 428
 
-    # login with secret works
-    response = await api_client.post("/api/auth/jwt/login", data=login_json | {"client_secret": totp.now()})
+    # login with otp works
+    response = await api_client.post("/api/auth/jwt/login", data=login_json | {"otp": totp.now()})
     assert response.status_code == 204
 
-    # mfa can-not be disabled without secret
+    # mfa can-not be disabled without valid otp
     response = await api_client.post(
-        "/api/auth/mfa/disable", data={"client_secret": "t"}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/disable", data={"otp": "wrong"}, cookies={session_cookie_name: auth_cookie}
     )
     assert response.status_code == 428
 
-    # mfa can be disabled with secret
+    # mfa can be disabled with otp
     response = await api_client.post(
-        "/api/auth/mfa/disable", data={"client_secret": totp.now()}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/disable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
     )
     assert response.status_code == 204
 
