@@ -179,19 +179,6 @@ class SubscriptionRepository:
                 async for (subscription,) in await session.stream(query):
                     yield subscription.to_model()
 
-    # async def not_assigned_subscriptions(self, user_id: UserId) -> List[AwsMarketplaceSubscription]:
-    #     query = (
-    #         select(SubscriptionEntity)
-    #         .where(SubscriptionEntity.user_id == user_id)
-    #         .where(SubscriptionEntity.workspace_id == None)  # noqa
-    #         .where(SubscriptionEntity.active == True)  # noqa
-    #     )
-
-    #     async with self.session_maker() as session:
-    #         results = await session.execute(query)
-    #         subs = results.scalars().all()
-    #         return [sub.to_model() for sub in subs]
-
     async def unreported_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
         async with self.session_maker() as session:
             query = (
@@ -277,25 +264,6 @@ class SubscriptionRepository:
                 .where(SubscriptionEntity.user_id == user_id)
             )
             return (await session.execute(stmt)).scalar_one_or_none() is not None
-
-    # async def update_subscription_for_workspace(
-    #     self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
-    # ) -> None:
-    #     async with self.session_maker() as session:
-    #         # remove the workspace from previous subscription
-    #         await session.execute(
-    #             update(SubscriptionEntity)
-    #             .where(SubscriptionEntity.workspace_id == workspace_id)
-    #             .values(workspace_id=None)
-    #         )
-    #         # assign the workspace to the new subscription
-    #         if subscription_id:
-    #             await session.execute(
-    #                 update(SubscriptionEntity)
-    #                 .where(SubscriptionEntity.id == subscription_id)
-    #                 .values(workspace_id=workspace_id)
-    #             )
-    #         await session.commit()
 
     async def list_billing_for_workspace(
         self, workspace_id: WorkspaceId

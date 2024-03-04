@@ -97,13 +97,6 @@ class SubscriptionRepositoryMock(SubscriptionRepository):
     async def user_has_subscription(self, user_id: UserId, subscription_id: SubscriptionId) -> bool:
         return subscription_id == sub_id
 
-    async def update_subscription_for_workspace(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
-    ) -> None:
-        assert subscription_id == subscription_id
-        assert workspace_id == workspace_id
-        return None
-
 
 class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
