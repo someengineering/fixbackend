@@ -1,8 +1,8 @@
 """add subscription id to workspace
 
 Revision ID: dfb8543513a5
-Revises: 625f5b0ac493
-Create Date: 2024-02-29 15:53:08.220955+00:00
+Revises: 56e928e9255b
+Create Date: 2024-03-02 15:53:08.220955+00:00
 
 """
 
@@ -14,7 +14,7 @@ from fastapi_users_db_sqlalchemy.generics import GUID
 
 # revision identifiers, used by Alembic.
 revision: str = "dfb8543513a5"
-down_revision: Union[str, None] = "625f5b0ac493"
+down_revision: Union[str, None] = "56e928e9255b"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

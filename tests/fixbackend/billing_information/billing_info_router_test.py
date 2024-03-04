@@ -206,6 +206,20 @@ async def test_update_billing(client: AsyncClient) -> None:
     }
     assert json.get("security_tier") == "free"
 
+    # empty update does not change anything
+    response = await client.put(
+        f"/api/workspaces/{workspace_id}/billing",
+        json={},
+    )
+
+    json = response.json()
+
+    assert json.get("workspace_payment_method") == {
+        "method": "aws_marketplace",
+        "subscription_id": str(sub_id),
+    }
+    assert json.get("security_tier") == "free"
+
 
 @pytest.mark.asyncio
 async def test_update_subscription(client: AsyncClient) -> None:
