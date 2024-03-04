@@ -123,9 +123,10 @@ class SubscriptionRepository:
         self, user_id: UserId, customer_identifier: str
     ) -> Optional[AwsMarketplaceSubscription]:
         async with self.session_maker() as session:
-            stmt = select(SubscriptionEntity).where(
-                SubscriptionEntity.aws_customer_identifier == customer_identifier
-                and SubscriptionEntity.user_id == user_id
+            stmt = (
+                select(SubscriptionEntity)
+                .where(SubscriptionEntity.aws_customer_identifier == customer_identifier)
+                .where(SubscriptionEntity.user_id == user_id)
             )
             if result := (await session.execute(stmt)).scalar_one_or_none():
                 return result.to_model()
