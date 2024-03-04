@@ -32,6 +32,7 @@ from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 
 
 def billing_info_router() -> APIRouter:
@@ -93,6 +94,7 @@ def billing_info_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         user: AuthenticatedUser,
         subscription_repository: SubscriptionRepositoryDependency,
+        workspace_repository: WorkspaceRepositoryDependency,
         subscription_id: SubscriptionId,
         _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.update_billing)),
     ) -> None:
@@ -100,6 +102,6 @@ def billing_info_router() -> APIRouter:
         if not await subscription_repository.user_has_subscription(user.id, subscription_id):
             raise ResourceNotFound("Subscription not found")
 
-        await subscription_repository.update_subscription_for_workspace(workspace.id, subscription_id)
+        await workspace_repository.update_subscription(workspace.id, subscription_id)
 
     return router

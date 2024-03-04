@@ -14,7 +14,7 @@
 
 
 import uuid
-from typing import AsyncIterator, Optional, Sequence
+from typing import AsyncIterator, Optional, Sequence, override
 from attrs import evolve
 
 import pytest
@@ -64,14 +64,17 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
+    @override
     async def get_workspace(
         self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
     ) -> Workspace | None:
         return workspace
 
-    async def list_workspaces(self, user_id: UserId) -> Sequence[Workspace]:
+    @override
+    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
         return [workspace]
 
+    @override
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
         if generate_external_id:
             new_external_id = ExternalId(uuid.uuid4())
@@ -79,7 +82,8 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
             new_external_id = workspace.external_id
         return evolve(workspace, name=name, external_id=new_external_id)
 
-    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+    @override
+    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         return evolve(workspace, product_tier=tier)
 
 

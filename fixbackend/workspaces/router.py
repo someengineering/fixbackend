@@ -51,9 +51,10 @@ def workspaces_router() -> APIRouter:
     async def list_workspaces(
         user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
+        can_assign_subscriptions: bool = False,
     ) -> List[WorkspaceRead]:
         """List all workspaces."""
-        orgs = await workspace_repository.list_workspaces(user.id)
+        orgs = await workspace_repository.list_workspaces(user)
 
         return [WorkspaceRead.from_model(org) for org in orgs]
 

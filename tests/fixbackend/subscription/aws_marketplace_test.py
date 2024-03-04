@@ -32,6 +32,7 @@ from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.metering.metering_repository_test import create_metering_record
 
 
@@ -39,16 +40,17 @@ async def test_handle_subscription(
     aws_marketplace_handler: AwsMarketplaceHandler, user: User, boto_answers: Dict[str, Any]
 ) -> None:
     boto_answers["ResolveCustomer"] = {"CustomerAWSAccountId": "1", "CustomerIdentifier": "2", "ProductCode": "3"}
-    result = await aws_marketplace_handler.subscribed(user, "123")
+    result, workspace_added = await aws_marketplace_handler.subscribed(user, "123")
     assert result is not None
     assert result.customer_aws_account_id == "1"
     assert result.customer_identifier == "2"
     assert result.product_code == "3"
     assert result.user_id == user.id
-    assert result.workspace_id is None  # user does not have any workspaces yet
+    assert workspace_added is False  # user does not have any workspaces yet
     # subscribe again: will not create a new subscription
-    result2 = await aws_marketplace_handler.subscribed(user, "123")
+    result2, workspace_added = await aws_marketplace_handler.subscribed(user, "123")
     assert result2 is not None
+    assert workspace_added is False
     assert result == evolve(result2, last_charge_timestamp=result.last_charge_timestamp)
 
 
@@ -61,12 +63,14 @@ async def test_create_billing_entry(
     boto_answers: Dict[str, Any],
     metering_repository: MeteringRepository,
     subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
 ) -> None:
     now = datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     boto_answers["BatchMeterUsage"] = {
         "Results": [{"MeteringRecordId": "123", "Status": "Success"}],
         "UnprocessedRecords": [],
     }
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
     # factories to create metering records
     mr1free = partial(
         create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
@@ -111,9 +115,11 @@ async def test_create_daily_billing_entry(
     boto_answers: Dict[str, Any],
     metering_repository: MeteringRepository,
     subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
 ) -> None:
     # set billing period to daily
     aws_marketplace_handler.billing_period = "day"
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
 
     now = datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
     boto_answers["BatchMeterUsage"] = {

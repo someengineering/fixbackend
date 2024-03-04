@@ -112,7 +112,7 @@ class AwsMarketplaceHandler(Service):
         if self.listener is not None:
             await self.listener.stop()
 
-    async def subscribed(self, user: User, token: str) -> SubscriptionMethod:
+    async def subscribed(self, user: User, token: str) -> Tuple[SubscriptionMethod, bool]:
         log.info(f"AWS Marketplace subscription for user {user.email} with token {token}")
         # Get the related data from AWS. Will throw in case of an error.
         customer_data = self.marketplace_client.resolve_customer(RegistrationToken=token)
@@ -121,20 +121,27 @@ class AwsMarketplaceHandler(Service):
         customer_identifier = customer_data["CustomerIdentifier"]
         customer_aws_account_id = customer_data["CustomerAWSAccountId"]
 
-        # get all workspaces of the user and use the first one if it is the only one
+        # get all workspaces of the user where the user can assign subscriptions
+        # and use the first one if it is the only one
         # if more than one workspace exists, the user needs to define the workspace in a later step
-        workspaces = await self.workspace_repo.list_workspaces(user.id)
-        workspace_id = workspaces[0].id if len(workspaces) == 1 else None
+        workspaces = await self.workspace_repo.list_workspaces(user, can_assign_subscriptions=True)
+        if len(workspaces) == 1:
+            workspace = workspaces[0]
+            workspace_id = workspace.id
+        else:
+            workspace_id = None
+            workspace = None
+
+        workspace_assigned = False
 
         # only create a new subscription if there is no existing one
         if existing := await self.subscription_repo.aws_marketplace_subscription(user.id, customer_identifier):
             log.debug(f"AWS Marketplace user {user.email}: return existing subscription")
-            return existing
+            return existing, workspace_assigned
         else:
             subscription = AwsMarketplaceSubscription(
                 id=SubscriptionId(uuid4()),
                 user_id=user.id,
-                workspace_id=workspace_id,
                 customer_identifier=customer_identifier,
                 customer_aws_account_id=customer_aws_account_id,
                 product_code=product_code,
@@ -146,8 +153,11 @@ class AwsMarketplaceHandler(Service):
                 workspace_id=workspace_id, user_id=user.id, subscription_id=subscription.id
             )
             result = await self.subscription_repo.create(subscription)
+            if workspace and workspace.subscription_id is None:
+                await self.workspace_repo.update_subscription(workspace.id, result.id)
+                workspace_assigned = True
             await self.domain_event_sender.publish(event)
-            return result
+            return result, workspace_assigned
 
     async def create_billing_entry(
         self, subscription: AwsMarketplaceSubscription, now: Optional[datetime] = None
@@ -173,12 +183,18 @@ class AwsMarketplaceHandler(Service):
                 last_charged=last_charged,
                 period_value=billing_period_value,
             )
-            if ws_id := subscription.workspace_id:
+            workspaces = await self.workspace_repo.list_workspaces_by_subscription_id(subscription.id)
+
+            for workspace in workspaces:
                 # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
                 summaries = [
                     summary
                     async for summary in self.metering_repo.collect_summary(
-                        ws_id, start=last_charged, end=billing_time, min_resources_collected=100, min_nr_of_collects=3
+                        workspace.id,
+                        start=last_charged,
+                        end=billing_time,
+                        min_resources_collected=100,
+                        min_nr_of_collects=3,
                     )
                 ]
 
@@ -197,7 +213,7 @@ class AwsMarketplaceHandler(Service):
                 AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
-                    subscription.workspace_id,
+                    workspace.id,
                     product_tier,
                     usage,
                     last_charged,
@@ -205,7 +221,7 @@ class AwsMarketplaceHandler(Service):
                     next_charge,
                 )
                 await self.domain_event_sender.publish(
-                    BillingEntryCreated(subscription.workspace_id, subscription.id, product_tier, usage)
+                    BillingEntryCreated(workspace.id, subscription.id, product_tier, usage)
                 )
                 return billing_entry
             else:

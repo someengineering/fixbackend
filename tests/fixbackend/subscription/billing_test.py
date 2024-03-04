@@ -18,8 +18,11 @@ async def test_report_usage(
     subscription: AwsMarketplaceSubscription,
     billing_service: BillingService,
     metering_repository: MeteringRepository,
+    workspace_repository: WorkspaceRepository,
     workspace: Workspace,
 ) -> None:
+
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
     assert subscription.next_charge_timestamp
     after_next_charge = subscription.next_charge_timestamp + timedelta(days=1)
     before_next_charge = subscription.next_charge_timestamp - timedelta(days=1)
@@ -53,7 +56,8 @@ async def test_report_no_usage(
         "UnprocessedRecords": [],
     }
     # define a paid tier: otherwise nothing will be reported to AWS
-    await workspace_repository.update_product_tier(user, workspace.id, ProductTier.Business)
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_product_tier(workspace.id, ProductTier.Business)
     assert subscription.next_charge_timestamp
     before_next_charge = subscription.next_charge_timestamp - timedelta(days=1)
     after_next_charge = subscription.next_charge_timestamp + timedelta(days=1)

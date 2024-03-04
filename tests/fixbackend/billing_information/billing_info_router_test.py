@@ -22,7 +22,7 @@ from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
 from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
-from typing import AsyncIterator, List, Optional, Sequence
+from typing import AsyncIterator, List, Optional, Sequence, override
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
 from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
@@ -99,26 +99,22 @@ class SubscriptionRepositoryMock(SubscriptionRepository):
     async def user_has_subscription(self, user_id: UserId, subscription_id: SubscriptionId) -> bool:
         return subscription_id == sub_id
 
-    async def update_subscription_for_workspace(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
-    ) -> None:
-        assert subscription_id == subscription_id
-        assert workspace_id == workspace_id
-        return None
-
 
 class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     def __init__(self) -> None:
         pass
 
+    @override
     async def get_workspace(
         self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
     ) -> Workspace | None:
         return workspace
 
-    async def list_workspaces(self, owner_id: UserId) -> Sequence[Workspace]:
+    @override
+    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
         return [workspace]
 
+    @override
     async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
         if generate_external_id:
             new_external_id = ExternalId(uuid.uuid4())
@@ -126,8 +122,15 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
             new_external_id = workspace.external_id
         return evolve(workspace, name=name, external_id=new_external_id)
 
-    async def update_product_tier(self, user: User, workspace_id: WorkspaceId, security_tier: ProductTier) -> Workspace:
-        return evolve(workspace, product_tier=security_tier)
+    @override
+    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+        return evolve(workspace, product_tier=tier)
+
+    @override
+    async def update_subscription(
+        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+    ) -> Workspace:
+        return evolve(workspace, subscription_id=subscription_id)
 
 
 @pytest.fixture
@@ -197,6 +200,20 @@ async def test_update_billing(client: AsyncClient) -> None:
     json = response.json()
 
     assert json.get("payment_method") is None
+    assert json.get("workspace_payment_method") == {
+        "method": "aws_marketplace",
+        "subscription_id": str(sub_id),
+    }
+    assert json.get("security_tier") == "free"
+
+    # empty update does not change anything
+    response = await client.put(
+        f"/api/workspaces/{workspace_id}/billing",
+        json={},
+    )
+
+    json = response.json()
+
     assert json.get("workspace_payment_method") == {
         "method": "aws_marketplace",
         "subscription_id": str(sub_id),
