@@ -292,7 +292,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
                     set_cloud_account_id(account.account_id)
-                    if account.scanned_resources == 0:
+                    if account.scanned_resources == 42:
                         failed_scan = 1
                     else:
                         failed_scan = 0
