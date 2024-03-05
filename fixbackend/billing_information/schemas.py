@@ -99,13 +99,12 @@ PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
 class WorkspaceBillingSettingsRead(BaseModel):
     workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
     available_payment_methods: List[PaymentMethod] = Field(description="The payment methods available for workspace")
-    security_tier: ProductTierRead = Field(description="The product tier of this workspace")
+    product_tier: ProductTierRead = Field(description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "payment_method": "aws_marketplace",
                     "workspace_payment_method": {
                         "method": "aws_marketplace",
                         "subscription_id": "00000000-0000-0000-0000-000000000000",
@@ -145,7 +144,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
         return WorkspaceBillingSettingsRead(
             workspace_payment_method=payment(payment_methods.current),
             available_payment_methods=[payment(method) for method in payment_methods.available],
-            security_tier=ProductTierRead.from_tier(workspace.product_tier),
+            product_tier=ProductTierRead.from_tier(workspace.product_tier),
         )
 
 
@@ -153,7 +152,7 @@ class WorkspaceBillingSettingsUpdate(BaseModel):
     workspace_payment_method: Optional[PaymentMethod] = Field(
         default=None, description="The payment method selected for workspace"
     )
-    security_tier: Optional[ProductTierRead] = Field(default=None, description="The product tier of this workspace")
+    product_tier: Optional[ProductTierRead] = Field(default=None, description="The product tier of this workspace")
 
     model_config = {
         "json_schema_extra": {

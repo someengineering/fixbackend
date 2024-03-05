@@ -154,7 +154,7 @@ async def test_add_to_workspace(
 
 
 @pytest.mark.asyncio
-async def test_update_security_tier(
+async def test_update_product_tier(
     workspace_repository: WorkspaceRepository,
     user: User,
     workspace: Workspace,
