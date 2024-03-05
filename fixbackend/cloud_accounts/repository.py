@@ -22,8 +22,9 @@ from fixcloudutils.util import utc
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
 from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, WorkspaceId
+from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, ProductTier, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.workspaces.models.orm import Organization
 
 
 class CloudAccountRepository(ABC):
@@ -55,6 +56,10 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def delete(self, id: FixCloudAccountId) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
         raise NotImplementedError
 
 
@@ -224,6 +229,24 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             cloud_account = results.unique().scalar_one()
             await session.delete(cloud_account)
             await session.commit()
+
+    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
+        async with self.session_maker() as session:
+            # select all accounts that are enabled and in the configured state
+            # join with the workspaces where the workspace product_tier is not business or enterprise
+
+            statement = (
+                select(orm.CloudAccount)
+                .join(Organization, orm.CloudAccount.tenant_id == Organization.id)
+                .where(orm.CloudAccount.enabled.is_(True))
+                .where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
+                .where(orm.CloudAccount.failed_scan_count > 0)
+                .where(Organization.tier.notin_([ProductTier.Enterprise, ProductTier.Business, ProductTier.Trial]))
+            )
+
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model() for acc in accounts]
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:

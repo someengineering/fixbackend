@@ -109,6 +109,9 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
             account for account in self.accounts.values() if isinstance(account.state, CloudAccountStates.Discovered)
         ]
 
+    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
+        return []
+
 
 test_workspace_id = WorkspaceId(uuid.uuid4())
 

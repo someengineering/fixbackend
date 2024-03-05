@@ -31,6 +31,8 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    ProductTier,
+    SubscriptionId,
     UserCloudAccountName,
 )
 from fixbackend.types import AsyncSessionMaker
@@ -54,13 +56,17 @@ async def test_create_cloud_account(
         CloudAccountStates.Detected(),
         CloudAccountStates.Discovered(cloud_access),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
+        CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
         CloudAccountStates.Deleted(),
     ]
 
     configured_account_id: FixCloudAccountId | None = None
 
+    configured_count = 0
+
     for idx, account_state in enumerate(account_states):
+
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
             account_id=CloudAccountId(str(idx)),
@@ -79,8 +85,11 @@ async def test_create_cloud_account(
             updated_at=utc().replace(microsecond=0),
             state_updated_at=utc().replace(microsecond=0),
             cf_stack_version=0,
-            failed_scan_count=42,
+            failed_scan_count=configured_count * 42,  # only the last one has failed scans
         )
+
+        if isinstance(account_state, CloudAccountStates.Configured):
+            configured_count += 1
 
         if isinstance(account_state, CloudAccountStates.Configured):
             configured_account_id = account.id
@@ -101,7 +110,7 @@ async def test_create_cloud_account(
     collectable_accounts = await cloud_account_repository.list_by_workspace_id(
         workspace_id=workspace_id, ready_for_collection=True
     )
-    assert len(collectable_accounts) == 1
+    assert len(collectable_accounts) == 2
 
     new_cloud_access = AwsCloudAccess(
         role_name=AwsRoleName("bar"),
@@ -116,6 +125,21 @@ async def test_create_cloud_account(
     discovered_accounts = await cloud_account_repository.list_all_discovered_accounts()
     assert len(discovered_accounts) == 1
     assert discovered_accounts[0].state.state_name == CloudAccountStates.Discovered.state_name
+
+    # list where we have failed scans
+    # default workspace is free so the join in the query below should work fine
+    failed_scan_accounts = await cloud_account_repository.list_non_hourly_failed_scans_accounts()
+    assert len(failed_scan_accounts) == 1
+    assert failed_scan_accounts[0].state.state_name == CloudAccountStates.Configured.state_name
+    assert failed_scan_accounts[0].failed_scan_count == 42
+    assert failed_scan_accounts[0].account_id == CloudAccountId("3")  # the forth account created in the loop above
+    # if the tier is not free, we should not get any failed scan accounts
+    await workspace_repository.update_subscription(workspace_id, SubscriptionId(uuid.uuid4()))
+    await workspace_repository.update_product_tier(workspace_id, ProductTier.Enterprise)
+    assert await cloud_account_repository.list_non_hourly_failed_scans_accounts() == []
+    # change the tier back to free and remove the subscription
+    await workspace_repository.update_product_tier(workspace_id, ProductTier.Free)
+    await workspace_repository.update_subscription(workspace_id, None)
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:
