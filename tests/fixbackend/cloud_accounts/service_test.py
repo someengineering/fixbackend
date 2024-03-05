@@ -824,6 +824,7 @@ async def test_configure_account(
             updated_at=utc(),
             state_updated_at=state_updated_at,
             cf_stack_version=0,
+            failed_scan_count=0,
         )
 
     # fresh account should be retried
