@@ -292,7 +292,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
                     set_cloud_account_id(account.account_id)
-                    await self.cloud_account_repository.update(
+                    if account.scanned_resources == 0:
+                        failed_scan = 1
+                    else:
+                        failed_scan = 0
+
+                    updated = await self.cloud_account_repository.update(
                         account_id,
                         lambda acc: evolve(
                             acc,
@@ -300,8 +305,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             last_scan_resources_scanned=account.scanned_resources,
                             last_scan_started_at=account.started_at,
                             next_scan=event.next_run,
+                            failed_scan_count=acc.failed_scan_count + failed_scan,
                         ),
                     )
+
+                    if updated.failed_scan_count > 3:
+                        await self.__degrade_account(updated.id, "Too many consecutive failed scans")
 
                 user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                 if first_workspace_collect:

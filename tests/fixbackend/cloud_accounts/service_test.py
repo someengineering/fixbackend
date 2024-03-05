@@ -909,3 +909,49 @@ async def test_handle_cf_sqs_message(
     account = await service.process_cf_stack_event(notification("Delete", str(account.id)))
     assert account is not None
     assert isinstance(account.state, CloudAccountStates.Degraded)
+
+
+@pytest.mark.asyncio
+async def test_move_to_degraded(
+    domain_sender: DomainEventSenderMock,
+    service: CloudAccountServiceImpl,
+) -> None:
+
+    account = await service.create_aws_account(
+        workspace_id=test_workspace_id,
+        account_id=account_id,
+        role_name=role_name,
+        external_id=external_id,
+        account_name=None,
+    )
+
+    cloud_account_id = account.id
+    for i in range(4):
+        event = TenantAccountsCollected(
+            test_workspace_id,
+            {
+                cloud_account_id: CloudAccountCollectInfo(
+                    account_id, scanned_resources=0, duration_seconds=10, started_at=now, task_id=task_id
+                )
+            },
+            now,
+        )
+        await service.process_domain_event(
+            event.to_json(),
+            MessageContext(
+                id="test", kind=TenantAccountsCollected.kind, publisher="test", sent_at=now, received_at=now
+            ),
+        )
+
+    updated_account = await service.get_cloud_account(cloud_account_id, test_workspace_id)
+
+    assert updated_account
+    assert isinstance(updated_account.state, CloudAccountStates.Degraded)
+
+    assert len(domain_sender.events) == 2
+    published_event = domain_sender.events[1]
+    assert isinstance(published_event, AwsAccountDegraded)
+    assert published_event.cloud_account_id == account.id
+    assert published_event.aws_account_id == account_id
+    assert published_event.tenant_id == account.workspace_id
+    assert published_event.error == "Too many consecutive failed scans"
