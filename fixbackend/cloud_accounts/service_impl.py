@@ -292,10 +292,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 for account_id, account in event.cloud_accounts.items():
                     set_fix_cloud_account_id(account_id)
                     set_cloud_account_id(account.account_id)
-                    if account.scanned_resources == 42:
-                        failed_scan = 1
-                    else:
-                        failed_scan = 0
+
+                    def compute_failed_scan_count(acc: CloudAccount) -> int:
+                        if account.scanned_resources < 50:
+                            return acc.failed_scan_count + 1
+                        else:
+                            return 0
 
                     updated = await self.cloud_account_repository.update(
                         account_id,
@@ -305,7 +307,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             last_scan_resources_scanned=account.scanned_resources,
                             last_scan_started_at=account.started_at,
                             next_scan=event.next_run,
-                            failed_scan_count=acc.failed_scan_count + failed_scan,
+                            failed_scan_count=compute_failed_scan_count(acc),
                         ),
                     )
 
