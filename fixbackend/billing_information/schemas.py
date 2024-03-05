@@ -29,7 +29,7 @@ from fixbackend.workspaces.models import Workspace
 
 class ProductTierRead(str, Enum):
     Trial = "Trial"
-    Free = "free"  # todo: change to "Free" once the FE is updated
+    Free = "Free"
     Plus = "Plus"
     Business = "Business"
     Enterprise = "Enterprise"
