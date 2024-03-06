@@ -195,6 +195,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
         return await inventory().resource(graph_db, node_id)
 
+    @router.get("/node/{node_id}/neighborhood", tags=["search"])
+    async def get_node_neighborhood(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> List[Json]:
+        return await inventory().neighborhood(graph_db, node_id)
+
     # deprecated, needs to be removed
     @router.post("/node/{node_id}", tags=["deprecated"])
     async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:

@@ -305,11 +305,17 @@ async def test_resource(
     inventory_service: InventoryService, mocked_answers: RequestHandlerMock, azure_virtual_machine_resource_json: Json
 ) -> None:
     res = await inventory_service.resource(db, NodeId("some_node_id"))
-    assert res["neighborhood"] == neighborhood
     assert res["resource"] == azure_virtual_machine_resource_json
     assert len(res["resource"]["security"]["issues"]) == 1  # resource has one issue
     assert len(res["failing_checks"]) == 1  # one failing check is loaded
     assert res["failing_checks"][0]["id"] == res["resource"]["security"]["issues"][0]["check"]  # check id is the same
+
+
+async def test_resource_neighborhood(
+    inventory_service: InventoryService, mocked_answers: RequestHandlerMock, azure_virtual_machine_resource_json: Json
+) -> None:
+    res = await inventory_service.neighborhood(db, NodeId("some_node_id"))
+    assert res == neighborhood
 
 
 @pytest.mark.asyncio

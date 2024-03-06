@@ -295,9 +295,15 @@ class InventoryService(Service):
 
     @timed("fixbackend", "resource")
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
-        async def neighborhood(cmd: str) -> List[JsonElement]:
-            return [n async for n in await self.client.execute_single(db, cmd, env={"with-kind": "true"})]
+        resource = await self.client.resource(db, id=resource_id)
+        check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
+        checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
+        checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
+        # TODO: remove neighborhood from the result, once handled in the frontend
+        return dict(resource=resource, failing_checks=checks, neighborhood=[])
 
+    @timed("fixbackend", "neighborhood")
+    async def neighborhood(self, db: GraphDatabaseAccess, resource_id: NodeId) -> List[Json]:
         jq_reported = "{id: .reported.id, name: .reported.name, kind: .reported.kind}"
         jq_arg = (
             # properties to include in the result
@@ -310,11 +316,7 @@ class InventoryService(Service):
         cmd = (
             f"""search --with-edges id("{resource_id}") <-[0:2]-> | refine-resource-data | jq --no-rewrite '{jq_arg}'"""
         )
-        resource, nb = await asyncio.gather(self.client.resource(db, id=resource_id), neighborhood(cmd))
-        check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
-        checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
-        checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
-        return dict(resource=resource, failing_checks=checks, neighborhood=nb)
+        return [n async for n in await self.client.execute_single(db, cmd, env={"with-kind": "true"})]  # type: ignore
 
     @timed("fixbackend", "summary")
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
