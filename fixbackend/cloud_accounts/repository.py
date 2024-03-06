@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
@@ -22,9 +23,9 @@ from fixcloudutils.util import utc
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
 from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, ProductTier, WorkspaceId
+from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.workspaces.models.orm import Organization
+from fixbackend.dispatcher.next_run_repository import NextTenantRun
 
 
 class CloudAccountRepository(ABC):
@@ -59,7 +60,7 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
+    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
         raise NotImplementedError
 
 
@@ -230,18 +231,20 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             await session.delete(cloud_account)
             await session.commit()
 
-    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
+    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
         async with self.session_maker() as session:
             # select all accounts that are enabled and in the configured state
-            # join with the workspaces where the workspace product_tier is not business or enterprise
+            # and the next scan is more than 2 hours from now
+
+            two_hours_from_now = now + timedelta(hours=2)
 
             statement = (
                 select(orm.CloudAccount)
-                .join(Organization, orm.CloudAccount.tenant_id == Organization.id)
+                .join(NextTenantRun, orm.CloudAccount.tenant_id == NextTenantRun.tenant_id)
                 .where(orm.CloudAccount.enabled.is_(True))
                 .where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
                 .where(orm.CloudAccount.failed_scan_count > 0)
-                .where(Organization.tier.notin_([ProductTier.Enterprise, ProductTier.Business, ProductTier.Trial]))
+                .where(NextTenantRun.at > two_hours_from_now)
             )
 
             results = await session.execute(statement)

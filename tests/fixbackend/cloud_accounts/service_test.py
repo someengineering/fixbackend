@@ -109,7 +109,7 @@ class CloudAccountRepositoryMock(CloudAccountRepository):
             account for account in self.accounts.values() if isinstance(account.state, CloudAccountStates.Discovered)
         ]
 
-    async def list_non_hourly_failed_scans_accounts(self) -> List[CloudAccount]:
+    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
         return []
 
 

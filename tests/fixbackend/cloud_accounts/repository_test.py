@@ -31,17 +31,19 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
-    ProductTier,
-    SubscriptionId,
     UserCloudAccountName,
 )
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, workspace_repository: WorkspaceRepository, user: User
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    user: User,
+    next_run_repository: NextRunRepository,
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
@@ -127,19 +129,16 @@ async def test_create_cloud_account(
     assert discovered_accounts[0].state.state_name == CloudAccountStates.Discovered.state_name
 
     # list where we have failed scans
-    # default workspace is free so the join in the query below should work fine
-    failed_scan_accounts = await cloud_account_repository.list_non_hourly_failed_scans_accounts()
+    # we set the next tenant run 2 days in the future so the join in the query below should work fine
+    await next_run_repository.create(workspace_id, utc() + timedelta(days=1))
+    failed_scan_accounts = await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc())
     assert len(failed_scan_accounts) == 1
     assert failed_scan_accounts[0].state.state_name == CloudAccountStates.Configured.state_name
     assert failed_scan_accounts[0].failed_scan_count == 42
     assert failed_scan_accounts[0].account_id == CloudAccountId("3")  # the forth account created in the loop above
-    # if the tier is not free, we should not get any failed scan accounts
-    await workspace_repository.update_subscription(workspace_id, SubscriptionId(uuid.uuid4()))
-    await workspace_repository.update_product_tier(workspace_id, ProductTier.Enterprise)
-    assert await cloud_account_repository.list_non_hourly_failed_scans_accounts() == []
-    # change the tier back to free and remove the subscription
-    await workspace_repository.update_product_tier(workspace_id, ProductTier.Free)
-    await workspace_repository.update_subscription(workspace_id, None)
+    # if next scan is less than 2 hours from now, it should not be included in the list
+    await next_run_repository.update_next_run_at(workspace_id, utc() + timedelta(hours=1))
+    assert await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc()) == []
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:

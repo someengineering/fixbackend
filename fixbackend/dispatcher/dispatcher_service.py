@@ -211,9 +211,6 @@ class DispatcherService(Service):
         self.access_manager = access_manager
         self.workspace_repository = workspace_repository
         self.periodic = Periodic("schedule_next_runs", self.schedule_next_runs, timedelta(minutes=1))
-        self.collect_last_scan_failed_accounts = Periodic(
-            "collect_problematic_accounts", self.collect_problematic_accounts, timedelta(hours=1)
-        )
         self.collect_result_listener = RedisStreamListener(
             readwrite_redis,
             "collect-events",
@@ -437,7 +434,6 @@ class DispatcherService(Service):
             log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")
             await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
 
-    async def collect_problematic_accounts(self) -> None:
-        accounts = await self.cloud_account_repo.list_non_hourly_failed_scans_accounts()
-        for account in accounts:
+        failed_accounts = await self.cloud_account_repo.list_non_hourly_failed_scans_accounts(now)
+        for account in failed_accounts:
             await self.trigger_collect(account)
