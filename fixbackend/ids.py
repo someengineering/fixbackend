@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import NewType, Any, Literal
 from uuid import UUID
 
@@ -40,7 +40,7 @@ class CloudNames:
     GCP: CloudName = CloudName("gcp")
 
 
-class ProductTier(str, Enum):
+class ProductTier(StrEnum):
     # do not change the values of these enums, or things will break
     Trial = "Trial"
     Free = "Free"

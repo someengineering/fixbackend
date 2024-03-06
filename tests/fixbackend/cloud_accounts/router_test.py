@@ -86,6 +86,7 @@ class InMemoryCloudAccountService(CloudAccountService):
             updated_at=utc(),
             state_updated_at=utc(),
             cf_stack_version=0,
+            failed_scan_count=0,
         )
         self.accounts[account.id] = account
         return account
@@ -210,6 +211,7 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=0,
+        failed_scan_count=0,
     )
     response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -241,6 +243,7 @@ async def test_last_scan(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=0,
+        failed_scan_count=0,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts/last_scan")
@@ -279,6 +282,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=42,
+        failed_scan_count=0,
     )
 
     response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
@@ -326,6 +330,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
             updated_at=utc(),
             state_updated_at=utc(),
             cf_stack_version=0,
+            failed_scan_count=0,
         )
         cloud_account_service.accounts[cloud_account_id] = account
         return account
@@ -397,6 +402,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=0,
+        failed_scan_count=0,
     )
 
     payload: Dict[str, Optional[str]] = {
@@ -445,6 +451,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=0,
+        failed_scan_count=0,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")
@@ -494,6 +501,7 @@ async def test_enable_disable_account_scan(client: AsyncClient) -> None:
         updated_at=utc(),
         state_updated_at=utc(),
         cf_stack_version=None,
+        failed_scan_count=0,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/disable")
