@@ -35,11 +35,15 @@ from fixbackend.ids import (
 )
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 
 
 @pytest.mark.asyncio
 async def test_create_cloud_account(
-    async_session_maker: AsyncSessionMaker, workspace_repository: WorkspaceRepository, user: User
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    user: User,
+    next_run_repository: NextRunRepository,
 ) -> None:
     cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
@@ -54,13 +58,17 @@ async def test_create_cloud_account(
         CloudAccountStates.Detected(),
         CloudAccountStates.Discovered(cloud_access),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
+        CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
         CloudAccountStates.Deleted(),
     ]
 
     configured_account_id: FixCloudAccountId | None = None
 
+    configured_count = 0
+
     for idx, account_state in enumerate(account_states):
+
         account = CloudAccount(
             id=FixCloudAccountId(uuid.uuid4()),
             account_id=CloudAccountId(str(idx)),
@@ -79,7 +87,11 @@ async def test_create_cloud_account(
             updated_at=utc().replace(microsecond=0),
             state_updated_at=utc().replace(microsecond=0),
             cf_stack_version=0,
+            failed_scan_count=configured_count * 42,  # only the last one has failed scans
         )
+
+        if isinstance(account_state, CloudAccountStates.Configured):
+            configured_count += 1
 
         if isinstance(account_state, CloudAccountStates.Configured):
             configured_account_id = account.id
@@ -100,7 +112,7 @@ async def test_create_cloud_account(
     collectable_accounts = await cloud_account_repository.list_by_workspace_id(
         workspace_id=workspace_id, ready_for_collection=True
     )
-    assert len(collectable_accounts) == 1
+    assert len(collectable_accounts) == 2
 
     new_cloud_access = AwsCloudAccess(
         role_name=AwsRoleName("bar"),
@@ -115,6 +127,18 @@ async def test_create_cloud_account(
     discovered_accounts = await cloud_account_repository.list_all_discovered_accounts()
     assert len(discovered_accounts) == 1
     assert discovered_accounts[0].state.state_name == CloudAccountStates.Discovered.state_name
+
+    # list where we have failed scans
+    # we set the next tenant run 2 days in the future so the join in the query below should work fine
+    await next_run_repository.create(workspace_id, utc() + timedelta(days=1))
+    failed_scan_accounts = await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc())
+    assert len(failed_scan_accounts) == 1
+    assert failed_scan_accounts[0].state.state_name == CloudAccountStates.Configured.state_name
+    assert failed_scan_accounts[0].failed_scan_count == 42
+    assert failed_scan_accounts[0].account_id == CloudAccountId("3")  # the forth account created in the loop above
+    # if next scan is less than 2 hours from now, it should not be included in the list
+    await next_run_repository.update_next_run_at(workspace_id, utc() + timedelta(hours=1))
+    assert await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc()) == []
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:

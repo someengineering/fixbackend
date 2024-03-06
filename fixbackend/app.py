@@ -597,7 +597,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router(), tags=["billing"])
-        api_router.include_router(billing_info_router(), prefix="/workspaces", tags=["billing"])
+        api_router.include_router(billing_info_router(cfg), prefix="/workspaces", tags=["billing"])
         api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
 

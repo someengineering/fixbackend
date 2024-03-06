@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
@@ -24,6 +25,7 @@ from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, WorkspaceId
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.dispatcher.next_run_repository import NextTenantRun
 
 
 class CloudAccountRepository(ABC):
@@ -55,6 +57,10 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def delete(self, id: FixCloudAccountId) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
         raise NotImplementedError
 
 
@@ -127,6 +133,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 updated_at=cloud_account.updated_at,
                 state_updated_at=cloud_account.state_updated_at,
                 cf_stack_version=cloud_account.cf_stack_version,
+                failed_scan_count=cloud_account.failed_scan_count,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
@@ -176,6 +183,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 stored_account.updated_at = utc()
                 stored_account.state_updated_at = cloud_account.state_updated_at
                 stored_account.cf_stack_version = cloud_account.cf_stack_version
+                stored_account.failed_scan_count = cloud_account.failed_scan_count
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
                 await session.commit()
@@ -222,6 +230,26 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             cloud_account = results.unique().scalar_one()
             await session.delete(cloud_account)
             await session.commit()
+
+    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
+        async with self.session_maker() as session:
+            # select all accounts that are enabled and in the configured state
+            # and the next scan is more than 2 hours from now
+
+            two_hours_from_now = now + timedelta(hours=2)
+
+            statement = (
+                select(orm.CloudAccount)
+                .join(NextTenantRun, orm.CloudAccount.tenant_id == NextTenantRun.tenant_id)
+                .where(orm.CloudAccount.enabled.is_(True))
+                .where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
+                .where(orm.CloudAccount.failed_scan_count > 0)
+                .where(NextTenantRun.at > two_hours_from_now)
+            )
+
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model() for acc in accounts]
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:

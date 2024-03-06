@@ -15,9 +15,10 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.config import Config
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.billing_information import schemas
@@ -29,13 +30,13 @@ from fixbackend.billing_information.schemas import (
 )
 from fixbackend.billing_information.service import BillingEntryServiceDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import ProductTier, SubscriptionId
+from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId
 from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 
 
-def billing_info_router() -> APIRouter:
+def billing_info_router(config: Config) -> APIRouter:
     router = APIRouter()
 
     @router.get("/{workspace_id}/billing_entries/")
@@ -80,9 +81,9 @@ def billing_info_router() -> APIRouter:
                     return None
 
         def product_tier(billing: WorkspaceBillingSettingsUpdate) -> Optional[ProductTier]:
-            if billing.security_tier is None:
+            if billing.product_tier is None:
                 return None
-            return billing.security_tier.to_tier()
+            return billing.product_tier.to_tier()
 
         ws = await billing_info_service.update_billing(user, workspace, product_tier(billing), payment_method(billing))
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
@@ -103,5 +104,15 @@ def billing_info_router() -> APIRouter:
             raise ResourceNotFound("Subscription not found")
 
         await workspace_repository.update_subscription(workspace.id, subscription_id)
+
+    @router.get("/{workspace_id}/aws_marketplace_product")
+    async def redirect_to_aws_marketplace_product(
+        workspace_id: WorkspaceId,
+    ) -> Response:
+        response = Response(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": config.aws_marketplace_url},
+        )
+        return response
 
     return router
