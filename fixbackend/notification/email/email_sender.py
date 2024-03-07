@@ -98,7 +98,7 @@ class Boto3EmailSender(EmailSender):
 
             self.ses.send_raw_email(
                 Source="noreply@fix.security",
-                Destinations=to,
+                Destinations=[to],
                 RawMessage={"Data": msg.as_string().encode("utf-8")},
             )
 
