@@ -33,7 +33,7 @@ async def test_teams_notification(
     # evaluate message
     assert len(email_sender.call_args) == 1
     email = email_sender.call_args[0]
-    assert email.to == ["user@example.com"]
+    assert email.to == "user@example.com"
     assert email.subject == "💥 Critical: New issues Detected in your Infrastructure!"
     assert "We have completed a comprehensive scan of your infrastructure." in email.text
     assert email.html and "We have completed a comprehensive scan of your infrastructure." in email.html

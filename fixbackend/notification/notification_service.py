@@ -36,6 +36,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
+from fixbackend.jwt import JwtService
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage
@@ -59,7 +60,7 @@ from fixbackend.notification.slack.slack_notification import SlackNotificationSe
 from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import batch, md5
+from fixbackend.utils import md5
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -78,10 +79,11 @@ class NotificationService(Service):
         http_client: AsyncClient,
         domain_event_sender: DomainEventPublisher,
         domain_event_subscriber: DomainEventSubscriber,
+        jwt_service: JwtService,
         handle_events: bool = True,
     ) -> None:
         self.config = config
-        self.email_sender: EmailSender = email_sender_from_config(config)
+        self.email_sender: EmailSender = email_sender_from_config(config, jwt_service)
         self.workspace_repository = workspace_repository
         self.graphdb_access = graphdb_access
         self.user_repository = user_repository
@@ -123,7 +125,7 @@ class NotificationService(Service):
             await self.alert_listener.stop()
 
     async def send_email(self, *, to: str, subject: str, text: str, html: Optional[str]) -> None:
-        await self.email_sender.send_email(to=[to], subject=subject, text=text, html=html)
+        await self.email_sender.send_email(to=to, subject=subject, text=text, html=html)
 
     async def send_message(self, *, to: str, message: EmailMessage) -> None:
         await self.send_email(to=to, subject=message.subject(), text=message.text(), html=message.html())
@@ -136,9 +138,9 @@ class NotificationService(Service):
             return
 
         emails = [user.email for user in await self.user_repository.get_by_ids(workspace.all_users())]
-        for email_batch in batch(emails):
+        for email in emails:
             await self.email_sender.send_email(
-                to=email_batch, subject=message.subject(), text=message.text(), html=message.html()
+                to=email, subject=message.subject(), text=message.text(), html=message.html()
             )
 
     async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, Json]:

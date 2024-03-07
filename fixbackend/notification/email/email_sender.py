@@ -21,9 +21,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Optional
 import boto3
 from fixbackend.config import Config
+from fixbackend.jwt import JwtService
 
 
 class EmailSender(ABC):
@@ -31,7 +34,7 @@ class EmailSender(ABC):
     async def send_email(
         self,
         *,
-        to: List[str],
+        to: str,
         subject: str,
         text: str,
         html: Optional[str],
@@ -40,8 +43,12 @@ class EmailSender(ABC):
         raise NotImplementedError()
 
 
+EMAIL_UNSUBSCRIBE_AUDIENCE = "fix:unsubscribe"
+
+
 class Boto3EmailSender(EmailSender):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, jwt_service: JwtService) -> None:
+        self.jwt_service = jwt_service
         self.config = config
         self.ses = boto3.client(
             "ses",
@@ -53,36 +60,46 @@ class Boto3EmailSender(EmailSender):
     async def send_email(
         self,
         *,
-        to: List[str],
+        to: str,
         subject: str,
         text: str,
         html: Optional[str],
     ) -> None:  # pragma: no cover
-        def send_email() -> None:
-            body_section = {
-                "Text": {
-                    "Charset": "UTF-8",
-                    "Data": text,
-                },
-            }
-            if html:
-                body_section["Html"] = {
-                    "Charset": "UTF-8",
-                    "Data": html,
-                }
 
-            self.ses.send_email(
-                Destination={
-                    "ToAddresses": to,
-                },
-                Message={
-                    "Body": body_section,
-                    "Subject": {
-                        "Charset": "UTF-8",
-                        "Data": subject,
-                    },
-                },
-                Source="noreply@fix.tt",
+        token = await self.jwt_service.encode(
+            {
+                "sub": to,
+            },
+            audience=[EMAIL_UNSUBSCRIBE_AUDIENCE],
+        )
+
+        unsubscribe_url = ""
+        match self.config.environment:
+            case "dev":
+                unsubscribe_url = "https://app.dev.fixcloud.io/unsubscribe?token=" + token
+            case "prd":
+                unsubscribe_url = "https://app.global.fixcloud.io/unsubscribe?token=" + token
+
+        def send_email() -> None:
+
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = "noreply@fix.security"
+            msg["To"] = ", ".join(to)
+            msg.add_header("List-Unsubscribe", f"{unsubscribe_url}")
+            msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
+
+            plain_part = MIMEText(text, "plain")
+            msg.attach(plain_part)
+
+            if html:
+                html_part = MIMEText(html, "html")
+                msg.attach(html_part)
+
+            self.ses.send_raw_email(
+                Source="noreply@fix.security",
+                Destinations=to,
+                RawMessage={"Data": msg.as_string().encode("utf-8")},
             )
 
         await asyncio.to_thread(send_email)
@@ -91,7 +108,7 @@ class Boto3EmailSender(EmailSender):
 class ConsoleEmailSender(EmailSender):
     async def send_email(
         self,
-        to: List[str],
+        to: str,
         subject: str,
         text: str,
         html: Optional[str],
@@ -102,7 +119,9 @@ class ConsoleEmailSender(EmailSender):
             print(f"html: {html}")
 
 
-def email_sender_from_config(config: Config) -> EmailSender:
+def email_sender_from_config(config: Config, jwt_service: JwtService) -> EmailSender:
     return (
-        Boto3EmailSender(config) if config.aws_access_key_id and config.aws_secret_access_key else ConsoleEmailSender()
+        Boto3EmailSender(config, jwt_service)
+        if config.aws_access_key_id and config.aws_secret_access_key
+        else ConsoleEmailSender()
     )

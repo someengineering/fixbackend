@@ -38,4 +38,5 @@ class EmailNotificationSender(AlertSender):
 
             log.info(f"Send email notification for workspace {alert.workspace_id}")
             to = [to] if isinstance(to, str) else to
-            await self.sender.send_email(to=to, subject=subject, text=text, html=html)
+            for email in to:
+                await self.sender.send_email(to=email, subject=subject, text=text, html=html)

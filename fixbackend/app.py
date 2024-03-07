@@ -83,6 +83,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient, InventoryException
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
+from fixbackend.jwt import JwtServiceImpl
 from fixbackend.logging_context import (
     get_logging_context,
     set_fix_cloud_account_id,
@@ -90,7 +91,7 @@ from fixbackend.logging_context import (
 )
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
-from fixbackend.notification.notification_router import notification_router
+from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.permissions.router import roles_router
@@ -232,6 +233,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
             publisher_name="cloud_account_service",
         )
 
+        cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
+
+        jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+
         notification_service = deps.add(
             SN.notification_service,
             NotificationService(
@@ -245,6 +250,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 http_client,
                 domain_event_publisher,
                 domain_event_subscriber,
+                jwt_service,
             ),
         )
         deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
@@ -267,7 +273,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
 
-        deps.add(SN.certificate_store, CertificateStore(cfg))
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
@@ -340,6 +345,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
             SN.inventory,
             InventoryService(inventory_client, graph_db_access, cloud_account_repo, None, temp_store_redis),
         )
+
+        cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
+
+        jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+
         notification_service = deps.add(
             SN.notification_service,
             NotificationService(
@@ -353,6 +363,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 http_client,
                 domain_event_publisher,
                 domain_event_subscriber,
+                jwt_service,
                 handle_events=False,  # fixbackend will handle events. dispatching should ignore them.
             ),
         )
@@ -599,6 +610,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(subscription_router(), tags=["billing"])
         api_router.include_router(billing_info_router(cfg), prefix="/workspaces", tags=["billing"])
         api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
+        api_router.include_router(unsubscribe_router(deps), include_in_schema=False)
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
 
         app.include_router(api_router)

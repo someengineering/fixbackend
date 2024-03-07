@@ -75,11 +75,8 @@ async def test_sent_to_workspace(
 
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=SecurityScanFinished())
 
-    # emails must be sent in batches of no more than 50
-    assert len(email_sender.call_args) == 3
-    assert len(email_sender.call_args[0].to) == 50
-    assert len(email_sender.call_args[1].to) == 50
-    assert len(email_sender.call_args[2].to) == 1
+    # emails are sent 1 by 1 without batching
+    assert len(email_sender.call_args) == 101
 
 
 @pytest.mark.asyncio
@@ -91,7 +88,7 @@ async def test_sent_email(
 
     assert len(email_sender.call_args) == 1
     args = email_sender.call_args[0]
-    assert args.to == ["1"]
+    assert args.to == "1"
     assert args.subject == "2"
     assert args.text == "3"
     assert args.html == "4"
@@ -107,7 +104,7 @@ async def test_sent_message(
 
     assert len(email_sender.call_args) == 1
     args = email_sender.call_args[0]
-    assert args.to == ["1"]
+    assert args.to == "1"
     assert args.subject == message.subject()
     assert args.text == message.text()
     assert args.html == message.html()
