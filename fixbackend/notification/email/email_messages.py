@@ -46,10 +46,10 @@ class Signup:
             "signup.html",
             title=self.subject(),
             email=self.recipient,
-            visit_our_blog_url="https://fix.tt/blog",
+            visit_our_blog_url="https://fix.security/blog",
             connect_with_fix_on_linkedin_url="https://www.linkedin.com/company/fix/",
             discord_url="https://discord.gg/KQ3JeMbE",
-            support_email="support@fix.tt",
+            support_email="support@fix.security",
         )
 
 
@@ -77,7 +77,7 @@ class Invite:
             inviter=self.inviter,
             action_url=self.invitation_link,
             email=self.recipient,
-            support_email="support@fix.tt",
+            support_email="support@fix.security",
         )
 
 
@@ -98,7 +98,7 @@ class VerifyEmail:
             title=self.subject(),
             email=self.recipient,
             verification_link=self.verification_link,
-            support_email="support@fix.tt",
+            support_email="support@fix.security",
         )
 
 
@@ -119,7 +119,7 @@ class PasswordReset:
             title=self.subject(),
             email=self.recipient,
             action_link=self.password_reset_link,
-            support_email="support@fix.tt",
+            support_email="support@fix.security",
         )
 
 

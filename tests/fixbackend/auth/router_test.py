@@ -36,6 +36,7 @@ from fixbackend.workspaces.invitation_repository import InvitationRepository, ge
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
+from fixbackend.certificates.cert_store import CertificateStore
 
 
 class InMemoryVerifier(AuthEmailSender):
@@ -124,6 +125,7 @@ async def test_registration_flow(
     domain_event_sender: InMemoryDomainEventPublisher,
     workspace_repository: WorkspaceRepository,
     user_repository: UserRepository,
+    cert_store: CertificateStore,
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()

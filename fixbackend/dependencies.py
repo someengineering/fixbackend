@@ -26,6 +26,7 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.jwt import JwtService, JwtServiceImpl
 
 
 class ServiceNames:
@@ -62,6 +63,7 @@ class ServiceNames:
     email_on_signup_consumer = "email_on_signup_consumer"
     billing_entry_service = "billing_entry_services"
     role_repository = "role_repository"
+    jwt_service = "jwt_service"
 
 
 class FixDependencies(Dependencies):
@@ -104,6 +106,10 @@ class FixDependencies(Dependencies):
     @property
     def domain_event_sender(self) -> DomainEventPublisher:
         return self.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)
+
+    @property
+    def jwt_service(self) -> JwtService:
+        return self.service(ServiceNames.jwt_service, JwtServiceImpl)
 
 
 # placeholder for dependencies, will be replaced during the app initialization

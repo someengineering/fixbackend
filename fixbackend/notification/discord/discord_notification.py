@@ -48,7 +48,7 @@ class DiscordNotificationSender(AlertSender):
                     "title": f"{alert.severity.capitalize()}: New issues Detected in your Infrastructure!",
                     "author": {
                         "name": "FIX",
-                        "url": "https://fix.tt",
+                        "url": "https://fix.security",
                         "icon_url": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
                     },
                     "url": alert.ui_link,

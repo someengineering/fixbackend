@@ -17,19 +17,21 @@ from typing import Annotated, Dict, Optional, List
 from urllib.parse import urlencode
 
 import jwt
-from fastapi import APIRouter, Depends, Request, Response, Query, HTTPException, Body
+from fastapi import APIRouter, Depends, Request, Response, Query, HTTPException, Body, status
 from fastapi_users.jwt import decode_jwt, generate_jwt
 from fixcloudutils.types import Json
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.errors import NotAllowed
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
+from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
@@ -346,5 +348,40 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         ns = fix.service(ServiceNames.notification_service, NotificationService)
         await ns.send_test_alert(workspace_id, channel)
         return Response(status_code=204)
+
+    return router
+
+
+def unsubscribe_router(fix: FixDependencies) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/unsubscribe", include_in_schema=False)
+    async def unsubscribe(token: str) -> Response:
+
+        decoded = await fix.jwt_service.decode(token, [EMAIL_UNSUBSCRIBE_AUDIENCE])
+        if not decoded:
+            log.info("invalid token")
+            raise NotAllowed("Invalid token")
+        email = decoded.get("sub")
+        if not email:
+            log.info("no email in token")
+            raise NotAllowed("Invalid token")
+
+        # todo: implement this sometime
+        log.info(f"Unsubscribing {email} from all notifications")
+
+        content = """
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>You've successfully unsubscribed from all notifications</h1>
+
+</body>
+</html>
+"""
+
+        response = Response(content=content, media_type="text/html", status_code=status.HTTP_200_OK)
+        return response
 
     return router

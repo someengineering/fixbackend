@@ -12,16 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import hashlib
-import os
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-import jwt
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi_users import exceptions
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroyNotSupportedError
@@ -29,24 +23,17 @@ from fastapi_users.manager import BaseUserManager
 
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
-from fixbackend.certificates.cert_store import CertKeyPair
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency
-from fixbackend.certificates.cert_store import load_cert_key_pair
 from fixbackend.ids import UserId
-
-# copied from jwt package
-AllowedPrivateKeys = Union[
-    rsa.RSAPrivateKey, ec.EllipticCurvePrivateKey, ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey
-]
-AllowedPublicKeys = Union[rsa.RSAPublicKey, ec.EllipticCurvePublicKey, ed25519.Ed25519PublicKey, ed448.Ed448PublicKey]
+from fixbackend import jwt
 
 
 class FixJWTStrategy(Strategy[User, UserId]):
     def __init__(
         self,
-        public_keys: List[AllowedPublicKeys],
-        private_key: AllowedPrivateKeys,
+        public_keys: List[rsa.RSAPublicKey],
+        private_key: rsa.RSAPrivateKey,
         lifetime_seconds: Optional[int],
         token_audience: List[str] = ["fastapi-users:auth"],
         algorithm: str = "RS256",
@@ -57,44 +44,14 @@ class FixJWTStrategy(Strategy[User, UserId]):
         self.token_audience = token_audience
         self.algorithm = algorithm
 
-    def kid(self, key: AllowedPublicKeys) -> str:
-        return hashlib.sha256(
-            key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.PKCS1)
-        ).hexdigest()[0:8]
-
     def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
-        # try to decode the token without verifying the signature to get the key id
-        try:
-            unverified = jwt.api_jwt.decode_complete(token, options={"verify_signature": False})
-        except jwt.exceptions.DecodeError:  # token is not a valid JWT
-            return None
-
-        header = unverified["header"]
-        key_id = header.get("kid")
-
-        public_key = None
-
-        # poor man JWKS
-        available_keys = {self.kid(key): key for key in self.public_keys}
-
-        if not (key_id in available_keys):
-            return None
-
-        public_key = available_keys[key_id]
-
-        try:
-            data: Dict[str, Any] = jwt.decode(
-                jwt=token, key=public_key, algorithms=[self.algorithm], audience=self.token_audience
-            )
-            return data
-        except jwt.PyJWTError:
-            return None
+        return jwt.decode_token(token, self.token_audience, self.public_keys)
 
     async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UserId]) -> Optional[User]:
         if token is None:
             return None
 
-        data = self.decode_token(token)
+        data = jwt.decode_token(token, self.token_audience, self.public_keys)
         if data is None:
             return None
 
@@ -112,61 +69,19 @@ class FixJWTStrategy(Strategy[User, UserId]):
     async def write_token(self, user: User) -> str:
         payload: Dict[str, Any] = {
             "sub": str(user.id),
-            "aud": self.token_audience,
             "permissions": {str(role.workspace_id): role.permissions().value for role in user.roles},
-        }
-        headers = {
-            "kid": self.kid(self.private_key.public_key()),
         }
         if self.lifetime_seconds:
             expire = datetime.utcnow() + timedelta(seconds=self.lifetime_seconds)
             payload["exp"] = expire
-        return jwt.encode(payload, self.private_key, algorithm=self.algorithm, headers=headers)
+        return jwt.encode_token(payload, self.token_audience, self.private_key)
 
     async def destroy_token(self, token: str, user: User) -> None:
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-async def get_localhost_key_pair() -> List[CertKeyPair]:
-    local_signing_key_path = Path("/tmp/fixbackend/local_jwt_signing.key")
-    local_signing_crt_path = Path("/tmp/fixbackend/local_jwt_signing.crt")
-
-    if local_signing_key_path.exists() and local_signing_crt_path.exists():
-        key_pair = await load_cert_key_pair(local_signing_crt_path, local_signing_key_path)
-        return [key_pair]
-
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "fixbackend jwt ephemeral signing key")]))
-        .issuer_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "fixbackend running locally")]))
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=1))
-        .sign(key, hashes.SHA256())
-    )
-
-    local_signing_crt_path.parent.mkdir(parents=True, exist_ok=True)
-    local_signing_key_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(local_signing_key_path, "wb") as f:
-        f.write(
-            key.private_bytes(
-                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
-            )
-        )
-    with open(local_signing_crt_path, "wb") as f:
-        f.write(cert.public_bytes(serialization.Encoding.PEM))
-
-    return [CertKeyPair(cert=cert, private_key=key)]
-
-
 async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UserId]:
-    # only to make it easier to run locally
-    if os.environ.get("LOCAL_DEV_ENV") is not None:
-        cert_key_pairs = await get_localhost_key_pair()
-    else:
-        cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
+    cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
     return FixJWTStrategy(
         public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
         private_key=cert_key_pairs[0].private_key,

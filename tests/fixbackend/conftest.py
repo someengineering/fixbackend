@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
+import jwt
 
 import pytest
 from alembic.command import upgrade as alembic_upgrade, check as alembic_check
@@ -73,6 +74,8 @@ from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixbackend.jwt import JwtService
+from fixbackend.certificates.cert_store import CertificateStore
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -119,7 +122,7 @@ def event_loop() -> Iterator[AbstractEventLoop]:
 @pytest.fixture
 def default_config() -> Config:
     return Config(
-        environment="test",
+        environment="dev",
         instance_id="test",
         database_name="fixbackend-testdb",
         database_user="root",
@@ -456,7 +459,7 @@ def alert_failing_benchmark_checks_detected() -> FailingBenchmarkChecksDetected:
                 ],
             )
         ],
-        "https://fix.tt/",
+        "https://fix.security/",
     )
 
 
@@ -671,11 +674,17 @@ async def dispatcher(
 
 
 @pytest.fixture
+async def cert_store(default_config: Config) -> CertificateStore:
+    return CertificateStore(default_config)
+
+
+@pytest.fixture
 async def fix_deps(
     db_engine: AsyncEngine,
     graph_database_access_manager: GraphDatabaseAccessManager,
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
+    cert_store: CertificateStore,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -684,6 +693,7 @@ async def fix_deps(
             ServiceNames.graph_db_access: graph_database_access_manager,
             ServiceNames.session_maker: async_session_maker,
             ServiceNames.workspace_repo: workspace_repository,
+            ServiceNames.certificate_store: cert_store,
         }
     )
 
@@ -719,7 +729,7 @@ async def billing_service(
 
 @frozen
 class NotificationEmail:
-    to: List[str]
+    to: str
     subject: str
     text: str
     html: Optional[str]
@@ -729,13 +739,34 @@ class InMemoryEmailSender(EmailSender):
     def __init__(self) -> None:
         self.call_args: List[NotificationEmail] = []
 
-    async def send_email(self, *, to: List[str], subject: str, text: str, html: str | None) -> None:
+    async def send_email(self, *, to: str, subject: str, text: str, html: str | None) -> None:
         self.call_args.append(NotificationEmail(to, subject, text, html))
 
 
 @pytest.fixture
 def email_sender() -> InMemoryEmailSender:
     return InMemoryEmailSender()
+
+
+class JwtServiceMock(JwtService):
+    def __init__(self) -> None:
+        self.secret = "secret"
+
+    async def encode(self, payload: Json, audience: List[str]) -> str:
+        payload["aud"] = audience
+        return jwt.encode(payload, self.secret, algorithm="HS256")
+
+    async def decode(self, token: str, audience: List[str]) -> Optional[Json]:
+        try:
+            data: Json = jwt.decode(token, self.secret, algorithms=["HS256"], audience=audience)
+            return data
+        except jwt.PyJWTError:
+            return None
+
+
+@pytest.fixture
+def jwt_service() -> JwtService:
+    return JwtServiceMock()
 
 
 @pytest.fixture
@@ -752,6 +783,7 @@ def notification_service(
     domain_event_sender: DomainEventPublisher,
     domain_event_subscriber: DomainEventSubscriber,
     redis_publisher_mock: RedisStreamPublisherMock,
+    jwt_service: JwtService,
 ) -> NotificationService:
     service = NotificationService(
         default_config,
@@ -764,6 +796,7 @@ def notification_service(
         http_client,
         domain_event_sender,
         domain_event_subscriber,
+        jwt_service,
     )
     service.alert_publisher = redis_publisher_mock
     service.email_sender = email_sender
