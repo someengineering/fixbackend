@@ -85,7 +85,7 @@ class Boto3EmailSender(EmailSender):
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = "noreply@fix.security"
-            msg["To"] = ", ".join(to)
+            msg["To"] = to
             msg.add_header("List-Unsubscribe", f"{unsubscribe_url}")
             msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
 
