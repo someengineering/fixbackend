@@ -64,7 +64,7 @@ class Boto3EmailSender(EmailSender):
         subject: str,
         text: str,
         html: Optional[str],
-        unsubscribe: bool = False,
+        unsubscribe: bool = True,
     ) -> None:  # pragma: no cover
 
         unsubscribe_url = ""
@@ -89,7 +89,7 @@ class Boto3EmailSender(EmailSender):
             msg["From"] = "noreply@fix.security"
             msg["To"] = to
             if unsubscribe:
-                msg.add_header("List-Unsubscribe", f"{unsubscribe_url}")
+                msg.add_header("List-Unsubscribe", f"<{unsubscribe_url}>")
                 msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
 
             plain_part = MIMEText(text, "plain")
