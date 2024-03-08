@@ -64,7 +64,7 @@ class Boto3EmailSender(EmailSender):
         subject: str,
         text: str,
         html: Optional[str],
-        unsubscribe: bool = True,
+        unsubscribe: bool = False,
     ) -> None:  # pragma: no cover
 
         unsubscribe_url = ""
