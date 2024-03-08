@@ -33,7 +33,7 @@ from fixbackend.ids import (
     NodeId,
     BenchmarkName,
 )
-from fixbackend.notification.email.email_messages import SecurityScanFinished
+from fixbackend.notification.email.email_messages import AccountDegraded, SecurityScanFinished
 from fixbackend.notification.model import (
     WorkspaceAlert,
     AlertingSetting,
@@ -274,3 +274,17 @@ async def test_send_test_alert(
     # ensure that an alert was created
     assert len(inventory_requests) == 1
     assert str(inventory_requests[0].url) == "https://discord.com/webhook_example"
+
+
+@pytest.mark.asyncio
+async def test_send_degraded_message(
+    notification_service: NotificationService,
+    workspace: Workspace,
+    email_sender: InMemoryEmailSender,
+) -> None:
+    message = AccountDegraded(cloud_account_id=CloudAccountId("12345"))
+    await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)
+
+    assert len(email_sender.call_args) == 1
+    assert email_sender.call_args[0].subject == "FIX: Account 12345 Degraded"
+    assert "Account 12345 degraded!" in (email_sender.call_args[0].html or "")

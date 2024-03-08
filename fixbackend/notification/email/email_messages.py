@@ -19,6 +19,8 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from functools import lru_cache
 
+from fixbackend.ids import CloudAccountId
+
 
 @lru_cache(maxsize=1)
 def get_env() -> Environment:
@@ -136,8 +138,24 @@ class SecurityScanFinished:
             "security_scan_finished.html",
             title=self.subject(),
             fix_console_url="https://app.global.fixcloud.io/",
-            foo="foo",
         )
 
 
-EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset]
+@frozen(kw_only=True)
+class AccountDegraded:
+    cloud_account_id: CloudAccountId
+
+    def subject(self) -> str:
+        return f"FIX: Account {self.cloud_account_id} Degraded"
+
+    def text(self) -> str:
+        return f"Account {self.cloud_account_id} can't be collected and now in degraded state. Please check that the account exists."
+
+    def html(self) -> str:
+        return render(
+            "account_degraded.html",
+            message=self,
+        )
+
+
+EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset, AccountDegraded]

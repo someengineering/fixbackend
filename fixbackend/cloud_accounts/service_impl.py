@@ -65,7 +65,7 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
-from fixbackend.notification.email.email_messages import SecurityScanFinished
+from fixbackend.notification.email import email_messages as email
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
@@ -319,7 +319,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     await self.analytics_event_sender.send(AEFirstWorkspaceCollectFinished(user_id, event.tenant_id))
                     # inform workspace users about the first successful collect
                     await self.notification_service.send_message_to_workspace(
-                        workspace_id=event.tenant_id, message=SecurityScanFinished()
+                        workspace_id=event.tenant_id, message=email.SecurityScanFinished()
                     )
                 if first_account_collect:
                     await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
@@ -351,6 +351,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
             case AwsAccountDegraded.kind:
                 degraded_event = AwsAccountDegraded.from_json(message)
+                await self.notification_service.send_message_to_workspace(
+                    workspace_id=degraded_event.tenant_id,
+                    message=email.AccountDegraded(cloud_account_id=degraded_event.aws_account_id),
+                )
                 await send_pub_sub_message(degraded_event)
 
             case _:
