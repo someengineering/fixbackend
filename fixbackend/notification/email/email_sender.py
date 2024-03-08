@@ -64,21 +64,23 @@ class Boto3EmailSender(EmailSender):
         subject: str,
         text: str,
         html: Optional[str],
+        unsubscribe: bool = False,
     ) -> None:  # pragma: no cover
 
-        token = await self.jwt_service.encode(
-            {
-                "sub": to,
-            },
-            audience=[EMAIL_UNSUBSCRIBE_AUDIENCE],
-        )
-
         unsubscribe_url = ""
-        match self.config.environment:
-            case "dev":
-                unsubscribe_url = "https://app.dev.fixcloud.io/unsubscribe?token=" + token
-            case "prd":
-                unsubscribe_url = "https://app.global.fixcloud.io/unsubscribe?token=" + token
+        if unsubscribe:
+            token = await self.jwt_service.encode(
+                {
+                    "sub": to,
+                },
+                audience=[EMAIL_UNSUBSCRIBE_AUDIENCE],
+            )
+
+            match self.config.environment:
+                case "dev":
+                    unsubscribe_url = "https://app.dev.fixcloud.io/unsubscribe?token=" + token
+                case "prd":
+                    unsubscribe_url = "https://app.global.fixcloud.io/unsubscribe?token=" + token
 
         def send_email() -> None:
 
@@ -86,8 +88,9 @@ class Boto3EmailSender(EmailSender):
             msg["Subject"] = subject
             msg["From"] = "noreply@fix.security"
             msg["To"] = to
-            msg.add_header("List-Unsubscribe", f"{unsubscribe_url}")
-            msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
+            if unsubscribe:
+                msg.add_header("List-Unsubscribe", f"{unsubscribe_url}")
+                msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
 
             plain_part = MIMEText(text, "plain")
             msg.attach(plain_part)
