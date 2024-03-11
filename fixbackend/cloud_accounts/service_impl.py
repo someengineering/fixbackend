@@ -354,7 +354,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 await self.notification_service.send_message_to_workspace(
                     workspace_id=degraded_event.tenant_id,
                     message=email.AccountDegraded(
-                        cloud_account_id=degraded_event.aws_account_id, tenant_id=degraded_event.tenant_id
+                        cloud_account_id=degraded_event.aws_account_id,
+                        tenant_id=degraded_event.tenant_id,
+                        account_name=degraded_event.aws_account_name,
                     ),
                 )
                 await send_pub_sub_message(degraded_event)
@@ -765,6 +767,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 cloud_account_id=account.id,
                 tenant_id=account.workspace_id,
                 aws_account_id=account.account_id,
+                aws_account_name=account.final_name(),
                 error=error,
             )
         )

@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Union
+from typing import Any, Optional, Union
 from attrs import frozen
 
 from pathlib import Path
@@ -144,13 +144,20 @@ class SecurityScanFinished:
 @frozen(kw_only=True)
 class AccountDegraded:
     cloud_account_id: CloudAccountId
+    account_name: Optional[str]
     tenant_id: WorkspaceId
 
+    def account_info(self) -> str:
+        formatted = (
+            f"{self.account_name} ({self.cloud_account_id})" if self.account_name else f"{self.cloud_account_id}"
+        )
+        return formatted
+
     def subject(self) -> str:
-        return f"Account {self.cloud_account_id} cannot be accessed due to permission issues."
+        return f"""Account {self.account_info()} cannot be accessed due to permission issues."""
 
     def text(self) -> str:
-        return f"""We were not able to collect latest resource information for Account {self.cloud_account_id}. Please ensure the account exists and that the necessary permissions are granted for access.
+        return f"""We were not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary permissions are granted for access.
 
 Please visit https://app.global.fixcloud.io/workspace-settings/accounts#{self.tenant_id} for more details."""
 
