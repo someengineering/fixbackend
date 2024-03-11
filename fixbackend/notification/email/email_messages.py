@@ -19,7 +19,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from functools import lru_cache
 
-from fixbackend.ids import CloudAccountId
+from fixbackend.ids import CloudAccountId, WorkspaceId
 
 
 @lru_cache(maxsize=1)
@@ -144,12 +144,15 @@ class SecurityScanFinished:
 @frozen(kw_only=True)
 class AccountDegraded:
     cloud_account_id: CloudAccountId
+    tenant_id: WorkspaceId
 
     def subject(self) -> str:
-        return f"FIX: Account {self.cloud_account_id} Degraded"
+        return f"Account {self.cloud_account_id} cannot be accessed due to permission issues."
 
     def text(self) -> str:
-        return f"Account {self.cloud_account_id} can't be collected and now in degraded state. Please check that the account exists."
+        return f"""We were not able to collect latest resource information for Account {self.cloud_account_id}. Please ensure the account exists and that the necessary permissions are granted for access.
+
+Please visit https://app.global.fixcloud.io/workspace-settings/accounts#{self.tenant_id} for more details."""
 
     def html(self) -> str:
         return render(

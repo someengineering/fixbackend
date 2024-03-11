@@ -353,7 +353,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 degraded_event = AwsAccountDegraded.from_json(message)
                 await self.notification_service.send_message_to_workspace(
                     workspace_id=degraded_event.tenant_id,
-                    message=email.AccountDegraded(cloud_account_id=degraded_event.aws_account_id),
+                    message=email.AccountDegraded(
+                        cloud_account_id=degraded_event.aws_account_id, tenant_id=degraded_event.tenant_id
+                    ),
                 )
                 await send_pub_sub_message(degraded_event)
 

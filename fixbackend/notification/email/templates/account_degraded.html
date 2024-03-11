@@ -5,12 +5,14 @@
 
 <div class="f-fallback">
     <h1 style="margin-top: 0; color: #333333; font-size: 22px; font-weight: bold; text-align: left;" align="left">
-        Account {{ message.cloud_account_id }} degraded!
+        Account {{ message.cloud_account_id }} cannot be accessed due to permission issues.
     </h1>
 
     <p style="font-size: 16px; line-height: 1.625; color: #333; margin: .4em 0 1.1875em;">
-        One of your accounts can't be collected and is degraded now! Please check the account {{
-        message.cloud_account_id }} for issues.
+        We were not able to collect latest resource information for Account {{ message.cloud_account_id }}. Please
+        ensure the account exists and that the necessary permissions are granted for access.
+
+        Please visit https://app.global.fixcloud.io/workspace-settings/accounts#{{ message.tenant_id}} for more details.
     </p>
 
 </div>

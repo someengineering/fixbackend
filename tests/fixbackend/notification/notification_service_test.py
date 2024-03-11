@@ -282,9 +282,16 @@ async def test_send_degraded_message(
     workspace: Workspace,
     email_sender: InMemoryEmailSender,
 ) -> None:
-    message = AccountDegraded(cloud_account_id=CloudAccountId("12345"))
+    message = AccountDegraded(cloud_account_id=CloudAccountId("12345"), tenant_id=workspace.id)
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)
 
     assert len(email_sender.call_args) == 1
-    assert email_sender.call_args[0].subject == "FIX: Account 12345 Degraded"
-    assert "Account 12345 degraded!" in (email_sender.call_args[0].html or "")
+    assert email_sender.call_args[0].subject == "Account 12345 cannot be accessed due to permission issues."
+    assert "Account 12345 cannot be accessed due to permission issues." in (email_sender.call_args[0].html or "")
+    assert "We were not able to collect latest resource information for Account 12345." in (
+        email_sender.call_args[0].html or ""
+    )
+    assert (
+        f"Please visit https://app.global.fixcloud.io/workspace-settings/accounts#{workspace.id} for more details."
+        in (email_sender.call_args[0].html or "")
+    )
