@@ -209,19 +209,28 @@ class ProductTierSetting:
     retention_period: timedelta
     seats_included: int
     seats_max: Optional[int]
+    scan_interval: timedelta
 
 
-Free = ProductTierSetting(retention_period=timedelta(days=31), seats_included=1, seats_max=1)
-Trial = ProductTierSetting(retention_period=timedelta(days=183), seats_included=1, seats_max=1)
+Free = ProductTierSetting(
+    retention_period=timedelta(days=31), seats_included=1, seats_max=1, scan_interval=timedelta(days=30)
+)
+Trial = ProductTierSetting(
+    retention_period=timedelta(days=183), seats_included=1, seats_max=1, scan_interval=timedelta(hours=1)
+)
 ProductTierSettings = defaultdict(
     lambda: Free,
     {
         ProductTier.Free: Free,
         ProductTier.Trial: Trial,
-        ProductTier.Plus: ProductTierSetting(retention_period=timedelta(days=92), seats_included=2, seats_max=20),
-        ProductTier.Business: ProductTierSetting(retention_period=timedelta(days=183), seats_included=5, seats_max=50),
+        ProductTier.Plus: ProductTierSetting(
+            retention_period=timedelta(days=92), seats_included=2, seats_max=20, scan_interval=timedelta(days=1)
+        ),
+        ProductTier.Business: ProductTierSetting(
+            retention_period=timedelta(days=183), seats_included=5, seats_max=50, scan_interval=timedelta(hours=1)
+        ),
         ProductTier.Enterprise: ProductTierSetting(
-            retention_period=timedelta(days=549), seats_included=20, seats_max=None
+            retention_period=timedelta(days=549), seats_included=20, seats_max=None, scan_interval=timedelta(hours=1)
         ),
     },
 )

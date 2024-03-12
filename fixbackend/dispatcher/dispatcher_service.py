@@ -42,6 +42,7 @@ from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskI
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.config import ProductTierSettings
 
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -366,7 +367,8 @@ class DispatcherService(Service):
     async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
         now = utc()
         product_tier = await self.workspace_repository.get_product_tier(tenant)
-        delta = product_tier.scan_period()  # TODO: compute delta dependent on the tenant.
+        settings = ProductTierSettings[product_tier]
+        delta = settings.scan_interval
         initial_time = last_run or now
         diff = now - initial_time
         if diff.total_seconds() > 0:  # if the last run is in the past, make sure the next run is in the future

@@ -27,7 +27,7 @@ from fixcloudutils.util import utc
 
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
-from fixbackend.config import Config, ConfigDependency
+from fixbackend.config import Config, ConfigDependency, ProductTierSettings
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
 from fixbackend.domain_events.events import InvitationAccepted
@@ -117,7 +117,8 @@ class InvitationServiceImpl(InvitationService):
             raise ResourceNotFound(f"Workspace {workspace_id} does not exist.")
 
         # check permissions
-        if not workspace.product_tier.can_add_seat(current_seats=len(workspace.all_users())):
+        settings = ProductTierSettings[workspace.product_tier]
+        if settings.seats_max and len(workspace.all_users()) >= settings.seats_max:
             raise NotAllowed("Cannot add more users to this workspace.")
 
         # this is idempotent and will return the existing invitation if it exists
@@ -152,7 +153,8 @@ class InvitationServiceImpl(InvitationService):
         if workspace is None:
             return WorkspaceNotFound()
 
-        if not workspace.product_tier.can_add_seat(current_seats=len(workspace.all_users())):
+        settings = ProductTierSettings[workspace.product_tier]
+        if settings.seats_max and len(workspace.all_users()) >= settings.seats_max:
             return NoFreeSeats()
 
         updated = await self.invitation_repository.update_invitation(

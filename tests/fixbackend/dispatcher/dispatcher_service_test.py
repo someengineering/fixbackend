@@ -53,6 +53,7 @@ from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.config import ProductTierSettings
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -375,7 +376,9 @@ async def test_compute_next_run(
 
         workspace = await workspace_repository.update_product_tier(workspace.id, product_tier)
 
-        delta = workspace.product_tier.scan_period()
+        settings = ProductTierSettings[workspace.product_tier]
+
+        delta = settings.scan_interval
 
         async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
             assert (await dispatcher.compute_next_run(workspace.id, last_run)).timestamp() == approx(
