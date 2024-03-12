@@ -867,6 +867,7 @@ async def test_configure_account(
     assert event.cloud_account_id == account.id
     assert event.aws_account_id == account_id
     assert event.tenant_id == account.workspace_id
+    assert event.aws_account_name == account.final_name()
 
 
 @pytest.mark.asyncio
@@ -958,3 +959,4 @@ async def test_move_to_degraded(
     assert published_event.aws_account_id == account_id
     assert published_event.tenant_id == account.workspace_id
     assert published_event.error == "Too many consecutive failed scans"
+    assert published_event.aws_account_name == account.final_name()

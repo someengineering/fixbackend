@@ -139,9 +139,12 @@ class NotificationService(Service):
 
         emails = [user.email for user in await self.user_repository.get_by_ids(workspace.all_users())]
         for email in emails:
-            await self.email_sender.send_email(
-                to=email, subject=message.subject(), text=message.text(), html=message.html()
-            )
+            try:
+                await self.email_sender.send_email(
+                    to=email, subject=message.subject(), text=message.text(), html=message.html()
+                )
+            except Exception as e:
+                log.error(f"Failed to send message to workspace {workspace_id}: {e}")
 
     async def list_notification_provider_configs(self, workspace_id: WorkspaceId) -> Dict[str, Json]:
         configs = await self.provider_config_repo.all_messaging_configs_for_workspace(workspace_id)

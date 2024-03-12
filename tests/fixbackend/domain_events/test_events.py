@@ -43,7 +43,7 @@ events = [
     AwsAccountDiscovered(fix_cloud_account_id, workspace_id, cloud_account_id),
     AwsAccountConfigured(fix_cloud_account_id, workspace_id, cloud_account_id),
     AwsAccountDeleted(user_id, fix_cloud_account_id, workspace_id, cloud_account_id),
-    AwsAccountDegraded(fix_cloud_account_id, workspace_id, cloud_account_id, "some error"),
+    AwsAccountDegraded(fix_cloud_account_id, workspace_id, cloud_account_id, "aws final name", "some error"),
     TenantAccountsCollected(workspace_id, {fix_cloud_account_id: collect_info}, now + timedelta(hours=1)),
     WorkspaceCreated(workspace_id, user_id),
 ]
@@ -75,6 +75,7 @@ event_jsons: Dict[Type[Event], Json] = {
         "cloud_account_id": "69dea3e9-bafe-4e80-9c9d-5a7e1b519767",
         "tenant_id": "35dfca88-3028-4990-9d30-a269228d0b01",
         "aws_account_id": "123",
+        "aws_accoun_name": "aws final name",
         "error": "some error",
     },
     TenantAccountsCollected: {

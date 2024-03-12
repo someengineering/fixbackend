@@ -122,6 +122,7 @@ class AwsAccountDegraded(Event):
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
     aws_account_id: CloudAccountId
+    aws_account_name: Optional[str]
     error: str
 
 
