@@ -75,6 +75,11 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
+        """Get the product tier of the workspace"""
+        raise NotImplementedError
+
+    @abstractmethod
     async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
@@ -238,6 +243,15 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 return None
             await session.delete(membership)
             await session.commit()
+
+    async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
+        async with self.session_maker() as session:
+            statement = select(orm.Organization.tier).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            tier = results.unique().scalar_one_or_none()
+            if tier:
+                return ProductTier.from_str(tier)
+            return ProductTier.Free
 
     async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
         async with self.session_maker() as session:

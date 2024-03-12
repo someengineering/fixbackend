@@ -365,7 +365,8 @@ class DispatcherService(Service):
 
     async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
         now = utc()
-        delta = timedelta(hours=1)  # TODO: compute delta dependent on the tenant.
+        product_tier = await self.workspace_repository.get_product_tier(tenant)
+        delta = product_tier.scan_period()  # TODO: compute delta dependent on the tenant.
         initial_time = last_run or now
         diff = now - initial_time
         if diff.total_seconds() > 0:  # if the last run is in the past, make sure the next run is in the future

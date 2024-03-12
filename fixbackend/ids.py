@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import timedelta
 from enum import StrEnum
 from typing import NewType, Any, Literal
 from uuid import UUID
@@ -72,6 +73,32 @@ class ProductTier(StrEnum):
         if isinstance(other, ProductTier):
             return _product_tier_order[self] >= _product_tier_order[other]
         return NotImplemented
+
+    def can_add_seat(self, current_seats: int) -> bool:
+        match self:
+            case ProductTier.Trial:
+                return current_seats < 1
+            case ProductTier.Free:
+                return current_seats < 1
+            case ProductTier.Plus:
+                return current_seats < 2
+            case ProductTier.Business:
+                return current_seats < 50
+            case ProductTier.Enterprise:
+                return True
+
+    def scan_period(self) -> timedelta:
+        match self:
+            case ProductTier.Trial:
+                return timedelta(hours=1)
+            case ProductTier.Free:
+                return timedelta(days=30)
+            case ProductTier.Plus:
+                return timedelta(days=1)
+            case ProductTier.Business:
+                return timedelta(hours=1)
+            case ProductTier.Enterprise:
+                return timedelta(hours=1)
 
     @staticmethod
     def from_str(value: str) -> "ProductTier":

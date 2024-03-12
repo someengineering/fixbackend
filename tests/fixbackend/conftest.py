@@ -302,9 +302,7 @@ async def graph_db_access(
 
 
 @pytest.fixture
-async def subscription(
-    subscription_repository: SubscriptionRepository, user: User, workspace: Workspace
-) -> AwsMarketplaceSubscription:
+async def subscription(subscription_repository: SubscriptionRepository, user: User) -> AwsMarketplaceSubscription:
     return await subscription_repository.create(
         AwsMarketplaceSubscription(
             id=SubscriptionId(uid()),

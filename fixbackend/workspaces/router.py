@@ -25,8 +25,13 @@ from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
-from fixbackend.workspaces.invitation_service import InvitationServiceDependency
-from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.invitation_service import (
+    InvitationServiceDependency,
+    InvitationNotFound,
+    WorkspaceNotFound,
+    NoFreeSeats,
+)
+from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency, WorkspaceError, get_optional_user_workspace
 from fixbackend.workspaces.schemas import (
@@ -189,16 +194,21 @@ def workspaces_router() -> APIRouter:
         maybe_workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
     ) -> Response:
         """Accept an invitation to the workspace."""
-        invitation = await invitation_service.accept_invitation(token)
-        if invitation is None:
-            if isinstance(maybe_workspace, Workspace):
-                workspace_id = maybe_workspace.id
+        invitation_result = await invitation_service.accept_invitation(token)
+        match invitation_result:
+            case InvitationNotFound():
+                if isinstance(maybe_workspace, Workspace):
+                    workspace_id = maybe_workspace.id
+                    message = "invitation-accepted"
+                else:
+                    message = "invitation-not-found"
+            case WorkspaceNotFound():
+                message = "workspace-not-found"
+            case NoFreeSeats():
+                message = "no-free-seats"
+            case WorkspaceInvitation():
                 message = "invitation-accepted"
-            else:
-                message = "invitation-not-found"
-        else:
-            message = "invitation-accepted"
-            workspace_id = invitation.workspace_id
+                workspace_id = invitation_result.workspace_id
 
         url = request.base_url.replace_query_params(message=message, workspace_id=workspace_id)
         return RedirectResponse(url)
