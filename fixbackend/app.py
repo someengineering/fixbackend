@@ -646,6 +646,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
+                f" connect-src 'self' https://capture.trackjs.com https://*.google-analytics.com;"
                 f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
                 f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
                 " img-src 'self' https://cdn.fix.security https://usage.trackjs.com;"
