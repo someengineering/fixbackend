@@ -49,7 +49,7 @@ class DiscordNotificationSender(AlertSender):
                     "author": {
                         "name": "FIX",
                         "url": "https://fix.security",
-                        "icon_url": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
+                        "icon_url": "https://cdn.fix.security/assets/fix-logos/fix-logo-256.png",
                     },
                     "url": alert.ui_link,
                     "description": (

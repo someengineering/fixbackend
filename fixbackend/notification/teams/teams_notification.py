@@ -53,7 +53,7 @@ class TeamsNotificationSender(AlertSender):
                 {
                     "activityTitle": "**New issues Detected in your Infrastructure!**",
                     "activitySubtitle": f"{alert.emoji()} **{alert.severity.capitalize()}**: {alert.failed_checks_count_total} new issues",  # noqa: E501
-                    "activityImage": "https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png",
+                    "activityImage": "https://cdn.fix.security/assets/fix-logos/fix-logo-256.png",
                     "facts": [
                         {
                             "name": failed.emoji(),
