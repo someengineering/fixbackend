@@ -20,6 +20,7 @@ from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 from pydantic import BaseModel, EmailStr, Field
 
 from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
+from fixbackend.permissions.schemas import UserRolesRead
 
 
 class WorkspaceRead(BaseModel):
@@ -183,7 +184,7 @@ class WorkspaceUserRead(BaseModel):
     sources: List[UserSource] = Field(description="Where the user is found")
     name: str = Field(description="The user's name")
     email: str = Field(description="The user's email")
-    roles: List[str] = Field(description="The user's roles")
+    roles: List[UserRolesRead] = Field(description="The user's roles")
     last_login: Optional[datetime] = Field(description="The user's last login time, if any")
 
     @staticmethod
@@ -193,7 +194,7 @@ class WorkspaceUserRead(BaseModel):
             sources=[FixUserSource()],
             name=user.email,
             email=user.email,
-            roles=[],
+            roles=[UserRolesRead.from_model(role) for role in user.roles],
             last_login=None,
         )
 

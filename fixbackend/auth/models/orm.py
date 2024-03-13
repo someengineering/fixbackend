@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from fixbackend.auth import models
 from fixbackend.base_model import Base
 from fixbackend.ids import UserId
+from fixbackend.permissions.role_repository import UserRoleAssignmentEntity
 from fixbackend.sqlalechemy_extensions import GUID
 
 
@@ -67,6 +68,9 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     mfa_recovery_codes: Mapped[List[UserMFARecoveryCode]] = relationship(
         "UserMFARecoveryCode", backref="user", lazy="joined"
     )
+    roles: Mapped[List[UserRoleAssignmentEntity]] = relationship(
+        "UserRoleAssignmentEntity", backref="user", lazy="joined"
+    )
 
     def to_model(self) -> models.User:
         return models.User(
@@ -79,7 +83,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
             oauth_accounts=[acc.to_model() for acc in self.oauth_accounts],
             otp_secret=self.otp_secret,
             is_mfa_active=self.is_mfa_active,
-            roles=[],
+            roles=[role.to_model() for role in self.roles],
         )
 
     @staticmethod

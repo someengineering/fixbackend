@@ -18,7 +18,6 @@ from typing import Annotated, Any, AsyncIterator, Optional
 from uuid import UUID
 
 import pyotp
-from attrs import evolve
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, exceptions
 from fastapi_users.password import PasswordHelperProtocol
@@ -26,7 +25,6 @@ from starlette.responses import Response
 
 from fixbackend.auth.models import User
 from fixbackend.auth.schemas import OTPConfig
-from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryDependency
 from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
 from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
 from fixbackend.config import Config, ConfigDependency
@@ -49,7 +47,6 @@ class UserManager(BaseUserManager[User, UserId]):
         workspace_repository: WorkspaceRepository,
         domain_events_publisher: DomainEventPublisher,
         invitation_repository: InvitationRepository,
-        role_repository: RoleRepository,
     ):
         super().__init__(user_repository, password_helper)
         self.user_repository = user_repository
@@ -59,7 +56,6 @@ class UserManager(BaseUserManager[User, UserId]):
         self.workspace_repository = workspace_repository
         self.domain_events_publisher = domain_events_publisher
         self.invitation_repository = invitation_repository
-        self.role_repository = role_repository
 
     def parse_id(self, value: Any) -> UserId:
         if isinstance(value, UUID):
@@ -116,20 +112,14 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def get(self, id: UserId) -> User:
         user = await super().get(id)
-        roles = await self.role_repository.list_roles(user.id)
-        user = evolve(user, roles=roles)
         return user
 
     async def get_by_email(self, user_email: str) -> User:
         user = await super().get_by_email(user_email)
-        roles = await self.role_repository.list_roles(user.id)
-        user = evolve(user, roles=roles)
         return user
 
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> User:
         user = await super().get_by_oauth_account(oauth, account_id)
-        roles = await self.role_repository.list_roles(user.id)
-        user = evolve(user, roles=roles)
         return user
 
     async def oauth_callback(
@@ -258,7 +248,6 @@ async def get_user_manager(
     workspace_repository: WorkspaceRepositoryDependency,
     domain_event_publisher: DomainEventPublisherDependency,
     invitation_repository: InvitationRepositoryDependency,
-    role_repository: RoleRepositoryDependency,
 ) -> AsyncIterator[UserManager]:
     yield UserManager(
         config,
@@ -268,7 +257,6 @@ async def get_user_manager(
         workspace_repository,
         domain_event_publisher,
         invitation_repository,
-        role_repository,
     )
 
 
