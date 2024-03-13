@@ -640,13 +640,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
             nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
-            body = body.replace(b"{{ styleNonce }}", f"{nonce}".encode("utf-8"))
+            body = body.replace(b"{{ nonce }}", f"{nonce}".encode("utf-8"))
             headers: dict[str, str] = {}
             headers["fix-environment"] = cfg.environment
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
-                " script-src 'self' https://cdn.fix.security https://www.googletagmanager.com;"
+                f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
                 f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
                 " img-src 'self' https://cdn.fix.security https://usage.trackjs.com;"
                 " frame-ancestors 'none';"
