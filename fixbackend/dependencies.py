@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.jwt import JwtService, JwtServiceImpl
@@ -105,7 +104,7 @@ class FixDependencies(Dependencies):
 
     @property
     def domain_event_sender(self) -> DomainEventPublisher:
-        return self.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)
+        return self.service(ServiceNames.domain_event_sender, DomainEventPublisher)  # type: ignore
 
     @property
     def jwt_service(self) -> JwtService:

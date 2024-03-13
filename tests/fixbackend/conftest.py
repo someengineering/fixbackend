@@ -683,6 +683,9 @@ async def fix_deps(
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
     cert_store: CertificateStore,
+    notification_service: NotificationService,
+    domain_event_sender: DomainEventPublisher,
+    invitation_repository: InvitationRepository,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -692,6 +695,9 @@ async def fix_deps(
             ServiceNames.session_maker: async_session_maker,
             ServiceNames.workspace_repo: workspace_repository,
             ServiceNames.certificate_store: cert_store,
+            ServiceNames.notification_service: notification_service,
+            ServiceNames.domain_event_sender: domain_event_sender,
+            ServiceNames.invitation_repository: invitation_repository,
         }
     )
 
