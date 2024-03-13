@@ -649,7 +649,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 f" connect-src 'self' https://capture.trackjs.com https://*.google-analytics.com;"
                 f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
                 f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
-                " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com;"
+                " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com https://i.ytimg.com;"
                 " frame-src 'self' https://cdn.fix.security https://docs.fix.security https://www.youtube-nocookie.com;"
                 " frame-ancestors 'none';"
                 " form-action 'self';"
