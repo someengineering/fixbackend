@@ -641,8 +641,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
             headers["fix-environment"] = cfg.environment
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
-                "default-src 'self' https://cdn.fix.security; script-src 'self' https://cdn.fix.security https://www.googletagmanager.com;"
-                " style-src 'self' https://cdn.fix.security; img-src 'self' https://cdn.fix.security https://usage.trackjs.com; frame-ancestors 'none';"
+                "default-src 'self' https://cdn.fix.security;"
+                " script-src 'self' https://cdn.fix.security https://www.googletagmanager.com;"
+                " style-src 'self' 'unsafe-inline' https://cdn.fix.security;"
+                " img-src 'self' https://cdn.fix.security https://usage.trackjs.com;"
+                " frame-ancestors 'none';"
+                " form-action 'self';"
             )
             return Response(content=body, media_type="text/html", headers=headers)
 
