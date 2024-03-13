@@ -51,7 +51,7 @@ class PagerDutyNotificationSender(AlertSender):
             "links": [{"href": alert.ui_link, "text": "See all failed resources in FIX"}],
             "images": [
                 {
-                    "src": "https://cdn.some.engineering/assets/fix-logos/fix-logo-192.png",
+                    "src": "https://cdn.fix.security/assets/fix-logos/fix-logo-192.png",
                     "href": alert.ui_link,
                     "alt": "Fix Home Page",
                 }
