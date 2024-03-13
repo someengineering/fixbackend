@@ -637,7 +637,14 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.get("/", include_in_schema=False)
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
-            return Response(content=body, media_type="text/html", headers={"fix-environment": cfg.environment})
+            headers: dict[str, str] = {}
+            headers["fix-environment"] = cfg.environment
+            headers["X-Frame-Options"] = "DENY"
+            headers["Content-Security-Policy"] = (
+                "default-src 'self' https://cdn.fix.security; script-src 'self' https://cdn.fix.security https://www.googletagmanager.com;"
+                " style-src 'self' https://cdn.fix.security; img-src 'self' https://cdn.fix.security https://usage.trackjs.com; frame-ancestors 'none';"
+            )
+            return Response(content=body, media_type="text/html", headers=headers)
 
         @app.exception_handler(404)
         async def not_found_handler(request: Request, exception: HTTPException) -> Response:
