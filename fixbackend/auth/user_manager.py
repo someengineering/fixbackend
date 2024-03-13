@@ -218,7 +218,7 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def enable_mfa(self, user: User, otp: str) -> bool:
         assert not user.is_mfa_active, "User already has MFA enabled."
-        if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp):
+        if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp, valid_window=1):
             return False
         await self.user_repository.update(user, {"is_mfa_active": True})
         return True

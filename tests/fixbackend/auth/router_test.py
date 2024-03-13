@@ -212,7 +212,6 @@ async def test_mfa_flow(
     api_client: AsyncClient,
     fast_api: FastAPI,
     domain_event_sender: InMemoryDomainEventPublisher,
-    workspace_repository: WorkspaceRepository,
     user_repository: UserRepository,
 ) -> None:
     verifier = InMemoryVerifier()
