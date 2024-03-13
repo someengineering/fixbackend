@@ -637,7 +637,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.get("/", include_in_schema=False)
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
-            headers = {}
+            headers: dict[str, str] = {}
             headers["fix-environment"] = cfg.environment
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
