@@ -643,6 +643,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             body = body.replace(b"{{ nonce }}", f"{nonce}".encode("utf-8"))
             headers: dict[str, str] = {}
             headers["fix-environment"] = cfg.environment
+            headers["X-Content-Type-Options"] = "nosniff"
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
