@@ -13,6 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import base64
+import os
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
@@ -637,14 +639,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
         @app.get("/", include_in_schema=False)
         async def root(_: Request) -> Response:
             body = await load_app_from_cdn()
+            nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
+            body = body.replace(b"{{ nonce }}", f"{nonce}".encode("utf-8"))
             headers: dict[str, str] = {}
             headers["fix-environment"] = cfg.environment
+            headers["X-Content-Type-Options"] = "nosniff"
             headers["X-Frame-Options"] = "DENY"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
-                " script-src 'self' https://cdn.fix.security https://www.googletagmanager.com;"
-                " style-src 'self' 'unsafe-inline' https://cdn.fix.security;"
-                " img-src 'self' https://cdn.fix.security https://usage.trackjs.com;"
+                f" connect-src 'self' https://capture.trackjs.com https://*.google-analytics.com;"
+                f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
+                f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
+                " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com https://i.ytimg.com https://www.googletagmanager.com/;"
+                " frame-src 'self' https://cdn.fix.security https://docs.fix.security https://www.youtube-nocookie.com;"
                 " frame-ancestors 'none';"
                 " form-action 'self';"
             )
