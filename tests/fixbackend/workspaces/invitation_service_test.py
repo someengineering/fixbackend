@@ -17,8 +17,14 @@ from typing import Optional, List
 import pytest
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
 from fixbackend.errors import NotAllowed
+from fixbackend.ids import ProductTier
 from fixbackend.notification.email.email_messages import EmailMessage, Invite
-from fixbackend.workspaces.invitation_service import InvitationService, InvitationServiceImpl
+from fixbackend.workspaces.invitation_service import (
+    InvitationService,
+    InvitationServiceImpl,
+    NoFreeSeats,
+    InvitationNotFound,
+)
 
 
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -27,6 +33,7 @@ from fixbackend.notification.notification_service import NotificationService
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.auth.models import User
+from fixbackend.subscription.models import AwsMarketplaceSubscription
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -81,6 +88,7 @@ async def test_invite_accept_user(
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
+    subscription: AwsMarketplaceSubscription,
 ) -> None:
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
@@ -88,7 +96,13 @@ async def test_invite_accept_user(
 
     new_user_email = "new@foo.com"
 
-    # invite new user
+    # invite can't be done if there are no free seats
+    with pytest.raises(NotAllowed):
+        await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
+
+    # can invite a new user on a better tier
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
     invite, _ = await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
 
@@ -117,6 +131,13 @@ async def test_invite_accept_user(
     )
     existing_invite, token = await service.invite_user(workspace.id, user, existing_user.email, "https://example.com")
 
+    # accepting the invite should fail if there are not enough seats
+    await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
+    assert await service.accept_invitation(token) == NoFreeSeats()
+
+    # revert to the previous tier
+    await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
+
     # when the existinng user accepts the invite, they should be added to the workspace automatically
     # and the invitation should be deleted
     await service.accept_invitation(token)
@@ -126,8 +147,8 @@ async def test_invite_accept_user(
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
     assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
 
-    # accepting the invite again returns None
-    assert await service.accept_invitation(token) is None
+    # accepting the invite again returns NotFound
+    assert await service.accept_invitation(token) == InvitationNotFound()
 
     # invite can be revoked
     await service.revoke_invitation(invite.id)

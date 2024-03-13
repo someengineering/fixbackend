@@ -45,12 +45,15 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    ProductTier,
     TaskId,
     UserCloudAccountName,
-    WorkspaceId,
 )
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.config import ProductTierSettings
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -360,18 +363,33 @@ async def test_receive_collect_error_message(
 
 
 @pytest.mark.asyncio
-async def test_compute_next_run(dispatcher: DispatcherService) -> None:
-    tenant = WorkspaceId(uuid.uuid4())
-    delta = timedelta(hours=1)
+async def test_compute_next_run(
+    dispatcher: DispatcherService,
+    workspace: Workspace,
+    workspace_repository: WorkspaceRepository,
+    subscription: AwsMarketplaceSubscription,
+) -> None:
 
-    async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
-        assert (await dispatcher.compute_next_run(tenant, last_run)).timestamp() == approx(expected.timestamp(), abs=2)
+    await workspace_repository.update_subscription(workspace.id, subscription.id)
 
-    now = utc()
-    await assert_next_is(None, now + delta)
-    await assert_next_is(now, now + delta)
-    await assert_next_is(now + timedelta(seconds=10), now + delta + timedelta(seconds=10))
-    await assert_next_is(now - timedelta(seconds=10), now + delta - timedelta(seconds=10))
-    await assert_next_is(now + 3 * delta, now + 4 * delta)
-    await assert_next_is(now - 3 * delta, now + delta)
-    await assert_next_is(now - 123 * delta, now + delta)
+    for product_tier in ProductTier:
+
+        workspace = await workspace_repository.update_product_tier(workspace.id, product_tier)
+
+        settings = ProductTierSettings[workspace.product_tier]
+
+        delta = settings.scan_interval
+
+        async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
+            assert (await dispatcher.compute_next_run(workspace.id, last_run)).timestamp() == approx(
+                expected.timestamp(), abs=2
+            )
+
+        now = utc()
+        await assert_next_is(None, now + delta)
+        await assert_next_is(now, now + delta)
+        await assert_next_is(now + timedelta(seconds=10), now + delta + timedelta(seconds=10))
+        await assert_next_is(now - timedelta(seconds=10), now + delta - timedelta(seconds=10))
+        await assert_next_is(now + 3 * delta, now + 4 * delta)
+        await assert_next_is(now - 3 * delta, now + delta)
+        await assert_next_is(now - 123 * delta, now + delta)

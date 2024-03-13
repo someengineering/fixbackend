@@ -172,6 +172,8 @@ async def test_update_product_tier(
     updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Enterprise)
     assert updated.product_tier == ProductTier.Enterprise
 
+    assert await workspace_repository.get_product_tier(workspace.id) == ProductTier.Enterprise
+
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace(
         "not_subscribed", "not_subscribed", billing_admin
