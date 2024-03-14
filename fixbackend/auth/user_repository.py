@@ -62,6 +62,7 @@ class UserRepository(BaseUserDatabase[User, UserId]):
 
     async def get_by_ids(self, ids: List[UserId]) -> List[User]:
         """Get a list of users by ids."""
+        ids = list(set(ids))
         async with self.user_db() as db:
             result = await db.session.execute(select(orm.User).filter(orm.User.id.in_(ids)))  # type: ignore
             users = result.unique().scalars().all()

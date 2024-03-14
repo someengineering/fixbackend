@@ -24,7 +24,6 @@ from fixbackend.auth.models import User
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.user_verifier import AuthEmailSender
-from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.config import Config
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -72,7 +71,6 @@ async def test_token_validation(
     default_config: Config,
     async_session_maker: AsyncSessionMaker,
     invitation_repository: InvitationRepository,
-    role_repository: RoleRepository,
 ) -> None:
     private_key_1 = rsa.generate_private_key(65537, 2048)
     private_key_2 = rsa.generate_private_key(65537, 2048)
@@ -89,7 +87,6 @@ async def test_token_validation(
         workspace_repository,
         DomainEventSenderMock(),
         invitation_repository,
-        role_repository,
     )
 
     token1 = await strategy1.write_token(user)

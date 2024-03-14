@@ -44,24 +44,10 @@ class Roles(IntFlag):
     workspace_billing_admin = 2**3
 
 
-# todo: remove giving members all permissions after FE supports them.
-workspace_member_permissions = (
-    WorkspacePermissions.create
-    | WorkspacePermissions.read
-    | WorkspacePermissions.update
-    | WorkspacePermissions.delete
-    | WorkspacePermissions.invite_to
-    | WorkspacePermissions.remove_from
-    | WorkspacePermissions.read_settings
-    | WorkspacePermissions.update_settings
-    | WorkspacePermissions.update_cloud_accounts
-    | WorkspacePermissions.read_billing
-    | WorkspacePermissions.update_billing
-    | WorkspacePermissions.read_roles
-    | WorkspacePermissions.update_roles
-)
+# todo: remove giving members all permissions after FE supports permissions feature.
+all_permissions = reduce(lambda x, y: x | y, WorkspacePermissions, WorkspacePermissions(0))  # type: ignore
+workspace_member_permissions = WorkspacePermissions.read | WorkspacePermissions.create | all_permissions
 
-# workspace_member_permissions = WorkspacePermission.read | WorkspacePermission.create
 workspace_billing_admin_permissions = WorkspacePermissions.read_billing | WorkspacePermissions.update_billing
 workspace_admin_permissions = (
     workspace_member_permissions

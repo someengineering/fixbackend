@@ -12,14 +12,13 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.auth.models import User
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
@@ -44,7 +43,6 @@ from fixbackend.workspaces.schemas import (
     WorkspaceSettingsUpdate,
     WorkspaceUserRead,
 )
-import asyncio
 
 
 def workspaces_router() -> APIRouter:
@@ -136,8 +134,8 @@ def workspaces_router() -> APIRouter:
         _: bool = Depends(WorkspacePermissionChecker(WorkspacePermissions.read)),
     ) -> List[WorkspaceUserRead]:
         user_ids = workspace.all_users()
-        users: List[Optional[User]] = await asyncio.gather(*[user_repository.get(user_id) for user_id in user_ids])
-        return [WorkspaceUserRead.from_model(user) for user in users if user]
+        users = await user_repository.get_by_ids(user_ids)
+        return [WorkspaceUserRead.from_model(user) for user in users]
 
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(

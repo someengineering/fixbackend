@@ -13,136 +13,124 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import uuid
-from typing import AsyncIterator, Optional, Sequence, override
-from attrs import evolve
+from typing import AsyncIterator
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
-from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.workspaces.dependencies import get_user_workspace
-from fixbackend.permissions.models import Roles, UserRole
+from fixbackend.auth.depedencies import get_current_active_verified_user, maybe_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
-from fixbackend.config import config as get_config
-from fixbackend.db import get_async_session
-from fixbackend.ids import ExternalId, SubscriptionId, UserId, WorkspaceId, ProductTier
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
-
-ws_id = WorkspaceId(uuid.uuid4())
-external_id = ExternalId(uuid.uuid4())
-user_id = UserId(uuid.uuid4())
-user = User(
-    id=user_id,
-    email="foo@example.com",
-    hashed_password="passord",
-    is_verified=True,
-    is_active=True,
-    is_superuser=False,
-    is_mfa_active=False,
-    otp_secret=None,
-    oauth_accounts=[],
-    roles=[UserRole(user_id, ws_id, Roles.workspace_owner)],
-)
-workspace = Workspace(
-    id=ws_id,
-    name="org name",
-    slug="org-slug",
-    external_id=external_id,
-    owners=[user.id],
-    members=[],
-    product_tier=ProductTier.Free,
-)
-sub_id = SubscriptionId(uuid.uuid4())
-
-
-class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
-    def __init__(self) -> None:
-        pass
-
-    @override
-    async def get_workspace(
-        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
-    ) -> Workspace | None:
-        return workspace
-
-    @override
-    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
-        return [workspace]
-
-    @override
-    async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
-        if generate_external_id:
-            new_external_id = ExternalId(uuid.uuid4())
-        else:
-            new_external_id = workspace.external_id
-        return evolve(workspace, name=name, external_id=new_external_id)
-
-    @override
-    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
-        return evolve(workspace, product_tier=tier)
+from fixbackend.permissions.models import Roles
+from fixbackend.auth.user_repository import UserRepository
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
+async def client(
+    user: User, fast_api: FastAPI, user_repository: UserRepository
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_current_active_verified_user] = lambda: user
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_workspace_repository] = lambda: WorkspaceRepositoryMock()
-    app.dependency_overrides[get_user_workspace] = lambda: workspace
+    async def fetch_user() -> User | None:
+        return await user_repository.get(user.id)
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    fast_api.dependency_overrides[get_current_active_verified_user] = fetch_user
+    fast_api.dependency_overrides[maybe_current_active_verified_user] = fetch_user
+
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 
 @pytest.mark.asyncio
-async def test_list_organizations(client: AsyncClient) -> None:
+async def test_list_organizations(client: AsyncClient, workspace: Workspace) -> None:
     response = await client.get("/api/workspaces/")
     assert response.json()[0] is not None
+    assert response.json()[0].get("id") == str(workspace.id)
 
 
 @pytest.mark.asyncio
-async def test_cloudformation_link(client: AsyncClient, default_config: Config) -> None:
-    response = await client.get(f"/api/workspaces/{ws_id}/cf_url")
+async def test_cloudformation_link(client: AsyncClient, default_config: Config, workspace: Workspace) -> None:
+    response = await client.get(f"/api/workspaces/{workspace.id}/cf_url")
     url = response.json()
     assert str(default_config.cf_template_url) in url
-    assert str(ws_id) in url
-    assert str(external_id) in url
+    assert str(workspace.id) in url
+    assert str(workspace.external_id) in url
 
 
 @pytest.mark.asyncio
-async def test_external_id(client: AsyncClient) -> None:
-    # organization is created by default
-    response = await client.get(f"/api/workspaces/{ws_id}/external_id")
-    assert response.json().get("external_id") == str(external_id)
+async def test_external_id(client: AsyncClient, workspace: Workspace) -> None:
+    response = await client.get(f"/api/workspaces/{workspace.id}/external_id")
+    assert response.json().get("external_id") == str(workspace.external_id)
 
 
 @pytest.mark.asyncio
-async def test_cloudformation_template_url(client: AsyncClient, default_config: Config) -> None:
-    response = await client.get(f"/api/workspaces/{ws_id}/cf_template")
+async def test_cloudformation_template_url(client: AsyncClient, default_config: Config, workspace: Workspace) -> None:
+    response = await client.get(f"/api/workspaces/{workspace.id}/cf_template")
     assert response.json() == str(default_config.cf_template_url)
 
 
 @pytest.mark.asyncio
-async def test_get_workspace_settings(client: AsyncClient) -> None:
-    response = await client.get(f"/api/workspaces/{ws_id}/settings")
-    assert response.json().get("id") == str(ws_id)
+async def test_get_workspace_settings(
+    client: AsyncClient, workspace: Workspace, user: User, role_repository: RoleRepository
+) -> None:
+
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_admin)
+
+    response = await client.get(f"/api/workspaces/{workspace.id}/settings")
+    assert response.json().get("id") == str(workspace.id)
     assert response.json().get("slug") == workspace.slug
     assert response.json().get("name") == workspace.name
-    assert response.json().get("external_id") == str(external_id)
+    assert response.json().get("external_id") == str(workspace.external_id)
 
 
 @pytest.mark.asyncio
-async def test_update_workspace_settings(client: AsyncClient) -> None:
+async def test_update_workspace_settings(
+    client: AsyncClient, workspace: Workspace, user: User, role_repository: RoleRepository
+) -> None:
+
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_admin)
+
     payload = {"name": "new name", "generate_new_external_id": True}
-    response = await client.patch(f"/api/workspaces/{ws_id}/settings", json=payload)
-    assert response.json().get("id") == str(ws_id)
+    response = await client.patch(f"/api/workspaces/{workspace.id}/settings", json=payload)
+    assert response.json().get("id") == str(workspace.id)
     assert response.json().get("slug") == workspace.slug
     assert response.json().get("name") == "new name"
-    assert response.json().get("external_id") != str(external_id)
+    assert response.json().get("external_id") != str(workspace.external_id)
+
+
+@pytest.mark.asyncio
+async def test_list_workspace_users(
+    client: AsyncClient, workspace: Workspace, user: User, role_repository: RoleRepository
+) -> None:
+
+    response = await client.get(f"/api/workspaces/{workspace.id}/users/")
+    user_json = response.json()[0]
+    assert user_json.get("id") == str(user.id)
+    assert user_json.get("email") == user.email
+    assert user_json.get("name") == user.email
+    assert user_json.get("roles") == [
+        {
+            "user_id": str(user.id),
+            "workspace_id": str(workspace.id),
+            "member": False,
+            "admin": False,
+            "owner": True,
+            "billing_admin": False,
+        }
+    ]
+
+    await role_repository.add_roles(user.id, workspace.id, Roles.workspace_admin)
+    response = await client.get(f"/api/workspaces/{workspace.id}/users/")
+    user_json = response.json()[0]
+    assert user_json.get("roles") == [
+        {
+            "user_id": str(user.id),
+            "workspace_id": str(workspace.id),
+            "member": False,
+            "admin": True,
+            "owner": True,
+            "billing_admin": False,
+        }
+    ]
