@@ -645,6 +645,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
             headers["fix-environment"] = cfg.environment
             headers["X-Content-Type-Options"] = "nosniff"
             headers["X-Frame-Options"] = "DENY"
+            headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
                 f" connect-src 'self' https://capture.trackjs.com https://*.google-analytics.com;"
