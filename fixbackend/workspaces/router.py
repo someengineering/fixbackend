@@ -135,7 +135,7 @@ def workspaces_router() -> APIRouter:
     ) -> List[WorkspaceUserRead]:
         user_ids = workspace.all_users()
         users = await user_repository.get_by_ids(user_ids)
-        return [WorkspaceUserRead.from_model(user) for user in users]
+        return [WorkspaceUserRead.from_model(user, workspace.id) for user in users]
 
     @router.post("/{workspace_id}/invites/")
     async def invite_to_organization(

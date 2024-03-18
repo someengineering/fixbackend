@@ -110,27 +110,19 @@ async def test_list_workspace_users(
     assert user_json.get("id") == str(user.id)
     assert user_json.get("email") == user.email
     assert user_json.get("name") == user.email
-    assert user_json.get("roles") == [
-        {
-            "user_id": str(user.id),
-            "workspace_id": str(workspace.id),
-            "member": False,
-            "admin": False,
-            "owner": True,
-            "billing_admin": False,
-        }
-    ]
+    assert user_json.get("roles") == {
+        "member": False,
+        "admin": False,
+        "owner": True,
+        "billing_admin": False,
+    }
 
     await role_repository.add_roles(user.id, workspace.id, Roles.workspace_admin)
     response = await client.get(f"/api/workspaces/{workspace.id}/users/")
     user_json = response.json()[0]
-    assert user_json.get("roles") == [
-        {
-            "user_id": str(user.id),
-            "workspace_id": str(workspace.id),
-            "member": False,
-            "admin": True,
-            "owner": True,
-            "billing_admin": False,
-        }
-    ]
+    assert user_json.get("roles") == {
+        "member": False,
+        "admin": True,
+        "owner": True,
+        "billing_admin": False,
+    }

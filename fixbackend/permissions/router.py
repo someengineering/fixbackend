@@ -43,7 +43,9 @@ def roles_router() -> APIRouter:
 
         roles = no_assigned_roles + roles
 
-        return [UserRolesRead.from_model(role) for role in roles]
+        only_workspace_roles = [role for role in roles if role.workspace_id == workspace.id]
+
+        return [UserRolesRead.from_model(role) for role in only_workspace_roles]
 
     @router.put("/{workspace_id}/roles/{user_id}")
     async def update_user_role(
