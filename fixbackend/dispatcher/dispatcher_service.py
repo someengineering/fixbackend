@@ -82,20 +82,23 @@ class CollectAccountProgress:
             cloud_account_id=cloud_account_id, account_id=account_id, started_at=now
         ).to_json_str()
         # store account_collect_progress
-        await self.redis.hset(
-            name=self._collect_progress_hash_key(workspace_id), key=str(cloud_account_id), value=value
-        )  # type: ignore
-        # store job_id -> cloud_account_id mapping
-        await self.redis.hset(name=self._jobs_hash_key(workspace_id), key=str(job_id), value=str(cloud_account_id))  # type: ignore
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await pipe.hset(
+                name=self._collect_progress_hash_key(workspace_id), key=str(cloud_account_id), value=value
+            )  # type: ignore
+            # store job_id -> cloud_account_id mapping
+            await pipe.hset(name=self._jobs_hash_key(workspace_id), key=str(job_id), value=str(cloud_account_id))  # type: ignore
 
-        # store job_id -> workspace_id mapping
-        await self.redis.set(name=self._jobs_to_workspace_key(str(job_id)), value=str(workspace_id))
-        # cleanup after 4 hours just to be sure
-        expiration = timedelta(hours=4)
+            # store job_id -> workspace_id mapping
+            await pipe.set(name=self._jobs_to_workspace_key(str(job_id)), value=str(workspace_id))
+            # cleanup after 4 hours just to be sure
+            expiration = timedelta(hours=4)
 
-        await self.redis.expire(name=self._collect_progress_hash_key(workspace_id), time=expiration)
-        await self.redis.expire(name=self._jobs_hash_key(workspace_id), time=expiration)
-        await self.redis.expire(name=self._jobs_to_workspace_key(str(job_id)), time=expiration)
+            await pipe.expire(name=self._collect_progress_hash_key(workspace_id), time=expiration)
+            await pipe.expire(name=self._jobs_hash_key(workspace_id), time=expiration)
+            await pipe.expire(name=self._jobs_to_workspace_key(str(job_id)), time=expiration)
+
+            await pipe.execute()
 
     async def get_tenant_collect_state(
         self, workspace_id: WorkspaceId
