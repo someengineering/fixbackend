@@ -90,12 +90,12 @@ class CloudAccount(Base):
                         return models.CloudAccountStates.Configured(
                             access=access(), enabled=self.enabled, scan=self.scan
                         )
-                    return models.CloudAccountStates.Discovered(access=access())
+                    return models.CloudAccountStates.Discovered(access=access(), enabled=self.enabled)
 
                 case models.CloudAccountStates.Detected.state_name:
                     return models.CloudAccountStates.Detected()
                 case models.CloudAccountStates.Discovered.state_name:
-                    return models.CloudAccountStates.Discovered(access=access())
+                    return models.CloudAccountStates.Discovered(access=access(), enabled=self.enabled)
                 case models.CloudAccountStates.Configured.state_name:
                     return models.CloudAccountStates.Configured(access=access(), enabled=self.enabled, scan=self.scan)
                 case models.CloudAccountStates.Degraded.state_name:

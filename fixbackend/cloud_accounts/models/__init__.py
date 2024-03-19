@@ -87,6 +87,7 @@ class CloudAccountStates:
 
         state_name: ClassVar[str] = "discovered"
         access: CloudAccess
+        enabled: bool  # when it moves into configured, use this value for enabled and scan fields
 
         def cloud_access(self) -> Optional[CloudAccess]:
             return self.access

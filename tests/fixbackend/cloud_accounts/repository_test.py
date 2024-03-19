@@ -56,7 +56,8 @@ async def test_create_cloud_account(
 
     account_states: List[CloudAccountState] = [
         CloudAccountStates.Detected(),
-        CloudAccountStates.Discovered(cloud_access),
+        CloudAccountStates.Discovered(cloud_access, enabled=True),
+        CloudAccountStates.Discovered(cloud_access, enabled=False),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Degraded(cloud_access, error="test error"),
@@ -125,8 +126,9 @@ async def test_create_cloud_account(
 
     # list all discovered
     discovered_accounts = await cloud_account_repository.list_all_discovered_accounts()
-    assert len(discovered_accounts) == 1
-    assert discovered_accounts[0].state.state_name == CloudAccountStates.Discovered.state_name
+    assert len(discovered_accounts) == 2
+    for acc in discovered_accounts:
+        assert acc.state.state_name == CloudAccountStates.Discovered.state_name
 
     # list where we have failed scans
     # we set the next tenant run 2 days in the future so the join in the query below should work fine
@@ -135,7 +137,7 @@ async def test_create_cloud_account(
     assert len(failed_scan_accounts) == 1
     assert failed_scan_accounts[0].state.state_name == CloudAccountStates.Configured.state_name
     assert failed_scan_accounts[0].failed_scan_count == 42
-    assert failed_scan_accounts[0].account_id == CloudAccountId("3")  # the forth account created in the loop above
+    assert failed_scan_accounts[0].account_id == CloudAccountId("4")  # the fifth account created in the loop above
     # if next scan is less than 2 hours from now, it should not be included in the list
     await next_run_repository.update_next_run_at(workspace_id, utc() + timedelta(hours=1))
     assert await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc()) == []
