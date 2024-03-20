@@ -95,7 +95,7 @@ def cloud_accounts_router() -> APIRouter:
         service: CloudAccountServiceDependency,
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
     ) -> None:
-        await service.delete_cloud_account(user, cloud_account_id, workspace.id)
+        await service.delete_cloud_account(user.id, cloud_account_id, workspace.id)
 
     @router.patch("/{workspace_id}/cloud_account/{cloud_account_id}/enable")
     async def enable_cloud_account(

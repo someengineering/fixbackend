@@ -296,7 +296,7 @@ async def test_create_aws_account(
         account_name=account_name,
     )
     assert len(domain_sender.events) == 1
-    await service.delete_cloud_account(user, deleted_account.id, workspace.id)
+    await service.delete_cloud_account(user.id, deleted_account.id, workspace.id)
     deleted_account = await service.get_cloud_account(deleted_account.id, workspace.id)
     assert deleted_account.state == CloudAccountStates.Deleted()
     # a new account should be created
@@ -340,11 +340,11 @@ async def test_delete_aws_account(
 
     # deleting someone's else account
     with pytest.raises(Exception):
-        await service.delete_cloud_account(user, account.id, WorkspaceId(uuid.uuid4()))
+        await service.delete_cloud_account(user.id, account.id, WorkspaceId(uuid.uuid4()))
     assert await cloud_account_repository.count_by_workspace_id(workspace.id) == 1
 
     # success
-    await service.delete_cloud_account(user, account.id, workspace.id)
+    await service.delete_cloud_account(user.id, account.id, workspace.id)
     accounts = await cloud_account_repository.list_by_workspace_id(workspace.id)
     assert len(accounts) == 1
     assert isinstance(accounts[0].state, CloudAccountStates.Deleted)

@@ -46,6 +46,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     UserCloudAccountName,
+    UserId,
     WorkspaceId,
     ProductTier,
 )
@@ -92,7 +93,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         return account
 
     async def delete_cloud_account(
-        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+        self, user_id: UserId, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
     ) -> None:
         del self.accounts[cloud_account_id]
 

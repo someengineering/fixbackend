@@ -11,7 +11,9 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 import json
+import math
 import uuid
 from collections import defaultdict
 from datetime import timedelta
@@ -35,7 +37,6 @@ from fixbackend.analytics.events import (
     AEFirstWorkspaceCollectFinished,
     AEWorkspaceCollectFinished,
 )
-from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
@@ -46,13 +47,15 @@ from fixbackend.cloud_accounts.models import (
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
-from fixbackend.config import Config, ProductTierSettings
+from fixbackend.config import Config, Free, ProductTierSettings
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
     AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
+    AwsMarketplaceSubscriptionCancelled,
+    ProductTierChanged,
     CloudAccountActiveToggled,
     CloudAccountNameChanged,
     CloudAccountScanToggled,
@@ -68,6 +71,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     UserCloudAccountName,
+    UserId,
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
@@ -407,6 +411,36 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 )
                 await send_pub_sub_message(degraded_event)
 
+            case ProductTierChanged.kind:
+                ptc_evt = ProductTierChanged.from_json(message)
+                new_account_limit = ProductTierSettings[ptc_evt.product_tier].account_limit or math.inf
+                old_account_limit = ProductTierSettings[ptc_evt.previous_tier].account_limit or math.inf
+                if new_account_limit < old_account_limit:
+                    # we should not have infinity here
+                    new_account_limit = round(new_account_limit)
+                    # tier changed, time to delete accounts
+                    all_accounts = await self.list_accounts(ptc_evt.workspace_id)
+                    # keep the last new_account_limit accounts
+                    to_delete = all_accounts[:-new_account_limit]
+                    # delete them all in parallel
+                    async with asyncio.TaskGroup() as tg:
+                        for cloud_account in to_delete:
+                            tg.create_task(
+                                self.delete_cloud_account(ptc_evt.user_id, cloud_account.id, ptc_evt.workspace_id)
+                            )
+
+            case AwsMarketplaceSubscriptionCancelled.kind:
+                evt = AwsMarketplaceSubscriptionCancelled.from_json(message)
+                workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
+                async with asyncio.TaskGroup() as tg:
+                    for ws in workspaces:
+                        account_limit = Free.account_limit or 1
+                        all_accounts = await self.list_accounts(ws.id)
+                        # keep the last account_limit accounts
+                        to_disable = all_accounts[:-account_limit]
+                        for cloud_account in to_disable:
+                            tg.create_task(self.update_cloud_account_enabled(ws.id, cloud_account.id, False))
+
             case _:
                 pass  # ignore other domain events
 
@@ -676,7 +710,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return result
 
     async def delete_cloud_account(
-        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+        self, user_id: UserId, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
     ) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
@@ -696,7 +730,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 last_scan_started_at=None,
             ),
         )
-        await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
+        await self.domain_events.publish(AwsAccountDeleted(user_id, cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)
