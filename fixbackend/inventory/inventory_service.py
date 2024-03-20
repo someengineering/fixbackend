@@ -146,7 +146,7 @@ class InventoryService(Service):
         if (name := event.final_name) and (db := await self.db_access_manager.get_database_access(event.tenant_id)):
             log.info(f"Cloud account name changed. Update in inventory: {event}.")
             q = f"is(account) and id={event.account_id} and /ancestors.cloud.reported.name={event.cloud} limit 1"
-            accounts = [a async for a in await self.client.search_list(db, q)]
+            accounts = [a async for a in await self.client.search(db, q)]
             if accounts and (account := accounts[0]) and (node_id := account.get("id")):
                 await self.client.update_node(db, NodeId(node_id), {"name": name})
                 # account name has changed: invalidate the cache for the tenant

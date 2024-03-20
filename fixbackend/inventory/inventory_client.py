@@ -168,18 +168,20 @@ class InventoryClient(Service):
         )
         return AsyncIteratorWithContext(response)
 
-    async def search_list(
+    async def search(
         self,
         access: GraphDatabaseAccess,
         query: str,
         *,
         graph: str = DefaultGraph,
         section: str = DefaultSection,
+        with_edges: bool = False,
     ) -> AsyncIteratorWithContext[Json]:
-        log.info(f"Search list with query: {query}")
+        list_or_graph = "graph" if with_edges else "list"
+        log.info(f"Search {list_or_graph} with query: {query}")
         response = await self._perform(
             "POST",
-            f"/graph/{graph}/search/list",
+            f"/graph/{graph}/search/{list_or_graph}",
             content=query,
             params={"section": section},
             headers=self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText),
@@ -315,7 +317,7 @@ class InventoryClient(Service):
     ) -> None:
         log.info(f"Delete account {account_id} from cloud {cloud}")
         query = f'is(account) and id=={account_id} and /ancestors.cloud.reported.name=="{cloud}" limit 1'
-        async for node in await self.search_list(access, query):
+        async for node in await self.search(access, query):
             node_id = node["id"]
             await self._perform("DELETE", f"/graph/{graph}/node/{node_id}", headers=self.__headers(access))
 
