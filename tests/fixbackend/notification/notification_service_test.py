@@ -297,6 +297,6 @@ async def test_send_degraded_message(
     assert "We were not able to collect latest resource information for account Development (12345)." in (
         email_sender.call_args[0].html or ""
     )
-    assert f"""Please visit <a href="https://app.global.fixcloud.io/workspace-settings/accounts#{workspace.id}">""" in (
+    assert f"""Please visit <a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}">""" in (
         email_sender.call_args[0].html or ""
     )
