@@ -212,6 +212,8 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
     assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
     assert len(summary.top_checks) == 1
+    tc = summary.top_checks[0]
+    assert tc["benchmarks"] == [{"id": "aws_test", "title": "AWS Test"}]
     # vulnerable resources timeseries
     assert summary.vulnerable_resources is not None
     assert summary.vulnerable_resources.name == "infected_resources"
