@@ -31,6 +31,7 @@ from fixbackend.inventory.schemas import (
     ReportSummary,
     SearchRequest,
     SearchStartData,
+    SearchListGraphRequest,
 )
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -172,6 +173,18 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     ) -> JSONResponse:
         count, result = await inventory().client.complete_property_path(access=graph_db, request=body)
         return JSONResponse(result, headers={"Total-Count": str(count)})
+
+    @router.post(
+        "/search",
+        description="Search the inventory and return the results as a list of json objects.",
+        tags=["search"],
+    )
+    async def search(
+        graph_db: CurrentGraphDbDependency, request: Request, query: SearchListGraphRequest = Body()
+    ) -> StreamingResponse:
+        result = await inventory().client.search(graph_db, query.query, with_edges=query.with_edges)
+        accept = request.headers.get("accept", "application/json")
+        return streaming_response(accept, result, result.context)
 
     @router.post(
         "/search/table",
