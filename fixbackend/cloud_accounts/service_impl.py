@@ -70,6 +70,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    ProductTier,
     UserCloudAccountName,
     UserId,
     WorkspaceId,
@@ -434,6 +435,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
                 async with asyncio.TaskGroup() as tg:
                     for ws in workspaces:
+                        # first move the tier to free
+                        await self.workspace_repository.update_product_tier(ws.id, ProductTier.Free)
+                        # second remove the subscription from the workspace
+                        await self.workspace_repository.update_subscription(ws.id, None)
+                        # third disable all accounts
                         account_limit = Free.account_limit or 1
                         all_accounts = await self.list_accounts(ws.id)
                         # keep the last account_limit accounts
