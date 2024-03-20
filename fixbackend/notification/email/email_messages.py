@@ -137,7 +137,7 @@ class SecurityScanFinished:
         return render(
             "security_scan_finished.html",
             title=self.subject(),
-            fix_console_url="https://app.global.fixcloud.io/",
+            fix_console_url="https://app.fix.security/",
         )
 
 
@@ -159,7 +159,7 @@ class AccountDegraded:
     def text(self) -> str:
         return f"""We were not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary permissions are granted for access.
 
-Please visit https://app.global.fixcloud.io/workspace-settings/accounts#{self.tenant_id} for more details."""
+Please visit https://app.fix.security/workspace-settings/accounts#{self.tenant_id} for more details."""
 
     def html(self) -> str:
         return render(
