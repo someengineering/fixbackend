@@ -443,10 +443,21 @@ class InventoryService(Service):
                 ]
                 return TimeSeries(name="infected_resources", start=start, end=now, granularity=granularity, data=data)
 
-            async def top_issues(checks_by_severity: Dict[str, Set[str]], num: int) -> List[Json]:
+            async def top_issues(
+                checks_by_severity: Dict[str, Set[str]],
+                benchmark_by_check_id: Dict[str, Set[str]],
+                benchmarks: Dict[str, BenchmarkSummary],
+                num: int,
+            ) -> List[Json]:
                 check_ids = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
                 top = list(islice(check_ids, num))
                 checks = await self.client.checks(db, check_ids=top)
+                for check in checks:
+                    check["benchmarks"] = [
+                        {"id": bs.id, "title": bs.title}
+                        for b in benchmark_by_check_id[check["id"]]
+                        if (bs := benchmarks.get(b))
+                    ]
                 return sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
 
             def bench_account_score(failing_checks: Dict[str, int], benchmark_checks: Dict[str, int]) -> int:
@@ -485,6 +496,7 @@ class InventoryService(Service):
             severity_check_counter: Dict[str, int] = defaultdict(int)
             account_check_sum_count: Dict[str, int] = defaultdict(int)
             failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
+            benchmark_by_check_id: Dict[str, Set[str]] = defaultdict(set)
             available_checks = 0
             for bid, bench in benchmarks.items():
                 benchmark_account_issue_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -492,6 +504,7 @@ class InventoryService(Service):
                 benchmark_severity_count: Dict[str, int] = defaultdict(int)
                 for check_info in checks.get(bid, []):
                     check_id = check_info["id"]
+                    benchmark_by_check_id[check_id].add(bid)
                     benchmark_severity_count[check_info["severity"]] += 1
                     available_checks += 1
                     if severity := severity_by_check_id.get(check_id):
@@ -520,7 +533,7 @@ class InventoryService(Service):
                 accounts[account_id].score = sum(scores) // len(scores) if scores else 100
 
             # get issues for the top 5 issue_ids
-            tops = await top_issues(failed_checks_by_severity, num=5)
+            tops = await top_issues(failed_checks_by_severity, benchmark_by_check_id, benchmarks, num=5)
 
             # sort top changed account by score
             vulnerable_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
