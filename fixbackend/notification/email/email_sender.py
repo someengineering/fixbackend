@@ -80,7 +80,7 @@ class Boto3EmailSender(EmailSender):
                 case "dev":
                     unsubscribe_url = "https://app.dev.fixcloud.io/unsubscribe?token=" + token
                 case "prd":
-                    unsubscribe_url = "https://app.global.fixcloud.io/unsubscribe?token=" + token
+                    unsubscribe_url = "https://app.fix.security/unsubscribe?token=" + token
 
         def send_email() -> None:
 
