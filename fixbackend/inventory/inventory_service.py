@@ -455,7 +455,7 @@ class InventoryService(Service):
                 for check in checks:
                     check["benchmarks"] = [
                         {"id": bs.id, "title": bs.title}
-                        for b in benchmark_by_check_id.get(check["id"])
+                        for b in benchmark_by_check_id[check["id"]]
                         if (bs := benchmarks.get(b))
                     ]
                 return sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
