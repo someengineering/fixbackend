@@ -141,7 +141,7 @@ cloud_account_service = InMemoryCloudAccountService()
 
 workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free)
+workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free, utc(), utc())
 role_name = AwsRoleName("FooBarRole")
 account_id = CloudAccountId("123456789012")
 

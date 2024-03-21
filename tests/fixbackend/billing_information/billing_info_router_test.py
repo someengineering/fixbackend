@@ -38,7 +38,7 @@ from attrs import evolve
 
 external_id = ExternalId(uuid.uuid4())
 workspace_id = WorkspaceId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free)
+workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free, utc(), utc())
 user_id = UserId(uuid.uuid4())
 user = User(
     id=user_id,

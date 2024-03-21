@@ -58,13 +58,13 @@ async def get_user_workspace(
 ) -> Workspace:
     match maybe_workspace:
         case "Unauthorized":
-            raise HTTPException(status_code=401, detail="Unauthorized")
+            raise HTTPException(status_code=401, detail="unauthorized")
         case "WorkspaceNotFound":
-            raise HTTPException(status_code=404, detail="Workspace not found")
+            raise HTTPException(status_code=404, detail="workspace_not_found")
         case "Forbidden":
-            raise HTTPException(status_code=403, detail="You're not a member of this workspace")
+            raise HTTPException(status_code=403, detail="not_a_workspace_member")
         case workspace if workspace.payment_on_hold_since:
-            raise HTTPException(status_code=403, detail="Workspace is on hold")
+            raise HTTPException(status_code=403, detail="workspace_payment_on_hold")
         case workspace:
             return workspace
 

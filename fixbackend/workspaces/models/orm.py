@@ -21,13 +21,13 @@ from sqlalchemy import ForeignKey, String, DateTime, Integer
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
-from fixbackend.base_model import Base
+from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.ids import InvitationId, SubscriptionId, WorkspaceId, UserId, ExternalId, ProductTier
 from fixbackend.workspaces import models
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 
-class Organization(Base):
+class Organization(Base, CreatedUpdatedMixin):
     __tablename__ = "organization"
 
     id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
@@ -51,6 +51,8 @@ class Organization(Base):
             product_tier=ProductTier.from_str(self.tier),
             subscription_id=self.subscription_id,
             payment_on_hold_since=self.payment_on_hold_since,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
         )
 
 
