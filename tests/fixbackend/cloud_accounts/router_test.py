@@ -46,6 +46,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     UserCloudAccountName,
+    UserId,
     WorkspaceId,
     ProductTier,
 )
@@ -73,7 +74,7 @@ class InMemoryCloudAccountService(CloudAccountService):
             account_id=account_id,
             workspace_id=workspace_id,
             cloud=CloudNames.AWS,
-            state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)),
+            state=CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), enabled=True),
             account_name=account_name,
             account_alias=None,
             user_account_name=None,
@@ -92,7 +93,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         return account
 
     async def delete_cloud_account(
-        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+        self, user_id: UserId, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
     ) -> None:
         del self.accounts[cloud_account_id]
 
@@ -140,7 +141,7 @@ cloud_account_service = InMemoryCloudAccountService()
 
 workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free)
+workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free, utc(), utc())
 role_name = AwsRoleName("FooBarRole")
 account_id = CloudAccountId("123456789012")
 
@@ -181,9 +182,10 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
     assert saved_account.account_alias is None
     assert saved_account.user_account_name is None
     match saved_account.state:
-        case CloudAccountStates.Discovered(AwsCloudAccess(e_id, r_name)):
+        case CloudAccountStates.Discovered(AwsCloudAccess(e_id, r_name), enabled):
             assert e_id == external_id
             assert r_name == role_name
+            assert enabled is True
 
         case _:
             assert False, "Unexpected state"
@@ -351,7 +353,8 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
     added = add_account(utc() - timedelta(days=2), configured_state)
     detected = add_account(utc(), CloudAccountStates.Detected())
     recent_discovered = add_account(
-        utc() - timedelta(minutes=1), CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+        utc() - timedelta(minutes=1),
+        CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), enabled=True),
     )
     recent_degraded = add_account(
         utc() - timedelta(minutes=3), CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), "foo")

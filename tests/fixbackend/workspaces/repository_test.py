@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 import uuid
 from attr import evolve
 
@@ -25,6 +26,7 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.types import AsyncSessionMaker
+from fixcloudutils.util import utc
 
 
 @pytest.fixture
@@ -196,3 +198,24 @@ async def test_assign_subscription(
     with_subscription = await workspace_repository.list_workspaces_by_subscription_id(subscription.id)
     assert len(with_subscription) == 1
     assert with_subscription[0].id == workspace.id
+
+
+@pytest.mark.asyncio
+async def test_on_hold(
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+) -> None:
+    assert workspace.payment_on_hold_since is None
+
+    yesterday = utc().replace(microsecond=0) - datetime.timedelta(days=1)
+    before_yesterday = yesterday - datetime.timedelta(days=1)
+
+    assert await workspace_repository.list_by_on_hold(before=yesterday) == []
+
+    workspace = await workspace_repository.update_payment_on_hold(workspace.id, yesterday)
+
+    assert workspace.payment_on_hold_since == yesterday
+
+    assert await workspace_repository.list_by_on_hold(before=utc()) == [workspace]
+
+    assert await workspace_repository.list_by_on_hold(before=before_yesterday) == []

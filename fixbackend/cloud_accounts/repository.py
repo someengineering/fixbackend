@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm.exc import StaleDataError
 from fixcloudutils.util import utc
 
@@ -52,6 +52,12 @@ class CloudAccountRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def count_by_workspace_id(
+        self, workspace_id: WorkspaceId, ready_for_collection: bool = False, non_deleted: bool = False
+    ) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_all_discovered_accounts(self) -> List[CloudAccount]:
         raise NotImplementedError
 
@@ -81,10 +87,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             case CloudAccountStates.Detected():
                 state = CloudAccountStates.Detected.state_name
 
-            case CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name)):
+            case CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), ex_enabled):
                 role_name = role_name
                 external_id = external_id
                 state = CloudAccountStates.Discovered.state_name
+                enabled = ex_enabled
 
             case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), ex_enabled, ex_scan):
                 external_id = external_id
@@ -211,6 +218,22 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]
+
+    async def count_by_workspace_id(
+        self, workspace_id: WorkspaceId, ready_for_collection: bool = False, non_deleted: bool = False
+    ) -> int:
+        """Get a list of cloud accounts by tenant id."""
+        async with self.session_maker() as session:
+            statement = select(func.count(orm.CloudAccount.id)).where(orm.CloudAccount.tenant_id == workspace_id)
+            if ready_for_collection:
+                statement = statement.where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name).where(
+                    orm.CloudAccount.enabled.is_(True)
+                )
+            if non_deleted:
+                statement = statement.where(orm.CloudAccount.state != CloudAccountStates.Deleted.state_name)
+            results = await session.execute(statement)
+            accounts_count = results.scalar_one()
+            return accounts_count
 
     async def list_all_discovered_accounts(self) -> List[CloudAccount]:
         """Get a list of all discovered cloud accounts."""

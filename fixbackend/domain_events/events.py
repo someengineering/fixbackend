@@ -241,6 +241,17 @@ class AwsMarketplaceSubscriptionCreated(Event):
 
 
 @frozen
+class AwsMarketplaceSubscriptionCancelled(Event):
+    """
+    This event is emitted when a user cancels an AWS Marketplace subscription.
+    """
+
+    kind: ClassVar[str] = "aws_marketplace_subscription_cancelled"
+
+    subscription_id: SubscriptionId
+
+
+@frozen
 class FailingBenchmarkChecksAlertSend(Event):
     """
     This event is emitted when a user gets notified about failing benchmark checks.

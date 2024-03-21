@@ -11,7 +11,10 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import asyncio
+from functools import partial
 import json
+import math
 import uuid
 from collections import defaultdict
 from datetime import timedelta
@@ -20,7 +23,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional, Union
 
 import boto3
-from attrs import evolve
+from attrs import evolve, frozen
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff, Json, MessageContext, RedisStreamListener
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
@@ -35,22 +38,29 @@ from fixbackend.analytics.events import (
     AEFirstWorkspaceCollectFinished,
     AEWorkspaceCollectFinished,
 )
-from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates
+from fixbackend.cloud_accounts.models import (
+    AwsCloudAccess,
+    CloudAccess,
+    CloudAccount,
+    CloudAccountState,
+    CloudAccountStates,
+)
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
-from fixbackend.config import Config
+from fixbackend.config import Config, Free, ProductTierSettings
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
+    AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
-    TenantAccountsCollected,
-    AwsAccountDegraded,
-    CloudAccountNameChanged,
+    AwsMarketplaceSubscriptionCancelled,
+    ProductTierChanged,
     CloudAccountActiveToggled,
+    CloudAccountNameChanged,
     CloudAccountScanToggled,
+    TenantAccountsCollected,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
@@ -62,6 +72,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     UserCloudAccountName,
+    UserId,
     WorkspaceId,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
@@ -69,9 +80,50 @@ from fixbackend.notification.email import email_messages as email
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
+from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
+
+
+@frozen
+class UnknownCloud:
+    cloud: str
+
+
+@frozen
+class UnknownAccessType:
+    access: CloudAccess
+
+
+@frozen
+class WrongAccountState:
+    state: CloudAccountState
+
+
+@frozen
+class CantAssumeRole:
+    retry_limit_reached: bool
+
+
+@frozen
+class RoleNameMissing:
+    pass
+
+
+@frozen
+class ConcurrentUpdate:
+    pass
+
+
+ConfigurationFailure = Union[
+    UnknownCloud,
+    UnknownAccessType,
+    WrongAccountState,
+    CantAssumeRole,
+    RoleNameMissing,
+    ConcurrentUpdate,
+]
 
 
 class CloudAccountServiceImpl(CloudAccountService, Service):
@@ -361,6 +413,41 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 )
                 await send_pub_sub_message(degraded_event)
 
+            case ProductTierChanged.kind:
+                ptc_evt = ProductTierChanged.from_json(message)
+                new_account_limit = ProductTierSettings[ptc_evt.product_tier].account_limit or math.inf
+                old_account_limit = ProductTierSettings[ptc_evt.previous_tier].account_limit or math.inf
+                if new_account_limit < old_account_limit:
+                    # we should not have infinity here
+                    new_account_limit = round(new_account_limit)
+                    # tier changed, time to delete accounts
+                    all_accounts = await self.list_accounts(ptc_evt.workspace_id)
+                    # keep the last new_account_limit accounts
+                    to_delete = all_accounts[:-new_account_limit]
+                    # delete them all in parallel
+                    async with asyncio.TaskGroup() as tg:
+                        for cloud_account in to_delete:
+                            tg.create_task(
+                                self.delete_cloud_account(ptc_evt.user_id, cloud_account.id, ptc_evt.workspace_id)
+                            )
+
+            case AwsMarketplaceSubscriptionCancelled.kind:
+                evt = AwsMarketplaceSubscriptionCancelled.from_json(message)
+                workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
+                async with asyncio.TaskGroup() as tg:
+                    for ws in workspaces:
+                        # first move the tier to free
+                        await self.workspace_repository.update_payment_on_hold(ws.id, utc())
+                        # second remove the subscription from the workspace
+                        await self.workspace_repository.update_subscription(ws.id, None)
+                        # third disable all accounts
+                        account_limit = Free.account_limit or 1
+                        all_accounts = await self.list_accounts(ws.id)
+                        # keep the last account_limit accounts
+                        to_disable = all_accounts[:-account_limit]
+                        for cloud_account in to_disable:
+                            tg.create_task(self.update_cloud_account_enabled(ws.id, cloud_account.id, False))
+
             case _:
                 pass  # ignore other domain events
 
@@ -390,14 +477,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account: CloudAccount,
         *,
         called_from_event: bool,
-    ) -> None:
+    ) -> CloudAccount | ConfigurationFailure:
         set_cloud_account_id(account.account_id)
         set_fix_cloud_account_id(account.id)
         set_workspace_id(account.workspace_id)
 
         if account.cloud != "aws":
             log.warning(f"Account {account.id} is not an AWS account, cannot setup account")
-            return None
+            return UnknownCloud(account.cloud)
 
         log.info("Trying to configure account {account.id}")
 
@@ -408,14 +495,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         pass
                     case _:
                         log.warning(f"Account {account.id} has unknown access type {access}")
-                        return None
+                        return UnknownAccessType(access)
             case _:
                 log.warning(f"Account {account.id} is not configurable, cannot setup account")
-                return None
+                return WrongAccountState(account.state)
 
         if role_name is None:
             log.warning(f"Account {account.id} has no role name, cannot setup account")
-            return None
+            return RoleNameMissing()
 
         log.info("Trying to assume role")
         assume_role_result = await self.account_setup_helper.can_assume_role(account.account_id, role_name, external_id)
@@ -435,10 +522,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     log.info("failed to assume role, but timeout is reached, moving account to degraded state")
                     error = "Cannot assume role"
                     await self.__degrade_account(account.id, error)
-                    return None
+                    return CantAssumeRole(retry_limit_reached=True)
                 elif fast_lane_should_end():
                     log.info("Can't assume role, leaving account in discovered state")
-                    return None
+                    return CantAssumeRole(retry_limit_reached=False)
                 else:
                     msg = f"Cannot assume role for account {account.id}: {reason}, retrying again later"
                     log.info(msg)
@@ -476,10 +563,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         )
 
         def update_to_configured(cloud_account: CloudAccount) -> CloudAccount:
-            if isinstance(cloud_account.state, CloudAccountStates.Discovered):
+            state = cloud_account.state
+            if isinstance(state, CloudAccountStates.Discovered):
                 return evolve(
                     cloud_account,
-                    state=CloudAccountStates.Configured(access, True, True),
+                    state=CloudAccountStates.Configured(access, enabled=state.enabled, scan=state.enabled),
                     privileged=privileged,
                     state_updated_at=utc(),
                 )
@@ -487,7 +575,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 raise ValueError(f"Account {account.id} is not in the discovered state, skipping")
 
         try:
-            await self.cloud_account_repository.update(account.id, update_to_configured)
+            updated_account = await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
             await self.domain_events.publish(
                 AwsAccountConfigured(
@@ -496,8 +584,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     aws_account_id=account.account_id,
                 )
             )
+            return updated_account
         except ValueError as e:
             log.info(f"Account {account.id} was changed concurrently, skipping: {e}")
+            return ConcurrentUpdate()
 
     async def create_aws_account(
         self,
@@ -514,11 +604,23 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         log.info("create_aws_account called")
 
-        organization = await self.workspace_repository.get_workspace(workspace_id)
-        if organization is None:
+        workspace = await self.workspace_repository.get_workspace(workspace_id)
+        if workspace is None:
             raise ResourceNotFound("Organization does not exist")
-        if not compare_digest(str(organization.external_id), str(external_id)):
+        if not compare_digest(str(workspace.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
+
+        should_be_enabled = True
+
+        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+            existing_accounts = await self.cloud_account_repository.count_by_workspace_id(
+                workspace.id, non_deleted=True
+            )
+            if existing_accounts >= limit:
+                should_be_enabled = False
+
+        if workspace.payment_on_hold_since:
+            should_be_enabled = False
 
         async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> Optional[CloudAccount]:
             accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
@@ -560,7 +662,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             else:
                 # we have a role name: transition to discovered state
                 log.info(f"Moving account {existing.account_id} to discovered state because of the new role name")
-                new_state: CloudAccountState = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+                new_state: CloudAccountState = CloudAccountStates.Discovered(
+                    AwsCloudAccess(external_id, role_name), enabled=should_be_enabled
+                )
                 result = await self.cloud_account_repository.update(
                     existing.id,
                     lambda acc: evolve(
@@ -574,7 +678,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 new_state = CloudAccountStates.Detected()
             else:
                 log.info("Account state: Discovered")
-                new_state = CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name))
+                new_state = CloudAccountStates.Discovered(
+                    AwsCloudAccess(external_id, role_name), enabled=should_be_enabled
+                )
 
             created_at = utc()
 
@@ -614,7 +720,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return result
 
     async def delete_cloud_account(
-        self, user: User, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
+        self, user_id: UserId, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
     ) -> None:
         account = await self.cloud_account_repository.get(cloud_account_id)
         if account is None:
@@ -634,7 +740,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 last_scan_started_at=None,
             ),
         )
-        await self.domain_events.publish(AwsAccountDeleted(user.id, cloud_account_id, workspace_id, account.account_id))
+        await self.domain_events.publish(AwsAccountDeleted(user_id, cloud_account_id, workspace_id, account.account_id))
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)
@@ -685,15 +791,29 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     ) -> CloudAccount:
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)
+        workspace = await self.workspace_repository.get_workspace(workspace_id)
+        if workspace is None:
+            raise ResourceNotFound()
+        accounts_count = await self.cloud_account_repository.count_by_workspace_id(
+            workspace_id=workspace_id, ready_for_collection=True
+        )
 
-        def update_state(cloud_account: CloudAccount) -> CloudAccount:
+        def update_state(cloud_account: CloudAccount, workspace: Workspace) -> CloudAccount:
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _, scan):
+                    if enabled:
+                        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+                            if accounts_count >= limit:
+                                raise NotAllowed("Account limit reached")
+                        if workspace.payment_on_hold_since:
+                            raise NotAllowed("Payment on hold")
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
                 case _:
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
-        result = await self.cloud_account_repository.update(cloud_account_id, update_state)
+        result = await self.cloud_account_repository.update(
+            cloud_account_id, partial(update_state, workspace=workspace)
+        )
         await self.domain_events.publish(
             CloudAccountActiveToggled(
                 tenant_id=workspace_id, cloud_account_id=cloud_account_id, account_id=result.account_id, enabled=enabled

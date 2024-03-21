@@ -35,7 +35,11 @@ from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import AwsMarketplaceSubscriptionCreated, BillingEntryCreated
+from fixbackend.domain_events.events import (
+    AwsMarketplaceSubscriptionCancelled,
+    AwsMarketplaceSubscriptionCreated,
+    BillingEntryCreated,
+)
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.metering.metering_repository import MeteringRepository
@@ -270,6 +274,7 @@ class AwsMarketplaceHandler(Service):
 
     async def subscription_canceled(self, customer_id: str) -> None:
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
+            await self.domain_event_sender.publish(AwsMarketplaceSubscriptionCancelled(subscription.id))
             if billing := await self.create_billing_entry(subscription):
                 await self.report_usage(subscription.product_code, [(subscription, billing)])
 
