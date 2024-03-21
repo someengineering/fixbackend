@@ -13,27 +13,28 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Optional, List
+from typing import List, Optional
+
 import pytest
+from fixcloudutils.util import utc
+
+from fixbackend.auth.models import User
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.config import Config
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier
 from fixbackend.notification.email.email_messages import EmailMessage, Invite
+from fixbackend.notification.notification_service import NotificationService
+from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.invitation_service import (
+    InvitationNotFound,
     InvitationService,
     InvitationServiceImpl,
     NoFreeSeats,
-    InvitationNotFound,
 )
-
-
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.workspaces.invitation_repository import InvitationRepository
-from fixbackend.notification.notification_service import NotificationService
-from fixbackend.auth.user_repository import UserRepository
-from fixbackend.config import Config
-from fixbackend.auth.models import User
-from fixbackend.subscription.models import AwsMarketplaceSubscription
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -100,8 +101,15 @@ async def test_invite_accept_user(
     with pytest.raises(NotAllowed):
         await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
 
-    # can invite a new user on a better tier
     await workspace_repository.update_subscription(workspace.id, subscription.id)
+
+    # invite can't be done if the workspace has payment on hold
+    await workspace_repository.update_payment_on_hold(workspace.id, utc())
+    with pytest.raises(NotAllowed):
+        await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
+    await workspace_repository.update_payment_on_hold(workspace.id, None)
+
+    # can invite a new user on a better tier
     workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
     invite, _ = await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
@@ -137,6 +145,11 @@ async def test_invite_accept_user(
 
     # revert to the previous tier
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
+
+    # accepting the invite should fail if the workspace has payment on hold
+    await workspace_repository.update_payment_on_hold(workspace.id, utc())
+    assert await service.accept_invitation(token) == NoFreeSeats()
+    await workspace_repository.update_payment_on_hold(workspace.id, None)
 
     # when the existinng user accepts the invite, they should be added to the workspace automatically
     # and the invitation should be deleted

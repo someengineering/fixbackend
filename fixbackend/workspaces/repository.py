@@ -37,6 +37,7 @@ from fixbackend.ids import ExternalId, SubscriptionId, WorkspaceId, UserId, Prod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
+from datetime import datetime
 
 log = getLogger(__name__)
 
@@ -94,6 +95,16 @@ class WorkspaceRepository(ABC):
         self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
     ) -> Workspace:
         """Assign a subscription to a workspace."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_payment_on_hold(self, workspace_id: WorkspaceId, on_hold_since: Optional[datetime]) -> Workspace:
+        """Set the payment on hold for a workspace."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_on_hold(self, before: datetime) -> Sequence[Workspace]:
+        """List all workspaces with the payment on hold marker before the given date."""
         raise NotImplementedError
 
 
@@ -269,6 +280,29 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.refresh(workspace)
 
             return workspace.to_model()
+
+    async def update_payment_on_hold(self, workspace_id: WorkspaceId, on_hold_since: Optional[datetime]) -> Workspace:
+        """Set the payment on hold for a workspace."""
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            workspace = results.unique().scalar_one_or_none()
+            if workspace is None:
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+
+            workspace.payment_on_hold_since = on_hold_since
+            await session.commit()
+            await session.refresh(workspace)
+
+            return workspace.to_model()
+
+    async def list_by_on_hold(self, before: datetime) -> Sequence[Workspace]:
+        """List all workspaces with the payment on hold earlier the given date."""
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.payment_on_hold_since < before)
+            results = await session.execute(statement)
+            workspaces = results.unique().scalars().all()
+            return [ws.to_model() for ws in workspaces]
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

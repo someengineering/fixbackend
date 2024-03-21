@@ -30,6 +30,7 @@ class Workspace:
     members: List[UserId]
     product_tier: ProductTier
     subscription_id: Optional[SubscriptionId] = None
+    payment_on_hold_since: Optional[datetime] = None
 
     def all_users(self) -> List[UserId]:
         return self.owners + self.members

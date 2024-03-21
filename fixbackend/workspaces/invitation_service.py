@@ -118,7 +118,7 @@ class InvitationServiceImpl(InvitationService):
 
         # check permissions
         settings = ProductTierSettings[workspace.product_tier]
-        if settings.seats_max and len(workspace.all_users()) >= settings.seats_max:
+        if workspace.payment_on_hold_since or (settings.seats_max and len(workspace.all_users()) >= settings.seats_max):
             raise NotAllowed("Cannot add more users to this workspace.")
 
         # this is idempotent and will return the existing invitation if it exists
@@ -154,7 +154,7 @@ class InvitationServiceImpl(InvitationService):
             return WorkspaceNotFound()
 
         settings = ProductTierSettings[workspace.product_tier]
-        if settings.seats_max and len(workspace.all_users()) >= settings.seats_max:
+        if workspace.payment_on_hold_since or (settings.seats_max and len(workspace.all_users()) >= settings.seats_max):
             return NoFreeSeats()
 
         updated = await self.invitation_repository.update_invitation(

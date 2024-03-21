@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
+from functools import partial
 import json
 import math
 import uuid
@@ -70,7 +71,6 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
-    ProductTier,
     UserCloudAccountName,
     UserId,
     WorkspaceId,
@@ -80,6 +80,7 @@ from fixbackend.notification.email import email_messages as email
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
 from fixbackend.utils import uid
+from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = getLogger(__name__)
@@ -436,7 +437,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 async with asyncio.TaskGroup() as tg:
                     for ws in workspaces:
                         # first move the tier to free
-                        await self.workspace_repository.update_product_tier(ws.id, ProductTier.Free)
+                        await self.workspace_repository.update_payment_on_hold(ws.id, utc())
                         # second remove the subscription from the workspace
                         await self.workspace_repository.update_subscription(ws.id, None)
                         # third disable all accounts
@@ -618,6 +619,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             if existing_accounts >= limit:
                 should_be_enabled = False
 
+        if workspace.payment_on_hold_since:
+            should_be_enabled = False
+
         async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> Optional[CloudAccount]:
             accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
             maybe_account = next(
@@ -788,23 +792,28 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         # make sure access is possible
         await self.get_cloud_account(cloud_account_id, workspace_id)
         workspace = await self.workspace_repository.get_workspace(workspace_id)
-        if not workspace:
+        if workspace is None:
             raise ResourceNotFound()
         accounts_count = await self.cloud_account_repository.count_by_workspace_id(
             workspace_id=workspace_id, ready_for_collection=True
         )
 
-        def update_state(cloud_account: CloudAccount) -> CloudAccount:
+        def update_state(cloud_account: CloudAccount, workspace: Workspace) -> CloudAccount:
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _, scan):
-                    if limit := ProductTierSettings[workspace.product_tier].account_limit and enabled:
-                        if accounts_count >= limit:
-                            raise NotAllowed("Account limit reached")
+                    if enabled:
+                        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+                            if accounts_count >= limit:
+                                raise NotAllowed("Account limit reached")
+                        if workspace.payment_on_hold_since:
+                            raise NotAllowed("Payment on hold")
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
                 case _:
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
-        result = await self.cloud_account_repository.update(cloud_account_id, update_state)
+        result = await self.cloud_account_repository.update(
+            cloud_account_id, partial(update_state, workspace=workspace)
+        )
         await self.domain_events.publish(
             CloudAccountActiveToggled(
                 tenant_id=workspace_id, cloud_account_id=cloud_account_id, account_id=result.account_id, enabled=enabled
