@@ -12,10 +12,12 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import re
 import secrets
-from typing import Annotated, Any, AsyncIterator, Optional
+from typing import Annotated, Any, AsyncIterator, Optional, Tuple
 from uuid import UUID
+from concurrent.futures import ProcessPoolExecutor
 
 import pyotp
 from fastapi import Depends, Request
@@ -35,6 +37,17 @@ from fixbackend.ids import UserId
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
+from passlib.context import CryptContext
+
+# do not change this without regenerating MFA recovery codes in the db
+crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def bcrypt_hash(password: str) -> str:
+    return crypt_context.hash(password)  # type: ignore
+
+
+blocking_cpu_executor = ProcessPoolExecutor()
 
 
 class UserManager(BaseUserManager[User, UserId]):
@@ -205,13 +218,28 @@ class UserManager(BaseUserManager[User, UserId]):
 
         return user
 
+    async def compute_recovery_codes(self) -> Tuple[list[str], list[str]]:
+        # create recovery codes
+        recovery_codes = [secrets.token_hex(16) for _ in range(10)]
+        # create hashes of the recovery codes
+        hashes = []
+        loop = asyncio.get_event_loop()
+        async with asyncio.TaskGroup() as tg:
+            for code in recovery_codes:
+
+                async def compute_hash(code: str) -> None:
+                    result = await loop.run_in_executor(blocking_cpu_executor, bcrypt_hash, code)
+                    hashes.append(result)
+
+                tg.create_task(compute_hash(code))
+
+        return recovery_codes, hashes
+
     async def recreate_mfa(self, user: User) -> OTPConfig:
         assert not user.is_mfa_active, "User already has MFA enabled."
         user_secret = pyotp.random_base32()
         # create recovery codes
-        recovery_codes = [secrets.token_hex(16) for _ in range(10)]
-        # create hashes of the recovery codes
-        hashes = [self.password_helper.hash(code) for code in recovery_codes]
+        recovery_codes, hashes = await self.compute_recovery_codes()
         await self.user_repository.recreate_otp_secret(user.id, user_secret, is_mfa_active=False, hashes=hashes)
         # return the OTP Config
         return OTPConfig(secret=user_secret, recovery_codes=recovery_codes)
