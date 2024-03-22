@@ -20,9 +20,8 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from typing import AsyncIterator, Optional, Dict
+from typing import AsyncIterator, Callable, Tuple
 
-from fastapi.responses import StreamingResponse
 from fixcloudutils.types import JsonElement
 
 
@@ -46,14 +45,12 @@ async def csv_serializer(input_iterator: AsyncIterator[JsonElement]) -> AsyncIte
         yield str(item) + "\n"
 
 
-def streaming_response(
-    accept: str, gen: AsyncIterator[JsonElement], headers: Optional[Dict[str, str]] = None
-) -> StreamingResponse:
+def streaming_response(accept: str) -> Tuple[Callable[[AsyncIterator[JsonElement]], AsyncIterator[str]], str]:
     if accept in ["application/x-ndjson", "application/ndjson"]:
-        return StreamingResponse(ndjson_serializer(gen), media_type="application/ndjson", headers=headers)
+        return ndjson_serializer, "application/ndjson"
     elif accept == "application/json":
-        return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)
+        return json_serializer, "application/json"
     elif accept == "text/csv":
-        return StreamingResponse(csv_serializer(gen), media_type="text/csv", headers=headers)
+        return csv_serializer, "text/csv"
     else:
-        return StreamingResponse(json_serializer(gen), media_type="application/json", headers=headers)
+        return json_serializer, "application/json"

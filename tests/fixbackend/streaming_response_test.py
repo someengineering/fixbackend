@@ -33,9 +33,12 @@ async def test_streaming_json() -> None:
         yield {"a": 1}
         yield {"b": 2}
 
-    response = streaming_response("application/json", gen())
-    assert [a async for a in response.body_iterator] == ["[", '{"a": 1}', ',{"b": 2}', "]"]
-    response = streaming_response("application/ndjson", gen())
-    assert [a async for a in response.body_iterator] == ['{"a": 1}\n', '{"b": 2}\n']
-    response = streaming_response("text/csv", gen())
-    assert [a async for a in response.body_iterator] == ["{'a': 1}\n", "{'b': 2}\n"]
+    fn, media_type = streaming_response("application/json")
+    assert [a async for a in fn(gen())] == ["[", '{"a": 1}', ',{"b": 2}', "]"]
+    assert media_type == "application/json"
+    fn, media_type = streaming_response("application/ndjson")
+    assert [a async for a in fn(gen())] == ['{"a": 1}\n', '{"b": 2}\n']
+    assert media_type == "application/ndjson"
+    fn, media_type = streaming_response("text/csv")
+    assert [a async for a in fn(gen())] == ["{'a': 1}\n", "{'b': 2}\n"]
+    assert media_type == "text/csv"

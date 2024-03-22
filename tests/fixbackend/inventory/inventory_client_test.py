@@ -97,7 +97,8 @@ def mocked_inventory_client(
 
 
 async def test_execute_single(mocked_inventory_client: InventoryClient) -> None:
-    assert [a async for a in await mocked_inventory_client.execute_single(db_access, "json [1,2,3]")] == ["1", "2", "3"]
+    async with mocked_inventory_client.execute_single(db_access, "json [1,2,3]") as result:
+        assert [a async for a in result] == ["1", "2", "3"]
 
 
 async def test_report_benchmarks(mocked_inventory_client: InventoryClient) -> None:
@@ -113,12 +114,14 @@ async def test_deletion(mocked_inventory_client: InventoryClient) -> None:
 
 
 async def test_possible_values(mocked_inventory_client: InventoryClient) -> None:
-    keys = await mocked_inventory_client.possible_values(
+    async with mocked_inventory_client.possible_values(
         db_access, query="is(account)", prop_or_predicate="tags", detail="attributes"
-    )
-    assert [e async for e in keys] == ["prop_a", "prop_b", "prop_c"]
-    vals = await mocked_inventory_client.possible_values(db_access, query="is(account)", prop_or_predicate="id")
-    assert [e async for e in vals] == ["val_a", "val_b", "val_c"]
+    ) as result:
+        assert [e async for e in result] == ["prop_a", "prop_b", "prop_c"]
+    async with mocked_inventory_client.possible_values(
+        db_access, query="is(account)", prop_or_predicate="id"
+    ) as result:
+        assert [e async for e in result] == ["val_a", "val_b", "val_c"]
 
 
 async def test_model(mocked_inventory_client: InventoryClient, aws_ec2_model_json: Json) -> None:
@@ -146,17 +149,19 @@ async def test_node_update(mocked_inventory_client: InventoryClient) -> None:
 
 
 async def test_timeseries(mocked_inventory_client: InventoryClient) -> None:
-    result = await mocked_inventory_client.timeseries(db_access, name="infected_resources", start=utc(), end=utc())
-    result_list = [e async for e in result]
-    assert len(result_list) == 8
+    async with mocked_inventory_client.timeseries(
+        db_access, name="infected_resources", start=utc(), end=utc()
+    ) as result:
+        result_list = [e async for e in result]
+        assert len(result_list) == 8
 
 
 async def test_search_history(mocked_inventory_client: InventoryClient) -> None:
-    response = await mocked_inventory_client.search_history(
+    async with mocked_inventory_client.search_history(
         db_access, "is(account)", before=utc(), after=utc(), change=[HistoryChange.node_vulnerable]
-    )
-    result = [n async for n in response]
-    assert len(result) == 1
+    ) as response:
+        result = [n async for n in response]
+        assert len(result) == 1
 
 
 async def test_call_json(mocked_inventory_client: InventoryClient) -> None:

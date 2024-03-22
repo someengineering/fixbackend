@@ -218,24 +218,25 @@ class NotificationService(Service):
         failing_checks: Dict[str, str] = {}
         failing_resources_count: Dict[str, int] = defaultdict(int)
         total_failed_checks = 0
-        async for agg in await self.inventory_client.search_history(
+        async with self.inventory_client.search_history(
             access,
             f"search {query} | aggregate {aggregate}",
             before=before,
             after=after,
             change=[HistoryChange.node_vulnerable, HistoryChange.node_compliant],
-        ):
-            if (
-                (count := agg.get("count"))
-                and (group := agg.get("group"))
-                and (check := group.get("check"))
-                and (severity := group.get("severity"))
-                and (bench := group.get("benchmark"))
-                and bench == benchmark
-            ):
-                total_failed_checks += 1
-                failing_checks[check] = severity
-                failing_resources_count[check] = count
+        ) as result:
+            async for agg in result:
+                if (
+                    (count := agg.get("count"))
+                    and (group := agg.get("group"))
+                    and (check := group.get("check"))
+                    and (severity := group.get("severity"))
+                    and (bench := group.get("benchmark"))
+                    and bench == benchmark
+                ):
+                    total_failed_checks += 1
+                    failing_checks[check] = severity
+                    failing_resources_count[check] = count
 
         if total_failed_checks > 0:
             # pick examples for the top 5 checks
@@ -244,22 +245,23 @@ class NotificationService(Service):
             # load examples for the top 5 checks
             example_resources: Dict[str, List[VulnerableResource]] = defaultdict(list)
             example_count = 0
-            async for node in await self.inventory_client.execute_single(
+            async with self.inventory_client.execute_single(
                 access,
                 f"history --before {utc_str(before)} --after {utc_str(after)} --change node_vulnerable --change node_compliant /security.has_issues==true and /diff.node_vulnerable[].{{check in [{','.join(top_checks)}] and {issue}}} | "  # noqa
                 f"jq --no-rewrite '{{id:.id, kind:.reported.kind, name:.reported.name, cloud:.ancestors.cloud.reported.name, account:.ancestors.account.reported.name, region:.ancestors.region.reported.name, checks: [ .security.issues[] | select(.benchmarks != null and .benchmarks[] == \"{benchmark}\") | .check ]}}'",  # noqa
-            ):
-                if isinstance(node, dict):
-                    for check in node.get("checks", []):
-                        examples = example_resources[check]
-                        if check in top_checks and len(examples) < 3:
-                            resource = cattrs.structure(node, VulnerableResource)
-                            # the ui link does not come from the inventory and needs to be computed explicitly
-                            resource.ui_link = f"{self.config.service_base_url}/inventory/resource-detail/{resource.id}?{urlencode(dict(name=resource.name))}#{access.workspace_id}"  # noqa: E501
-                            examples.append(resource)
-                            example_count += 1
-                            if example_count == 25:
-                                break
+            ) as result:
+                async for node in result:
+                    if isinstance(node, dict):
+                        for check in node.get("checks", []):
+                            examples = example_resources[check]
+                            if check in top_checks and len(examples) < 3:
+                                resource = cattrs.structure(node, VulnerableResource)
+                                # the ui link does not come from the inventory and needs to be computed explicitly
+                                resource.ui_link = f"{self.config.service_base_url}/inventory/resource-detail/{resource.id}?{urlencode(dict(name=resource.name))}#{access.workspace_id}"  # noqa: E501
+                                examples.append(resource)
+                                example_count += 1
+                                if example_count == 25:
+                                    break
             # load definition of top checks
             top_check_defs = [
                 FailedBenchmarkCheck(cid, title, sev, failing_resources_count[cid], example_resources[cid])

@@ -164,8 +164,9 @@ def mocked_answers(
 async def test_benchmark_command(
     inventory_service: InventoryService, benchmark_json: List[Json], mocked_answers: RequestHandlerMock
 ) -> None:
-    response = [a async for a in await inventory_service.benchmark(db, "benchmark_name")]
-    assert response == benchmark_json
+    async with inventory_service.benchmark(db, "benchmark_name") as result:
+        response = [a async for a in result]
+        assert response == benchmark_json
 
 
 async def test_summary(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
@@ -275,19 +276,23 @@ async def test_search_table(inventory_service: InventoryService, mocked_answers:
     ]
     # simple search against the default graph
     request = SearchRequest(query="is(account) and name==foo")
-    result = [e async for e in await inventory_service.search_table(db, request)]
-    assert result == expected
+    async with inventory_service.search_table(db, request) as response:
+        result = [e async for e in response]
+        assert result == expected
     # search in history data
     request = SearchRequest(query="is(account) and name==foo", history=HistorySearch(change=HistoryChange.node_created))
-    result = [e async for e in await inventory_service.search_table(db, request)]
-    assert result == expected
+    async with inventory_service.search_table(db, request) as response:
+        result = [e async for e in response]
+        assert result == expected
     request = SearchRequest(query="is(account) and name==foo")
-    result = [e async for e in await inventory_service.search_table(db, request, "csv")]
+    async with inventory_service.search_table(db, request, "csv") as response:
+        result = [e async for e in response]
     assert result == ["name,some_int", "a,1"]
     request = SearchRequest(
         query="is(account) and name==foo", sort=[SortOrder(path="/reported.name", direction="desc")]
     )
-    result = [e async for e in await inventory_service.search_table(db, request, "csv")]
+    async with inventory_service.search_table(db, request, "csv") as response:
+        result = [e async for e in response]
     assert result == ["name,some_int", "a,1"]
 
 
@@ -316,8 +321,8 @@ async def test_resource(
 async def test_resource_neighborhood(
     inventory_service: InventoryService, mocked_answers: RequestHandlerMock, azure_virtual_machine_resource_json: Json
 ) -> None:
-    res = await inventory_service.neighborhood(db, NodeId("some_node_id"))
-    assert res == neighborhood
+    async with inventory_service.neighborhood(db, NodeId("some_node_id")) as result:
+        assert [a async for a in result] == neighborhood
 
 
 @pytest.mark.asyncio

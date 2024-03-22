@@ -25,17 +25,30 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 from itertools import islice
-from typing import List, Optional, Dict, Set, Tuple, Literal, TypeVar, Iterable, Callable, Any, Mapping, Union
+from typing import (
+    List,
+    Optional,
+    Dict,
+    Set,
+    Tuple,
+    Literal,
+    TypeVar,
+    Iterable,
+    Callable,
+    Any,
+    Mapping,
+    Union,
+    AsyncContextManager,
+)
 
-from fixcloudutils.asyncio.timed import timed
 from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.config import ProductTierSettings, Trial
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.config import ProductTierSettings, Trial
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     TenantAccountsCollected,
@@ -146,7 +159,8 @@ class InventoryService(Service):
         if (name := event.final_name) and (db := await self.db_access_manager.get_database_access(event.tenant_id)):
             log.info(f"Cloud account name changed. Update in inventory: {event}.")
             q = f"is(account) and id={event.account_id} and /ancestors.cloud.reported.name={event.cloud} limit 1"
-            accounts = [a async for a in await self.client.search(db, q)]
+            async with self.client.search(db, q) as result:
+                accounts = [a async for a in result]
             if accounts and (account := accounts[0]) and (node_id := account.get("id")):
                 await self.client.update_node(db, NodeId(node_id), {"name": name})
                 # account name has changed: invalidate the cache for the tenant
@@ -192,7 +206,6 @@ class InventoryService(Service):
         # evict the cache for the tenant in the cluster
         await self.cache.evict(str(workspace_id))
 
-    @timed("fixbackend", "report_info")
     async def report_info(self, db: GraphDatabaseAccess) -> Json:
         async def compute_report_info() -> Json:
             benchmark_ids, check_ids = await asyncio.gather(
@@ -202,21 +215,18 @@ class InventoryService(Service):
 
         return await self.cache.call(compute_report_info, key=str(db.workspace_id))()
 
-    @timed("fixbackend", "report_config")
     async def report_config(self, db: GraphDatabaseAccess) -> ReportConfig:
         js = await self.client.config(db, "fix.report.config")
         v = js.get("report_config", {})
         v["ignore_benchmarks"] = js.get("ignore_benchmarks", [])
         return ReportConfig.model_validate(v)
 
-    @timed("fixbackend", "update_report_config")
     async def update_report_config(self, db: GraphDatabaseAccess, config: ReportConfig) -> None:
         js = config.model_dump()
         update = dict(ignore_benchmarks=js.pop("ignore_benchmarks", None), report_config=js)
         await self.client.update_config(db, "fix.report.config", update)
 
-    @timed("fixbackend", "benchmark")
-    async def benchmark(
+    def benchmark(
         self,
         db: GraphDatabaseAccess,
         benchmark_name: str,
@@ -224,7 +234,7 @@ class InventoryService(Service):
         accounts: Optional[List[str]] = None,
         severity: Optional[str] = None,
         only_failing: bool = False,
-    ) -> AsyncIteratorWithContext[Json]:
+    ) -> AsyncContextManager[AsyncIteratorWithContext[Json]]:
         report = f"report benchmark load {benchmark_name}"
         if accounts:
             report += f" --accounts {' '.join(accounts)}"
@@ -233,15 +243,14 @@ class InventoryService(Service):
         if only_failing:
             report += " --only-failing"
 
-        return await self.client.execute_single(db, report + " | dump")  # type: ignore
+        return self.client.execute_single(db, report + " | dump")  # type: ignore
 
-    @timed("fixbackend", "search_table")
-    async def search_table(
+    def search_table(
         self,
         db: GraphDatabaseAccess,
         request: SearchRequest,
         result_format: Literal["table", "csv"] = "table",
-    ) -> AsyncIteratorWithContext[JsonElement]:
+    ) -> AsyncContextManager[AsyncIteratorWithContext[JsonElement]]:
         if history := request.history:
             cmd = "history"
             if history.change:
@@ -257,9 +266,8 @@ class InventoryService(Service):
             cmd += " | sort " + ", ".join(f"{s.path} {s.direction}" for s in request.sort)
         fmt_option = "--csv" if result_format == "csv" else "--json-table"
         cmd += f" | limit {request.skip}, {request.limit} | list {fmt_option}"
-        return await self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
+        return self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
-    @timed("fixbackend", "search_start_data")
     async def search_start_data(self, db: GraphDatabaseAccess) -> SearchStartData:
         async def compute_search_start_data() -> SearchStartData:
             async def cloud_resource(search_filter: str, id_prop: str, name_prop: str) -> List[SearchCloudResource]:
@@ -268,14 +276,15 @@ class InventoryService(Service):
                     f"aggregate {id_prop} as id, {name_prop} as name, /ancestors.cloud.reported.name as cloud: "
                     f"sum(1) as count | jq --no-rewrite .group"
                 )
-                return sorted(
-                    [
-                        SearchCloudResource.model_validate(n)
-                        async for n in await self.client.execute_single(db, f"{cmd}")
-                        if isinstance(n, dict) and n.get("cloud") is not None
-                    ],
-                    key=lambda x: x.name,
-                )
+                async with self.client.execute_single(db, f"{cmd}") as result:
+                    return sorted(
+                        [
+                            SearchCloudResource.model_validate(n)
+                            async for n in result
+                            if isinstance(n, dict) and n.get("cloud") is not None
+                        ],
+                        key=lambda x: x.name,
+                    )
 
             (accounts, regions, kinds, roots) = await asyncio.gather(
                 cloud_resource("is(account)", "id", "name"),
@@ -293,7 +302,6 @@ class InventoryService(Service):
 
         return await self.cache.call(compute_search_start_data, key=str(db.workspace_id))()
 
-    @timed("fixbackend", "resource")
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
         resource = await self.client.resource(db, id=resource_id)
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
@@ -302,8 +310,9 @@ class InventoryService(Service):
         # TODO: remove neighborhood from the result, once handled in the frontend
         return dict(resource=resource, failing_checks=checks, neighborhood=[])
 
-    @timed("fixbackend", "neighborhood")
-    async def neighborhood(self, db: GraphDatabaseAccess, resource_id: NodeId) -> List[Json]:
+    def neighborhood(
+        self, db: GraphDatabaseAccess, resource_id: NodeId
+    ) -> AsyncContextManager[AsyncIteratorWithContext[Json]]:
         jq_reported = "{id: .reported.id, name: .reported.name, kind: .reported.kind}"
         jq_arg = (
             # properties to include in the result
@@ -316,9 +325,8 @@ class InventoryService(Service):
         cmd = (
             f"""search --with-edges id("{resource_id}") <-[0:2]-> | refine-resource-data | jq --no-rewrite '{jq_arg}'"""
         )
-        return [n async for n in await self.client.execute_single(db, cmd, env={"with-kind": "true"})]  # type: ignore
+        return self.client.execute_single(db, cmd, env={"with-kind": "true"})  # type: ignore
 
-    @timed("fixbackend", "summary")
     async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
         async def compute_summary() -> ReportSummary:
             now = utc()
@@ -331,22 +339,23 @@ class InventoryService(Service):
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
                 # vulnerable: use current severity, compliant: use previous severity
                 severity_prop = "/security.severity" if change == "node_vulnerable" else "/diff.previous"
-                async for elem in await self.client.execute_single(
+                async with self.client.execute_single(
                     db,
                     f"history --change {change} --after {duration.total_seconds()}s | aggregate "
                     f"/ancestors.account.reported.id as account_id, "
                     f"{severity_prop} as severity,"
                     f"kind as kind"
                     ": count(name) as count",
-                ):
-                    assert isinstance(elem, dict), f"Expected Json object but got {elem}"
-                    severity = elem["group"]["severity"]
-                    if severity is None:  # safeguard for history entries in old format
-                        continue
-                    if isinstance(acc_id := elem["group"]["account_id"], str):
-                        accounts_by_severity[severity].add(acc_id)
-                    resource_count_by_severity[severity] += elem["count"]
-                    resource_count_by_kind[elem["group"]["kind"]] += elem["count"]
+                ) as result:
+                    async for elem in result:
+                        assert isinstance(elem, dict), f"Expected Json object but got {elem}"
+                        severity = elem["group"]["severity"]
+                        if severity is None:  # safeguard for history entries in old format
+                            continue
+                        if isinstance(acc_id := elem["group"]["account_id"], str):
+                            accounts_by_severity[severity].add(acc_id)
+                        resource_count_by_severity[severity] += elem["count"]
+                        resource_count_by_kind[elem["group"]["kind"]] += elem["count"]
                 # reduce the count by kind dict to the top 3
                 reduced = dict(sorted(resource_count_by_kind.items(), key=lambda item: item[1], reverse=True)[:3])
                 # reduce the list of accounts to the top 3
@@ -365,29 +374,30 @@ class InventoryService(Service):
                 resources_by_account: Dict[str, int] = defaultdict(int)
                 resources_by_account_by_severity: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
                 resources_by_severity: Dict[str, int] = defaultdict(int)
-                async for entry in await self.client.aggregate(
+                async with self.client.aggregate(
                     db,
                     "search /ancestors.account.reported.id!=null | aggregate "
                     "/ancestors.account.reported.id as account_id, "
                     "/ancestors.account.reported.name as account_name, "
                     "/ancestors.cloud.reported.name as cloud_name, "
                     "/security.severity as severity: sum(1) as count",
-                ):
-                    account_id = entry["group"]["account_id"]
-                    count = entry["count"]
-                    severity = entry["group"]["severity"]
-                    if account_id not in account_by_id:
-                        account_by_id[account_id] = AccountSummary(
-                            id=account_id,
-                            name=entry["group"]["account_name"],
-                            cloud=entry["group"]["cloud_name"],
-                            failed_resources_by_severity={},
-                            resource_count=0,
-                        )
-                    resources_by_account[account_id] += count
-                    if severity is not None:
-                        resources_by_account_by_severity[account_id][severity] = count
-                        resources_by_severity[severity] += count
+                ) as result:
+                    async for entry in result:
+                        account_id = entry["group"]["account_id"]
+                        count = entry["count"]
+                        severity = entry["group"]["severity"]
+                        if account_id not in account_by_id:
+                            account_by_id[account_id] = AccountSummary(
+                                id=account_id,
+                                name=entry["group"]["account_name"],
+                                cloud=entry["group"]["cloud_name"],
+                                failed_resources_by_severity={},
+                                resource_count=0,
+                            )
+                        resources_by_account[account_id] += count
+                        if severity is not None:
+                            resources_by_account_by_severity[account_id][severity] = count
+                            resources_by_severity[severity] += count
                 for account_id, account in account_by_id.items():
                     account.resource_count = resources_by_account.get(account_id, 0)
                     account.failed_resources_by_severity = resources_by_account_by_severity[account_id]
@@ -396,22 +406,22 @@ class InventoryService(Service):
             async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
                 check_accounts: ChecksByAccountId = defaultdict(dict)
                 check_severity: Dict[str, str] = {}
-
-                async for entry in await self.client.aggregate(
+                async with self.client.aggregate(
                     db,
                     "search /security.has_issues==true | aggregate "
                     "/security.issues[].check as check_id,"
                     "/security.issues[].severity as severity,"
                     "/ancestors.account.reported.id as account_id"
                     ": sum(1) as count",
-                ):
-                    group = entry["group"]
-                    count = entry["count"]
-                    check_id = group["check_id"]
-                    if isinstance(account_id := group["account_id"], str):
-                        check_accounts[check_id][account_id] = count
-                    check_severity[check_id] = group["severity"]
-                return check_accounts, check_severity
+                ) as result:
+                    async for entry in result:
+                        group = entry["group"]
+                        count = entry["count"]
+                        check_id = group["check_id"]
+                        if isinstance(account_id := group["account_id"], str):
+                            check_accounts[check_id][account_id] = count
+                        check_severity[check_id] = group["severity"]
+                    return check_accounts, check_severity
 
             async def benchmark_summary() -> Tuple[BenchmarkById, ChecksByBenchmarkId]:
                 summaries: BenchmarkById = {}
@@ -435,12 +445,10 @@ class InventoryService(Service):
                 start = now - timedelta(days=14)
                 granularity = timedelta(days=1)
                 groups = {"severity"}
-                data = [
-                    entry
-                    async for entry in await self.client.timeseries(
-                        db, "infected_resources", start=start, end=now, granularity=granularity, group=groups
-                    )
-                ]
+                async with self.client.timeseries(
+                    db, "infected_resources", start=start, end=now, granularity=granularity, group=groups
+                ) as result:
+                    data = [entry async for entry in result]
                 return TimeSeries(name="infected_resources", start=start, end=now, granularity=granularity, data=data)
 
             async def top_issues(
