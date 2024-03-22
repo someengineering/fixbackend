@@ -216,7 +216,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         ignore: UpdateSecurityIgnore = Body(...),
     ) -> Json:
         return await inventory().client.update_node(
-            graph_db, node_id, {"security_ignore": ignore.checks if ignore else None}, section="metadata"
+            graph_db, node_id, {"security_ignore": ignore.checks or None}, section="metadata"
         )
 
     @router.get("/node/{node_id}/neighborhood", tags=["search"])
