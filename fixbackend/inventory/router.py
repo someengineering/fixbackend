@@ -32,6 +32,7 @@ from fixbackend.inventory.schemas import (
     SearchRequest,
     SearchStartData,
     SearchListGraphRequest,
+    UpdateSecurityIgnore,
 )
 from fixbackend.streaming_response import streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -207,6 +208,16 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.get("/node/{node_id}", tags=["search"])
     async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
         return await inventory().resource(graph_db, node_id)
+
+    @router.patch("/node/{node_id}/security_ignore", tags=["report"])
+    async def ignore_security(
+        graph_db: CurrentGraphDbDependency,
+        node_id: NodeId = Path(),
+        ignore: UpdateSecurityIgnore = Body(...),
+    ) -> Json:
+        return await inventory().client.update_node(
+            graph_db, node_id, {"security_ignore": ignore.checks or None}, section="metadata"
+        )
 
     @router.get("/node/{node_id}/neighborhood", tags=["search"])
     async def get_node_neighborhood(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> List[Json]:
