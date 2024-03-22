@@ -31,6 +31,7 @@ class WorkspaceRead(BaseModel):
     owners: List[UserId] = Field(description="The workspace's owners, who can manage the organization")
     members: List[UserId] = Field(description="The workspace's members, who can view the organizatione")
     on_hold_since: Optional[datetime] = Field(description="The time at which the workspace was put on hold")
+    created_at: datetime = Field(description="The time at which the workspace was created")
 
     model_config = {
         "json_schema_extra": {
@@ -42,6 +43,7 @@ class WorkspaceRead(BaseModel):
                     "owners": ["00000000-0000-0000-0000-000000000000"],
                     "members": ["00000000-0000-0000-0000-000000000000"],
                     "on_hold_since": "2020-01-01T00:00:00Z",
+                    "created_at": "2020-01-01T00:00:00Z",
                 }
             ]
         }
@@ -56,6 +58,7 @@ class WorkspaceRead(BaseModel):
             owners=model.owners,
             members=model.members,
             on_hold_since=model.payment_on_hold_since,
+            created_at=model.created_at,
         )
 
 
