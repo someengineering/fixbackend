@@ -105,13 +105,14 @@ class InventoryClient(Service):
         self.inventory_url = inventory_url
         self.client = client
 
-    def _check_response(
+    async def _check_response(
         self,
         response: Response,
         expected_media_types: Optional[Union[str, Set[str]]],
         allowed_error_codes: Optional[Set[int]],
     ) -> None:
         if response.is_error and (allowed_error_codes is None or response.status_code in allowed_error_codes):
+            await response.aread()  # make sure the content is read
             if response.status_code == 401:
                 raise GraphDatabaseForbidden(401, response.text)
             elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
@@ -152,7 +153,7 @@ class InventoryClient(Service):
             # If the request takes longer than the defined timeout, we define this as client error (4xx)
             raise InventoryRequestTookTooLong(408, f"Request took too long: {e}") from e
         else:
-            self._check_response(response, expected_media_types, allowed_error_codes)
+            await self._check_response(response, expected_media_types, allowed_error_codes)
             return response
 
     @asynccontextmanager
@@ -172,7 +173,7 @@ class InventoryClient(Service):
             async with self.client.stream(
                 method, self.inventory_url + path, params=params, headers=headers, content=content, json=json
             ) as response:
-                self._check_response(response, expected_media_types, allowed_error_codes)
+                await self._check_response(response, expected_media_types, allowed_error_codes)
                 yield AsyncIteratorWithContext(response)
 
         except ConnectError as e:
