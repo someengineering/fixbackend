@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Union
 from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
@@ -181,4 +181,11 @@ class ReportConfig(BaseModel):
     ignore_benchmarks: Optional[List[str]] = Field(default=None, description="List of benchmarks to ignore.")
     override_values: Optional[Json] = Field(
         default=None, description="Default values for the report. Will be merged with the values from the config."
+    )
+
+
+class UpdateSecurityIgnore(BaseModel):
+    checks: Union[Literal["*"], List[str], None] = Field(
+        description="Checks to ignore. Use '*' to ignore all checks. Use null to reset all checks.",
+        examples=[["check1", "check2"], "*", None],
     )
