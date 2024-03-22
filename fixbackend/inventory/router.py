@@ -11,10 +11,9 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import logging
 from datetime import datetime
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, List, Literal, Optional, AsyncIterator
 
 from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -107,10 +106,16 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         only_failing: bool = Query(False),
     ) -> StreamingResponse:
         log.info(f"Show benchmark {benchmark_name} for tenant {graph_db.workspace_id}")
-        result = await inventory().benchmark(
-            graph_db, benchmark_name, accounts=accounts, severity=severity, only_failing=only_failing
-        )
-        return streaming_response(request.headers.get("accept", "application/json"), result)
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().benchmark(
+                graph_db, benchmark_name, accounts=accounts, severity=severity, only_failing=only_failing
+            ) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     @router.get("/report-summary", tags=["report"])
     async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
@@ -147,10 +152,16 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         limit: int = Query(default=10, ge=0, le=50),
         count: bool = Query(default=False),
     ) -> StreamingResponse:
-        result = await inventory().client.possible_values(
-            graph_db, query=query, prop_or_predicate=prop, detail="attributes", skip=skip, limit=limit, count=count
-        )
-        return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.possible_values(
+                graph_db, query=query, prop_or_predicate=prop, detail="attributes", skip=skip, limit=limit, count=count
+            ) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     @router.post("/property/values", tags=["search"])
     async def property_values(
@@ -162,10 +173,16 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         limit: int = Query(default=10, ge=0, le=50),
         count: bool = Query(default=False),
     ) -> StreamingResponse:
-        result = await inventory().client.possible_values(
-            graph_db, query=query, prop_or_predicate=prop, detail="values", skip=skip, limit=limit, count=count
-        )
-        return streaming_response(request.headers.get("accept", "application/json"), result, result.context)
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.possible_values(
+                graph_db, query=query, prop_or_predicate=prop, detail="values", skip=skip, limit=limit, count=count
+            ) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     @router.post("/property/path/complete", tags=["search"])
     async def complete_property_path(
@@ -183,9 +200,14 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def search(
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchListGraphRequest = Body()
     ) -> StreamingResponse:
-        result = await inventory().client.search(graph_db, query.query, with_edges=query.with_edges)
-        accept = request.headers.get("accept", "application/json")
-        return streaming_response(accept, result, result.context)
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.search(graph_db, query.query, with_edges=query.with_edges) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     @router.post(
         "/search/table",
@@ -198,12 +220,19 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
     ) -> StreamingResponse:
         accept = request.headers.get("accept", "application/json")
+        fn, media_type = streaming_response(accept)
         result_format: Literal["table", "csv"] = "csv" if accept == "text/csv" else "table"
-        search_result = await inventory().search_table(graph_db, query, result_format=result_format)
-        extra_headers = search_result.context
-        if accept == "text/csv":
-            extra_headers["Content-Disposition"] = 'attachment; filename="inventory.csv"'
-        return streaming_response(accept, search_result, headers=extra_headers)
+        extra_headers = {}
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().search_table(graph_db, query, result_format=result_format) as result:
+                extra_headers.update(result.context)
+                if accept == "text/csv":
+                    extra_headers["Content-Disposition"] = 'attachment; filename="inventory.csv"'
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type, headers=extra_headers)
 
     @router.get("/node/{node_id}", tags=["search"])
     async def get_node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
@@ -220,8 +249,17 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         )
 
     @router.get("/node/{node_id}/neighborhood", tags=["search"])
-    async def get_node_neighborhood(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> List[Json]:
-        return await inventory().neighborhood(graph_db, node_id)
+    async def get_node_neighborhood(
+        graph_db: CurrentGraphDbDependency, request: Request, node_id: NodeId = Path()
+    ) -> StreamingResponse:
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().neighborhood(graph_db, node_id) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     # deprecated, needs to be removed
     @router.post("/node/{node_id}", tags=["deprecated"])
@@ -238,14 +276,19 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         changes: Optional[List[HistoryChange]] = Query(default=None),
         limit: int = Query(default=20, ge=1),
     ) -> StreamingResponse:
-        result = await inventory().client.search_history(
-            graph_db,
-            query=f'id("{node_id}") sort /changed_at desc limit {limit}',
-            before=before,
-            after=after,
-            change=changes,
-        )
-        accept = request.headers.get("accept", "application/json")
-        return streaming_response(accept, result, result.context)
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.search_history(
+                graph_db,
+                query=f'id("{node_id}") sort /changed_at desc limit {limit}',
+                before=before,
+                after=after,
+                change=changes,
+            ) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamingResponse(stream(), media_type=media_type)
 
     return router
