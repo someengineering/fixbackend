@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from attrs import frozen
@@ -36,6 +36,11 @@ class Workspace:
 
     def all_users(self) -> List[UserId]:
         return self.owners + self.members
+
+    def trial_end(self) -> Optional[datetime]:
+        if self.product_tier == ProductTier.Trial:
+            return self.created_at + timedelta(days=14)
+        return None
 
 
 @frozen
