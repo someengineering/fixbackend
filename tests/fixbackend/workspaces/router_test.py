@@ -16,13 +16,18 @@
 from typing import AsyncIterator
 
 import pytest
+from _datetime import timedelta
+from attr import evolve
 from fastapi import FastAPI
+from fixcloudutils.util import utc
 from httpx import AsyncClient
 
 from fixbackend.auth.depedencies import get_current_active_verified_user, maybe_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
+from fixbackend.ids import WorkspaceId, ProductTier, ExternalId
 from fixbackend.permissions.role_repository import RoleRepository
+from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 from fixbackend.permissions.models import Roles
 from fixbackend.auth.user_repository import UserRepository
@@ -126,3 +131,20 @@ async def test_list_workspace_users(
         "owner": True,
         "billing_admin": False,
     }
+
+
+async def test_workspace_trial_period() -> None:
+    workspace = Workspace(
+        WorkspaceId(uid()),
+        "slug",
+        "name",
+        ExternalId(uid()),
+        [],
+        [],
+        ProductTier.Trial,
+        utc(),
+        utc(),
+    )
+    assert workspace.trial_end_days() == 14
+    assert evolve(workspace, created_at=utc() - timedelta(days=15)).trial_end_days() == 0
+    assert evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days() == 4
