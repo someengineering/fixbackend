@@ -37,9 +37,9 @@ class Workspace:
     def all_users(self) -> List[UserId]:
         return self.owners + self.members
 
-    def trial_end(self) -> Optional[datetime]:
+    def trial_end_days(self) -> Optional[int]:
         if self.product_tier == ProductTier.Trial:
-            return self.created_at + timedelta(days=14)
+            return max((self.created_at + timedelta(days=14, hours=12) - datetime.now()).days, 0)
         return None
 
 

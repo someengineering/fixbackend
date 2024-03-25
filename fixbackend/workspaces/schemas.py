@@ -32,7 +32,7 @@ class WorkspaceRead(BaseModel):
     members: List[UserId] = Field(description="The workspace's members, who can view the organizatione")
     on_hold_since: Optional[datetime] = Field(description="The time at which the workspace was put on hold")
     created_at: datetime = Field(description="The time at which the workspace was created")
-    trial_end: Optional[datetime] = Field(description="The time at which the workspace's trial ends, if any")
+    trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
 
     model_config = {
         "json_schema_extra": {
@@ -45,7 +45,7 @@ class WorkspaceRead(BaseModel):
                     "members": ["00000000-0000-0000-0000-000000000000"],
                     "on_hold_since": "2020-01-01T00:00:00Z",
                     "created_at": "2020-01-01T00:00:00Z",
-                    "trial_end": "2020-01-01T00:00:00Z",
+                    "trial_end_days": 13,
                 }
             ]
         }
@@ -61,7 +61,7 @@ class WorkspaceRead(BaseModel):
             members=model.members,
             on_hold_since=model.payment_on_hold_since,
             created_at=model.created_at,
-            trial_end=model.trial_end(),
+            trial_end_days=model.trial_end_days(),
         )
 
 
