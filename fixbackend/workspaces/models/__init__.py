@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from attrs import frozen
+from fixcloudutils.util import utc
 
 from fixbackend.ids import InvitationId, SubscriptionId, WorkspaceId, UserId, ExternalId, ProductTier
 
@@ -39,7 +40,7 @@ class Workspace:
 
     def trial_end_days(self) -> Optional[int]:
         if self.product_tier == ProductTier.Trial:
-            return max((self.created_at + timedelta(days=14, hours=12) - datetime.now()).days, 0)
+            return max((self.created_at + timedelta(days=14, hours=12) - utc()).days, 0)
         return None
 
 
