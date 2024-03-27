@@ -12,8 +12,8 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import logging
 import base64
+import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import replace
@@ -93,6 +93,7 @@ from fixbackend.logging_context import (
 )
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
+from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
@@ -405,6 +406,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 workspace_repo,
             ),
         )
+        deps.add(SN.scheduled_email_sender, ScheduledEmailSender(notification_service.email_sender, session_maker))
 
         async with deps:
             log.info("Application services started.")

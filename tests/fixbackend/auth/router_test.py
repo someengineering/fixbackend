@@ -19,10 +19,12 @@ import pytest
 from fastapi import Request, FastAPI
 from httpx import AsyncClient
 from pyotp import TOTP
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.auth.models import User
+from fixbackend.auth.models.orm import UserMFARecoveryCode
 from fixbackend.auth.schemas import OTPConfig
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
@@ -284,9 +286,9 @@ async def test_mfa_flow(
     assert response.status_code == 204
 
     # make sure only the new codes are stored
-    async with user_repository.user_db() as db:
-        orm_user = await db.get(user.id)  # type: ignore
-        assert len(orm_user.mfa_recovery_codes) == 10  # type: ignore
+    async with user_repository.session_maker() as session:
+        mfa_recovery_codes = (await session.execute(select(UserMFARecoveryCode))).scalars().all()
+        assert len(mfa_recovery_codes) == 10
 
     # login now requires mfa
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
