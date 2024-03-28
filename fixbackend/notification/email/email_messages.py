@@ -21,10 +21,12 @@ from functools import lru_cache
 
 from fixbackend.ids import CloudAccountId, WorkspaceId
 
+TemplatesPath = Path(__file__).parent / "templates"
+
 
 @lru_cache(maxsize=1)
 def get_env() -> Environment:
-    return Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"), undefined=StrictUndefined)
+    return Environment(loader=FileSystemLoader(TemplatesPath), undefined=StrictUndefined)
 
 
 def render(template_name: str, **kwargs: Any) -> str:
