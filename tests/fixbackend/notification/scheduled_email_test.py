@@ -22,6 +22,7 @@
 from datetime import datetime, timedelta
 
 from fixcloudutils.util import utc
+from sqlalchemy import text
 
 from fixbackend.auth.models.orm import User
 from fixbackend.notification.email.scheduled_email import (
@@ -61,12 +62,13 @@ async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session
                 session.add(sent)
             # session.commit()
 
+        await session.execute(text("DELETE FROM scheduled_email"))
         session.add(ScheduledEmailEntity(id=uid(), kind="day1", after=timedelta(days=1).total_seconds()))
         session.add(ScheduledEmailEntity(id=uid(), kind="day2", after=timedelta(days=2).total_seconds()))
         session.add(ScheduledEmailEntity(id=uid(), kind="day3", after=timedelta(days=3).total_seconds()))
         session.add(ScheduledEmailEntity(id=uid(), kind="day4", after=timedelta(days=4).total_seconds()))
         session.add(ScheduledEmailEntity(id=uid(), kind="day5", after=timedelta(days=5).total_seconds()))
-        # await session.commit()
+        await session.commit()
 
         # user a signed up 100 days ago. He will receive 5 emails
         a = create_user("a", now - timedelta(days=100, hours=1))
