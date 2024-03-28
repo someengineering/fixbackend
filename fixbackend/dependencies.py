@@ -63,6 +63,7 @@ class ServiceNames:
     billing_entry_service = "billing_entry_services"
     role_repository = "role_repository"
     jwt_service = "jwt_service"
+    scheduled_email_sender = "scheduled_email_sender"
 
 
 class FixDependencies(Dependencies):
