@@ -54,7 +54,7 @@ def upgrade() -> None:
     )
     oneday = 24 * 3600
     op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D1', 'day1', {oneday})" )  # fmt: skip # noqa
-    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D1', 'day2', {2*oneday})" )  # fmt: skip # noqa
-    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D1', 'day3', {3*oneday})" )  # fmt: skip # noqa
-    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D1', 'day4', {4*oneday})" )  # fmt: skip # noqa
-    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D1', 'day5', {5*oneday})" )  # fmt: skip # noqa
+    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D2', 'day2', {2*oneday})" )  # fmt: skip # noqa
+    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D3', 'day3', {3*oneday})" )  # fmt: skip # noqa
+    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D4', 'day4', {4*oneday})" )  # fmt: skip # noqa
+    op.execute( f"INSERT INTO scheduled_email (id, kind, after) VALUES ('EC177BEF-E1F5-4660-8843-D8110DB8B4D5', 'day5', {5*oneday})" )  # fmt: skip # noqa
