@@ -24,7 +24,7 @@ from attrs import define
 from fixbackend.ids import WorkspaceId
 
 
-@define
+@define(hash=True, slots=True, frozen=True)
 class GraphDatabaseAccess:
     workspace_id: WorkspaceId
     server: str

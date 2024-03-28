@@ -68,6 +68,18 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def report_info(graph_db: CurrentGraphDbDependency) -> Json:
         return await inventory().report_info(graph_db)
 
+    @router.get("/report/benchmarks", tags=["report-management"])
+    async def list_benchmarks(
+        graph_db: CurrentGraphDbDependency,
+        benchmarks: Optional[List[str]] = None,
+        short: Optional[bool] = None,
+        with_checks: Optional[bool] = None,
+        ids_only: Optional[bool] = None,
+    ) -> List[Json]:
+        return await inventory().benchmarks(
+            graph_db, benchmarks=benchmarks, short=short, with_checks=with_checks, ids_only=ids_only
+        )
+
     @router.get("/report/benchmark/{benchmark_name}", tags=["report-management"])
     async def get_benchmark(benchmark_name: str, graph_db: CurrentGraphDbDependency) -> Json:
         return await inventory().client.call_json(graph_db, "get", f"/report/benchmark/{benchmark_name}")
@@ -82,6 +94,26 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             graph_db, "delete", f"/report/benchmark/{benchmark_name}", expect_result=False
         )
         return Response(status_code=204)
+
+    @router.get("/report/checks", tags=["report-management"])
+    async def list_checks(
+        graph_db: CurrentGraphDbDependency,
+        provider: Optional[str] = None,
+        service: Optional[str] = None,
+        category: Optional[str] = None,
+        kind: Optional[str] = None,
+        check_ids: Optional[List[str]] = None,
+        ids_only: Optional[bool] = None,
+    ) -> List[Json]:
+        return await inventory().checks(
+            graph_db,
+            provider=provider,
+            service=service,
+            category=category,
+            kind=kind,
+            check_ids=check_ids,
+            ids_only=ids_only,
+        )
 
     @router.get("/report/check/{check_id}", tags=["report-management"])
     async def get_check(check_id: str, graph_db: CurrentGraphDbDependency) -> Json:
