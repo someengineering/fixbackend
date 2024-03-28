@@ -307,7 +307,7 @@ class InventoryService(Service):
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
         ignored_checks = value_in_path(resource, ["metadata", "security_ignore"])
         if isinstance(ignored_checks, list):
-            check_ids.append(ignored_checks)
+            check_ids.extend(ignored_checks)
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
         checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
         return dict(resource=resource, checks=checks)
