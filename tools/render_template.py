@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os
+import sys
 import subprocess
 from pathlib import Path
 from time import sleep
@@ -19,7 +20,7 @@ from time import sleep
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_messages import TemplatesPath
 
-template = "day1.html"
+template = sys.argv[1]
 
 last_mod_time = None
 

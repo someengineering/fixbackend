@@ -1,1 +1,43 @@
-Day 1 text goes here
+Day 1: Effortless Search, Powerful Insights
+
+Imagine having the ability to pinpoint any resource in your cloud environment within seconds.
+With Fix, that's not just possible; it's your new reality.
+Our search functionality is designed to streamline your workflows, enhance security, and ensure you're always just a few keystrokes away from finding exactly what you need.
+
+This tutorial assumes that you connected at least one cloud account with Fix.
+If not already happened, please visit the setup cloud accounts page in fix and connect your accounts.
+
+Filter by Origin
+
+Log into your Fix account and navigate to the Inventory.
+Here, you find dropdowns for the most common filters.
+Filter resources by cloud, account, region or zone is straightforward.
+You can also narrow down the list of resources by a specific tag.
+
+Filter by Security Severity
+
+Fix analyzes all your resources against different security benchmarks and compliance frameworks.
+Fix marks all security vulnerabilities on the resource.
+The severity filter now allows you to filter for resources that have vulnerabilities of a specific severity.
+
+Filter by Kind
+
+The Kinds filter allows you to filter resources of a specific service, e.g.
+Lambda Functions or IAM roles.
+This is the goto filter if you want to narrow down specific resources by specific property filters.
+
+Filter by Property
+
+Every resource kind has its own set of properties.
+Fix allows you to filter resources by any property.
+Press the + button.
+Based on the selected kind of resource, you now see all possible properties.
+
+Once the property is selected, you can define the operation and filter value.
+The value dropdown shows all possible values that exist for the selected property in the current search configuration.
+
+We're Here to Help If any steps feel unclear, or if you encounter any bumps along the road, our team is standing by.
+Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
+
+Happy searching,
+The Fix Team
