@@ -305,10 +305,12 @@ class InventoryService(Service):
     async def resource(self, db: GraphDatabaseAccess, resource_id: NodeId) -> Json:
         resource = await self.client.resource(db, id=resource_id)
         check_ids = [sc["check"] for sc in (value_in_path(resource, ["security", "issues"]) or [])]
+        ignored_checks = value_in_path(resource, ["metadata", "security_ignore"])
+        if isinstance(ignored_checks, list):
+            check_ids.extend(ignored_checks)
         checks = await self.client.checks(db, check_ids=check_ids) if check_ids else []
         checks = sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
-        # TODO: remove neighborhood from the result, once handled in the frontend
-        return dict(resource=resource, failing_checks=checks, neighborhood=[])
+        return dict(resource=resource, checks=checks)
 
     def neighborhood(
         self, db: GraphDatabaseAccess, resource_id: NodeId
