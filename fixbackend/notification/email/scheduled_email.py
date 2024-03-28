@@ -11,6 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import logging
 from datetime import datetime, timedelta
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -28,6 +29,8 @@ from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
+
+log = logging.getLogger(__name__)
 
 
 class ScheduledEmailEntity(Base):
@@ -85,9 +88,10 @@ class ScheduledEmailSender(Service):
             user: User
             to_send: ScheduledEmailEntity
             for user, to_send in result.unique().all():
-                subject = email_messages.render(f"{to_send.kind}.subject")
+                subject = email_messages.render(f"{to_send.kind}.subject").strip()
                 txt = email_messages.render(f"{to_send.kind}.txt")
                 html = email_messages.render(f"{to_send.kind}.html")
+                log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
                 await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
                 # mark this kind of email as sent
                 session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=to_send.kind, at=utc()))
