@@ -572,7 +572,7 @@ class InventoryService(Service):
         except InventoryException as ex:
             # in case no account is collected yet -> no graph, this is expected.
             if not isinstance(ex, NoSuchGraph):
-                log.warning(f"Inventory not available yet: {ex}. Returning empty summary.")
+                log.info(f"Inventory not available yet: {ex}. Returning empty summary.")
             empty = CheckSummary(
                 available_checks=0,
                 failed_checks=0,
