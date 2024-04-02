@@ -25,6 +25,8 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
+
+from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
 
@@ -44,6 +46,9 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
     Event,
     TenantAccountsCollected,
+    ProductTierChanged,
+    AwsMarketplaceSubscriptionCancelled,
+    AwsAccountDeleted,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound
@@ -59,6 +64,7 @@ from fixbackend.ids import (
     TaskId,
     UserCloudAccountName,
     WorkspaceId,
+    SubscriptionId,
 )
 from fixbackend.notification.email.email_messages import EmailMessage
 from fixbackend.notification.notification_service import NotificationService
@@ -931,12 +937,20 @@ async def test_handle_cf_sqs_message(
             base["PhysicalResourceId"] = physical_resource_id
         return {"Body": json.dumps(base)}
 
-    # Handle Create Message
     request_handler_mock.append(handle_request)
+
+    # Handle Create Message
     assert await cloud_account_repository.count_by_workspace_id(workspace.id) == 0
     account = await service.process_cf_stack_event(notification("Create"))
     assert account is not None
 
+    assert await cloud_account_repository.count_by_workspace_id(workspace.id) == 1
+    repo_account = await cloud_account_repository.get(account.id)
+    assert repo_account == account
+
+    # Handle Update Message
+    account = await service.process_cf_stack_event(notification("Update"))
+    assert account is not None
     assert await cloud_account_repository.count_by_workspace_id(workspace.id) == 1
     repo_account = await cloud_account_repository.get(account.id)
     assert repo_account == account
@@ -1000,3 +1014,55 @@ async def test_move_to_degraded(
     assert published_event.tenant_id == account.workspace_id
     assert published_event.error == "Too many consecutive failed scans"
     assert published_event.aws_account_name == account.final_name()
+
+
+@pytest.mark.asyncio
+async def test_handle_events(
+    service: CloudAccountServiceImpl, workspace: Workspace, user: User, workspace_repository: WorkspaceRepository
+) -> None:
+    subscription_id = SubscriptionId(uid())
+    await workspace_repository.update_subscription(workspace.id, subscription_id)
+
+    for event in [
+        AwsAccountDiscovered(
+            cloud_account_id=FixCloudAccountId(uuid.uuid4()),
+            aws_account_id=CloudAccountId("foobar"),
+            tenant_id=workspace.id,
+        ),
+        AwsAccountConfigured(
+            cloud_account_id=FixCloudAccountId(uuid.uuid4()),
+            aws_account_id=CloudAccountId("foobar"),
+            tenant_id=workspace.id,
+        ),
+        AwsAccountDegraded(
+            cloud_account_id=FixCloudAccountId(uuid.uuid4()),
+            aws_account_id=CloudAccountId("foobar"),
+            tenant_id=workspace.id,
+            aws_account_name="test",
+            error="test",
+        ),
+        AwsAccountDeleted(
+            cloud_account_id=FixCloudAccountId(uuid.uuid4()),
+            aws_account_id=CloudAccountId("foobar"),
+            tenant_id=workspace.id,
+            user_id=user.id,
+        ),
+        ProductTierChanged(
+            workspace_id=workspace.id,
+            user_id=user.id,
+            product_tier=ProductTier.Business,
+            is_paid_tier=True,
+            is_higher_tier=True,
+            previous_tier=ProductTier.Plus,
+        ),
+        ProductTierChanged(
+            workspace_id=workspace.id,
+            user_id=user.id,
+            product_tier=ProductTier.Free,
+            is_paid_tier=False,
+            is_higher_tier=False,
+            previous_tier=ProductTier.Business,
+        ),
+        AwsMarketplaceSubscriptionCancelled(subscription_id=subscription_id),
+    ]:
+        await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
