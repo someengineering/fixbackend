@@ -466,7 +466,7 @@
                 <table class="email-content" width="100%" cellpadding="0" cellspacing="0" role="presentation"
                     style="width: 100%; -premailer-width: 100%; -premailer-cellpadding: 0; -premailer-cellspacing: 0; margin: 0; padding: 0;">
                     <tr>
-                        <td class="email-masthead"
+                        <td class="email-masthead_logo"
                             style="word-break: break-word; font-family: Nunito Sans, Helvetica, Arial, sans-serif; font-size: 16px; text-align: center; padding: 25px 0;"
                             align="center">
                             <a href="https://fix.security" class="f-fallback email-masthead_name"
@@ -477,6 +477,13 @@
                             </a>
                         </td>
                     </tr>
+                    {% if user_id is defined %}
+                    <tr>
+                      <td class="email-masthead" align="center">
+                          <img src="https://app.fix.security/api/analytics/email_opened/pixel?user={{ user_id }}&email={{ template_name }}" alt="" width="1" height="1"/>
+                      </td>
+                    </tr>
+                    {% endif %}
                     <!-- Email Body -->
                     <tr>
                         <td class="email-body" width="570" cellpadding="0" cellspacing="0"

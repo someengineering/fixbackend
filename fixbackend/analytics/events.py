@@ -156,3 +156,9 @@ class AEBillingEntryCreated(AnalyticsEvent):
     workspace_id: WorkspaceId
     product_tier: str
     usage: int
+
+
+@frozen
+class AEEmailOpened(AnalyticsEvent):
+    kind: ClassVar[str] = "fix_email_opened"
+    email: str

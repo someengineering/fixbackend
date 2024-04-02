@@ -31,7 +31,7 @@ def get_env() -> Environment:
 
 def render(template_name: str, **kwargs: Any) -> str:
     template = get_env().get_template(template_name)
-    result = template.render(**kwargs)
+    result = template.render({"template_name": template_name, **kwargs})
     return result
 
 
