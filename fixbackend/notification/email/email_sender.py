@@ -75,7 +75,9 @@ class Boto3EmailSender(EmailSender):
             params = dict(
                 token=await self.jwt_service.encode({"sub": to, "kind": kind}, audience=[EMAIL_UNSUBSCRIBE_AUDIENCE]),
             )
-            additional_headers["List-Unsubscribe"] = f"<{self.config.service_base_url}/unsubscribe?{urlencode(params)}>"
+            additional_headers["List-Unsubscribe"] = (
+                f"<{self.config.service_base_url}/api/unsubscribe?{urlencode(params)}>"
+            )
             additional_headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
 
         def send_email() -> None:

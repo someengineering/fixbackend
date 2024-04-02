@@ -107,8 +107,10 @@ class UserNotificationSettingsRepositoryImpl(UserNotificationSettingsRepository)
         async with self.session_maker() as session:
             if isinstance(user_id_or_email, str):
                 maybe_user = (
-                    await session.execute(select(User).where(User.email == user_id_or_email))  # type: ignore
-                ).scalar_one_or_none()
+                    (await session.execute(select(User).where(User.email == user_id_or_email)))  # type: ignore
+                    .unique()
+                    .scalar_one_or_none()
+                )
                 if maybe_user is None:
                     raise ValueError("User not found")
                 user_id = maybe_user.id
