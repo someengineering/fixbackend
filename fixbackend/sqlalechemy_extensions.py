@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime, timezone
-from typing import Optional, Any, Type
+from typing import Optional, Any, Type, Dict
 
 import cattrs
 import sqlalchemy as sa
@@ -20,7 +20,7 @@ from fixcloudutils.asyncio.timed import perf_now
 from fixcloudutils.types import JsonElement
 from prometheus_client import Histogram, Gauge
 from pydantic import BaseModel
-from sqlalchemy import Connection, event
+from sqlalchemy import Connection, event, ClauseElement
 from sqlalchemy.ext.asyncio import AsyncEngine
 from fastapi_users_db_sqlalchemy import GUID as FastApiUsersGUID  # type: ignore
 
@@ -93,12 +93,25 @@ class EngineMetrics:
     DbConnections = Gauge("db_connections", "Number of active DB connections")
 
     @classmethod
-    def before_execute(cls, connection: Connection, clause: Any, multiparams: Any, params: Any) -> None:  # noqa
+    def before_execute(
+        cls,
+        connection: Connection,
+        clauseelement: ClauseElement,
+        multiparams: Any,
+        params: Any,
+        execution_options: Dict[Any, Any],
+    ) -> None:
         connection.info.setdefault(cls.query_start_time, []).append(perf_now())
 
     @classmethod
     def after_execute(
-        cls, connection: Connection, clause: Any, multiparams: Any, params: Any, result: Any  # noqa
+        cls,
+        connection: Connection,
+        clauseelement: ClauseElement,
+        multiparams: Any,
+        params: Any,
+        execution_options: Dict[Any, Any],
+        result: Any,
     ) -> None:
         start_time = connection.info[cls.query_start_time].pop()
         cls.DbStatementDuration.observe(perf_now() - start_time)
