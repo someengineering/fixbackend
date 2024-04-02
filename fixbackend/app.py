@@ -96,6 +96,7 @@ from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.permissions.router import roles_router
 from fixbackend.sqlalechemy_extensions import EngineMetrics
@@ -275,7 +276,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 analytics_event_sender=analytics_event_sender,
             ),
         )
-
+        deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl(session_maker))
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:

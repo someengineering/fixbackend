@@ -15,10 +15,9 @@
 
 from fastapi.routing import APIRouter
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
-from fixbackend.auth.schemas import UserNotificationSettingsRead, UserRead, UserUpdate
+from fixbackend.auth.schemas import UserNotificationSettingsRead, UserRead, UserUpdate, UserNotificationSettingsWrite
 
-
-from fixbackend.notification.user_notification_repo import UserNotificationSettingsReporitoryDependency
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryDependency
 
 
 def users_router() -> APIRouter:
@@ -29,7 +28,7 @@ def users_router() -> APIRouter:
     @router.get("/me/settings/notifications")
     async def get_user_notification_settings(
         user: AuthenticatedUser,
-        user_notification_repo: UserNotificationSettingsReporitoryDependency,
+        user_notification_repo: UserNotificationSettingsRepositoryDependency,
     ) -> UserNotificationSettingsRead:
         settings = await user_notification_repo.get_notification_settings(user.id)
         return UserNotificationSettingsRead.from_model(settings)
@@ -37,12 +36,10 @@ def users_router() -> APIRouter:
     @router.put("/me/settings/notifications")
     async def update_user_notification_settings(
         user: AuthenticatedUser,
-        notification_settings: UserNotificationSettingsRead,
-        user_notification_repo: UserNotificationSettingsReporitoryDependency,
+        notification_settings: UserNotificationSettingsWrite,
+        user_notification_repo: UserNotificationSettingsRepositoryDependency,
     ) -> UserNotificationSettingsRead:
-        updated = await user_notification_repo.update_notification_settings(
-            user.id, notification_settings.to_model(user.id)
-        )
+        updated = await user_notification_repo.update_notification_settings(user.id, **notification_settings.dict())
         return UserNotificationSettingsRead.from_model(updated)
 
     return router

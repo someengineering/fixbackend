@@ -698,6 +698,9 @@ async def fix_deps(
             ServiceNames.notification_service: notification_service,
             ServiceNames.domain_event_sender: domain_event_sender,
             ServiceNames.invitation_repository: invitation_repository,
+            ServiceNames.user_notification_settings_repository: UserNotificationSettingsRepositoryImpl(
+                async_session_maker
+            ),
         }
     )
 
@@ -743,7 +746,9 @@ class InMemoryEmailSender(EmailSender):
     def __init__(self) -> None:
         self.call_args: List[NotificationEmail] = []
 
-    async def send_email(self, *, to: str, subject: str, text: str, html: str | None) -> None:
+    async def send_email(
+        self, *, to: str, subject: str, text: str, html: str | None, unsubscribe: Optional[str] = None
+    ) -> None:
         self.call_args.append(NotificationEmail(to, subject, text, html))
 
 

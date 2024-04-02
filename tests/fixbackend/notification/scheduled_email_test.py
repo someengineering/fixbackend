@@ -25,11 +25,13 @@ from fixcloudutils.util import utc
 from sqlalchemy import text
 
 from fixbackend.auth.models.orm import User
+from fixbackend.ids import UserId
 from fixbackend.notification.email.scheduled_email import (
     ScheduledEmailSender,
     ScheduledEmailEntity,
     ScheduledEmailSentEntity,
 )
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from tests.fixbackend.conftest import InMemoryEmailSender
@@ -37,6 +39,7 @@ from tests.fixbackend.conftest import InMemoryEmailSender
 
 async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session_maker: AsyncSessionMaker) -> None:
     sender = ScheduledEmailSender(email_sender, async_session_maker)
+    pref = UserNotificationSettingsRepositoryImpl(async_session_maker)
     now = utc()
 
     async with async_session_maker() as session:
@@ -62,6 +65,7 @@ async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session
                 session.add(sent)
             # session.commit()
 
+        # noinspection SqlWithoutWhere
         await session.execute(text("DELETE FROM scheduled_email"))
         session.add(ScheduledEmailEntity(id=uid(), kind="day1", after=timedelta(days=1).total_seconds()))
         session.add(ScheduledEmailEntity(id=uid(), kind="day2", after=timedelta(days=2).total_seconds()))
@@ -93,8 +97,13 @@ async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session
 
         # user d signed up 4 days ago and already received 2 emails. He will receive 2 emails
         d = create_user("d", now - timedelta(days=4, hours=1))
-        email_send(d, "day1")
-        email_send(d, "day2")
+        email_send(d, "day1", "day2")
         await sender._send_emails()
         assert len(email_sender.call_args) == 2
         email_sender.call_args.clear()
+
+        # user e signed up 5 days ago and opted out of emails. He will receive 0 emails
+        e = create_user("e", now - timedelta(days=5, hours=1))
+        await pref.update_notification_settings(UserId(e.id), tutorial=False)
+        await sender._send_emails()
+        assert len(email_sender.call_args) == 0

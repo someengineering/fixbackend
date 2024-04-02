@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from datetime import timedelta
+from textwrap import dedent
 from typing import Annotated, Dict, Optional, List
 from urllib.parse import urlencode
 
@@ -25,13 +26,16 @@ from starlette.responses import RedirectResponse, JSONResponse
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.errors import NotAllowed
-from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider
+from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email
 from fixbackend.logging_context import set_workspace_id, set_context
+from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.notification.user_notification_repo import (
+    UserNotificationSettingsRepositoryImpl,
+)
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
-from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 
 log = logging.getLogger(__name__)
 AddSlack = "notification_add_slack"
@@ -366,21 +370,26 @@ def unsubscribe_router(fix: FixDependencies) -> APIRouter:
         if not email:
             log.info("no email in token")
             raise NotAllowed("Invalid token")
+        kind = decoded.get("kind")
+        if not kind:
+            log.info("no kind in token")
+            raise NotAllowed("Invalid token")
+        pref_service = fix.service(
+            ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl
+        )
+        await pref_service.update_notification_settings(Email(email), **{kind: False})
+        content = dedent(
+            f"""
+            <!DOCTYPE html>
+            <html>
+            <body>
 
-        # todo: implement this sometime
-        log.info(f"Unsubscribing {email} from all notifications")
+            <h1>You've successfully unsubscribed from {kind} emails</h1>
 
-        content = """
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>You've successfully unsubscribed from all notifications</h1>
-
-</body>
-</html>
-"""
-
+            </body>
+            </html>
+            """
+        )
         response = Response(content=content, media_type="text/html", status_code=status.HTTP_200_OK)
         return response
 

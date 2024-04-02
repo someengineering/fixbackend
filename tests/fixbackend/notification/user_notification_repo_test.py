@@ -15,12 +15,11 @@
 
 import pytest
 
+from fixbackend.auth.models import User
 from fixbackend.notification.user_notification_repo import (
-    UserNotificationSettings,
     UserNotificationSettingsRepositoryImpl,
 )
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.auth.models import User
 
 
 @pytest.mark.asyncio
@@ -32,17 +31,19 @@ async def test_user_notification_settings_repo(async_session_maker: AsyncSession
     settings = await repo.get_notification_settings(user.id)
     assert settings.user_id == user.id
     assert settings.weekly_report is True
-    assert settings.inactivity_reminder is False
+    assert settings.inactivity_reminder is True
 
     # update settings
     updated = await repo.update_notification_settings(
-        user.id, UserNotificationSettings(user_id=user.id, weekly_report=False, inactivity_reminder=True)
+        user.id, weekly_report=False, inactivity_reminder=True, tutorial=False
     )
     assert updated.weekly_report is False
     assert updated.inactivity_reminder is True
+    assert updated.tutorial is False
 
     # get updated settings
     settings = await repo.get_notification_settings(user.id)
     assert settings.user_id == user.id
     assert settings.weekly_report is False
     assert settings.inactivity_reminder is True
+    assert settings.tutorial is False

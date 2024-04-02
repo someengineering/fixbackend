@@ -75,14 +75,16 @@ class OAuth2PasswordMFARequestForm(OAuth2PasswordRequestForm):
 
 
 class UserNotificationSettingsRead(BaseModel):
-    weekly_report: bool = Field(description="Whether to send a weekly report")
-    inactivity_reminder: bool = Field(description="Whether to send a reminder for open incidents")
+    weekly_report: bool = Field(description="Whether to receive a weekly report")
+    inactivity_reminder: bool = Field(description="Whether to receive a reminder for open incidents")
+    tutorial: bool = Field(description="Whether to receive tutorial emails")
 
     @staticmethod
     def from_model(model: UserNotificationSettings) -> "UserNotificationSettingsRead":
         return UserNotificationSettingsRead(
             weekly_report=model.weekly_report,
             inactivity_reminder=model.inactivity_reminder,
+            tutorial=model.tutorial,
         )
 
     def to_model(self, user_id: UserId) -> UserNotificationSettings:
@@ -90,7 +92,16 @@ class UserNotificationSettingsRead(BaseModel):
             user_id=user_id,
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
+            tutorial=self.tutorial,
         )
+
+
+class UserNotificationSettingsWrite(BaseModel):
+    weekly_report: Optional[bool] = Field(default=None, description="Whether to receive a weekly report")
+    inactivity_reminder: Optional[bool] = Field(
+        default=None, description="Whether to receive a reminder for open incidents"
+    )
+    tutorial: Optional[bool] = Field(default=None, description="Whether to receive tutorial emails")
 
 
 class OTPConfig(BaseModel):
