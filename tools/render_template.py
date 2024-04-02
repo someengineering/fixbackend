@@ -21,7 +21,7 @@ from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_messages import TemplatesPath
 
 template = sys.argv[1]
-
+additional_context = dict(user_id="test")
 last_mod_time = None
 
 
@@ -40,7 +40,7 @@ rendered_path = Path(f"~/{template}").expanduser().absolute()
 while True:
     if file_has_changed(path):
         with open(rendered_path, "w+") as f:
-            f.write(email_messages.render(template))
+            f.write(email_messages.render(template, **additional_context))
         subprocess.run(["open", "-g", rendered_path])
-        print(f"file {template} changed. rerenderd.") 
+        print(f"file {template} changed. rerenderd.")
     sleep(0.1)

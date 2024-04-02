@@ -99,7 +99,7 @@ class ScheduledEmailSender(Service):
             for user, to_send in result.unique().all():
                 subject = email_messages.render(f"{to_send.kind}.subject").strip()
                 txt = email_messages.render(f"{to_send.kind}.txt")
-                html = email_messages.render(f"{to_send.kind}.html")
+                html = email_messages.render(f"{to_send.kind}.html", user_id=user.id)
                 log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
                 await self.email_sender.send_email(
                     to=user.email, subject=subject, text=txt, html=html, unsubscribe="tutorial"

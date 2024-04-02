@@ -55,6 +55,7 @@ from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
 from fixbackend.analytics.domain_event_to_analytics import analytics
+from fixbackend.analytics.router import analytics_router
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
@@ -639,6 +640,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
         api_router.include_router(unsubscribe_router(deps), include_in_schema=False)
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
+        api_router.include_router(analytics_router(deps))
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
