@@ -21,8 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
-import jwt
 
+import jwt
 import pytest
 from alembic.command import upgrade as alembic_upgrade, check as alembic_check
 from alembic.config import Config as AlembicConfig
@@ -39,11 +39,11 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from fixbackend.analytics import AnalyticsEventSender
-from fixbackend.analytics.analytics_event_sender import NoAnalyticsEventSender
+from fixbackend.analytics import AnalyticsEventSender, AnalyticsEvent
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
+from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
@@ -56,9 +56,10 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId
+from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId, UserId
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.jwt import JwtService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
@@ -74,8 +75,6 @@ from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
-from fixbackend.jwt import JwtService
-from fixbackend.certificates.cert_store import CertificateStore
 
 DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 # only used to create/drop the database
@@ -509,9 +508,20 @@ async def http_client(request_handler_mock: RequestHandlerMock, inventory_reques
     return AsyncClient(transport=MockTransport(app))
 
 
+class InMemoryAnalyticsEventSender(AnalyticsEventSender):
+    def __init__(self) -> None:
+        self.events: List[AnalyticsEvent] = []
+
+    async def send(self, event: AnalyticsEvent) -> None:
+        self.events.append(event)
+
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        return UserId(uid())
+
+
 @pytest.fixture
-def analytics_event_sender() -> AnalyticsEventSender:
-    return NoAnalyticsEventSender()
+def analytics_event_sender() -> InMemoryAnalyticsEventSender:
+    return InMemoryAnalyticsEventSender()
 
 
 @pytest.fixture
@@ -686,6 +696,7 @@ async def fix_deps(
     notification_service: NotificationService,
     domain_event_sender: DomainEventPublisher,
     invitation_repository: InvitationRepository,
+    analytics_event_sender: AnalyticsEventSender,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -701,6 +712,7 @@ async def fix_deps(
             ServiceNames.user_notification_settings_repository: UserNotificationSettingsRepositoryImpl(
                 async_session_maker
             ),
+            ServiceNames.analytics_event_sender: analytics_event_sender,
         }
     )
 
