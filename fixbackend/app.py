@@ -576,7 +576,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health() -> Response:
         try:
-            pong = await deps.readonly_redis.ping()
+            pong = await deps.readwrite_redis.ping()
             if not pong:
                 log.error("Redis did not respond to ping")
                 return Response(status_code=500)
