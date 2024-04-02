@@ -39,7 +39,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from fixbackend.analytics import AnalyticsEventSender, AnalyticsEvent
+from fixbackend.analytics import AnalyticsEventSender
+from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
