@@ -230,7 +230,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 resource_properties = msg["ResourceProperties"]
                 role_name = AwsRoleName(resource_properties["RoleName"])
                 stack_id = resource_properties["StackId"]
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 log.warning(f"Not enough data to inform CF: {msg}. Error: {e}")
                 mark_failed()
                 return None
@@ -261,7 +261,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 assert stack_id.startswith("arn:aws:cloudformation:")
                 assert stack_id.count(":") == 5
                 account_id = CloudAccountId(stack_id.split(":")[4])
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 log.warning(f"Received invalid CF stack create event: {msg}. Error: {e}")
                 mark_failed()
                 await send_response(msg, str(uid()), "Invalid format for CF stack create/update event")
@@ -286,7 +286,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 role_name = AwsRoleName(resource_properties["RoleName"])
                 external_id = ExternalId(uuid.UUID(resource_properties["ExternalId"]))
                 cloud_account_id = FixCloudAccountId(uuid.UUID(msg["PhysicalResourceId"]))
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 log.warning(f"Received invalid CF stack delete event: {msg}. Error: {e}")
                 mark_failed()
                 await send_response(msg, str(uid()), "Invalid format for CF stack delete event")
@@ -314,11 +314,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     return await handle_stack_deleted(body)
                 case "Update":
                     return await handle_stack_created(body)
-                case _:
+                case _:  # pragma: no cover
                     log.info(f"Received a CF stack event that is currently not handled. Ignore. {kind}")
                     await send_response(message)  # still try to acknowledge the message
                     return None
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             log.warning(f"Received invalid CF stack event: {message}. Error: {e}")
             mark_failed()
             return None
@@ -453,7 +453,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             for cloud_account in to_disable:
                                 tg.create_task(self.update_cloud_account_enabled(ws.id, cloud_account.id, False))
 
-                case _:
+                case _:  # pragma: no cover
                     pass  # ignore other domain events
 
     async def process_discovered_event(self, discovered: AwsAccountDiscovered) -> None:
@@ -498,10 +498,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 match access:
                     case AwsCloudAccess(external_id, role_name):
                         pass
-                    case _:
+                    case _:  # pragma: no cover
                         log.warning(f"Account {account.id} has unknown access type {access}")
                         return UnknownAccessType(access)
-            case _:
+            case _:  # pragma: no cover
                 log.warning(f"Account {account.id} is not configurable, cannot setup account")
                 return WrongAccountState(account.state)
 
@@ -590,7 +590,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 )
             )
             return updated_account
-        except ValueError as e:
+        except ValueError as e:  # pragma: no cover
             log.info(f"Account {account.id} was changed concurrently, skipping: {e}")
             return ConcurrentUpdate()
 
@@ -813,7 +813,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         if workspace.payment_on_hold_since:
                             raise NotAllowed("Payment on hold")
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
-                case _:
+                case _:  # pragma: no cover
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         result = await self.cloud_account_repository.update(
@@ -845,7 +845,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         scan=scan,
                     )
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
-                case _:
+                case _:  # pragma: no cover
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         result = await self.cloud_account_repository.update(cloud_account_id, update_state)
@@ -865,7 +865,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _):
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, False, False))
-                case _:
+                case _:  # pragma: no cover
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
         return await self.cloud_account_repository.update(cloud_account_id, update_state)

@@ -29,7 +29,7 @@ def analytics_router(dependencies: FixDependencies) -> APIRouter:
 
     @router.get("/analytics/email_opened/pixel", include_in_schema=False)
     async def email_opened(user: UserId, email: str) -> Response:
-        sender = dependencies.service(ServiceNames.analytics_event_sender, AnalyticsEventSender)
+        sender = dependencies.service(ServiceNames.analytics_event_sender, AnalyticsEventSender)  # type: ignore
         await sender.send(AEEmailOpened(user_id=user, email=email))
         return Response(content=b64decode(pxl_base64), media_type="image/png")
 

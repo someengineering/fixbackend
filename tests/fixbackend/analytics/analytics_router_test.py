@@ -20,11 +20,11 @@ from fixbackend.utils import uid
 from tests.fixbackend.conftest import InMemoryAnalyticsEventSender
 
 
-def test_analytics_router(fix_deps: FixDependencies, analytics_event_sender: InMemoryAnalyticsEventSender):
+def test_analytics_router(fix_deps: FixDependencies, analytics_event_sender: InMemoryAnalyticsEventSender) -> None:
     client = TestClient(analytics_router(fix_deps))
     user_id = uid()
-    client.get("/analytics/email_opened/pixel", params={"user": user_id, "email": "foo"})
-    client.get("/analytics/email_opened/pixel", params={"user": user_id, "email": "blah"})
+    client.get("/analytics/email_opened/pixel", params={"user": str(user_id), "email": "foo"})
+    client.get("/analytics/email_opened/pixel", params={"user": str(user_id), "email": "blah"})
     assert len(analytics_event_sender.events) == 2
     for event in analytics_event_sender.events:
         assert isinstance(event, AEEmailOpened)
