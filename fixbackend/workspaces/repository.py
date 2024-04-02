@@ -128,7 +128,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
-            organization = orm.Organization(id=workspace_id, name=name, slug=slug, tier=ProductTier.Free.value)
+            organization = orm.Organization(id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value)
             owner_relationship = orm.OrganizationOwners(user_id=owner.id)
             organization.owners.append(owner_relationship)
             session.add(organization)
@@ -139,6 +139,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
             await session.commit()
             await session.refresh(organization)
+            log.info(f"Created workspace {workspace_id}, owner {owner.id}")
             statement = (
                 select(orm.Organization)
                 .where(orm.Organization.id == organization.id)

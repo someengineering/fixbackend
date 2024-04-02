@@ -69,7 +69,7 @@ async def test_list_payment_methods(
 ) -> None:
 
     # we're on the free tier and have no subscription attached:
-    assert workspace.product_tier == ProductTier.Free
+    assert workspace.product_tier == ProductTier.Trial
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
         case PaymentMethods.NoPaymentMethod():
@@ -87,7 +87,7 @@ async def test_list_payment_methods(
     await workspace_repository.update_subscription(workspace.id, subscription.id)
 
     # on paid tier we can't get the no payment method
-    assert workspace.product_tier == ProductTier.Free
+    assert workspace.product_tier == ProductTier.Trial
     workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
     available_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     match available_methods.current:
@@ -108,7 +108,7 @@ async def test_update_billing(
     user: User,
 ) -> None:
     # we're on the free tier:
-    assert workspace.product_tier == ProductTier.Free
+    assert workspace.product_tier == ProductTier.Trial
     # update to higher tier is possible if there is a payment method
     await workspace_repository.update_subscription(workspace.id, subscription.id)
     workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
