@@ -59,6 +59,7 @@ class ServiceNames:
     invitation_repository = "invitation_repository"
     analytics_event_sender = "analytics_event_sender"
     notification_service = "notification_service"
+    user_notification_settings_repository = "user_notification_settings_repository"
     email_on_signup_consumer = "email_on_signup_consumer"
     billing_entry_service = "billing_entry_services"
     role_repository = "role_repository"
