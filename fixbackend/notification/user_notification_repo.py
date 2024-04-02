@@ -12,25 +12,21 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>
 
-from abc import ABC, abstractmethod
-from typing import Annotated, override
-
-from fastapi import Depends
-from fixbackend.db import AsyncSessionMakerDependency
-
-from fixbackend.ids import UserId
-from fixbackend.types import AsyncSessionMaker
-
 import uuid
-
-
-from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import Boolean
-from sqlalchemy.orm import Mapped, mapped_column
-
-from fixbackend.base_model import Base
+from abc import ABC, abstractmethod
+from typing import Annotated, override, Optional
 
 from attr import frozen
+from fastapi import Depends
+from fastapi_users_db_sqlalchemy.generics import GUID
+from sqlalchemy import Boolean, select
+from sqlalchemy.orm import Mapped, mapped_column
+
+from fixbackend.auth.models.orm import User
+from fixbackend.base_model import Base, CreatedUpdatedMixin
+from fixbackend.dependencies import FixDependency, ServiceNames
+from fixbackend.ids import UserId, Email
+from fixbackend.types import AsyncSessionMaker
 
 
 @frozen
@@ -38,20 +34,23 @@ class UserNotificationSettings:
     user_id: UserId
     weekly_report: bool
     inactivity_reminder: bool
+    tutorial: bool
 
 
-class UserNotificationSettingsEntity(Base):
+class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
     __tablename__ = "user_notification_settings"
 
     user_id: Mapped[UserId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     weekly_report: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    inactivity_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    inactivity_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    tutorial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def to_model(self) -> UserNotificationSettings:
         return UserNotificationSettings(
             user_id=self.user_id,
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
+            tutorial=self.tutorial,
         )
 
     @staticmethod
@@ -60,6 +59,7 @@ class UserNotificationSettingsEntity(Base):
             user_id=settings.user_id,
             weekly_report=settings.weekly_report,
             inactivity_reminder=settings.inactivity_reminder,
+            tutorial=settings.tutorial,
         )
 
 
@@ -70,7 +70,12 @@ class UserNotificationSettingsRepository(ABC):
 
     @abstractmethod
     async def update_notification_settings(
-        self, user_id: UserId, settings: UserNotificationSettings
+        self,
+        user_id_or_email: UserId | Email,
+        *,
+        weekly_report: Optional[bool] = None,
+        inactivity_reminder: Optional[bool] = None,
+        tutorial: Optional[bool] = None,
     ) -> UserNotificationSettings:
         pass
 
@@ -87,34 +92,53 @@ class UserNotificationSettingsRepositoryImpl(UserNotificationSettingsRepository)
                 return result.to_model()
             else:
                 return UserNotificationSettings(
-                    user_id=user_id,
-                    weekly_report=True,
-                    inactivity_reminder=False,
+                    user_id=user_id, weekly_report=True, inactivity_reminder=True, tutorial=True
                 )
 
     @override
     async def update_notification_settings(
-        self, user_id: UserId, settings: UserNotificationSettings
+        self,
+        user_id_or_email: UserId | Email,
+        *,
+        weekly_report: Optional[bool] = None,
+        inactivity_reminder: Optional[bool] = None,
+        tutorial: Optional[bool] = None,
     ) -> UserNotificationSettings:
         async with self.session_maker() as session:
-            existing = await session.get(UserNotificationSettingsEntity, user_id)
-            if existing:
-                existing.weekly_report = settings.weekly_report
-                existing.inactivity_reminder = settings.inactivity_reminder
+            if isinstance(user_id_or_email, str):
+                maybe_user = (
+                    await session.execute(select(User).where(User.email == user_id_or_email))  # type: ignore
+                ).scalar_one_or_none()
+                if maybe_user is None:
+                    raise ValueError("User not found")
+                user_id = maybe_user.id
             else:
-                new = UserNotificationSettingsEntity.from_model(settings)
-                session.add(new)
-
+                user_id = user_id_or_email
+            value = await session.get(UserNotificationSettingsEntity, user_id)
+            if value is None:
+                value = UserNotificationSettingsEntity(
+                    user_id=user_id, weekly_report=True, inactivity_reminder=True, tutorial=True
+                )
+                session.add(value)
+            if weekly_report is not None:
+                value.weekly_report = weekly_report
+            if inactivity_reminder is not None:
+                value.inactivity_reminder = inactivity_reminder
+            if tutorial is not None:
+                value.tutorial = tutorial
+            settings = value.to_model()
             await session.commit()
             return settings
 
 
 def get_user_notification_settings_repo(
-    session_maker: AsyncSessionMakerDependency,
+    fix_dependency: FixDependency,
 ) -> UserNotificationSettingsRepository:
-    return UserNotificationSettingsRepositoryImpl(session_maker)
+    return fix_dependency.service(
+        ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl
+    )
 
 
-UserNotificationSettingsReporitoryDependency = Annotated[
+UserNotificationSettingsRepositoryDependency = Annotated[
     UserNotificationSettingsRepository, Depends(get_user_notification_settings_repo)
 ]

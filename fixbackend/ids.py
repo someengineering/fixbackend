@@ -21,6 +21,7 @@ UserCloudAccountName = NewType("UserCloudAccountName", str)
 TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
+Email = NewType("Email", str)
 
 
 class NotificationProvider(StrEnum):
