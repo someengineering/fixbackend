@@ -53,7 +53,7 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
     for owner in organization.owners:
         assert owner == user.id
 
-    assert organization.product_tier == ProductTier.Free
+    assert organization.product_tier == ProductTier.Trial
 
     assert len(organization.members) == 0
 
@@ -169,7 +169,7 @@ async def test_update_product_tier(
     await workspace_repository.update_subscription(workspace.id, subscription.id)
 
     current_tier = workspace.product_tier
-    assert current_tier == ProductTier.Free
+    assert current_tier == ProductTier.Trial
 
     updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Enterprise)
     assert updated.product_tier == ProductTier.Enterprise

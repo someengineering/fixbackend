@@ -56,7 +56,7 @@ class BillingEntryService:
         current: PaymentMethod = PaymentMethods.NoPaymentMethod()
 
         payment_methods: List[PaymentMethod] = []
-        if workspace.product_tier == ProductTier.Free:
+        if workspace.product_tier == ProductTier.Free or workspace.product_tier == ProductTier.Trial:
             payment_methods.append(PaymentMethods.NoPaymentMethod())
 
         async def get_current_subscription() -> Optional[AwsMarketplaceSubscription]:
