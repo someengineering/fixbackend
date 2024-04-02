@@ -20,8 +20,9 @@ from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
-from fixbackend.base_model import Base
+from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.ids import UserId
+
 from fixbackend.permissions.role_repository import UserRoleAssignmentEntity
 from fixbackend.sqlalechemy_extensions import GUID
 
@@ -61,13 +62,10 @@ class UserMFARecoveryCode(Base):
     code_hash: Mapped[str] = mapped_column(String(length=64), primary_key=True)
 
 
-class User(SQLAlchemyBaseUserTableUUID, Base):
+class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
     otp_secret: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     is_mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")
-    mfa_recovery_codes: Mapped[List[UserMFARecoveryCode]] = relationship(
-        "UserMFARecoveryCode", backref="user", lazy="joined"
-    )
     roles: Mapped[List[UserRoleAssignmentEntity]] = relationship(
         "UserRoleAssignmentEntity", backref="user", lazy="joined"
     )
