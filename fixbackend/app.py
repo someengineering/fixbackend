@@ -29,6 +29,7 @@ from typing import (
     Set,
     Tuple,
     cast,
+    Dict,
 )
 
 import boto3
@@ -140,7 +141,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
     session_maker = deps.add(SN.session_maker, async_sessionmaker(engine))
 
     def create_redis(url: str) -> Redis:
-        kwargs = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
+        kwargs: Dict[str, Any] = dict(ssl_ca_certs=ca_cert_path) if url.startswith("rediss://") else {}
+        kwargs["health_check_interval"] = 30
+        kwargs["socket_timeout"] = 10
+        kwargs["socket_connect_timeout"] = 10
+        kwargs["socket_keepalive"] = True
         if cfg.args.redis_password:
             kwargs["password"] = cfg.args.redis_password
         return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
