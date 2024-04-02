@@ -102,6 +102,7 @@ ReportSeverityScore: Dict[str, int] = defaultdict(
 ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
 ReportSeverityIncluded: Dict[str, List[str]] = {n: ReportSeverityList[idx:] for idx, n in enumerate(ReportSeverityList)}
 Inventory = "inventory-service"
+DecoratedFn = TypeVar("DecoratedFn", bound=Callable[..., Any])
 
 
 def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterable[V]:
@@ -205,6 +206,48 @@ class InventoryService(Service):
     async def evict_cache(self, workspace_id: WorkspaceId) -> None:
         # evict the cache for the tenant in the cluster
         await self.cache.evict(str(workspace_id))
+
+    async def checks(
+        self,
+        db: GraphDatabaseAccess,
+        provider: Optional[str] = None,
+        service: Optional[str] = None,
+        category: Optional[str] = None,
+        kind: Optional[str] = None,
+        check_ids: Optional[List[str]] = None,
+        ids_only: Optional[bool] = None,
+    ) -> List[Json]:
+        async def fetch_checks(*_: Any) -> List[Json]:
+            return await self.client.checks(
+                db,
+                provider=provider,
+                service=service,
+                category=category,
+                kind=kind,
+                check_ids=check_ids,
+                ids_only=ids_only,
+            )
+
+        return await self.cache.call(fetch_checks, key=str(db.workspace_id))(
+            provider, service, category, kind, check_ids, ids_only  # parameters passed as cache key
+        )
+
+    async def benchmarks(
+        self,
+        db: GraphDatabaseAccess,
+        benchmarks: Optional[List[str]] = None,
+        short: Optional[bool] = None,
+        with_checks: Optional[bool] = None,
+        ids_only: Optional[bool] = None,
+    ) -> List[Json]:
+        async def fetch_benchmarks(*_: Any) -> List[Json]:
+            return await self.client.benchmarks(
+                db, benchmarks=benchmarks, short=short, with_checks=with_checks, ids_only=ids_only
+            )
+
+        return await self.cache.call(fetch_benchmarks, key=str(db.workspace_id))(
+            benchmarks, short, with_checks, ids_only  # parameters passed as cache key
+        )
 
     async def report_info(self, db: GraphDatabaseAccess) -> Json:
         async def compute_report_info() -> Json:
