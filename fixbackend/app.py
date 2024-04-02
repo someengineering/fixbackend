@@ -49,6 +49,7 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from httpx import AsyncClient, Limits, Timeout
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.exceptions import HTTPException
 
@@ -574,6 +575,22 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     @app.get("/health", tags=["system"])
     async def health() -> Response:
+        try:
+            pong = await deps.readonly_redis.ping()
+            if not pong:
+                log.error("Redis did not respond to ping")
+                return Response(status_code=500)
+
+            async with deps.session_maker() as session:
+                result = await session.execute(select(1))
+                if result.scalar_one() != 1:
+                    log.error("MySQL did not return 1 from select 1")
+                    return Response(status_code=500)
+
+        except Exception as e:
+            log.error("Health check failed", exc_info=e)
+            return Response(status_code=500)
+
         return Response(status_code=200)
 
     @app.get("/ready", tags=["system"])
