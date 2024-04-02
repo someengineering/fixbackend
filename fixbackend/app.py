@@ -579,16 +579,18 @@ def fast_api_app(cfg: Config) -> FastAPI:
         try:
             pong = await deps.readonly_redis.ping()
             if not pong:
-                return JSONResponse(status_code=500, content="Redis health check failed")
+                log.error("Redis did not respond to ping")
+                return Response(status_code=500)
 
             async with deps.session_maker() as session:
                 result = await session.execute(select(1))
                 if result.scalar_one() != 1:
-                    return JSONResponse(status_code=500, content="MySQL health check failed")
+                    log.error("MySQL did not return 1 from select 1")
+                    return Response(status_code=500)
 
         except Exception as e:
             log.error("Health check failed", exc_info=e)
-            return JSONResponse(status_code=500, content="Health check failed")
+            return Response(status_code=500)
 
         return Response(status_code=200)
 
