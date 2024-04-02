@@ -16,6 +16,7 @@
 import pytest
 
 from fixbackend.auth.models import User
+from fixbackend.ids import Email
 from fixbackend.notification.user_notification_repo import (
     UserNotificationSettingsRepositoryImpl,
 )
@@ -47,3 +48,11 @@ async def test_user_notification_settings_repo(async_session_maker: AsyncSession
     assert settings.weekly_report is False
     assert settings.inactivity_reminder is True
     assert settings.tutorial is False
+
+    # update via email settings
+    updated = await repo.update_notification_settings(
+        Email(user.email), weekly_report=True, inactivity_reminder=False, tutorial=True
+    )
+    assert updated.weekly_report is True
+    assert updated.inactivity_reminder is False
+    assert updated.tutorial is True
