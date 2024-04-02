@@ -24,6 +24,8 @@ from abc import ABC, abstractmethod
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
+from urllib.parse import urlencode
+
 import boto3
 from fixbackend.config import Config
 from fixbackend.jwt import JwtService
@@ -38,8 +40,9 @@ class EmailSender(ABC):
         subject: str,
         text: str,
         html: Optional[str],
+        unsubscribe: Optional[str] = None,  # kind of emails to unsubscribe from
     ) -> None:
-        """Send an email to the given address."""
+        """Email the given address."""
         raise NotImplementedError()
 
 
@@ -64,34 +67,24 @@ class Boto3EmailSender(EmailSender):
         subject: str,
         text: str,
         html: Optional[str],
-        unsubscribe: bool = False,
+        unsubscribe: Optional[str] = None,
     ) -> None:  # pragma: no cover
 
-        unsubscribe_url = ""
-        if unsubscribe:
-            token = await self.jwt_service.encode(
-                {
-                    "sub": to,
-                },
-                audience=[EMAIL_UNSUBSCRIBE_AUDIENCE],
+        additional_headers = {}
+        if kind := unsubscribe:
+            params = dict(
+                token=await self.jwt_service.encode({"sub": to, "kind": kind}, audience=[EMAIL_UNSUBSCRIBE_AUDIENCE]),
             )
-
-            match self.config.environment:
-                case "dev":
-                    unsubscribe_url = "https://app.dev.fixcloud.io/unsubscribe?token=" + token
-                case "prd":
-                    unsubscribe_url = "https://app.fix.security/unsubscribe?token=" + token
+            additional_headers["List-Unsubscribe"] = f"<{self.config.service_base_url}/unsubscribe?{urlencode(params)}>"
+            additional_headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
 
         def send_email() -> None:
-
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = "noreply@fix.security"
             msg["To"] = to
-            if unsubscribe:
-                msg.add_header("List-Unsubscribe", f"<{unsubscribe_url}>")
-                msg.add_header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
-
+            for key, value in additional_headers.items():
+                msg.add_header(key, value)
             plain_part = MIMEText(text, "plain")
             msg.attach(plain_part)
 
@@ -115,6 +108,7 @@ class ConsoleEmailSender(EmailSender):
         subject: str,
         text: str,
         html: Optional[str],
+        unsubscribe: Optional[str] = None,
     ) -> None:  # pragma: no cover
         print(f"Sending emails to {to} with subject {subject}")
         print(f"text: {text}")

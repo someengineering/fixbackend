@@ -22,16 +22,20 @@ from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
+from fixbackend.dependencies import FixDependencies, fix_dependencies
 
 
 @pytest.fixture
-async def client(default_config: Config, user: User) -> AsyncIterator[AsyncClient]:  # noqa: F811
+async def client(
+    default_config: Config, user: User, fix_deps: FixDependencies
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
     app = fast_api_app(default_config)
 
     # app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_config] = lambda: default_config
     # app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
     app.dependency_overrides[get_current_active_verified_user] = lambda: user
+    app.dependency_overrides[fix_dependencies] = lambda: fix_deps
 
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
@@ -41,10 +45,8 @@ async def client(default_config: Config, user: User) -> AsyncIterator[AsyncClien
 async def test_user_notification_settings(client: AsyncClient) -> None:
     response = await client.get("/api/users/me/settings/notifications")
     assert response.status_code == 200
-    assert response.json() == {"inactivity_reminder": False, "weekly_report": True}
+    assert response.json() == {"inactivity_reminder": True, "weekly_report": True, "tutorial": True}
 
-    response = await client.put(
-        "/api/users/me/settings/notifications", json={"inactivity_reminder": True, "weekly_report": False}
-    )
+    response = await client.put("/api/users/me/settings/notifications", json={"weekly_report": False})
     assert response.status_code == 200
-    assert response.json() == {"inactivity_reminder": True, "weekly_report": False}
+    assert response.json() == {"inactivity_reminder": True, "weekly_report": False, "tutorial": True}

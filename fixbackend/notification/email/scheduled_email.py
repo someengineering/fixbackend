@@ -26,6 +26,7 @@ from fixbackend.base_model import Base
 from fixbackend.ids import UserId
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
@@ -67,7 +68,7 @@ class ScheduledEmailSender(Service):
             stmt = (
                 select(User, ScheduledEmailEntity)
                 .select_from(
-                    # This uses a literal TRUE to simulate a cross join
+                    # This uses a literal TRUE to simulate a cross-join
                     User.__table__.join(ScheduledEmailEntity.__table__, text("true"))
                 )
                 .outerjoin(
@@ -77,10 +78,18 @@ class ScheduledEmailSender(Service):
                         ScheduledEmailEntity.kind == ScheduledEmailSentEntity.kind,
                     ),
                 )
+                .outerjoin(
+                    UserNotificationSettingsEntity,
+                    and_(
+                        UserNotificationSettingsEntity.user_id == User.id,
+                        UserNotificationSettingsEntity.tutorial == False,  # noqa
+                    ),
+                )
                 .where(
                     and_(
                         text("user.created_at + INTERVAL scheduled_email.after SECOND") < func.now(),
                         ScheduledEmailSentEntity.id.is_(None),
+                        UserNotificationSettingsEntity.user_id.is_(None),
                     )
                 )
             )
@@ -92,7 +101,9 @@ class ScheduledEmailSender(Service):
                 txt = email_messages.render(f"{to_send.kind}.txt")
                 html = email_messages.render(f"{to_send.kind}.html")
                 log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
-                await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
+                await self.email_sender.send_email(
+                    to=user.email, subject=subject, text=txt, html=html, unsubscribe="tutorial"
+                )
                 # mark this kind of email as sent
                 session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=to_send.kind, at=utc()))
             await session.commit()
