@@ -30,3 +30,4 @@ from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertCo
 from fixbackend.notification.notification_provider_config_repo import NotificationProviderConfigEntity  # noqa
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity  # noqa
 from fixbackend.permissions.role_repository import UserRoleAssignmentEntity  # noqa
+from fixbackend.notification.email.scheduled_email import ScheduledEmailEntity, ScheduledEmailSentEntity  # noqa

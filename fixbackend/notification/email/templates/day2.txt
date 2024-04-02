@@ -1,0 +1,43 @@
+Day 2: Elevate Your Security Insights with Fix
+
+Welcome to Day 2 of our journey towards securing your digital landscape.
+As your infrastructure evolves, so do its vulnerabilities.
+It's challenging to predict when a new change might weaken your security defenses.
+That's where Fix steps in – your vigilant partner, dedicated to highlighting potential vulnerabilities the moment they arise.
+
+Fix is not just a tool; it's your ally in maintaining a robust security posture.
+By implementing a comprehensive suite of security benchmarks, Fix evaluates every modification within your infrastructure.
+This continuous scrutiny ensures that your security measures always align with the best practices.
+
+Your Security, Visualized
+
+When you navigate to the Security Tab within the Fix app, you're met with insightful metrics.
+Fix calculates an overarching score for your cloud accounts, offering you a bird's eye view of your infrastructure's security health.
+A score of 100 would signify flawless security alignment with every benchmark.
+If you hover over the score you get the number of security issues broken down by severity.
+
+Dive Deep with Detailed Analytics
+
+Our benchmark heatmap provides an in-depth analysis, plotting all your accounts against the established benchmarks.
+This visualization allows you to quickly gauge how each account stands in relation to specific security benchmarks, empowering you with the knowledge to make informed decisions.
+
+Monitoring Evolution Over Time
+
+Understanding the dynamic nature of your security posture is crucial.
+That's why we highlight not only the quantity of new security issues identified over the last 7 days but also how many have been resolved.
+Gain insights into the 'top offenders' by account and resource type, enabling you to focus your efforts where they are needed most.
+
+
+How to progress from here
+
+In our commitment to not only identify but also solve, Fix offers a prioritized list of issues that, when addressed, will significantly enhance your security posture.
+This list goes beyond mere identification; it details the risks involved and provides comprehensive instructions for resolution.
+
+We're Here to Support You.
+Navigating the complexities of cybersecurity can be daunting, but you're not alone.
+Whether you have questions, need clarification, or encounter any obstacles, our dedicated team is here to assist you.
+
+Reach out to us at support@fix.security or connect with us on Discord at https://discord.gg/fixsecurity.
+
+Wishing you a secure and insightful journey,
+The Fix Team

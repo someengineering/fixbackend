@@ -422,3 +422,29 @@ async def test_retention_period(
     await inventory_service._process_product_tier_changed(
         ProductTierChanged(workspace.id, UserId(uid()), ProductTier.Enterprise, True, True, ProductTier.Plus)
     )
+
+
+@pytest.mark.asyncio
+async def test_benchmarks(
+    inventory_service: InventoryService,
+    graph_db_access: GraphDatabaseAccess,
+    mocked_answers: RequestHandlerMock,
+    inventory_requests: List[Request],
+) -> None:
+    for _ in range(5):
+        benchmarks = await inventory_service.benchmarks(graph_db_access)
+        assert len(benchmarks) == 2
+    assert len(inventory_requests) == 1  # only one request is made, 4 are served from cache
+
+
+@pytest.mark.asyncio
+async def test_checks(
+    inventory_service: InventoryService,
+    graph_db_access: GraphDatabaseAccess,
+    mocked_answers: RequestHandlerMock,
+    inventory_requests: List[Request],
+) -> None:
+    for _ in range(5):
+        checks = await inventory_service.checks(graph_db_access)
+        assert len(checks) == 1
+    assert len(inventory_requests) == 1  # only one request is made, 4 are served from cache

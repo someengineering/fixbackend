@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  <h1>Day 3: Viewing resources in Fix</h1>
+
+  <p>
+    Looking for resources spread out over multiple accounts and regions can feel like searching for a needle in a
+    haystack. Infrastructure components also shift and change with the needs of the business. Fix provides a simple,
+    intuitive, and powerful way to discover and understand the assets in your cloud environment. On day 1 we learned how
+    to find resources we are interested in. Let’s dive into the details presented, when a resource is selected.
+  </p>
+
+
+  <h2>Basic information</h2>
+  <p>
+    Some attributes are common across all resources, like kind and name, age, account, region, and tags. This essential
+    information is always available at a glance.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/basic-ingormation.webp" width="600"
+          alt="Basic Information"/>
+  </p>
+
+  <h2>Neighborhood</h2>
+  <p>
+    A resource is seldom self-contained and isolated. Rather, resources are part of a larger context and interact with
+    other resources. Visualizing this context is crucial to understanding, so Fix renders a resource’s neighborhood in
+    a
+    graph view. This graph view includes resources directly related to the target resource, plus its neighbors.
+    Below, we have an <code>EC2 Instance</code> <code>TaskWorker-132</code>. It has a network interface attached, an <code>EBS Volume</code> bound, and an <code>SSH keypair</code> deployed. It is controlled by the AWS Systems Manager. You can quickly see information about the <code>VPC</code>, the
+    instance type, and related quotas.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/graph-view-ec2.webp" width="600"
+          alt="Graph View Ec2"/>
+  </p>
+
+  <p>
+    Click on any resource in the neighborhood to view its details. For example, suppose you are interested in how the
+    <code>EC2 Instance</code> from the above image is connected to the Internet. You can click on the <code>EC2 Instance</code>’s network interface to
+    see its subnets, security groups, and the <code>VPC</code> in which it is deployed.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/graph-view-eni.webp" width="600"
+          alt="Graph View ENI"/>
+  </p>
+
+  <h2>Details</h2>
+  <p>
+    The details page shows all the collected information about the resource. This resource data is specific to the
+    resource kind and is usually a lot of data. Fix renders the data in YAML, a human-readable format that represents
+    the
+    data in a structured way. The resource data adheres to the format defined in Fix’s resource models.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/details.webp" width="600"
+          alt="Details"/>
+  </p>
+
+  <h2>Security issues</h2>
+  <p>
+    Fix collects resource data and runs security benchmarks on that data. A benchmark consists of a set of checks, each
+    of
+    which defines a security best practice.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/security-issues.webp" width="600"
+          alt="Security Issues"/>
+  </p>
+
+  <p>
+    Failing checks are listed on the details page. The severity of a check is an indicator of how important it is to fix
+    the issue. When you click on a failing check, a description of the risk and remediation steps are displayed.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/failing-check-example.webp" width="600"
+          alt="Failing Check Example"/>
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    Fix takes a snapshot of your cloud resources every hour. Whenever changes to a resource are detected, an event is
+    produced, and the Fix database is updated.
+    The Fix database maintains a record of the resource’s previous state, so you can see the difference between the old
+    and the new versions. Not only might a resource’s configuration change, but its security posture may as well. Fix
+    keeps track of security check results so you can see how a resource’s security posture changes over time.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/history.webp" width="600"
+          alt="History"/>
+  </p>
+  <p>
+    Every change event has a kind, timestamp, and dedicated visualization. Clicking on an event reveals more detailed
+    information.
+  </p>
+
+  <h2>Configuration changes</h2>
+  <p>
+    When changes to a resource are detected, Fix provides a diff view that shows exactly how the configuration changed.
+    The previous configuration is displayed in red, while changes introduced by the new version are printed in green.
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/configuration-changed.webp" width="600"
+          alt="Configuration Changed."/>
+  </p>
+  <p>
+    A resource’s configuration may change multiple times over its lifetime. The resource history shows all the changes
+    at
+    a glance, while still giving you all the details you need. Consider, for example, a postmortem analysis or security
+    breach: you need to understand not only the current configuration of a resource but also the configuration at a
+    specific moment in time.
+  </p>
+
+  <h2>Vulnerability changes</h2>
+  <p>
+    Configuration changes might also alter a resource’s security posture; an existing vulnerability could be fixed, or a
+    new vulnerability introduced. The “Security” section contains details about the posture change. (The current
+    security
+    posture is always visible in the “Security” section, while the diff view shows how configuration changes affect it.)
+  </p>
+  <p><img src="https://cdn.some.engineering/fix/assets/101/day3/vulnerabilities-changed.webp" width="600"
+          alt="Vulnerabilities Changed."/>
+  </p>
+
+
+  <h2> Your Journey Continues with Our Full Support </h2>
+
+  <p>
+    Delving into the depths of cloud infrastructure management can sometimes feel like uncharted territory. Remember,
+    you're not venturing alone. Our team at Fix is here to guide, clarify, and help you overcome any hurdles you might
+    face.
+  </p>
+
+  <p>
+    If questions arise or you need a helping hand, don't hesitate to contact us at <a href="mailto:support@fix.security">support@fix.security</a> or join the
+    conversation on <a href="https://discord.gg/fixsecurity">Discord</a>.
+  </p>
+
+  Here's to advancing your infrastructure management skills,<br/>
+  The Fix Team
+
+{% endblock content %}
