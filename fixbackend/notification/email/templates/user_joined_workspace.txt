@@ -1,0 +1,97 @@
+Welcome to Fix
+
+Thank you for trusting us to help you secure your cloud environments.
+Your journey to a safer, more robust cloud infrastructure starts today.
+Since you have been invited by a coworker, here is a quick overview of what Fix is about.
+
+What is CSPM and why do I need it?
+
+In the era of cloud computing, the scale and complexity of cloud resources have escalated dramatically.
+With anywhere from a handful to potentially hundreds or even thousands of engineers deploying, modifying,
+and managing cloud resources across multiple platforms, the landscape of a company's cloud infrastructure
+has become vast and intricate.
+This expansion means no single person has full visibility into every asset or configuration within the infrastructure.
+It's within this context that Cloud Security Posture Management (CSPM) becomes indispensable.
+
+CSPM tools like Fix are designed to provide a panoramic view of an organization's cloud security posture,
+automating the detection of risks that can stem from:
+
+- Misconfigurations:
+  As cloud environments grow, so does the likelihood of misconfigurations.
+  Simple oversights in settings can lead to significant vulnerabilities,
+  such as exposed data stores or improperly secured compute instances and databases.
+
+- Compliance Drifts:
+  With regulations evolving and varying across jurisdictions,
+  maintaining compliance in the cloud becomes a moving target.
+  CSPM ensures that your infrastructure adheres to the latest standards,
+  protecting against penalties and breaches.
+
+- Orphaned Resources:
+  Among the most insidious risks are the forgotten, unused, or "orphaned" resources that accumulate over time,
+  such as volume snapshots of sensitive data (e.g., customer databases) or unused virtual machines.
+  These abandoned assets can not only incur unnecessary costs but also pose significant security
+  risks if left unmonitored and unprotected.
+
+Given the dynamic nature of cloud resources, with new services being spun up and down daily,
+CSPM serves as an essential system to ensure that every piece of your cloud puzzle is accounted for,
+secure, and compliant.
+Fix leverages advanced CSPM capabilities to scan and identify potential vulnerabilities across your entire cloud ecosystem,
+ensuring not just security, but peace of mind in a landscape where traditional oversight methods no longer suffice.
+
+How does Fix help?
+
+In the complex landscape of cloud infrastructure, Fix stands out as your vigilant partner,
+offering comprehensive monitoring and management of your cloud environment.
+
+At the heart of Fix is the inventory of your cloud infrastructure,
+a precise mapping of all resources and their interconnections.
+This approach enhances visibility and deepens your understanding of the cloud environment's intricate dynamics.
+It allows you to see certain misconfigurations at a glance, like load balancers without backends,
+or abandoned volumes that are not mounted by a VM.
+
+Our search engine transforms the way you interact with your cloud resources.
+Whether you're pinpointing instances with public IPs, identifying aging resources,
+or locating too open firewall rules, Fix delivers precise and immediate insights.
+This capability extends to full-text searches,
+making it possible to swiftly find resources related to specific keywords, such as tags or names.
+
+Beyond search, Fix enhances your data management capabilities.
+It allows for the exportation of data for deeper analysis or seamless integration with various
+data analysis and management tools, including traditional databases
+as well as spreadsheet programs like Excel and Google Sheets.
+This flexibility enriches your analytics ecosystem,
+ensuring comprehensive and actionable insights across your cloud environment.
+
+A cornerstone of Fix's philosophy is openness and flexibility.
+Built on our open-source project "Fix Inventory," we offer unparalleled transparency and control.
+This ensures that migrating away from our SaaS, should you choose to,
+is hassle-free, reinforcing our commitment to data ownership and vendor independence.
+
+Getting Started with Fix
+
+To kickstart your journey with Fix,
+we've prepared a Quick Start Guide that covers everything from setting up your account to navigating the dashboard.
+Additionally, our introductory video [link to video] will walk you through the basics,
+ensuring you're well-equipped to secure your cloud environment.
+
+Your Next Steps
+
+Ready to dive in? Here are a few first steps we recommend:
+Log in to your Fix account: Explore the dashboard and familiarize yourself with its features.
+Complete your profile setup: Ensure your account information is up-to-date and turn on or off any E-mail notifications you would like to receive from us.
+Review your cloud inventory: Start by getting an overview of your existing cloud resources.
+
+Here for You
+
+Your success is our top priority. If you have any questions or need assistance, our team is just an email away.
+Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
+
+Let's Secure Your Cloud, Together.
+
+Thank you once again for choosing Fix.
+We're excited to be a part of your cloud security journey.
+Log in now to start securing your cloud infrastructure: https://app.fix.security?origin=email&tpl={{ template_name }}
+
+Warm regards,
+The Fix Team
