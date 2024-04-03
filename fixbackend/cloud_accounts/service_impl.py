@@ -439,19 +439,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case AwsMarketplaceSubscriptionCancelled.kind:
                     evt = AwsMarketplaceSubscriptionCancelled.from_json(message)
                     workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
-                    async with asyncio.TaskGroup() as tg:
-                        for ws in workspaces:
-                            # first move the tier to free
-                            await self.workspace_repository.update_payment_on_hold(ws.id, utc())
-                            # second remove the subscription from the workspace
-                            await self.workspace_repository.update_subscription(ws.id, None)
-                            # third disable all accounts
-                            account_limit = Free.account_limit or 1
-                            all_accounts = await self.list_accounts(ws.id)
-                            # keep the last account_limit accounts
-                            to_disable = all_accounts[:-account_limit]
-                            for cloud_account in to_disable:
-                                tg.create_task(self.update_cloud_account_enabled(ws.id, cloud_account.id, False))
+                    for ws in workspaces:
+                        # first move the tier to free
+                        await self.workspace_repository.update_payment_on_hold(ws.id, utc())
+                        # second remove the subscription from the workspace
+                        await self.workspace_repository.update_subscription(ws.id, None)
+                        # third disable all accounts
+                        account_limit = Free.account_limit or 1
+                        await self.disable_cloud_accounts(ws.id, account_limit)
 
                 case _:  # pragma: no cover
                     pass  # ignore other domain events
@@ -897,3 +892,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             )
         )
         return account
+
+    async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
+        async with asyncio.TaskGroup() as tg:
+            all_accounts = await self.list_accounts(workspace_id)
+            # keep the last account_limit accounts
+            to_disable = all_accounts[:-keep_enabled]
+            for cloud_account in to_disable:
+                tg.create_task(self.update_cloud_account_enabled(workspace_id, cloud_account.id, False))

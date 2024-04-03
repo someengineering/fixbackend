@@ -87,3 +87,8 @@ class CloudAccountService(ABC):
     ) -> CloudAccount:
         """Enable a cloud account."""
         raise NotImplementedError
+
+    @abstractmethod
+    async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
+        """Disable all accounts except the ones to keep."""
+        raise NotImplementedError

@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import datetime
 import uuid
 from attr import evolve
@@ -219,3 +220,18 @@ async def test_on_hold(
     assert await workspace_repository.list_by_on_hold(before=utc()) == [workspace]
 
     assert await workspace_repository.list_by_on_hold(before=before_yesterday) == []
+
+
+@pytest.mark.asyncio
+async def test_expired_trials(
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+) -> None:
+
+    assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(days=14)) == []
+
+    await asyncio.sleep(1)
+
+    assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(seconds=0)) == [
+        workspace
+    ]
