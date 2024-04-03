@@ -11,6 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import logging
 from base64 import b64decode
 
 from fastapi import APIRouter, Response
@@ -20,8 +21,10 @@ from fixbackend.analytics.events import AEEmailOpened
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import UserId
 
+
 # 1x1 transparent PNG pixel
 pxl_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
+log = logging.getLogger(__name__)
 
 
 def analytics_router(dependencies: FixDependencies) -> APIRouter:
@@ -29,6 +32,7 @@ def analytics_router(dependencies: FixDependencies) -> APIRouter:
 
     @router.get("/analytics/email_opened/pixel", include_in_schema=False)
     async def email_opened(user: UserId, email: str) -> Response:
+        log.info(f"Email opened by {user} for email {email}")
         sender = dependencies.service(ServiceNames.analytics_event_sender, AnalyticsEventSender)  # type: ignore
         await sender.send(AEEmailOpened(user_id=user, email=email))
         return Response(content=b64decode(pxl_base64), media_type="image/png")
