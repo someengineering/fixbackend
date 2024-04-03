@@ -19,18 +19,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from ssl import Purpose, create_default_context
-from typing import (
-    Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    ClassVar,
-    Optional,
-    Set,
-    Tuple,
-    cast,
-    Dict,
-)
+from typing import Any, AsyncIterator, Awaitable, Callable, ClassVar, Dict, Optional, Set, Tuple, cast
 
 import boto3
 import httpx
@@ -67,10 +56,7 @@ from fixbackend.billing_information.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.cloud_accounts.router import (
-    cloud_accounts_callback_router,
-    cloud_accounts_router,
-)
+from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
@@ -82,18 +68,14 @@ from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import CustomerIoEventConsumer, EmailOnSignupConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
-from fixbackend.errors import NotAllowed, ResourceNotFound, ClientError, WrongState
+from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
 from fixbackend.events.router import websocket_router
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient, InventoryException
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import inventory_router
 from fixbackend.jwt import JwtServiceImpl
-from fixbackend.logging_context import (
-    get_logging_context,
-    set_fix_cloud_account_id,
-    set_workspace_id,
-)
+from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
@@ -343,6 +325,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 role_repo,
             ),
         )
+
+        # uncomment once aws marketplace suscriptions are available on prd
+        # trial_end_service = deps.add(SN.trial_end_service, TrialEndService(workspace_repo))
 
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=readwrite_redis,

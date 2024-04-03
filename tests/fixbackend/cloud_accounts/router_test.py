@@ -136,6 +136,9 @@ class InMemoryCloudAccountService(CloudAccountService):
         self.accounts[cloud_account_id] = account
         return account
 
+    async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
+        return None
+
 
 cloud_account_service = InMemoryCloudAccountService()
 
