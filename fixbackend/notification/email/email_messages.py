@@ -179,7 +179,7 @@ class UserJoinedWorkspaceMail:
     workspace: Workspace
 
     def subject(self) -> str:
-        return f"""Welcome to Fix!"""
+        return """Welcome to Fix!"""
 
     def text(self) -> str:
         return render("user_joined_workspace.txt", message=self)

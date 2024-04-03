@@ -72,8 +72,6 @@ Getting Started with Fix
 
 To kickstart your journey with Fix,
 we've prepared a Quick Start Guide that covers everything from setting up your account to navigating the dashboard.
-Additionally, our introductory video [link to video] will walk you through the basics,
-ensuring you're well-equipped to secure your cloud environment.
 
 Your Next Steps
 
