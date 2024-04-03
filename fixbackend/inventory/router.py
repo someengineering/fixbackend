@@ -17,7 +17,7 @@ from typing import Annotated, List, Literal, Optional, AsyncIterator
 
 from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
-from fixcloudutils.types import Json
+from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.dependencies import FixDependencies, FixDependency, ServiceNames
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -75,8 +75,8 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         short: Optional[bool] = None,
         with_checks: Optional[bool] = None,
         ids_only: Optional[bool] = None,
-    ) -> List[Json]:
-        return await inventory().benchmarks(
+    ) -> List[JsonElement]:
+        return await inventory().benchmarks(  # type: ignore
             graph_db, benchmarks=benchmarks, short=short, with_checks=with_checks, ids_only=ids_only
         )
 
@@ -98,20 +98,20 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.get("/report/checks", tags=["report-management"])
     async def list_checks(
         graph_db: CurrentGraphDbDependency,
-        provider: Optional[str] = None,
-        service: Optional[str] = None,
-        category: Optional[str] = None,
-        kind: Optional[str] = None,
-        check_ids: Optional[List[str]] = None,
-        ids_only: Optional[bool] = None,
-    ) -> List[Json]:
-        return await inventory().checks(
+        provider: Optional[str] = Query(default=None, description="Cloud provider.", example="aws"),
+        service: Optional[str] = Query(default=None, description="Cloud provider service.", example="ec2"),
+        category: Optional[str] = Query(default=None, description="Category of the check", example="security"),
+        kind: Optional[str] = Query(default=None, description="Result kind of the check", example="aws_ec2_instance"),
+        check_ids: Optional[str] = Query(default=None, description="Comma separated list of check ids."),
+        ids_only: Optional[bool] = Query(default=None, description="If set to true, only the ids are returned."),
+    ) -> List[JsonElement]:
+        return await inventory().checks(  # type: ignore
             graph_db,
             provider=provider,
             service=service,
             category=category,
             kind=kind,
-            check_ids=check_ids,
+            check_ids=[cid.strip() for cid in check_ids.split(",")] if check_ids else None,
             ids_only=ids_only,
         )
 
