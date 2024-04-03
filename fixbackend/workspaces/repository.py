@@ -37,7 +37,8 @@ from fixbackend.ids import ExternalId, SubscriptionId, WorkspaceId, UserId, Prod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
-from datetime import datetime
+from datetime import datetime, timedelta
+from fixcloudutils.util import utc
 
 log = getLogger(__name__)
 
@@ -81,7 +82,9 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+    async def update_product_tier(
+        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: Optional[AsyncSession] = None
+    ) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
 
@@ -105,6 +108,13 @@ class WorkspaceRepository(ABC):
     @abstractmethod
     async def list_by_on_hold(self, before: datetime) -> Sequence[Workspace]:
         """List all workspaces with the payment on hold marker before the given date."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_expired_trials(
+        self, been_in_trial_tier_for: timedelta, *, session: Optional[AsyncSession] = None
+    ) -> Sequence[Workspace]:
+        """List all workspaces which have been in trial for mor that provided time."""
         raise NotImplementedError
 
 
@@ -265,8 +275,10 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 return ProductTier.from_str(tier)
             return ProductTier.Free
 
-    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
-        async with self.session_maker() as session:
+    async def update_product_tier(
+        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: Optional[AsyncSession] = None
+    ) -> Workspace:
+        async def do_tx(session: AsyncSession) -> Workspace:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
             workspace = results.unique().scalar_one_or_none()
@@ -281,6 +293,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.refresh(workspace)
 
             return workspace.to_model()
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
 
     async def update_payment_on_hold(self, workspace_id: WorkspaceId, on_hold_since: Optional[datetime]) -> Workspace:
         """Set the payment on hold for a workspace."""
@@ -304,6 +322,27 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             workspaces = results.unique().scalars().all()
             return [ws.to_model() for ws in workspaces]
+
+    async def list_expired_trials(
+        self, been_in_trial_tier_for: timedelta, *, session: Optional[AsyncSession] = None
+    ) -> Sequence[Workspace]:
+        """List all workspaces with the trial expired before the given date."""
+
+        async def do_tx(session: AsyncSession) -> Sequence[Workspace]:
+            statement = (
+                select(orm.Organization)
+                .where(orm.Organization.tier == ProductTier.Trial.value)
+                .where(orm.Organization.created_at < utc() - been_in_trial_tier_for)
+            )
+            results = await session.execute(statement)
+            workspaces = results.unique().scalars().all()
+            return [ws.to_model() for ws in workspaces]
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

@@ -65,6 +65,7 @@ class ServiceNames:
     role_repository = "role_repository"
     jwt_service = "jwt_service"
     scheduled_email_sender = "scheduled_email_sender"
+    trial_end_service = "trial_end_service"
 
 
 class FixDependencies(Dependencies):

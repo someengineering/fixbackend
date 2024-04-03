@@ -123,7 +123,9 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
         return evolve(workspace, name=name, external_id=new_external_id)
 
     @override
-    async def update_product_tier(self, workspace_id: WorkspaceId, tier: ProductTier) -> Workspace:
+    async def update_product_tier(
+        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: AsyncSession | None = None
+    ) -> Workspace:
         return evolve(workspace, product_tier=tier)
 
     @override

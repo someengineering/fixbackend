@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import ForeignKey, String, DateTime, Integer
+from sqlalchemy import ForeignKey, String, DateTime, Integer, func
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
@@ -36,9 +36,10 @@ class Organization(Base, CreatedUpdatedMixin):
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization", lazy="joined")
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
-    tier: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    tier: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True, default=ProductTier.Trial.value)
     subscription_id: Mapped[Optional[SubscriptionId]] = mapped_column(GUID, nullable=True, index=True)
     payment_on_hold_since: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), index=True)
 
     def to_model(self) -> models.Workspace:
         return models.Workspace(
