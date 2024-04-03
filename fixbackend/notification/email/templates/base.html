@@ -480,7 +480,7 @@
                     {% if user_id is defined %}
                     <tr>
                       <td class="email-masthead" align="center">
-                          <img src="https://app.fix.security/api/analytics/email_opened/pixel?user={{ user_id }}&email={{ template_name }}" alt="" width="1" height="1"/>
+                          <img src="https://app.fix.security/api/analytics/email_opened/pixel?user={{ user_id }}&email={{ template_name }}&uid={{ uid }}" alt="" width="1" height="1"/>
                       </td>
                     </tr>
                     {% endif %}

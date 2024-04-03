@@ -20,6 +20,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from functools import lru_cache
 
 from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.utils import uid
 
 TemplatesPath = Path(__file__).parent / "templates"
 
@@ -31,7 +32,7 @@ def get_env() -> Environment:
 
 def render(template_name: str, **kwargs: Any) -> str:
     template = get_env().get_template(template_name)
-    result = template.render({"template_name": template_name, **kwargs})
+    result = template.render({"template_name": template_name, "uid": str(uid()), **kwargs})
     return result
 
 
