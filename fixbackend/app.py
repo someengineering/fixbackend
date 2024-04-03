@@ -568,8 +568,9 @@ def fast_api_app(cfg: Config) -> FastAPI:
     @alru_cache(maxsize=1)
     async def load_app_from_cdn() -> bytes:
         async with httpx.AsyncClient() as client:
-            log.info("Loading app from CDN")
-            response = await client.get(f"{cfg.frontend_cdn_origin()}/index.html")
+            app_url = f"{cfg.frontend_cdn_origin()}/index.html"
+            log.info(f"Loading app from CDN {app_url}")
+            response = await client.get(app_url)
             log.info("Loaded app from CDN")
             body = response.content
             return body
