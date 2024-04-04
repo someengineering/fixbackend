@@ -36,7 +36,9 @@ class Workspace:
     payment_on_hold_since: Optional[datetime] = None
 
     def all_users(self) -> List[UserId]:
-        return [self.owner_id] + self.members
+        unique = set(self.members)
+        unique.add(self.owner_id)
+        return list(unique)
 
     def trial_end_days(self) -> Optional[int]:
         if self.product_tier == ProductTier.Trial:
