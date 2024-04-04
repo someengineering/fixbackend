@@ -13,25 +13,29 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from datetime import datetime, timedelta
+from typing import Tuple
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
-from sqlalchemy import String, Integer, select, Index, and_, func, text
+from sqlalchemy import String, Integer, select, Index, and_, func, text, Select, union
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.auth.models.orm import User
 from fixbackend.base_model import Base
-from fixbackend.ids import UserId
+from fixbackend.cloud_accounts.models.orm import CloudAccount
+from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
+from fixbackend.workspaces.models.orm import Organization, OrganizationOwners, OrganizationMembers
 
 log = logging.getLogger(__name__)
+no_cloud_account = "no_cloud_account"
 
 
 class ScheduledEmailEntity(Base):
@@ -64,6 +68,60 @@ class ScheduledEmailSender(Service):
         await self.periodic.stop()
 
     async def _send_emails(self) -> None:
+        await self._new_workspaces_without_cloud_account()
+        await self._send_scheduled_emails()
+
+    async def _new_workspaces_without_cloud_account(self) -> None:
+        now = utc()
+        async with self.session_maker() as session:
+            # select all workspaces
+            stmt: Select[Tuple[WorkspaceId]] = (
+                select(Organization.id)
+                .outerjoin(CloudAccount, CloudAccount.tenant_id == Organization.id)
+                .where(
+                    and_(
+                        CloudAccount.id.is_(None),  # do not have a cloud account
+                        Organization.created_at < (now - timedelta(days=1)),  # created more than a day ago
+                        Organization.created_at > (now - timedelta(days=2)),  # created less than two days ago
+                    )
+                )
+            )
+            workspace_ids = (await session.execute(stmt)).scalars().all()
+
+            # bail out early if there are no workspaces to process
+            if len(workspace_ids) == 0:
+                return
+
+            # select all users that are owners or members of the workspaces and have not received the email
+            union_subquery = union(
+                select(OrganizationOwners.user_id).where(OrganizationOwners.organization_id.in_(workspace_ids)),
+                select(OrganizationMembers.user_id).where(OrganizationMembers.organization_id.in_(workspace_ids)),
+            ).alias("users")
+            query = (
+                select(User)
+                .select_from(User.__table__.join(union_subquery, User.id == union_subquery.c.user_id))  # type: ignore
+                .outerjoin(
+                    ScheduledEmailSentEntity,
+                    and_(
+                        User.id == ScheduledEmailSentEntity.user_id,  # type: ignore
+                        ScheduledEmailSentEntity.kind == no_cloud_account,
+                    ),
+                )
+                .where(ScheduledEmailSentEntity.id.is_(None))
+            )
+
+            # send the email to all users that have not received it yet
+            all_users = (await session.execute(query)).unique().scalars().all()
+            for user in all_users:
+                subject = "Fix: Connect your Cloud Accounts  🔌"
+                txt = email_messages.render("no_cloud_account.txt")
+                html = email_messages.render("no_cloud_account.html", user_id=user.id)
+                log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
+                await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
+                session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=no_cloud_account, at=now))
+            await session.commit()
+
+    async def _send_scheduled_emails(self) -> None:
         async with self.session_maker() as session:
             stmt = (
                 select(User, ScheduledEmailEntity)

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  <h1>Connect your Cloud Accounts</h1>
+
+  <p>
+    We noticed you haven't added any cloud account to your Fix workspace yet, and we're here to guide you through this
+    final, crucial step. It's your gateway to a world of clarity, security, and optimization for your cloud
+    infrastructure and takes less than 5 minutes.
+  </p>
+
+  <h2>Easy Steps to Connect Your Cloud Account</h2>
+  <ol>
+    <li>
+      <strong>Workspace Settings:</strong> <a href="https://app.fix.security">Login to Fix</a> and locate the Workspace
+      Settings icon at the bottom left of your screen.
+    </li>
+    <li>
+      <strong>Access Accounts:</strong> Within the Workspace Settings, you'll find the "Accounts" section. Here's where
+      you'll tell us what accounts to scan and turn on/off individual accounts and add new ones.
+    </li>
+    <li>
+      <strong>Add an Account:</strong> Look to the top right and click on <nobr><a href="https://app.fix.security/workspace-settings/accounts/setup-cloud">Add an Account</a> </nobr>.
+      Prepare for Deployment: Before moving forward, ensure you're logged into the correct AWS account - the one you want
+      us to secure and optimize.
+    </li>
+    <li>
+      <strong>Deploy with Ease:</strong> Click the <code>"DEPLOY STACK"</code> button. This opens a new tab leading you to AWS
+      CloudFormation. You can stick with the default settings or customize the stack name to your liking. Important: The
+      WorkspaceId and ExternalId fields are pre-filled for your convenience. Acknowledge the creation of IAM
+      resources by checking the box and hit <code>"Create Stack"</code>.
+    </li>
+    <li>
+      <strong>Seal the Deal:</strong> Now, you can close the AWS tab and head back to Fix. Our system will spring into
+      action, detecting your new CloudFormation stack.
+    </li>
+  </ol>
+
+  <h2>What Comes Next?</h2>
+  <p>
+    Give us about 20 minutes after the stack creation, and we'll conduct our first scan of your cloud environment.
+    We will send you a message when the first scan is complete, and you can start exploring the insights we've gathered.
+  </p>
+
+  <h2>Here for You</h2>
+  <p>
+    If any step in the process feels unclear, or if you encounter any bumps along the road, our team is standing by.
+    Contact us at <a href="mailto:support@fix.security">support@fix.security</a> or ping us on <a href="https://discord.gg/fixsecurity">Discord</a>.
+  </p>
+  <p>
+    <a href="https://app.fix.security?origin=email&tpl={{ template_name }}" class="button" target="_blank">Login to
+      Fix</a>
+  </p>
+
+
+  <p>
+    Warm regards,<br/>
+    The Fix Team
+  </p>
+
+
+{% endblock content %}
