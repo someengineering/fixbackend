@@ -33,6 +33,7 @@ class WorkspaceRead(BaseModel):
     on_hold_since: Optional[datetime] = Field(description="The time at which the workspace was put on hold")
     created_at: datetime = Field(description="The time at which the workspace was created")
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
+    user_has_access: bool = Field(description="Whether the user has access to the workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -46,13 +47,14 @@ class WorkspaceRead(BaseModel):
                     "on_hold_since": "2020-01-01T00:00:00Z",
                     "created_at": "2020-01-01T00:00:00Z",
                     "trial_end_days": 13,
+                    "user_has_access": True,
                 }
             ]
         }
     }
 
     @classmethod
-    def from_model(cls, model: Workspace) -> "WorkspaceRead":
+    def from_model(cls, model: Workspace, user_id: UserId) -> "WorkspaceRead":
         return WorkspaceRead(
             id=model.id,
             slug=model.slug,
@@ -62,6 +64,7 @@ class WorkspaceRead(BaseModel):
             on_hold_since=model.payment_on_hold_since,
             created_at=model.created_at,
             trial_end_days=model.trial_end_days(),
+            user_has_access=model.paid_tier_access(user_id),
         )
 
 

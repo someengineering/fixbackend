@@ -31,7 +31,7 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
 from fixbackend.logging_context import set_workspace_id
 
 
-WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized", "Forbidden"]
+WorkspaceError = Literal["WorkspaceNotFound", "Unauthorized", "Forbidden", "TrialEnded"]
 
 
 async def get_optional_user_workspace(
@@ -50,6 +50,9 @@ async def get_optional_user_workspace(
     if user.id not in workspace.all_users():
         return "Forbidden"
 
+    if not workspace.paid_tier_access(user.id):
+        return "TrialEnded"
+
     return workspace
 
 
@@ -63,6 +66,8 @@ async def get_user_workspace(
             raise HTTPException(status_code=404, detail="workspace_not_found")
         case "Forbidden":
             raise HTTPException(status_code=403, detail="not_a_workspace_member")
+        case "TrialEnded":
+            raise HTTPException(status_code=403, detail="trial_ended")
         case workspace if workspace.payment_on_hold_since:
             raise HTTPException(status_code=403, detail="workspace_payment_on_hold")
         case workspace:

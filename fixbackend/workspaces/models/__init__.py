@@ -45,6 +45,22 @@ class Workspace:
             return max((self.created_at + timedelta(days=14, hours=12) - utc()).days, 0)
         return None
 
+    # for the cases of the trial period ended
+    def paid_tier_access(self, user_id: UserId) -> bool:
+        # owner can always access
+        if user_id == self.owner_id:
+            return True
+
+        if self.payment_on_hold_since is not None:
+            return False
+
+        # if trial period is over, no access
+        if trial_end := self.trial_end_days():
+            if trial_end == 0 and self.subscription_id is None:
+                return False
+
+        return True
+
 
 @frozen
 class WorkspaceInvitation:

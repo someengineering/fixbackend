@@ -59,7 +59,7 @@ def workspaces_router() -> APIRouter:
         """List all workspaces."""
         orgs = await workspace_repository.list_workspaces(user)
 
-        return [WorkspaceRead.from_model(org) for org in orgs]
+        return [WorkspaceRead.from_model(org, user.id) for org in orgs]
 
     @router.get("/{workspace_id}")
     async def get_workspace(
@@ -76,7 +76,7 @@ def workspaces_router() -> APIRouter:
         if user.id not in org.all_users():
             raise HTTPException(status_code=403, detail="You are not a member of this workspace")
 
-        return WorkspaceRead.from_model(org)
+        return WorkspaceRead.from_model(org, user.id)
 
     @router.get("/{workspace_id}/settings")
     async def get_workspace_settings(
@@ -115,7 +115,7 @@ def workspaces_router() -> APIRouter:
         except IntegrityError:
             raise HTTPException(status_code=409, detail="Organization with this slug already exists")
 
-        return WorkspaceRead.from_model(org)
+        return WorkspaceRead.from_model(org, user.id)
 
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
