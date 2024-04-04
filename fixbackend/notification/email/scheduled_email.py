@@ -19,7 +19,7 @@ from fastapi_users_db_sqlalchemy.generics import GUID
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
-from sqlalchemy import String, Integer, select, Index, and_, func, text, Select, union
+from sqlalchemy import String, Integer, select, Index, and_, func, text, Select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.auth.models.orm import User
@@ -32,7 +32,7 @@ from fixbackend.notification.user_notification_repo import UserNotificationSetti
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
-from fixbackend.workspaces.models.orm import Organization, OrganizationOwners, OrganizationMembers
+from fixbackend.workspaces.models.orm import Organization, OrganizationMembers
 
 log = logging.getLogger(__name__)
 no_cloud_account = "no_cloud_account"
@@ -92,14 +92,14 @@ class ScheduledEmailSender(Service):
             if len(workspace_ids) == 0:
                 return
 
-            # select all users that are owners or members of the workspaces and have not received the email
-            union_subquery = union(
-                select(OrganizationOwners.user_id).where(OrganizationOwners.organization_id.in_(workspace_ids)),
-                select(OrganizationMembers.user_id).where(OrganizationMembers.organization_id.in_(workspace_ids)),
-            ).alias("users")
+            subquery = (
+                select(OrganizationMembers.user_id)
+                .where(OrganizationMembers.organization_id.in_(workspace_ids))
+                .alias("users")
+            )
             query = (
                 select(User)
-                .select_from(User.__table__.join(union_subquery, User.id == union_subquery.c.user_id))  # type: ignore
+                .select_from(User.__table__.join(subquery, User.id == subquery.c.user_id))  # type: ignore
                 .outerjoin(
                     ScheduledEmailSentEntity,
                     and_(

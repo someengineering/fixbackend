@@ -35,10 +35,6 @@ class Organization(Base, CreatedUpdatedMixin):
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owner_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), nullable=False, index=True)
-    # todo: drop this column sometime
-    owners: Mapped[List["OrganizationOwners"]] = relationship(
-        back_populates="organization", lazy="joined"
-    )  # deprecated, do not use
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
     tier: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True, default=ProductTier.Trial.value)
     subscription_id: Mapped[Optional[SubscriptionId]] = mapped_column(GUID, nullable=True, index=True)
@@ -92,9 +88,7 @@ class OrganizationOwners(Base):
     __tablename__ = "organization_owners"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"), primary_key=True)
-    organization: Mapped[Organization] = relationship(back_populates="owners")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
-    user: Mapped[orm.User] = relationship()
 
 
 class OrganizationMembers(Base):

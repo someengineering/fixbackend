@@ -155,7 +155,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             statement = (
                 select(orm.Organization)
                 .where(orm.Organization.id == organization.id)
-                .options(selectinload(orm.Organization.owners), selectinload(orm.Organization.members))
+                .options(selectinload(orm.Organization.members))
             )
             results = await session.execute(statement)
             org = results.unique().scalar_one()
