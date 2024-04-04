@@ -51,6 +51,7 @@ from fixbackend.ids import (
     ProductTier,
 )
 from fixbackend.permissions.models import Roles, UserRole
+from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
 
@@ -144,7 +145,7 @@ cloud_account_service = InMemoryCloudAccountService()
 
 workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free, utc(), utc())
+workspace = Workspace(workspace_id, "foo", "foo", external_id, UserId(uid()), [], ProductTier.Free, utc(), utc())
 role_name = AwsRoleName("FooBarRole")
 account_id = CloudAccountId("123456789012")
 

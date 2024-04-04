@@ -29,6 +29,7 @@ from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, U
 from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
+from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
 from fixcloudutils.util import utc, UTC_Date_Format
@@ -38,7 +39,7 @@ from attrs import evolve
 
 external_id = ExternalId(uuid.uuid4())
 workspace_id = WorkspaceId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, [], [], ProductTier.Free, utc(), utc())
+workspace = Workspace(workspace_id, "foo", "foo", external_id, UserId(uid()), [], ProductTier.Free, utc(), utc())
 user_id = UserId(uuid.uuid4())
 user = User(
     id=user_id,

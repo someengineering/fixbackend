@@ -138,9 +138,11 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
-            organization = orm.Organization(id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value)
-            owner_relationship = orm.OrganizationOwners(user_id=owner.id)
-            organization.owners.append(owner_relationship)
+            organization = orm.Organization(
+                id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
+            )
+            member_relationship = orm.OrganizationMembers(user_id=owner.id)
+            organization.members.append(member_relationship)
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
@@ -153,7 +155,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             statement = (
                 select(orm.Organization)
                 .where(orm.Organization.id == organization.id)
-                .options(selectinload(orm.Organization.owners), selectinload(orm.Organization.members))
+                .options(selectinload(orm.Organization.members))
             )
             results = await session.execute(statement)
             org = results.unique().scalar_one()
@@ -194,14 +196,11 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             statement = (
                 select(orm.Organization)
                 .join(
-                    orm.OrganizationOwners, orm.Organization.id == orm.OrganizationOwners.organization_id, isouter=True
-                )
-                .join(
                     orm.OrganizationMembers,
                     orm.Organization.id == orm.OrganizationMembers.organization_id,
                     isouter=True,
                 )
-                .where(or_(orm.OrganizationOwners.user_id == user.id, orm.OrganizationMembers.user_id == user.id))
+                .where(or_(orm.Organization.owner_id == user.id, orm.OrganizationMembers.user_id == user.id))
             )
             results = await session.execute(statement)
             entities = results.unique().scalars().all()

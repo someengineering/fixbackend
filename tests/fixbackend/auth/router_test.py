@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from typing import Callable, List, Optional, Sequence, Tuple, override
 
 import jwt
@@ -121,6 +122,9 @@ class InMemoryRoleRepository(RoleRepository):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("LOCAL_DEV_ENV") is not None, reason="Skipping in local dev environment for performance reasons."
+)
 async def test_registration_flow(
     api_client: AsyncClient,
     fast_api: FastAPI,
@@ -210,6 +214,9 @@ async def test_registration_flow(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("LOCAL_DEV_ENV") is not None, reason="Skipping in local dev environment for performance reasons."
+)
 async def test_mfa_flow(
     api_client: AsyncClient,
     fast_api: FastAPI,

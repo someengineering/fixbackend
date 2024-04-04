@@ -57,7 +57,7 @@ class WorkspaceRead(BaseModel):
             id=model.id,
             slug=model.slug,
             name=model.name,
-            owners=model.owners,
+            owners=[model.owner_id],
             members=model.members,
             on_hold_since=model.payment_on_hold_since,
             created_at=model.created_at,

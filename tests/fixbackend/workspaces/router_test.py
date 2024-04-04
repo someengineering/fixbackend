@@ -25,7 +25,7 @@ from httpx import AsyncClient
 from fixbackend.auth.depedencies import get_current_active_verified_user, maybe_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
-from fixbackend.ids import WorkspaceId, ProductTier, ExternalId
+from fixbackend.ids import UserId, WorkspaceId, ProductTier, ExternalId
 from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
@@ -139,7 +139,7 @@ async def test_workspace_trial_period() -> None:
         "slug",
         "name",
         ExternalId(uid()),
-        [],
+        UserId(uid()),
         [],
         ProductTier.Trial,
         utc(),
