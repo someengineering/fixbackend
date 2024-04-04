@@ -28,7 +28,11 @@ from redis.asyncio import Redis
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
-from fixbackend.domain_events.events import TenantAccountsCollected, FailingBenchmarkChecksAlertSend
+from fixbackend.domain_events.events import (
+    TenantAccountsCollected,
+    FailingBenchmarkChecksAlertSend,
+    UserJoinedWorkspace,
+)
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -39,7 +43,7 @@ from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryCh
 from fixbackend.jwt import JwtService
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
-from fixbackend.notification.email.email_messages import EmailMessage
+from fixbackend.notification.email.email_messages import EmailMessage, UserJoinedWorkspaceMail
 from fixbackend.notification.email.email_notification import EmailNotificationSender
 from fixbackend.notification.email.email_sender import (
     EmailSender,
@@ -113,6 +117,9 @@ class NotificationService(Service):
         self.domain_event_sender = domain_event_sender
         if handle_events:
             domain_event_subscriber.subscribe(TenantAccountsCollected, self.alert_on_changed, "NotificationService")
+            domain_event_subscriber.subscribe(
+                UserJoinedWorkspace, self._send_welcome_email_to_new_user, "NotificationService"
+            )
 
     async def start(self) -> None:
         if self.handle_events:
@@ -339,3 +346,9 @@ class NotificationService(Service):
 
         else:
             log.error(f"Workspace {workspace_id} does not have GraphDbAccess?")
+
+    async def _send_welcome_email_to_new_user(self, event: UserJoinedWorkspace) -> None:
+        if (user := await self.user_repository.get(event.user_id)) and (
+            workspace := await self.workspace_repository.get_workspace(event.workspace_id)
+        ):
+            await self.send_message(to=user.email, message=UserJoinedWorkspaceMail(user=user, workspace=workspace))

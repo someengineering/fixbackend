@@ -12,15 +12,17 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Optional, Union
-from attrs import frozen
-
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Optional, Union
 
+from attrs import frozen
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+from fixbackend.auth.models import User
 from fixbackend.ids import CloudAccountId, WorkspaceId
 from fixbackend.utils import uid
+from fixbackend.workspaces.models import Workspace
 
 TemplatesPath = Path(__file__).parent / "templates"
 
@@ -171,4 +173,21 @@ Please visit https://app.fix.security/workspace-settings/accounts#{self.tenant_i
         )
 
 
-EmailMessage = Union[Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset, AccountDegraded]
+@frozen(kw_only=True)
+class UserJoinedWorkspaceMail:
+    user: User
+    workspace: Workspace
+
+    def subject(self) -> str:
+        return """Welcome to Fix!"""
+
+    def text(self) -> str:
+        return render("user_joined_workspace.txt", message=self)
+
+    def html(self) -> str:
+        return render("user_joined_workspace.html", message=self, user_id=self.user.id)
+
+
+EmailMessage = Union[
+    Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset, AccountDegraded, UserJoinedWorkspaceMail
+]
