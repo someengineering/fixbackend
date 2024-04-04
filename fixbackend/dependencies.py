@@ -24,8 +24,8 @@ from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.types import AsyncSessionMaker
 from fixbackend.jwt import JwtService, JwtServiceImpl
+from fixbackend.types import AsyncSessionMaker
 
 
 class ServiceNames:
@@ -112,6 +112,12 @@ class FixDependencies(Dependencies):
     @property
     def jwt_service(self) -> JwtService:
         return self.service(ServiceNames.jwt_service, JwtServiceImpl)
+
+    async def stop(self) -> None:
+        await super().stop()
+        # non-service objects that need to be stopped explicitly
+        if engine := self.service(ServiceNames.async_engine, AsyncEngine):
+            await engine.dispose()
 
 
 # placeholder for dependencies, will be replaced during the app initialization
