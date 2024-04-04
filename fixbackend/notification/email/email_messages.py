@@ -185,7 +185,7 @@ class UserJoinedWorkspaceMail:
         return render("user_joined_workspace.txt", message=self)
 
     def html(self) -> str:
-        return render("user_joined_workspace.html", message=self)
+        return render("user_joined_workspace.html", message=self, user_id=self.user.id)
 
 
 EmailMessage = Union[
