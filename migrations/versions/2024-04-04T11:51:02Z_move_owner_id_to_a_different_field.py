@@ -37,6 +37,16 @@ def upgrade() -> None:
         """
     )
 
+    # update the members table
+    # Step 3: Copy entries from organization_owners to organization_members.
+    op.execute(
+        """
+        INSERT INTO organization_members (organization_id, user_id)
+        SELECT organization_id, user_id
+        FROM organization_owners
+        """
+    )
+
     # make the new column not nullable and add a foreign key
     # op.alter_column("organization", "owner_id", existing_type=GUID(), nullable=False)
     op.create_foreign_key(None, "organization", "user", ["owner_id"], ["id"])

@@ -55,7 +55,9 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
 
     assert organization.product_tier == ProductTier.Trial
 
-    assert len(organization.members) == 0
+    assert len(organization.members) == 1
+    for member in organization.members:
+        assert member == user.id
 
     # creating an organization with the same slug should raise an exception
     with pytest.raises(Exception):
@@ -142,10 +144,11 @@ async def test_add_to_workspace(
 
     retrieved_organization = await workspace_repository.get_workspace(org_id)
     assert retrieved_organization
-    assert len(retrieved_organization.members) == 1
-    assert retrieved_organization.members[0] == new_user.id
+    assert len(retrieved_organization.members) == 2
+    assert new_user_id in retrieved_organization.members
 
     assert retrieved_organization.owner_id == user.id
+    assert user.id in retrieved_organization.members
 
     # when adding a user which is already a member of the organization, nothing should happen
     await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=new_user_id)

@@ -141,6 +141,8 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             organization = orm.Organization(
                 id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
             )
+            member_relationship = orm.OrganizationMembers(user_id=owner.id)
+            organization.members.append(member_relationship)
             session.add(organization)
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
