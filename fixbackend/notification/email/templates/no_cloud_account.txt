@@ -1,0 +1,45 @@
+Connect your Cloud Accounts
+
+We noticed you haven't added any cloud account to your Fix workspace yet,
+and we're here to guide you through this final, crucial step.
+It's your gateway to a world of clarity, security, and optimization
+for your cloud infrastructure and takes less than 5 minutes.
+
+Easy Steps to Connect Your Cloud Account
+
+1. Workspace Settings:
+   Login to Fix at https://app.fix.security and locate the Workspace
+   Settings icon at the bottom left of your screen.
+2. Access Accounts:
+   Within the Workspace Settings, you'll find the "Accounts" section.
+   Here's where you'll tell us what accounts to scan and turn on/off
+   individual accounts and add new ones.
+3. Add an Account:
+   Look to the top right and click on Add an Account https://app.fix.security/workspace-settings/accounts/setup-cloud .
+   Prepare for Deployment: Before moving forward, ensure you're logged into the correct AWS account -
+   the one you want us to secure and optimize.
+4. Deploy with Ease:
+   Click the "DEPLOY STACK" button.
+   This opens a new tab leading you to AWS CloudFormation.
+   You can stick with the default settings or customize the stack name to your liking.
+   Important: The WorkspaceId and ExternalId fields are pre-filled for your convenience.
+   Acknowledge the creation of IAM resources by checking the box and hit "Create Stack".
+5. Seal the Deal:
+   Now, you can close the AWS tab and head back to Fix.
+   Our system will spring into action, detecting your new CloudFormation stack.
+
+What Comes Next?
+
+Give us about 20 minutes after the stack creation,
+and we'll conduct our first scan of your cloud environment.
+We will send you a message when the first scan is complete,
+and you can start exploring the insights we've gathered.
+
+Here for You
+
+If any step in the process feels unclear,
+or if you encounter any bumps along the road, our team is standing by.
+Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
+
+Warm regards,
+The Fix Team
