@@ -92,14 +92,15 @@ class ScheduledEmailSender(Service):
             if len(workspace_ids) == 0:
                 return
 
-            subquery = (
-                select(OrganizationMembers.user_id)
-                .where(OrganizationMembers.organization_id.in_(workspace_ids))
-                .alias("users")
-            )
             query = (
                 select(User)
-                .select_from(User.__table__.join(subquery, User.id == subquery.c.user_id))  # type: ignore
+                .join(
+                    OrganizationMembers,
+                    and_(
+                        User.id == OrganizationMembers.user_id,  # type: ignore
+                        OrganizationMembers.organization_id.in_(workspace_ids),
+                    ),
+                )
                 .outerjoin(
                     ScheduledEmailSentEntity,
                     and_(
