@@ -11,17 +11,25 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import asyncio
+from argparse import Namespace
+from asyncio import Task
+from signal import signal, SIGINT
+from types import FrameType
+from typing import Optional, Any
 
 import uvicorn
-from fixbackend.config import parse_args, get_config
-from alembic.config import Config
 from alembic import command
+from alembic.config import Config
+
 from fixbackend.alembic_startup_utils import database_revision, all_migration_revisions
+from fixbackend.config import parse_args, get_config
 
 
 def main() -> None:
     args = parse_args()
 
+    # alembic wants to have its own async loop
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", get_config().database_url)
     if args.skip_migrations:
@@ -37,7 +45,12 @@ def main() -> None:
     else:
         command.upgrade(alembic_cfg, "head")
 
-    uvicorn.run(
+    # start a new async loop for the uvicorn server
+    asyncio.run(start(args))
+
+
+async def start(args: Namespace) -> None:
+    config = uvicorn.Config(
         "fixbackend.app:setup_process",
         host="0.0.0.0",
         log_level="info",
@@ -48,6 +61,22 @@ def main() -> None:
         ssl_keyfile=args.host_key,
         factory=True,
     )
+    server = uvicorn.Server(config)
+    wait_for_shutdown: Optional[Task[Any]] = None
+
+    def signal_handler(_: int, __: Optional[FrameType]) -> None:
+        nonlocal wait_for_shutdown
+        if wait_for_shutdown is None:
+            print("Interrupt received, shutting down...")
+            wait_for_shutdown = asyncio.create_task(server.shutdown())
+
+    # register signal handler to gracefully shutdown the server
+    signal(SIGINT, signal_handler)
+    # this will block until the server is stopped
+    await server.serve()
+    # wait for the server to finish shutting down
+    if wait_for_shutdown:
+        await wait_for_shutdown
 
 
 if __name__ == "__main__":
