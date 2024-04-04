@@ -27,7 +27,7 @@ class Workspace:
     slug: str
     name: str
     external_id: ExternalId
-    owners: List[UserId]
+    owner_id: UserId
     members: List[UserId]
     product_tier: ProductTier
     created_at: datetime
@@ -36,7 +36,7 @@ class Workspace:
     payment_on_hold_since: Optional[datetime] = None
 
     def all_users(self) -> List[UserId]:
-        return self.owners + self.members
+        return [self.owner_id] + self.members
 
     def trial_end_days(self) -> Optional[int]:
         if self.product_tier == ProductTier.Trial:

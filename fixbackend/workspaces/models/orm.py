@@ -34,7 +34,11 @@ class Organization(Base, CreatedUpdatedMixin):
     slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
-    owners: Mapped[List["OrganizationOwners"]] = relationship(back_populates="organization", lazy="joined")
+    owner_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), nullable=False, index=True)
+    # todo: drop this column sometime
+    owners: Mapped[List["OrganizationOwners"]] = relationship(
+        back_populates="organization", lazy="joined"
+    )  # deprecated, do not use
     members: Mapped[List["OrganizationMembers"]] = relationship(back_populates="organization", lazy="joined")
     tier: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True, default=ProductTier.Trial.value)
     subscription_id: Mapped[Optional[SubscriptionId]] = mapped_column(GUID, nullable=True, index=True)
@@ -47,7 +51,7 @@ class Organization(Base, CreatedUpdatedMixin):
             slug=self.slug,
             name=self.name,
             external_id=self.external_id,
-            owners=[UserId(owner.user_id) for owner in self.owners],
+            owner_id=UserId(self.owner_id),
             members=[UserId(member.user_id) for member in self.members],
             product_tier=ProductTier.from_str(self.tier),
             subscription_id=self.subscription_id,
@@ -79,6 +83,7 @@ class OrganizationInvite(Base):
         )
 
 
+# todo: remove this sometime
 class OrganizationOwners(Base):
     """
     Many-to-many relationship between organizations and owners.

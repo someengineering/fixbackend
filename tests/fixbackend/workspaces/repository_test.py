@@ -51,8 +51,7 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
 
     assert organization.name == "Test Organization"
     assert organization.slug == "test-organization"
-    for owner in organization.owners:
-        assert owner == user.id
+    assert organization.owner_id == user.id
 
     assert organization.product_tier == ProductTier.Trial
 
@@ -146,7 +145,7 @@ async def test_add_to_workspace(
     assert len(retrieved_organization.members) == 1
     assert retrieved_organization.members[0] == new_user.id
 
-    assert retrieved_organization.owners[0] == user.id
+    assert retrieved_organization.owner_id == user.id
 
     # when adding a user which is already a member of the organization, nothing should happen
     await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=new_user_id)
