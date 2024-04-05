@@ -390,7 +390,7 @@ class InventoryService(Service):
                     f"/ancestors.account.reported.id as account_id, "
                     f"{severity_prop} as severity,"
                     f"kind as kind"
-                    ": count(name) as count",
+                    ": count(name) as count | dump",
                 ) as result:
                     async for elem in result:
                         assert isinstance(elem, dict), f"Expected Json object but got {elem}"
