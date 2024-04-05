@@ -19,7 +19,7 @@ from typing import Annotated, Optional, Sequence
 
 from fastapi import Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -115,6 +115,13 @@ class WorkspaceRepository(ABC):
         self, been_in_trial_tier_for: timedelta, *, session: Optional[AsyncSession] = None
     ) -> Sequence[Workspace]:
         """List all workspaces which have been in trial for mor that provided time."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def remove_all_users_but_owner(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> None:
+        """Remove all users from the workspace except the owner."""
         raise NotImplementedError
 
 
@@ -336,6 +343,31 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             workspaces = results.unique().scalars().all()
             return [ws.to_model() for ws in workspaces]
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
+
+    async def remove_all_users_but_owner(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> None:
+        """Remove all users from the workspace except the owner."""
+
+        async def do_tx(session: AsyncSession) -> None:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            workspace = results.unique().scalar_one_or_none()
+            if workspace is None:
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+            delete_statement = (
+                delete(orm.OrganizationMembers)
+                .where(orm.OrganizationMembers.organization_id == workspace_id)
+                .where(orm.OrganizationMembers.user_id != workspace.owner_id)
+            )
+            await session.execute(delete_statement)
+            await session.commit()
 
         if session:
             return await do_tx(session)

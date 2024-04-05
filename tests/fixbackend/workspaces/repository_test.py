@@ -237,3 +237,28 @@ async def test_expired_trials(
     assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(seconds=0)) == [
         workspace
     ]
+
+
+@pytest.mark.asyncio
+async def test_remove_all_users_but_owner(
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+    async_session_maker: AsyncSessionMaker,
+) -> None:
+    user_db = await anext(get_user_repository(async_session_maker))
+    new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
+    new_user = await user_db.create(new_user_dict)
+    new_user_id = new_user.id
+    await workspace_repository.add_to_workspace(workspace_id=workspace.id, user_id=new_user.id)
+
+    retrieved_ws = await workspace_repository.get_workspace(workspace.id)
+    assert retrieved_ws
+    assert len(retrieved_ws.members) == 2
+    assert new_user_id in retrieved_ws.members
+    assert workspace.owner_id in retrieved_ws.members
+
+    await workspace_repository.remove_all_users_but_owner(workspace.id)
+    retrieved_ws = await workspace_repository.get_workspace(workspace.id)
+    assert retrieved_ws
+    assert len(retrieved_ws.members) == 1
+    assert workspace.owner_id in retrieved_ws.members

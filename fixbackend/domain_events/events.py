@@ -217,6 +217,12 @@ class UserJoinedWorkspace(Event):
 
 @frozen
 class ProductTierChanged(Event):
+    """
+    This event is emitted when a user changes their product tier.
+    Warning: If the user is downgrading from a paid tier to a free tier,
+    the user will lose their clolud accounts permanently (they won't be just disabled).
+    """
+
     kind: ClassVar[str] = "product_tier_changed"
 
     workspace_id: WorkspaceId
