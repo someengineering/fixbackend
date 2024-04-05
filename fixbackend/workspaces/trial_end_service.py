@@ -16,7 +16,6 @@
 import logging
 from datetime import timedelta
 from typing import Any, Optional
-from uuid import UUID
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
@@ -25,7 +24,7 @@ from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.config import ProductTierSettings
 from fixbackend.domain_events.events import ProductTierChanged
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import ProductTier, UserId
+from fixbackend.ids import ProductTier
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -81,7 +80,7 @@ class TrialEndService(Service):
                 await self.workspace_repository.remove_all_users_but_owner(workspace.id, session=session)
                 event = ProductTierChanged(
                     workspace_id=workspace.id,
-                    user_id=UserId(UUID("00000000-0000-0000-0000-000000000000")),
+                    user_id=workspace.owner_id,
                     product_tier=ProductTier.Free,
                     is_paid_tier=False,
                     is_higher_tier=False,
