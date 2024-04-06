@@ -83,7 +83,7 @@ class Boto3EmailSender(EmailSender):
         def send_email() -> None:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = "noreply@fix.security"
+            msg["From"] = "Fix Security <noreply@fix.security>"
             msg["To"] = to
             for key, value in additional_headers.items():
                 msg.add_header(key, value)
