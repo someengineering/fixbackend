@@ -223,9 +223,9 @@ Free = ProductTierSetting(
 Trial = ProductTierSetting(
     retention_period=timedelta(days=183),
     seats_included=1,
-    seats_max=1,
+    seats_max=None,
     scan_interval=timedelta(hours=1),
-    account_limit=1,
+    account_limit=None,
 )
 ProductTierSettings = defaultdict(
     lambda: Free,
