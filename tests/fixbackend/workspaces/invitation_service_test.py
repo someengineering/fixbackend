@@ -125,7 +125,7 @@ async def test_invite_accept_user(
     email = notification_service.call_args[0]
     assert isinstance(email, Invite)
     assert email.recipient == new_user_email
-    assert email.subject() == "You've been invited to join FIX!"
+    assert email.subject() == "You've been invited to join Fix!"
     assert email.text().startswith(f"{user.email} has invited you to join their workspace")
     assert "https://example.com?token=" in email.text()
 
