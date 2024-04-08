@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Your Fix trial has ended.</h1>
+
+<p>
+  We noticed you haven't bought a Fix subscription yet, and your trial has expired. Your account has been downgraded to
+  the Free plan, and you have lost access to the features available in the paid plans.
+
+  But don't worry, your account data is still there and you can easily get back on track by subscribing to one of our
+  plans.
+</p>
+
+<h2>Easy Steps to get a Fix subscription</h2>
+<ol>
+  <li>
+    <strong>Workspace Settings:</strong> <a href="https://app.fix.security">Login to Fix</a> and locate the Workspace
+    Settings icon at the bottom left of your screen.
+  </li>
+  <li>
+    <strong>Billing:</strong> Within the Workspace Settings, you'll find the "Billing" section. Here's where
+    can select a subscription plan that suits your needs.
+  </li>
+  <li>
+    <strong>Select the plan and add the payment method:</strong> Follow the instructions on the screen to select a plan
+    and add your payment method.
+  </li>
+
+</ol>
+
+<h2>What Comes Next?</h2>
+<p>
+  If you won't get a subscription, your account will be soon downgraded to the Free plan.
+  Only a single user will be able to log in, and the data collected about your cloud accounts will no longer be
+  available in Fix.
+  You will also lose access to the features available in the paid plans.
+</p>
+
+<h2>Here for You</h2>
+<p>
+  If any step in the process feels unclear, or if you encounter any bumps along the road, our team is standing by.
+  Contact us at <a href="mailto:support@fix.security">support@fix.security</a> or ping us on <a
+    href="https://discord.gg/fixsecurity">Discord</a>.
+</p>
+<p>
+  <a href="https://app.fix.security?origin=email&tpl={{ template_name }}" class="button" target="_blank">Login to
+    Fix</a>
+</p>
+
+
+<p>
+  Warm regards,<br />
+  The Fix Team
+</p>
+
+
+{% endblock content %}

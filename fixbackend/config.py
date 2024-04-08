@@ -213,6 +213,11 @@ class ProductTierSetting:
     account_limit: Optional[int]
 
 
+# todo: change this after we have payments
+TrialPeriodDuration = timedelta(days=365)
+NoPaymentAccountDowngradeTimeTimeout = timedelta(days=30)
+
+
 Free = ProductTierSetting(
     retention_period=timedelta(days=31),
     seats_included=1,

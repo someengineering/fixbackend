@@ -19,13 +19,14 @@ from fastapi_users_db_sqlalchemy.generics import GUID
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
-from sqlalchemy import String, Integer, select, Index, and_, func, text, Select
+from sqlalchemy import Result, String, Integer, select, Index, and_, func, text, Select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.auth.models.orm import User
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
-from fixbackend.ids import UserId, WorkspaceId
+from fixbackend.config import TrialPeriodDuration
+from fixbackend.ids import ProductTier, UserId, WorkspaceId
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity
@@ -33,9 +34,13 @@ from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from fixbackend.workspaces.models.orm import Organization, OrganizationMembers
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
+
 no_cloud_account = "no_cloud_account"
+trial_expires = "trial_expires"
+trial_expired = "trial_expired"
 
 
 class ScheduledEmailEntity(Base):
@@ -166,3 +171,78 @@ class ScheduledEmailSender(Service):
                 # mark this kind of email as sent
                 session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=to_send.kind, at=utc()))
             await session.commit()
+
+    async def _send_trial_end_reminder(self) -> None:
+
+        remind_before = [
+            timedelta(days=2),
+            timedelta(days=1),
+        ]
+
+        for trial_end in remind_before:
+            async with self.session_maker() as session:
+                result = (await users_with_trial_ending_in(session, trial_end, trial_expires)).unique().all()
+                user: User
+                for user, to_send in result:
+                    day = "days"
+                    if trial_end.days == 1:
+                        day = "day"
+
+                    expires_in = f"{trial_end.days} {day}"
+
+                    subject = f"Fix: Your trial is ending in {expires_in}"
+                    txt = email_messages.render(trial_expires + ".txt", period=expires_in)
+                    html = email_messages.render(trial_expires + ".html", user_id=user.id, period=expires_in)
+                    log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
+                    await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
+                await session.commit()
+
+        async with self.session_maker() as session:
+            five_seconds = timedelta(seconds=-5)
+            result = (await users_with_trial_ending_in(session, five_seconds, trial_expired)).unique().all()
+            for user, to_send in result:
+                subject = "Fix: Your trial is over"
+                txt = email_messages.render(trial_expired + ".txt")
+                html = email_messages.render(trial_expired + ".html", user_id=user.id)
+                log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
+                await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
+            await session.commit()
+
+
+async def users_with_trial_ending_in(
+    session: AsyncSession, trial_ends_in: timedelta, kind: str
+) -> Result[Tuple[User, ScheduledEmailEntity]]:
+
+    statement = (
+        select(User, ScheduledEmailEntity)
+        .select_from(
+            # This uses a literal TRUE to simulate a cross-join
+            User.__table__.join(ScheduledEmailEntity.__table__, text("true"))
+        )
+        .outerjoin(
+            ScheduledEmailSentEntity,
+            and_(
+                User.id == ScheduledEmailSentEntity.user_id,  # type: ignore
+                ScheduledEmailEntity.kind == ScheduledEmailSentEntity.kind,
+            ),
+        )
+        .join(
+            OrganizationMembers,
+            User.id == OrganizationMembers.user_id,  # type: ignore
+        )
+        .join(
+            Organization,
+            Organization.id == OrganizationMembers.organization_id,
+        )
+        .where(ScheduledEmailSentEntity.id.is_(None))
+        .where(
+            and_(
+                Organization.tier == ProductTier.Trial.value,
+                ScheduledEmailEntity.kind == kind,
+                Organization.created_at < utc() - TrialPeriodDuration + trial_ends_in,
+                Organization.created_at > utc() - TrialPeriodDuration + trial_ends_in - timedelta(hours=23),
+            )
+        )
+    )
+
+    return await session.execute(statement)
