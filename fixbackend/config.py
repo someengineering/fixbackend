@@ -96,7 +96,7 @@ class Config(BaseSettings):
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
-    parser = ArgumentParser(prog="FIX Backend")
+    parser = ArgumentParser(prog="Fix Backend")
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--instance-id", default=os.environ.get("FIX_INSTANCE_ID", "single"))
     parser.add_argument("--environment", choices=["dev", "prd"], default=os.environ.get("FIX_ENVIRONMENT", "dev"))

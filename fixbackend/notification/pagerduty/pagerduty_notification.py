@@ -48,7 +48,7 @@ class PagerDutyNotificationSender(AlertSender):
             "routing_key": integration_key,
             "dedup_key": alert.id,
             "event_action": "trigger",
-            "links": [{"href": alert.ui_link, "text": "See all failed resources in FIX"}],
+            "links": [{"href": alert.ui_link, "text": "See all failed resources in Fix"}],
             "images": [
                 {
                     "src": "https://cdn.fix.security/assets/fix-logos/fix-logo-192.png",
@@ -59,9 +59,9 @@ class PagerDutyNotificationSender(AlertSender):
             "payload": {
                 "summary": f"{alert.failed_checks_count_total} new issues detected in your infrastructure for benchmark {alert.benchmark}",
                 "severity": SeverityToPagerDutySeverity[alert.severity],
-                "source": "FIX",
+                "source": "Fix",
                 "timestamp": utc_str(),
-                "component": "FIX",
+                "component": "Fix",
                 "group": "Benchmark",
                 "class": alert.benchmark,
                 "custom_details": {

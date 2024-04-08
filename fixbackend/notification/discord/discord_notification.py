@@ -47,7 +47,7 @@ class DiscordNotificationSender(AlertSender):
                 {
                     "title": f"{alert.severity.capitalize()}: New issues Detected in your Infrastructure!",
                     "author": {
-                        "name": "FIX",
+                        "name": "Fix",
                         "url": "https://fix.security",
                         "icon_url": "https://cdn.fix.security/assets/fix-logos/fix-logo-256.png",
                     },
@@ -67,7 +67,7 @@ class DiscordNotificationSender(AlertSender):
                         for vr in alert.examples
                     ]
                     + exhausted
-                    + [{"name": "See the full list of failing resources", "value": f"[View in FIX]({alert.ui_link})"}],
+                    + [{"name": "See the full list of failing resources", "value": f"[View in Fix]({alert.ui_link})"}],
                     "color": 16744272,
                 }
             ]

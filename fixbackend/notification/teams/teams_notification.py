@@ -70,7 +70,7 @@ class TeamsNotificationSender(AlertSender):
             "potentialAction": [
                 {
                     "@type": "OpenUri",
-                    "name": "View in FIX",
+                    "name": "View in Fix",
                     "targets": [{"os": "default", "uri": alert.ui_link}],
                 }
             ],

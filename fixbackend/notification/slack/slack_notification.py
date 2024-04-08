@@ -69,7 +69,7 @@ class SlackNotificationSender(AlertSender):
                             "accessory": {
                                 "type": "image",
                                 "image_url": "https://cdn.fix.security/assets/fix-logos/fix-logo-256.png",
-                                "alt_text": "FIX",
+                                "alt_text": "Fix",
                             },
                         },
                     ]
@@ -93,7 +93,7 @@ class SlackNotificationSender(AlertSender):
                                 {
                                     "type": "image",
                                     "image_url": "https://cdn.fix.security/assets/fix-logos/fix-logo-256.png",
-                                    "alt_text": "FIX logo",
+                                    "alt_text": "Fix logo",
                                 },
                                 {
                                     "type": "mrkdwn",

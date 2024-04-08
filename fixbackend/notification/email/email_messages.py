@@ -67,7 +67,7 @@ class Invite:
     recipient: str
 
     def subject(self) -> str:
-        return "You've been invited to join FIX!"
+        return "You've been invited to join Fix!"
 
     def text(self) -> str:
         text = (
@@ -94,10 +94,10 @@ class VerifyEmail:
     verification_link: str
 
     def subject(self) -> str:
-        return "FIX: verify your e-mail address"
+        return "Fix: verify your e-mail address"
 
     def text(self) -> str:
-        return f"Hello fellow FIX user, click this link to verify your email. {self.verification_link}"
+        return f"Hello fellow Fix user, click this link to verify your email. {self.verification_link}"
 
     def html(self) -> str:
         return render(
@@ -115,10 +115,10 @@ class PasswordReset:
     password_reset_link: str
 
     def subject(self) -> str:
-        return "FIX: password reset"
+        return "Fix: password reset"
 
     def text(self) -> str:
-        return f"You requested a password reset link for your FIX account. Here it is: {self.password_reset_link}"
+        return f"You requested a password reset link for your Fix account. Here it is: {self.password_reset_link}"
 
     def html(self) -> str:
         return render(
@@ -133,10 +133,10 @@ class PasswordReset:
 @frozen(kw_only=True)
 class SecurityScanFinished:
     def subject(self) -> str:
-        return "FIX: Security Scan Finished"
+        return "Fix: Security Scan Finished"
 
     def text(self) -> str:
-        return "Your first security scan is finished! You can now view the results in the FIX console."
+        return "Your first security scan is finished! You can now view the results in the Fix console."
 
     def html(self) -> str:
         return render(
