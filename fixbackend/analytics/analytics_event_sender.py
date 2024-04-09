@@ -24,6 +24,7 @@ from typing import MutableSequence
 
 from async_lru import alru_cache
 from fixcloudutils.asyncio.periodic import Periodic
+from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import uuid_str, utc
 from httpx import AsyncClient
@@ -50,7 +51,7 @@ class NoAnalyticsEventSender(AnalyticsEventSender):
         return UserId(uuid.uuid5(uuid.NAMESPACE_DNS, "fixbackend"))
 
 
-class MultiAnalyticsEventSender(AnalyticsEventSender):
+class MultiAnalyticsEventSender(AnalyticsEventSender, Service):
     def __init__(self, senders: List[AnalyticsEventSender]) -> None:
         self.senders = senders
         self.event_handler: Optional[Any] = None
@@ -63,6 +64,14 @@ class MultiAnalyticsEventSender(AnalyticsEventSender):
         for sender in self.senders:
             return await sender.user_id_from_workspace(workspace_id)
         raise ValueError("No senders configured")
+
+    async def start(self) -> Any:
+        for sender in self.senders:
+            await sender.start()
+
+    async def stop(self) -> None:
+        for sender in self.senders:
+            await sender.stop()
 
 
 class GoogleAnalyticsEventSender(AnalyticsEventSender):
