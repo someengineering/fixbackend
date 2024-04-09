@@ -31,11 +31,11 @@ from fixbackend.ids import (
 
 
 class AwsCloudFormationLambdaCallbackParameters(BaseModel):
-    workspace_id: WorkspaceId = Field(description="Your FIX-assigned Workspace ID")
-    external_id: ExternalId = Field(description="Your FIX-assigned External ID")
+    workspace_id: WorkspaceId = Field(description="Your Fix-assigned Workspace ID")
+    external_id: ExternalId = Field(description="Your Fix-assigned External ID")
     account_id: CloudAccountId = Field(description="AWS account ID", pattern=r"^\d{12}$")
     role_name: AwsRoleName = Field(description="AWS role name", max_length=2048)
-    fix_stack_version: int = Field(description="The version of the FIX stack")
+    fix_stack_version: int = Field(description="The version of the Fix stack")
 
     model_config = {
         "json_schema_extra": {

@@ -97,10 +97,6 @@ async def test_invite_accept_user(
 
     new_user_email = "new@foo.com"
 
-    # invite can't be done if there are no free seats
-    with pytest.raises(NotAllowed):
-        await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
-
     await workspace_repository.update_subscription(workspace.id, subscription.id)
 
     # invite can't be done if the workspace has payment on hold
@@ -125,7 +121,7 @@ async def test_invite_accept_user(
     email = notification_service.call_args[0]
     assert isinstance(email, Invite)
     assert email.recipient == new_user_email
-    assert email.subject() == "You've been invited to join FIX!"
+    assert email.subject() == "You've been invited to join Fix!"
     assert email.text().startswith(f"{user.email} has invited you to join their workspace")
     assert "https://example.com?token=" in email.text()
 

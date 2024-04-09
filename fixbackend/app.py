@@ -469,7 +469,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
 
     app = FastAPI(
         title="Fix Backend",
-        summary="Backend for the FIX project",
+        summary="Backend for the Fix project",
         lifespan=lifespan,
         swagger_ui_parameters=dict(docExpansion=False, tagsSorter="alpha", operationsSorter="alpha"),
     )

@@ -47,7 +47,7 @@ class OpsgenieNotificationSender(AlertSender):
                 for num, fail in enumerate(alert.examples)
             },
             "priority": SeverityToOpsgeniePriority[alert.severity],
-            "source": "FIX",
+            "source": "Fix",
         }
 
     async def send_alert(self, alert: Alert, config: Json) -> None:
