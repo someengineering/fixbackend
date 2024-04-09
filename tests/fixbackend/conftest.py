@@ -175,6 +175,7 @@ def default_config() -> Config:
         slack_oauth_client_secret="",
         service_base_url="http://localhost:8000",
         push_gateway_url=None,
+        posthog_api_key=None,
     )
 
 

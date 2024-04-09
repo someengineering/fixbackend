@@ -147,7 +147,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
             await self.role_repository.add_roles(owner.id, workspace_id, Roles.workspace_owner, session=session)
-            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
+            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, name, slug, owner.id))
 
             await session.commit()
             await session.refresh(organization)

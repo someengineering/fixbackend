@@ -45,7 +45,7 @@ events = [
     AwsAccountDeleted(user_id, fix_cloud_account_id, workspace_id, cloud_account_id),
     AwsAccountDegraded(fix_cloud_account_id, workspace_id, cloud_account_id, "aws final name", "some error"),
     TenantAccountsCollected(workspace_id, {fix_cloud_account_id: collect_info}, now + timedelta(hours=1)),
-    WorkspaceCreated(workspace_id, user_id),
+    WorkspaceCreated(workspace_id, "name", "slug", user_id),
 ]
 
 # CHANGING THE JSON STRUCTURE HERE MEANS BREAKING THE EVENT CONTRACT!
