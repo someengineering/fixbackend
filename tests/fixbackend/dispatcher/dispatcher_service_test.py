@@ -99,7 +99,7 @@ async def test_receive_workspace_created(
     )
     # signal to the dispatcher that the new workspace was created
     await dispatcher.process_workspace_created(
-        WorkspaceCreated(workspace.id, user.id),
+        WorkspaceCreated(workspace.id, workspace.name, workspace.slug, user.id),
     )
     # check that a new entry was created in the next_run table
     next_run = await session.get(NextTenantRun, workspace.id)

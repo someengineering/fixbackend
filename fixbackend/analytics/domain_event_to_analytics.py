@@ -12,11 +12,17 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
+from typing import List
 
 from httpx import AsyncClient
 
 from fixbackend.analytics import AnalyticsEventSender
-from fixbackend.analytics.analytics_event_sender import GoogleAnalyticsEventSender, NoAnalyticsEventSender
+from fixbackend.analytics.analytics_event_sender import (
+    GoogleAnalyticsEventSender,
+    NoAnalyticsEventSender,
+    PostHogEventSender,
+    MultiAnalyticsEventSender,
+)
 from fixbackend.analytics.events import (
     AEUserRegistered,
     AEAccountDiscovered,
@@ -78,7 +84,7 @@ class DomainEventToAnalyticsEventHandler:
     async def handle(self, event: Event) -> None:
         match event:
             case UserRegistered() as event:
-                await self.sender.send(AEUserRegistered(event.user_id, event.tenant_id))
+                await self.sender.send(AEUserRegistered(event.user_id, event.tenant_id, event.email))
             case AwsAccountDiscovered() as event:
                 user_id = await self.sender.user_id_from_workspace(event.tenant_id)
                 await self.sender.send(AEAccountDiscovered(user_id, event.tenant_id, "aws"))
@@ -94,7 +100,7 @@ class DomainEventToAnalyticsEventHandler:
                 user_id = await self.sender.user_id_from_workspace(event.tenant_id)
                 await self.sender.send(AEAccountNameChanged(user_id, event.tenant_id, event.cloud))
             case WorkspaceCreated() as event:
-                await self.sender.send(AEWorkspaceCreated(event.user_id, event.workspace_id))
+                await self.sender.send(AEWorkspaceCreated(event.user_id, event.workspace_id, event.name, event.slug))
             case InvitationAccepted() as event:
                 user_id = event.user_id or await self.sender.user_id_from_workspace(event.workspace_id)
                 await self.sender.send(AEInvitationAccepted(user_id, event.workspace_id))
@@ -127,11 +133,16 @@ def analytics(
     domain_event_subscriber: DomainEventSubscriber,
     workspace_repo: WorkspaceRepository,
 ) -> AnalyticsEventSender:
+    senders: List[AnalyticsEventSender] = []
     if (measurement_id := config.google_analytics_measurement_id) and (secret := config.google_analytics_api_secret):
         log.info("Use Google Analytics Event Sender.")
-        sender = GoogleAnalyticsEventSender(client, measurement_id, secret, workspace_repo)
-        sender.event_handler = DomainEventToAnalyticsEventHandler(domain_event_subscriber, sender)
-        return sender
-    else:
+        senders.append(GoogleAnalyticsEventSender(client, measurement_id, secret, workspace_repo))
+    if api_key := config.posthog_api_key:
+        log.info("Use Posthog Event Sender.")
+        senders.append(PostHogEventSender(api_key, workspace_repo))
+    if len(senders) == 0:
         log.info("Analytics turned off.")
-        return NoAnalyticsEventSender()
+        senders.append(NoAnalyticsEventSender())
+    sender = MultiAnalyticsEventSender(senders)
+    sender.event_handler = DomainEventToAnalyticsEventHandler(domain_event_subscriber, sender)
+    return sender
