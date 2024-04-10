@@ -31,7 +31,7 @@ class Organization(Base, CreatedUpdatedMixin):
     __tablename__ = "organization"
 
     id: Mapped[WorkspaceId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
-    slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(length=320), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(length=320), nullable=False)
     external_id: Mapped[ExternalId] = mapped_column(GUID, default=uuid.uuid4, nullable=False)
     owner_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), nullable=False, index=True)

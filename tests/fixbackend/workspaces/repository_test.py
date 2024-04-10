@@ -59,9 +59,11 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
     for member in organization.members:
         assert member == user.id
 
-    # creating an organization with the same slug should raise an exception
-    with pytest.raises(Exception):
-        await workspace_repository.create_workspace(name="Test Organization", slug="test-organization", owner=user)
+    # creating an organization with the same slug should not raise an exception but adjust the slug
+    same_slug = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+    assert same_slug.slug == f"test-organization-{same_slug.id}"
 
 
 @pytest.mark.asyncio
