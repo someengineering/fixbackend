@@ -12,7 +12,6 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from typing import Callable, List, Optional, Sequence, Tuple, override
 
 import jwt
@@ -27,6 +26,7 @@ from fixbackend.auth.auth_backend import session_cookie_name
 from fixbackend.auth.models import User
 from fixbackend.auth.models.orm import UserMFARecoveryCode
 from fixbackend.auth.schemas import OTPConfig
+from fixbackend.auth.user_manager import get_password_helper
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
 from fixbackend.domain_events.dependencies import get_domain_event_publisher
@@ -38,7 +38,7 @@ from fixbackend.permissions.role_repository import RoleRepository, get_role_repo
 from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
-from tests.fixbackend.conftest import InMemoryDomainEventPublisher
+from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InsecureFastPasswordHelper
 from fixbackend.certificates.cert_store import CertificateStore
 
 
@@ -122,9 +122,6 @@ class InMemoryRoleRepository(RoleRepository):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.getenv("LOCAL_DEV_ENV") is not None, reason="Skipping in local dev environment for performance reasons."
-)
 async def test_registration_flow(
     api_client: AsyncClient,
     fast_api: FastAPI,
@@ -132,6 +129,7 @@ async def test_registration_flow(
     workspace_repository: WorkspaceRepository,
     user_repository: UserRepository,
     cert_store: CertificateStore,
+    password_helper: InsecureFastPasswordHelper,
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
@@ -140,6 +138,7 @@ async def test_registration_flow(
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
     fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
     fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
+    fast_api.dependency_overrides[get_password_helper] = lambda: password_helper
 
     registration_json = {
         "email": "user@example.com",
@@ -214,14 +213,12 @@ async def test_registration_flow(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.getenv("LOCAL_DEV_ENV") is not None, reason="Skipping in local dev environment for performance reasons."
-)
 async def test_mfa_flow(
     api_client: AsyncClient,
     fast_api: FastAPI,
     domain_event_sender: InMemoryDomainEventPublisher,
     user_repository: UserRepository,
+    password_helper: InsecureFastPasswordHelper,
 ) -> None:
     verifier = InMemoryVerifier()
     invitation_repo = InMemoryInvitationRepo()
@@ -230,6 +227,7 @@ async def test_mfa_flow(
     fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
     fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
     fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
+    fast_api.dependency_overrides[get_password_helper] = lambda: password_helper
 
     # register user
     registration_json = {"email": "user2@example.com", "password": "changeme"}
