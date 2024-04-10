@@ -138,6 +138,13 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
+
+            # get workspace by slug
+            statement = select(orm.Organization).where(orm.Organization.slug == slug)
+            slug_exists = (await session.execute(statement)).unique().scalar_one_or_none()
+            if slug_exists:
+                slug = f"{slug}-{workspace_id}"
+
             organization = orm.Organization(
                 id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
             )
