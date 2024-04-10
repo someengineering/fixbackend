@@ -188,20 +188,27 @@ class PostHogEventSender(AnalyticsEventSender):
                     self.client.identify(  # type: ignore
                         distinct_id=str(event.user_id),
                         properties={"email": event.email},
+                        timestamp=utc(),
+                        uuid=uuid_str(),
                     )
                 # when a workspace is created, identify it as a group
                 if isinstance(event, AEWorkspaceCreated):
                     self.client.group_identify(  # type: ignore
-                        "workspace_id", str(event.workspace_id), properties={"name": event.name, "slug": event.slug}
+                        group_type="workspace_id",
+                        group_key=str(event.workspace_id),
+                        properties={"name": event.name, "slug": event.slug},
+                        timestamp=utc(),
+                        uuid=uuid_str(),
                     )
                 # if the event has a workspace_id, use it to define the group
                 groups = {"workspace_id": str(ws)} if (ws := getattr(event, "workspace_id", None)) else None
                 self.client.capture(  # type: ignore
-                    distinct_id=uuid_str(),
+                    distinct_id=str(event.user_id),
                     event=event.kind,
                     properties=event.to_json(),
                     timestamp=utc(),
                     groups=groups,
+                    uuid=uuid_str(),
                 )
             self.queue.clear()
 
