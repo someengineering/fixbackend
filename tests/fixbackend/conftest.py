@@ -13,12 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import hashlib
 import json
 import os
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from pathlib import Path
+import random
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
 from unittest.mock import patch
 
@@ -39,6 +41,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
+from fastapi_users.password import PasswordHelper
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
@@ -686,6 +689,25 @@ async def dispatcher(
 @pytest.fixture
 async def cert_store(default_config: Config) -> CertificateStore:
     return CertificateStore(default_config)
+
+
+class InsecureFastPasswordHelper(PasswordHelper):
+    def __init__(self) -> None:
+        pass
+
+    def verify_and_update(self, plain_password: str, hashed_password: str) -> Tuple[bool, str]:
+        return hashed_password == hashlib.md5(plain_password.encode()).hexdigest(), hashed_password
+
+    def hash(self, password: str) -> str:
+        return hashlib.md5(password.encode()).hexdigest()
+
+    def generate(self) -> str:
+        return str(random.randint(100000, 999999))
+
+
+@pytest.fixture
+def password_helper() -> InsecureFastPasswordHelper:
+    return InsecureFastPasswordHelper()
 
 
 @pytest.fixture

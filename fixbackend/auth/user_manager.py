@@ -69,6 +69,8 @@ class UserManager(BaseUserManager[User, UserId]):
         self.workspace_repository = workspace_repository
         self.domain_events_publisher = domain_events_publisher
         self.invitation_repository = invitation_repository
+        self.custom_password_helper = password_helper is not None
+        self.otp_valid_window = 1
 
     def parse_id(self, value: Any) -> UserId:
         if isinstance(value, UUID):
@@ -219,6 +221,12 @@ class UserManager(BaseUserManager[User, UserId]):
         return user
 
     async def compute_recovery_codes(self) -> Tuple[list[str], list[str]]:
+        # use custom password helper if provided, e.g. for testing
+        if self.custom_password_helper:
+            recovery_codes = [secrets.token_hex(16) for _ in range(10)]
+            hashes = [self.password_helper.hash(code) for code in recovery_codes]
+            return recovery_codes, hashes
+
         # create recovery codes
         recovery_codes = [secrets.token_hex(16) for _ in range(10)]
         # create hashes of the recovery codes
@@ -246,7 +254,7 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def enable_mfa(self, user: User, otp: str) -> bool:
         assert not user.is_mfa_active, "User already has MFA enabled."
-        if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp, valid_window=1):
+        if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp, valid_window=self.otp_valid_window):
             return False
         await self.user_repository.update(user, {"is_mfa_active": True})
         return True
@@ -263,15 +271,23 @@ class UserManager(BaseUserManager[User, UserId]):
         if not user.is_mfa_active:
             return True
         if (secret := user.otp_secret) and (otp_defined := otp):
-            return pyotp.TOTP(secret).verify(otp_defined)
+            return pyotp.TOTP(secret).verify(otp_defined, valid_window=self.otp_valid_window)
         if recovery_code:
             return await self.user_repository.delete_recovery_code(user.id, recovery_code, self.password_helper)
         return False
 
 
+def get_password_helper() -> PasswordHelperProtocol | None:
+    return None
+
+
+PasswordHelperDependency = Annotated[PasswordHelperProtocol | None, Depends(get_password_helper)]
+
+
 async def get_user_manager(
     config: ConfigDependency,
     user_repository: UserRepositoryDependency,
+    password_helper: PasswordHelperDependency,
     user_verifier: AuthEmailSenderDependency,
     workspace_repository: WorkspaceRepositoryDependency,
     domain_event_publisher: DomainEventPublisherDependency,
@@ -280,7 +296,7 @@ async def get_user_manager(
     yield UserManager(
         config,
         user_repository,
-        None,
+        password_helper,
         user_verifier,
         workspace_repository,
         domain_event_publisher,
