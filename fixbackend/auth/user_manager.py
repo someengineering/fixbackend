@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import logging
 import re
 import secrets
 from typing import Annotated, Any, AsyncIterator, Optional, Tuple
@@ -41,6 +42,7 @@ from passlib.context import CryptContext
 
 # do not change this without regenerating MFA recovery codes in the db
 crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+log = logging.getLogger(__name__)
 
 
 def bcrypt_hash(password: str) -> str:
@@ -99,6 +101,7 @@ class UserManager(BaseUserManager[User, UserId]):
         self, user: User, request: Optional[Request] = None, response: Optional[Response] = None
     ) -> None:
         await super().on_after_login(user, request, response)
+        log.info(f"User logged in: {user.email} ({user.id})")
         await self.domain_events_publisher.publish(UserLoggedIn(user.id, user.email))
 
     async def add_to_workspace(self, user: User) -> None:
@@ -106,6 +109,7 @@ class UserManager(BaseUserManager[User, UserId]):
             pending_invitation := await self.invitation_repository.get_invitation_by_email(user.email)
         ) and pending_invitation.accepted_at:
             if workspace := await self.workspace_repository.get_workspace(pending_invitation.workspace_id):
+                log.info(f"Add user {user.email} to workspace {workspace.id}")
                 await self.workspace_repository.add_to_workspace(workspace.id, user.id)
             else:
                 # wtf?
@@ -113,6 +117,7 @@ class UserManager(BaseUserManager[User, UserId]):
             await self.invitation_repository.delete_invitation(pending_invitation.id)
         else:
             workspace = await self.create_default_workspace(user)
+            log.info(f"Create new workspace {workspace.id} for {user.email}.")
 
         await self.domain_events_publisher.publish(
             UserRegistered(user_id=user.id, email=user.email, tenant_id=workspace.id)
@@ -123,6 +128,7 @@ class UserManager(BaseUserManager[User, UserId]):
         return await self.workspace_repository.create_workspace(user.email, org_slug, user)
 
     async def remove_oauth_account(self, account_id: UUID) -> None:
+        log.info(f"Remove oauth account with id {account_id}")
         await self.user_repository.remove_oauth_account(account_id)
 
     async def get(self, id: UserId) -> User:
@@ -244,6 +250,7 @@ class UserManager(BaseUserManager[User, UserId]):
         return recovery_codes, hashes
 
     async def recreate_mfa(self, user: User) -> OTPConfig:
+        log.info(f"Recreate MFA for user {user.email}")
         assert not user.is_mfa_active, "User already has MFA enabled."
         user_secret = pyotp.random_base32()
         # create recovery codes
@@ -253,6 +260,7 @@ class UserManager(BaseUserManager[User, UserId]):
         return OTPConfig(secret=user_secret, recovery_codes=recovery_codes)
 
     async def enable_mfa(self, user: User, otp: str) -> bool:
+        log.info(f"Enable MFA for user {user.email}")
         assert not user.is_mfa_active, "User already has MFA enabled."
         if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp, valid_window=self.otp_valid_window):
             return False
@@ -260,6 +268,7 @@ class UserManager(BaseUserManager[User, UserId]):
         return True
 
     async def disable_mfa(self, user: User, otp: Optional[str], recovery_code: Optional[str]) -> bool:
+        log.info(f"Disable MFA for user {user.email}")
         if not user.is_mfa_active:
             return True
         if await self.check_otp(user, otp, recovery_code):
