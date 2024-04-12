@@ -179,6 +179,8 @@ def default_config() -> Config:
         service_base_url="http://localhost:8000",
         push_gateway_url=None,
         posthog_api_key=None,
+        stripe_api_key=None,
+        stripe_webhook_key=None,
     )
 
 
@@ -306,7 +308,9 @@ async def graph_db_access(
 
 
 @pytest.fixture
-async def subscription(subscription_repository: SubscriptionRepository, user: User) -> AwsMarketplaceSubscription:
+async def aws_marketplace_subscription(
+    subscription_repository: SubscriptionRepository, user: User
+) -> AwsMarketplaceSubscription:
     return await subscription_repository.create(
         AwsMarketplaceSubscription(
             id=SubscriptionId(uid()),

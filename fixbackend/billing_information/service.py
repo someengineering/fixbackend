@@ -28,7 +28,7 @@ from fixbackend.domain_events.events import ProductTierChanged
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier, UserId, WorkspaceId
-from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
+from fixbackend.subscription.models import BillingEntry, SubscriptionMethod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -59,7 +59,7 @@ class BillingEntryService:
         if workspace.product_tier == ProductTier.Free or workspace.product_tier == ProductTier.Trial:
             payment_methods.append(PaymentMethods.NoPaymentMethod())
 
-        async def get_current_subscription() -> Optional[AwsMarketplaceSubscription]:
+        async def get_current_subscription() -> Optional[SubscriptionMethod]:
             if workspace.subscription_id is None:
                 return None
 
@@ -118,6 +118,8 @@ class BillingEntryService:
                 return workspace
             match payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
+                    return await self.workspace_repository.update_subscription(workspace.id, subscription_id)
+                case PaymentMethods.StripeSubscription(subscription_id):
                     return await self.workspace_repository.update_subscription(workspace.id, subscription_id)
                 case PaymentMethods.NoPaymentMethod():
                     return await self.workspace_repository.update_subscription(workspace.id, None)

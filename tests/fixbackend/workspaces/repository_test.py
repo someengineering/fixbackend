@@ -165,13 +165,13 @@ async def test_update_product_tier(
     workspace_repository: WorkspaceRepository,
     user: User,
     workspace: Workspace,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
     billing_admin = evolve(
         user, roles=[UserRole(user_id=user.id, workspace_id=workspace.id, role_names=Roles.workspace_billing_admin)]
     )
 
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
     current_tier = workspace.product_tier
     assert current_tier == ProductTier.Trial
@@ -193,14 +193,14 @@ async def test_update_product_tier(
 async def test_assign_subscription(
     workspace_repository: WorkspaceRepository,
     workspace: Workspace,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
     assert workspace.subscription_id is None
 
-    workspace = await workspace_repository.update_subscription(workspace.id, subscription.id)
-    assert workspace.subscription_id == subscription.id
+    workspace = await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
+    assert workspace.subscription_id == aws_marketplace_subscription.id
 
-    with_subscription = await workspace_repository.list_workspaces_by_subscription_id(subscription.id)
+    with_subscription = await workspace_repository.list_workspaces_by_subscription_id(aws_marketplace_subscription.id)
     assert len(with_subscription) == 1
     assert with_subscription[0].id == workspace.id
 

@@ -88,6 +88,7 @@ from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
+from fixbackend.subscription.stripe_subscription import create_stripe_service
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -214,6 +215,12 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg.args.aws_marketplace_metering_sqs_url,
                 domain_event_publisher,
                 cfg.billing_period,
+            ),
+        )
+        deps.add(
+            SN.stripe_service,
+            create_stripe_service(
+                cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher
             ),
         )
         deps.add(

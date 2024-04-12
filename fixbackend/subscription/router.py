@@ -19,15 +19,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import logging
+from typing import Optional
 
-from fastapi import APIRouter, Form, Cookie, Response, Request
-from starlette.responses import RedirectResponse
+from fastapi import APIRouter, Form, Cookie, Response, Request, Depends
+from starlette.responses import RedirectResponse, JSONResponse
 
-from fixbackend.auth.depedencies import OptionalAuthenticatedUser
+from fixbackend.auth.depedencies import OptionalAuthenticatedUser, AuthenticatedUser
+from fixbackend.permissions.models import workspace_billing_admin_permissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandlerDependency
+from fixbackend.subscription.stripe_subscription import StripeServiceDependency
+from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 AddUrlName = "aws-marketplace-subscription-add"
+BackFromStripe = "back-from-stripe"
 MarketplaceTokenCookie = "fix-aws-marketplace-token"
+log = logging.getLogger(__name__)
 
 
 def subscription_router() -> APIRouter:
@@ -67,5 +75,38 @@ def subscription_router() -> APIRouter:
             return response
         else:  # something went wrong
             raise ValueError("No AWS token found!")
+
+    @router.get("/workspaces/{workspace_id}/subscriptions/stripe", include_in_schema=False)
+    async def redirect_to_stripe(
+        workspace: UserWorkspaceDependency,
+        stripe_service: StripeServiceDependency,
+        request: Request,
+        _: bool = Depends(WorkspacePermissionChecker(workspace_billing_admin_permissions)),
+    ) -> Response:
+        return_url = request.url_for(BackFromStripe, workspace_id=workspace.id)
+        print(str(return_url))
+        url = await stripe_service.redirect_to_stripe(workspace, str(return_url))
+        return RedirectResponse(url)
+
+    @router.get("/workspaces/{workspace_id}/subscriptions/stripe/back", include_in_schema=False, name=BackFromStripe)
+    async def back_from_stripe(_: AuthenticatedUser, success: Optional[bool] = None) -> Response:
+        # success is only returned from the checkout, not the customer portal (hence optional)
+        # in case the user did the checkout successfully, we want to show a message
+        # otherwise nothing is shown - the user can visit the checkout as often as they want
+        if success:
+            return RedirectResponse("/?message=stripe-subscribed")
+        return RedirectResponse("/")
+
+    @router.post("/subscriptions/stripe/events", include_in_schema=False)
+    async def stripe_callback(request: Request, stripe_service: StripeServiceDependency) -> Response:
+        signature = request.headers.get("Stripe-Signature")
+        assert signature is not None, "No Stripe-Signature header found"
+        js_bytes = await request.body()
+        try:
+            await stripe_service.handle_event(js_bytes, signature)
+            return JSONResponse({"success": True})
+        except Exception as e:
+            log.error("Could not handle stripe event", exc_info=True)
+            return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
     return router

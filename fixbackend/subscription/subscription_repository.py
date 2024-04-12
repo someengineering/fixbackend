@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Optional, Tuple, AsyncIterator
+from typing import Annotated, Optional, Tuple, AsyncIterator, cast
 from fastapi import Depends
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -32,9 +32,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import ProductTier, WorkspaceId, UserId, SubscriptionId, BillingId
+from fixbackend.ids import ProductTier, WorkspaceId, UserId, SubscriptionId, BillingId, StripeCustomerId
 from fixbackend.sqlalechemy_extensions import UTCDateTime
-from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
+from fixbackend.subscription.models import (
+    AwsMarketplaceSubscription,
+    BillingEntry,
+    StripeSubscription,
+    SubscriptionMethod,
+    SubscriptionMethodType,
+)
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 
@@ -45,37 +51,63 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
 
     id: Mapped[SubscriptionId] = mapped_column(GUID, primary_key=True)
     user_id: Mapped[Optional[UserId]] = mapped_column(GUID, nullable=True, index=True)
-    aws_customer_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
-    aws_customer_account_id: Mapped[str] = mapped_column(String(128), nullable=True, default="")
-    aws_product_code: Mapped[str] = mapped_column(String(128), nullable=False)
+    aws_customer_identifier: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    aws_customer_account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default="")
+    aws_product_code: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
     next_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
 
-    def to_model(self) -> AwsMarketplaceSubscription:
-        return AwsMarketplaceSubscription(
-            id=self.id,
-            user_id=self.user_id,
-            customer_identifier=self.aws_customer_identifier,
-            customer_aws_account_id=self.aws_customer_account_id,
-            product_code=self.aws_product_code,
-            active=self.active,
-            last_charge_timestamp=self.last_charge_timestamp,
-            next_charge_timestamp=self.next_charge_timestamp,
-        )
+    def to_model(self) -> SubscriptionMethod:
+        if stripe_subscription_id := self.stripe_subscription_id:
+            return StripeSubscription(
+                id=self.id,
+                stripe_subscription_id=stripe_subscription_id,
+                active=self.active,
+                last_charge_timestamp=self.last_charge_timestamp,
+                next_charge_timestamp=self.next_charge_timestamp,
+            )
+        elif (
+            (customer_identifier := self.aws_customer_identifier)
+            and (customer_account_id := self.aws_customer_account_id)
+            and (product_code := self.aws_product_code)
+        ):
+            return AwsMarketplaceSubscription(
+                id=self.id,
+                user_id=self.user_id,
+                customer_identifier=customer_identifier,
+                customer_aws_account_id=customer_account_id,
+                product_code=product_code,
+                active=self.active,
+                last_charge_timestamp=self.last_charge_timestamp,
+                next_charge_timestamp=self.next_charge_timestamp,
+            )
+        else:
+            raise ValueError("Subscription is neither AWS Marketplace nor Stripe")
 
     @staticmethod
-    def from_model(subscription: AwsMarketplaceSubscription) -> SubscriptionEntity:
-        return SubscriptionEntity(
-            id=subscription.id,
-            user_id=subscription.user_id,
-            aws_customer_identifier=subscription.customer_identifier,
-            aws_customer_account_id=subscription.customer_aws_account_id,
-            aws_product_code=subscription.product_code,
-            active=subscription.active,
-            last_charge_timestamp=subscription.last_charge_timestamp,
-            next_charge_timestamp=subscription.next_charge_timestamp,
-        )
+    def from_model(subscription: SubscriptionMethod) -> SubscriptionEntity:
+        if isinstance(subscription, AwsMarketplaceSubscription):
+            return SubscriptionEntity(
+                id=subscription.id,
+                user_id=subscription.user_id,
+                aws_customer_identifier=subscription.customer_identifier,
+                aws_customer_account_id=subscription.customer_aws_account_id,
+                aws_product_code=subscription.product_code,
+                active=subscription.active,
+                last_charge_timestamp=subscription.last_charge_timestamp,
+                next_charge_timestamp=subscription.next_charge_timestamp,
+            )
+        elif isinstance(subscription, StripeSubscription):
+            return SubscriptionEntity(
+                id=subscription.id,
+                user_id=None,
+                stripe_subscription_id=subscription.stripe_subscription_id,
+                active=subscription.active,
+                last_charge_timestamp=subscription.last_charge_timestamp,
+                next_charge_timestamp=subscription.next_charge_timestamp,
+            )
 
 
 class BillingEntity(CreatedUpdatedMixin, Base):
@@ -129,7 +161,7 @@ class SubscriptionRepository:
                 .where(SubscriptionEntity.user_id == user_id)
             )
             if result := (await session.execute(stmt)).scalar_one_or_none():
-                return result.to_model()
+                return cast(AwsMarketplaceSubscription, result.to_model())
             else:
                 return None
 
@@ -142,7 +174,7 @@ class SubscriptionRepository:
             )
             return result.rowcount  # noqa
 
-    async def get_subscription(self, subscription_id: SubscriptionId) -> Optional[AwsMarketplaceSubscription]:
+    async def get_subscription(self, subscription_id: SubscriptionId) -> Optional[SubscriptionMethod]:
         async with self.session_maker() as session:
             stmt = select(SubscriptionEntity).where(SubscriptionEntity.id == subscription_id)
             if result := (await session.execute(stmt)).scalar_one_or_none():
@@ -159,7 +191,9 @@ class SubscriptionRepository:
         next_charge_timestamp_before: Optional[datetime] = None,
         next_charge_timestamp_after: Optional[datetime] = None,
         session: Optional[AsyncSession] = None,
-    ) -> AsyncIterator[AwsMarketplaceSubscription]:
+        is_aws_marketplace_subscription: Optional[bool] = None,
+        is_stripe_subscription: Optional[bool] = None,
+    ) -> AsyncIterator[SubscriptionMethod]:
         query = select(SubscriptionEntity)
         if user_id:
             query = query.where(SubscriptionEntity.user_id == user_id)
@@ -171,6 +205,12 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.next_charge_timestamp <= next_charge_timestamp_before)
         if next_charge_timestamp_after:
             query = query.where(SubscriptionEntity.next_charge_timestamp > next_charge_timestamp_after)
+        if (is_aws := is_aws_marketplace_subscription) is not None:
+            aws_customer = SubscriptionEntity.aws_customer_identifier
+            query = query.where(aws_customer.isnot(None) if is_aws else aws_customer.is_(None))
+        if (is_stripe := is_stripe_subscription) is not None:
+            stripe_sub = SubscriptionEntity.stripe_subscription_id
+            query = query.where(stripe_sub.isnot(None) if is_stripe else stripe_sub.is_(None))
 
         if session:
             async for (subscription,) in await session.stream(query):
@@ -180,15 +220,16 @@ class SubscriptionRepository:
                 async for (subscription,) in await session.stream(query):
                     yield subscription.to_model()
 
-    async def unreported_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
+    async def unreported_aws_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
         async with self.session_maker() as session:
             query = (
                 select(BillingEntity, SubscriptionEntity)
                 .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
                 .where(BillingEntity.reported == False)  # noqa
+                .where(SubscriptionEntity.aws_customer_identifier != None)  # noqa
             )
             async for billing_entity, subscription_entity in await session.stream(query):
-                yield billing_entity.to_model(), subscription_entity.to_model()
+                yield billing_entity.to_model(), cast(AwsMarketplaceSubscription, subscription_entity.to_model())
 
     async def add_billing_entry(
         self,
@@ -246,7 +287,7 @@ class SubscriptionRepository:
             )
             return result.rowcount  # noqa
 
-    async def create(self, subscription: AwsMarketplaceSubscription) -> AwsMarketplaceSubscription:
+    async def create(self, subscription: SubscriptionMethodType) -> SubscriptionMethodType:
         async with self.session_maker() as session:
             session.add(SubscriptionEntity.from_model(subscription))
             await session.commit()
@@ -268,7 +309,7 @@ class SubscriptionRepository:
 
     async def list_billing_for_workspace(
         self, workspace_id: WorkspaceId
-    ) -> AsyncIterator[Tuple[BillingEntry, AwsMarketplaceSubscription]]:
+    ) -> AsyncIterator[Tuple[BillingEntry, SubscriptionMethod]]:
         async with self.session_maker() as session:
             query = (
                 select(BillingEntity, SubscriptionEntity)
@@ -277,6 +318,39 @@ class SubscriptionRepository:
             )
             async for billing_entity, subscription_entity in await session.stream(query):
                 yield billing_entity.to_model(), subscription_entity.to_model()
+
+
+class StripeCustomerEntity(CreatedUpdatedMixin, Base):
+    __tablename__ = "stripe_customers"
+    workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, primary_key=True)
+    customer_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+
+
+class StripeCustomerRepository:
+    def __init__(self, session_maker: AsyncSessionMaker) -> None:
+        self.session_maker = session_maker
+
+    async def get(self, workspace_id: WorkspaceId) -> Optional[StripeCustomerId]:
+        async with self.session_maker() as session:
+            stmt = select(StripeCustomerEntity).where(StripeCustomerEntity.workspace_id == workspace_id)
+            if result := (await session.execute(stmt)).scalar_one_or_none():
+                return StripeCustomerId(result.customer_id)
+            else:
+                return None
+
+    async def workspace_of_customer(self, customer_id: StripeCustomerId) -> Optional[WorkspaceId]:
+        async with self.session_maker() as session:
+            stmt = select(StripeCustomerEntity.workspace_id).where(StripeCustomerEntity.customer_id == customer_id)
+            if result := (await session.execute(stmt)).scalar_one_or_none():
+                return result
+            else:
+                return None
+
+    async def create(self, workspace_id: WorkspaceId, customer_id: StripeCustomerId) -> None:
+        async with self.session_maker() as session:
+            entity = StripeCustomerEntity(workspace_id=workspace_id, customer_id=customer_id)
+            session.add(entity)
+            await session.commit()
 
 
 def get_subscription_repository(fix: FixDependency) -> SubscriptionRepository:

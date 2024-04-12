@@ -89,7 +89,7 @@ async def test_invite_accept_user(
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
     user: User,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
@@ -97,7 +97,7 @@ async def test_invite_accept_user(
 
     new_user_email = "new@foo.com"
 
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
     # invite can't be done if the workspace has payment on hold
     await workspace_repository.update_payment_on_hold(workspace.id, utc())

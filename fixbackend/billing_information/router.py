@@ -75,6 +75,8 @@ def billing_info_router(config: Config) -> APIRouter:
             match billing.workspace_payment_method:
                 case schemas.NoPaymentMethod():
                     return PaymentMethods.NoPaymentMethod()
+                case schemas.StripeSubscription():
+                    return PaymentMethods.StripeSubscription(billing.workspace_payment_method.subscription_id)
                 case schemas.AwsSubscription():
                     return PaymentMethods.AwsSubscription(billing.workspace_payment_method.subscription_id)
                 case None:

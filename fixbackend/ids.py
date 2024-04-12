@@ -22,6 +22,7 @@ TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
 Email = NewType("Email", str)
+StripeCustomerId = NewType("StripeCustomerId", str)
 
 
 class NotificationProvider(StrEnum):
@@ -33,6 +34,7 @@ class NotificationProvider(StrEnum):
     opsgenie = "opsgenie"
 
 
+BillingPeriod = Literal["month", "day"]
 ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 
 

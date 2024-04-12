@@ -367,10 +367,10 @@ async def test_compute_next_run(
     dispatcher: DispatcherService,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
 
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
     for product_tier in ProductTier:
 

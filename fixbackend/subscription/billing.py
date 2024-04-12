@@ -24,7 +24,7 @@ import prometheus_client
 
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.models import SubscriptionMethod, BillingEntry
+from fixbackend.subscription.models import SubscriptionMethod, BillingEntry, AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -64,8 +64,8 @@ class BillingService(Service):
             await self.create_overdue_billing_entries(now, parallel_requests)
             log.info("Report usages to AWS Marketplace")
             await self.aws_marketplace.report_unreported_usages()
-            log.info("Report no usage for all active subscriptions")
-            await self.report_no_usage_for_active_subscriptions(now, parallel_requests)
+            log.info("Report no usage for all active AWS Marketplace subscriptions")
+            await self.report_no_usage_for_active_aws_marketplace_subscriptions(now, parallel_requests)
             await self.push_metrics()
         finally:
             kill_running_process()
@@ -97,14 +97,21 @@ class BillingService(Service):
             ):
                 group.create_task(create_billing_entry(subscription))
 
-    async def report_no_usage_for_active_subscriptions(self, now: datetime, parallel_requests: int) -> None:
+    async def report_no_usage_for_active_aws_marketplace_subscriptions(
+        self, now: datetime, parallel_requests: int
+    ) -> None:
         semaphore = asyncio.Semaphore(parallel_requests)
 
-        async def chunked_subscriptions(size: int) -> AsyncIterator[List[Tuple[SubscriptionMethod, BillingEntry]]]:
-            chunk: List[Tuple[SubscriptionMethod, BillingEntry]] = []
+        async def chunked_subscriptions(
+            size: int,
+        ) -> AsyncIterator[List[Tuple[AwsMarketplaceSubscription, BillingEntry]]]:
+            chunk: List[Tuple[AwsMarketplaceSubscription, BillingEntry]] = []
             async for subscription in self.subscription_repository.subscriptions(
-                active=True, next_charge_timestamp_after=now
+                active=True, is_aws_marketplace_subscription=True, next_charge_timestamp_after=now
             ):
+                assert isinstance(
+                    subscription, AwsMarketplaceSubscription
+                ), f"Expected AwsMarketplaceSubscription, but got {subscription}"
                 for workspace in await self.workspace_repository.list_workspaces_by_subscription_id(subscription.id):
                     # create a dummy billing entry with no usage
                     entry = BillingEntry(
@@ -124,7 +131,7 @@ class BillingService(Service):
             if len(chunk) > 0:
                 yield chunk
 
-        async def report_usages(chunk: List[Tuple[SubscriptionMethod, BillingEntry]]) -> None:
+        async def report_usages(chunk: List[Tuple[AwsMarketplaceSubscription, BillingEntry]]) -> None:
             assert 0 < len(chunk) <= 25, f"Chunk size must be between 1 and 25, but got {len(chunk)}"
             product_code = chunk[0][0].product_code  # all subscriptions in a chunk have the same product code
             async with semaphore:

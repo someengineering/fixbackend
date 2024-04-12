@@ -53,6 +53,7 @@ async def start(args: Namespace) -> None:
     config = uvicorn.Config(
         "fixbackend.app:setup_process",
         host="0.0.0.0",
+        port=args.port,
         log_level="info",
         ws_ping_interval=1,
         ws_ping_timeout=5,
