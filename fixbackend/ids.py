@@ -52,7 +52,9 @@ class ProductTier(StrEnum):
 
     @property
     def paid(self) -> bool:
-        return self != ProductTier.Free
+        not_free = self != ProductTier.Free
+        not_trial = self != ProductTier.Trial
+        return not_free and not_trial
 
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, ProductTier):

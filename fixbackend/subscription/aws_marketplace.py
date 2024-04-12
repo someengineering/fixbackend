@@ -207,7 +207,8 @@ class AwsMarketplaceHandler(Service):
                 product_tier = max(tiers, default=ProductTier.Free)
                 # We only count the number of accounts, no matter how many runs we had
                 usage = int(len(summaries) * month_factor)
-                if product_tier == ProductTier.Free or usage == 0:
+                on_payment_free_tier = product_tier.paid is False
+                if on_payment_free_tier or usage == 0:
                     log.info(f"AWS Marketplace: customer {customer} has no usage")
                     # move the charge timestamp tp
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)

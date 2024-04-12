@@ -181,9 +181,13 @@ async def test_create_free_tier_billing_entry(
         create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
     )
 
+    mrTrial = partial(
+        create_metering_record, workspace_id=workspace.id, account_id="acc3", product_tier=ProductTier.Trial
+    )
+
     mr2 = partial(create_metering_record, workspace_id=workspace.id, account_id="acc2", product_tier=ProductTier.Free)
     # create 3 metering records for acc1 and acc2, all with free tiers
-    await metering_repository.add([mr1free(), mr1free(), mr1free(), mr2(), mr2(), mr2()])
+    await metering_repository.add([mr1free(), mr1free(), mr1free(), mrTrial(), mrTrial(), mr2(), mr2(), mr2()])
     # billing entry is not created for free tier accounts because we have a job that reports dummy zero usage for such cases
     billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
     assert billing is None
