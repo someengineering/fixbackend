@@ -33,11 +33,7 @@ from httpx import AsyncClient
 from redis.asyncio import Redis
 
 from fixbackend.analytics import AnalyticsEventSender
-from fixbackend.analytics.events import (
-    AEFirstAccountCollectFinished,
-    AEFirstWorkspaceCollectFinished,
-    AEWorkspaceCollectFinished,
-)
+from fixbackend.analytics.events import AEFirstAccountCollectFinished, AEFirstWorkspaceCollectFinished
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
@@ -369,8 +365,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         if updated.failed_scan_count > 3:
                             await self.__degrade_account(updated.id, "Too many consecutive failed scans")
 
-                    user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                     if first_workspace_collect:
+                        user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(
                             AEFirstWorkspaceCollectFinished(user_id, event.tenant_id)
                         )
@@ -379,16 +375,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             workspace_id=event.tenant_id, message=email.SecurityScanFinished()
                         )
                     if first_account_collect:
+                        user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
-
-                    await self.analytics_event_sender.send(
-                        AEWorkspaceCollectFinished(
-                            user_id,
-                            event.tenant_id,
-                            len(collected_accounts),
-                            sum(a.scanned_resources for a in event.cloud_accounts.values()),
-                        )
-                    )
 
                 case AwsAccountDiscovered.kind:
                     discovered_event = AwsAccountDiscovered.from_json(message)
