@@ -113,7 +113,7 @@ class StripeService(Service):
     async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
         raise NotImplementedError("No payment service configured.")
 
-    async def handle_event(self, event: bytes, signature: str) -> None:
+    async def handle_event(self, event: str, signature: str) -> None:
         raise NotImplementedError("No payment service configured.")
 
 
@@ -172,7 +172,7 @@ class StripeServiceImpl(StripeService):
             url = cu_session.url
         return url
 
-    async def handle_event(self, event: bytes, signature: str) -> None:
+    async def handle_event(self, event: str, signature: str) -> None:
         we = Webhook.construct_event(event, signature, self.webhook_key)  # type: ignore
         do = we.data.object
         log.info(f"Received Stripe event: {we.type}: {we.id}")

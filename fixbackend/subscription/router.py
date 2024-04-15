@@ -103,7 +103,7 @@ def subscription_router() -> APIRouter:
         assert signature is not None, "No Stripe-Signature header found"
         js_bytes = await request.body()
         try:
-            await stripe_service.handle_event(js_bytes, signature)
+            await stripe_service.handle_event(js_bytes.decode("utf-8"), signature)
             return JSONResponse({"success": True})
         except Exception as e:
             log.error("Could not handle stripe event", exc_info=True)
