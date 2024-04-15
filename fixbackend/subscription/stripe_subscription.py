@@ -55,16 +55,6 @@ class StripeClient:
     async def create_customer(self, email: str) -> stripe.Customer:
         return await stripe.Customer.create_async(email=email)
 
-    async def get_subscription(self, customer_id: StripeCustomerId) -> Optional[stripe.Subscription]:
-        # Look for an already active subscription of the customer
-        subscriptions = await stripe.Subscription.list_async(customer=customer_id)
-        for sub in subscriptions.auto_paging_iter():
-            # subscriptions of this kind need to be renewed
-            if sub.status != "incomplete_expired" and sub.status != "canceled":
-                return sub
-        return None
-        # If we come here, there is no subscription. Create a new one.
-
     async def create_subscription(
         self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
     ) -> stripe.Subscription:
@@ -99,13 +89,12 @@ class StripeClient:
             result.append(usage_record)
         return result
 
-    async def activation_product_id(self) -> str:
-        # Expect a single price that is not recurring
+    async def activation_price_id(self) -> str:
         prices = await self.get_prices()
         for p in prices:
-            if p.recurring is None:
+            if p.lookup_key == "activation" and p.recurring is None:
                 return p.id
-        raise ValueError("No activation product found!")
+        raise ValueError("No activation price found!")
 
     async def get_price_ids_by_product_id(self) -> Dict[str, str]:
         prices = await self.get_prices()
@@ -152,7 +141,7 @@ class StripeServiceImpl(StripeService):
 
     async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
         customer_id = await self._get_stripe_customer_id(workspace)
-        subscription = await self.client.get_subscription(customer_id)
+        subscription = await self._get_stripe_subscription_id(customer_id)
         if subscription is None:
             # No subscription yet: let the user create a one-time payment as activation.
             # Once the activation is done, we will create a subscription from the provided payment method.
@@ -162,12 +151,13 @@ class StripeServiceImpl(StripeService):
                 customer=customer_id,
                 success_url=f"{return_url}?success=true",
                 cancel_url=f"{return_url}?success=false",
-                payment_intent_data={
-                    "setup_future_usage": "off_session",  # we want to use this payment method for future payments
-                },
+                payment_intent_data=dict(
+                    setup_future_usage="off_session",  # we want to use this payment method for future payments
+                    metadata=dict(reason="activation"),  # mark this payment to be refunded
+                ),
                 line_items=[
                     {
-                        "price": await self.client.activation_product_id(),
+                        "price": await self.client.activation_price_id(),
                         "quantity": 1,
                     }
                 ],
@@ -213,6 +203,7 @@ class StripeServiceImpl(StripeService):
             subscription = await self.subscription_repository.create(
                 StripeSubscription(
                     id=SubscriptionId(uid()),
+                    customer_identifier=customer_id,
                     stripe_subscription_id=stripe_subscription.id,
                     active=True,
                     last_charge_timestamp=utc(),
@@ -236,6 +227,12 @@ class StripeServiceImpl(StripeService):
             customer_id = StripeCustomerId(customer.id)
             await self.stripe_customer_repo.create(workspace.id, customer_id)
         return customer_id
+
+    async def _get_stripe_subscription_id(self, customer_id: str) -> Optional[str]:
+        async for sub in self.subscription_repository.subscriptions(stripe_customer_identifier=customer_id):
+            if isinstance(sub, StripeSubscription) and sub.stripe_subscription_id:
+                return sub.stripe_subscription_id
+        return None
 
 
 def create_stripe_service(

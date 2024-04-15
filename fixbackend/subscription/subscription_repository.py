@@ -54,31 +54,29 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
     aws_customer_identifier: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     aws_customer_account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default="")
     aws_product_code: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    stripe_customer_identifier: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
     next_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
 
     def to_model(self) -> SubscriptionMethod:
-        if stripe_subscription_id := self.stripe_subscription_id:
+        if self.stripe_subscription_id and self.stripe_customer_identifier:
             return StripeSubscription(
                 id=self.id,
-                stripe_subscription_id=stripe_subscription_id,
+                customer_identifier=self.stripe_customer_identifier,
+                stripe_subscription_id=self.stripe_subscription_id,
                 active=self.active,
                 last_charge_timestamp=self.last_charge_timestamp,
                 next_charge_timestamp=self.next_charge_timestamp,
             )
-        elif (
-            (customer_identifier := self.aws_customer_identifier)
-            and (customer_account_id := self.aws_customer_account_id)
-            and (product_code := self.aws_product_code)
-        ):
+        elif self.aws_customer_identifier and self.aws_customer_account_id and self.aws_product_code:
             return AwsMarketplaceSubscription(
                 id=self.id,
                 user_id=self.user_id,
-                customer_identifier=customer_identifier,
-                customer_aws_account_id=customer_account_id,
-                product_code=product_code,
+                customer_identifier=self.aws_customer_identifier,
+                customer_aws_account_id=self.aws_customer_account_id,
+                product_code=self.aws_product_code,
                 active=self.active,
                 last_charge_timestamp=self.last_charge_timestamp,
                 next_charge_timestamp=self.next_charge_timestamp,
@@ -103,6 +101,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
             return SubscriptionEntity(
                 id=subscription.id,
                 user_id=None,
+                stripe_customer_identifier=subscription.customer_identifier,
                 stripe_subscription_id=subscription.stripe_subscription_id,
                 active=subscription.active,
                 last_charge_timestamp=subscription.last_charge_timestamp,
@@ -187,6 +186,7 @@ class SubscriptionRepository:
         *,
         user_id: Optional[UserId] = None,
         aws_customer_identifier: Optional[str] = None,
+        stripe_customer_identifier: Optional[str] = None,
         active: Optional[bool] = None,
         next_charge_timestamp_before: Optional[datetime] = None,
         next_charge_timestamp_after: Optional[datetime] = None,
@@ -205,6 +205,8 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.next_charge_timestamp <= next_charge_timestamp_before)
         if next_charge_timestamp_after:
             query = query.where(SubscriptionEntity.next_charge_timestamp > next_charge_timestamp_after)
+        if stripe_customer_identifier:
+            query = query.where(SubscriptionEntity.stripe_customer_identifier == stripe_customer_identifier)
         if (is_aws := is_aws_marketplace_subscription) is not None:
             aws_customer = SubscriptionEntity.aws_customer_identifier
             query = query.where(aws_customer.isnot(None) if is_aws else aws_customer.is_(None))

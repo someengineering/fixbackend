@@ -42,6 +42,7 @@ class AwsMarketplaceSubscription:
 @frozen
 class StripeSubscription:
     id: SubscriptionId
+    customer_identifier: str
     stripe_subscription_id: str
     active: bool
     last_charge_timestamp: Optional[datetime]

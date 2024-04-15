@@ -42,8 +42,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("workspace_id"),
         sa.UniqueConstraint("customer_id"),
     )
-    # add stripe_subscription_id column (nullable)
+    # add stripe_subscription columns (nullable)
     op.add_column("subscriptions", sa.Column("stripe_subscription_id", sa.String(length=128), nullable=True))
+    op.add_column("subscriptions", sa.Column("stripe_customer_identifier", sa.String(length=128), nullable=True))
     # define the aws columns as nullable
     op.alter_column("subscriptions", "aws_customer_identifier", existing_type=mysql.VARCHAR(length=128), nullable=True)
     op.alter_column("subscriptions", "aws_product_code", existing_type=mysql.VARCHAR(length=128), nullable=True)
