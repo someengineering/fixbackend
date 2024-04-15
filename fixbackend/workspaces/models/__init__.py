@@ -12,12 +12,13 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
 from attrs import frozen
 from fixcloudutils.util import utc
 
+from fixbackend.config import trial_period_duration
 from fixbackend.ids import InvitationId, SubscriptionId, WorkspaceId, UserId, ExternalId, ProductTier
 
 
@@ -42,7 +43,7 @@ class Workspace:
 
     def trial_end_days(self) -> Optional[int]:
         if self.product_tier == ProductTier.Trial:
-            return max((self.created_at + timedelta(days=14, hours=12) - utc()).days, 0)
+            return max((self.created_at + trial_period_duration() - utc()).days, 0)
         return None
 
     # for the cases of the trial period ended
