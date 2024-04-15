@@ -29,7 +29,7 @@ from async_lru import alru_cache
 from fastapi import Depends
 from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.service import Service
-from fixcloudutils.util import utc
+from fixcloudutils.util import utc, value_in_path
 from stripe import Webhook
 
 from fixbackend.auth.user_repository import UserRepository
@@ -88,6 +88,9 @@ class StripeClient:
             )
             result.append(usage_record)
         return result
+
+    async def refund(self, payment_intent_id: str) -> stripe.Refund:
+        return await stripe.Refund.create_async(payment_intent=payment_intent_id)
 
     async def activation_price_id(self) -> str:
         prices = await self.get_prices()
@@ -172,16 +175,23 @@ class StripeServiceImpl(StripeService):
     async def handle_event(self, event: bytes, signature: str) -> None:
         we = Webhook.construct_event(event, signature, self.webhook_key)  # type: ignore
         do = we.data.object
-        log.info(f"Received Stripe event: {we.type}: {we.data.object}")
+        log.info(f"Received Stripe event: {we.type}: {we.id}")
         match we.type:
             case "checkout.session.completed":
-                if isinstance(customer_id := do["customer"], str) and isinstance(pid := do["payment_intent"], str):
+                customer_id = do.get("customer")
+                intent_id = do.get("payment_intent")
+                if customer_id and isinstance(pid := intent_id, str):
                     await self._create_stripe_subscription(StripeCustomerId(customer_id), pid)
                 else:
                     log.error("Invalid checkout session event: missing customer or payment intent")
-            case "charge.succeeded":
-                # listen for the one time payment and trigger a refund
-                pass
+            case "payment_intent.succeeded":
+                reason = value_in_path(do, ["metadata", "reason"])
+                customer_id = do.get("customer")
+                intent_id = do.get("id")
+                # activation payments should be refunded
+                if reason == "activation" and intent_id and customer_id:
+                    log.info(f"Activation payment found for customer {customer_id}. Refund.")
+                    await self.client.refund(intent_id)
             case "invoice.finalized":
                 # we could send the invoice via email to the customer
                 pass
