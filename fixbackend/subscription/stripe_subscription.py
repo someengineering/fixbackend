@@ -22,7 +22,7 @@
 import logging
 import time
 from datetime import timedelta
-from typing import Dict, List, Annotated, Optional
+from typing import Dict, List, Annotated, Optional, Unpack
 
 import stripe
 from async_lru import alru_cache
@@ -37,7 +37,7 @@ from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import SubscriptionCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import BillingPeriod, StripeCustomerId, SubscriptionId
+from fixbackend.ids import BillingPeriod, StripeCustomerId, SubscriptionId, StripeSubscriptionId
 from fixbackend.subscription.models import StripeSubscription
 from fixbackend.subscription.subscription_repository import StripeCustomerRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
@@ -48,27 +48,29 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 log = logging.getLogger(__name__)
 
 
-class StripeClient:
+class StripeClient:  # pragma: no cover
     def __init__(self, api_key: str) -> None:
         stripe.api_key = api_key
 
-    async def create_customer(self, email: str) -> stripe.Customer:
-        return await stripe.Customer.create_async(email=email)
+    async def create_customer(self, email: str) -> StripeCustomerId:
+        customer = await stripe.Customer.create_async(email=email)
+        return StripeCustomerId(customer.id)
 
     async def create_subscription(
         self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
-    ) -> stripe.Subscription:
+    ) -> StripeSubscriptionId:
         # Get the money two days after the next billing period.
         # Usage is reported on 1.th - charged on 3.th
         subscription_at = start_of_next_period(period=billing_period) + timedelta(days=2)
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
-        return await stripe.Subscription.create_async(
+        subscription = await stripe.Subscription.create_async(
             customer=customer_id,
             items=[{"price": price} for price in price_ids_by_product_id.values()],
             billing_cycle_anchor=int(time.mktime(subscription_at.timetuple())),
             # automatic_tax=dict(enabled=True),
             default_payment_method=payment_method_id,
         )
+        return StripeSubscriptionId(subscription.id)
 
     async def create_usage_record(self, subscription_id: str, quantity: Dict[str, int]) -> List[stripe.UsageRecord]:
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
@@ -103,6 +105,21 @@ class StripeClient:
         prices = await self.get_prices()
         return {p.product.name: p.id for p in prices if p.recurring is not None}  # type: ignore
 
+    async def checkout_session(self, **params: Unpack[stripe.checkout.Session.CreateParams]) -> str:
+        session = await stripe.checkout.Session.create_async(**params)
+        assert session.url is not None, "No session URL?"
+        return session.url
+
+    async def billing_portal_session(self, **params: Unpack[stripe.billing_portal.Session.CreateParams]) -> str:
+        session = await stripe.billing_portal.Session.create_async(**params)
+        return session.url
+
+    async def payment_method_id_from_intent(
+        self, id: str, **params: Unpack[stripe.PaymentIntent.RetrieveParams]
+    ) -> str:
+        intent = await stripe.PaymentIntent.retrieve_async(id, **params)
+        return intent.payment_method  # type: ignore
+
     @alru_cache(ttl=600)
     async def get_prices(self) -> List[stripe.Price]:
         prices = await stripe.Price.list_async(expand=["data.product"], active=True)
@@ -124,7 +141,7 @@ class NoStripeService(StripeService):
 class StripeServiceImpl(StripeService):
     def __init__(
         self,
-        api_key: str,
+        client: StripeClient,
         webhook_key: str,
         billing_period: BillingPeriod,
         user_repo: UserRepository,
@@ -133,7 +150,7 @@ class StripeServiceImpl(StripeService):
         session_maker: AsyncSessionMaker,
         domain_event_publisher: DomainEventPublisher,
     ) -> None:
-        self.client = StripeClient(api_key)
+        self.client = client
         self.webhook_key = webhook_key
         self.billing_period = billing_period
         self.user_repo = user_repo
@@ -148,7 +165,7 @@ class StripeServiceImpl(StripeService):
         if subscription is None:
             # No subscription yet: let the user create a one-time payment as activation.
             # Once the activation is done, we will create a subscription from the provided payment method.
-            co_session = await stripe.checkout.Session.create_async(
+            url = await self.client.checkout_session(
                 payment_method_types=["card"],
                 mode="payment",
                 customer=customer_id,
@@ -165,18 +182,19 @@ class StripeServiceImpl(StripeService):
                     }
                 ],
             )
-            url: str = co_session.url  # type: ignore
         else:
             # subscription exists: use the customer portal to review payment data and invoices
-            cu_session = await stripe.billing_portal.Session.create_async(customer=customer_id, return_url=return_url)
-            url = cu_session.url
+            url = await self.client.billing_portal_session(customer=customer_id, return_url=return_url)
         return url
 
-    async def handle_event(self, event: str, signature: str) -> None:
-        we = Webhook.construct_event(event, signature, self.webhook_key)  # type: ignore
-        do = we.data.object
-        log.info(f"Received Stripe event: {we.type}: {we.id}")
-        match we.type:
+    async def handle_event(self, event: str, signature: str) -> None:  # pragma: no cover
+        # This will validate the event using the secret key you provided
+        await self.handle_verified_event(Webhook.construct_event(event, signature, self.webhook_key))  # type: ignore
+
+    async def handle_verified_event(self, event: stripe.Event) -> None:
+        do = event.data.object
+        log.info(f"Received Stripe event: {event.type}: {event.id}")
+        match event.type:
             case "checkout.session.completed":
                 customer_id = do.get("customer")
                 intent_id = do.get("payment_intent")
@@ -205,16 +223,15 @@ class StripeServiceImpl(StripeService):
         # get workspace of customer:
         if workspace_id := await self.stripe_customer_repo.workspace_of_customer(customer_id):
             # lookup the payment method of the related payment intent
-            payment_intent = await stripe.PaymentIntent.retrieve_async(payment_intent_id)
-            pm: str = payment_intent.payment_method  # type: ignore
+            pm_id = await self.client.payment_method_id_from_intent(payment_intent_id)
             # create a subscription for customer using given payment method for defined billing period
-            stripe_subscription = await self.client.create_subscription(customer_id, pm, self.billing_period)
+            stripe_subscription = await self.client.create_subscription(customer_id, pm_id, self.billing_period)
             # the subscription has been created on the stripe side
             subscription = await self.subscription_repository.create(
                 StripeSubscription(
                     id=SubscriptionId(uid()),
                     customer_identifier=customer_id,
-                    stripe_subscription_id=stripe_subscription.id,
+                    stripe_subscription_id=stripe_subscription,
                     active=True,
                     last_charge_timestamp=utc(),
                     next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
@@ -233,8 +250,7 @@ class StripeServiceImpl(StripeService):
         if customer_id is None:
             owner = await self.user_repo.get(workspace.owner_id)
             assert owner is not None, f"Workspace {workspace.id} does not have an owner?"
-            customer = await self.client.create_customer(owner.email)
-            customer_id = StripeCustomerId(customer.id)
+            customer_id = await self.client.create_customer(owner.email)
             await self.stripe_customer_repo.create(workspace.id, customer_id)
         return customer_id
 
@@ -255,8 +271,9 @@ def create_stripe_service(
 ) -> StripeService:
     if (api_key := config.stripe_api_key) and (ws_key := config.stripe_webhook_key):
         log.info("Stripe Service configured")
+        client = StripeClient(api_key)
         return StripeServiceImpl(
-            api_key,
+            client,
             ws_key,
             config.billing_period,
             user_repo,

@@ -32,7 +32,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import ProductTier, WorkspaceId, UserId, SubscriptionId, BillingId, StripeCustomerId
+from fixbackend.ids import (
+    ProductTier,
+    WorkspaceId,
+    UserId,
+    SubscriptionId,
+    BillingId,
+    StripeCustomerId,
+    StripeSubscriptionId,
+)
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import (
     AwsMarketplaceSubscription,
@@ -64,8 +72,8 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         if self.stripe_subscription_id and self.stripe_customer_identifier:
             return StripeSubscription(
                 id=self.id,
-                customer_identifier=self.stripe_customer_identifier,
-                stripe_subscription_id=self.stripe_subscription_id,
+                customer_identifier=StripeCustomerId(self.stripe_customer_identifier),
+                stripe_subscription_id=StripeSubscriptionId(self.stripe_subscription_id),
                 active=self.active,
                 last_charge_timestamp=self.last_charge_timestamp,
                 next_charge_timestamp=self.next_charge_timestamp,

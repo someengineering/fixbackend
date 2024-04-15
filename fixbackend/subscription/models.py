@@ -24,7 +24,15 @@ from typing import Union, Optional, TypeVar
 
 from attr import frozen
 
-from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId, UserId, BillingId
+from fixbackend.ids import (
+    ProductTier,
+    SubscriptionId,
+    WorkspaceId,
+    UserId,
+    BillingId,
+    StripeSubscriptionId,
+    StripeCustomerId,
+)
 
 
 @frozen
@@ -42,8 +50,8 @@ class AwsMarketplaceSubscription:
 @frozen
 class StripeSubscription:
     id: SubscriptionId
-    customer_identifier: str
-    stripe_subscription_id: str
+    customer_identifier: StripeCustomerId
+    stripe_subscription_id: StripeSubscriptionId
     active: bool
     last_charge_timestamp: Optional[datetime]
     next_charge_timestamp: Optional[datetime]

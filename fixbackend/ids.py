@@ -23,6 +23,7 @@ BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
 Email = NewType("Email", str)
 StripeCustomerId = NewType("StripeCustomerId", str)
+StripeSubscriptionId = NewType("StripeSubscriptionId", str)
 
 
 class NotificationProvider(StrEnum):
