@@ -15,7 +15,7 @@ import os
 import sys
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Sequence, List, Tuple
@@ -208,6 +208,15 @@ def config() -> Config:
 
 
 ConfigDependency = Annotated[Config, Depends(config)]
+
+
+def trial_period_duration() -> timedelta:
+    # todo: use a constant here
+    # timedelta(days=14)
+    # until we have payment set up, we always promise you 14 days of trial
+    day_of_the_commit = datetime(2024, 4, 15)  # when this line of code was addded.
+    now = datetime.now()
+    return now - day_of_the_commit + timedelta(days=14)
 
 
 @frozen
