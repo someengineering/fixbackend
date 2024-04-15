@@ -21,7 +21,7 @@ from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 
 from fixbackend.cloud_accounts.service import CloudAccountService
-from fixbackend.config import ProductTierSettings
+from fixbackend.config import ProductTierSettings, trial_period_duration
 from fixbackend.ids import ProductTier
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -57,7 +57,7 @@ class TrialEndService(Service):
     async def move_trials_to_free_tier(self) -> None:
         async with self.session_maker() as session:
             workspaces = await self.workspace_repository.list_expired_trials(
-                been_in_trial_tier_for=timedelta(days=14), session=session
+                been_in_trial_tier_for=trial_period_duration(), session=session
             )
             for workspace in workspaces:
                 new_tier = ProductTier.Free
