@@ -431,7 +431,7 @@ def fast_api_app(cfg: Config) -> FastAPI:
         metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
         subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
         role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
-
+        user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
         workspace_repo = deps.add(
             SN.workspace_repo,
             WorkspaceRepositoryImpl(
@@ -459,7 +459,13 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg.billing_period,
             ),
         )
-        deps.add(SN.billing, BillingService(aws_marketplace, subscription_repo, workspace_repo, cfg))
+        stripe = deps.add(
+            SN.stripe_service,
+            create_stripe_service(
+                cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher
+            ),
+        )
+        deps.add(SN.billing, BillingService(aws_marketplace, stripe, subscription_repo, workspace_repo, cfg))
 
         async with deps:
             log.info("Application services started.")

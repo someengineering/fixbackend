@@ -25,6 +25,7 @@ import prometheus_client
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import SubscriptionMethod, BillingEntry, AwsMarketplaceSubscription
+from fixbackend.subscription.stripe_subscription import StripeService
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -37,11 +38,13 @@ class BillingService(Service):
     def __init__(
         self,
         aws_marketplace: AwsMarketplaceHandler,
+        stripe_service: StripeService,
         subscription_repository: SubscriptionRepository,
         workspace_repository: WorkspaceRepository,
         config: Config,
     ) -> None:
         self.aws_marketplace = aws_marketplace
+        self.stripe_service = stripe_service
         self.subscription_repository = subscription_repository
         self.workspace_repository = workspace_repository
         self.handler: Optional[Task[Any]] = None
@@ -64,6 +67,8 @@ class BillingService(Service):
             await self.create_overdue_billing_entries(now, parallel_requests)
             log.info("Report usages to AWS Marketplace")
             await self.aws_marketplace.report_unreported_usages()
+            log.info("Report usages to Stripe")
+            await self.stripe_service.report_unreported_usages()
             log.info("Report no usage for all active AWS Marketplace subscriptions")
             await self.report_no_usage_for_active_aws_marketplace_subscriptions(now, parallel_requests)
             await self.push_metrics()

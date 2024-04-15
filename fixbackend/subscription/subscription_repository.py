@@ -241,6 +241,17 @@ class SubscriptionRepository:
             async for billing_entity, subscription_entity in await session.stream(query):
                 yield billing_entity.to_model(), cast(AwsMarketplaceSubscription, subscription_entity.to_model())
 
+    async def unreported_stripe_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, StripeSubscription]]:
+        async with self.session_maker() as session:
+            query = (
+                select(BillingEntity, SubscriptionEntity)
+                .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
+                .where(BillingEntity.reported == False)  # noqa
+                .where(SubscriptionEntity.stripe_subscription_id != None)  # noqa
+            )
+            async for billing_entity, subscription_entity in await session.stream(query):
+                yield billing_entity.to_model(), cast(StripeSubscription, subscription_entity.to_model())
+
     async def add_billing_entry(
         self,
         sid: SubscriptionId,

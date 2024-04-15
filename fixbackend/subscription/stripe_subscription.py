@@ -21,6 +21,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 import time
+from asyncio import Semaphore, TaskGroup
 from datetime import timedelta
 from typing import Dict, List, Annotated, Optional, Unpack
 
@@ -37,8 +38,8 @@ from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import SubscriptionCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import BillingPeriod, StripeCustomerId, SubscriptionId, StripeSubscriptionId
-from fixbackend.subscription.models import StripeSubscription
+from fixbackend.ids import BillingPeriod, StripeCustomerId, SubscriptionId, StripeSubscriptionId, ProductTier
+from fixbackend.subscription.models import StripeSubscription, BillingEntry
 from fixbackend.subscription.subscription_repository import StripeCustomerRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_period, uid
@@ -72,13 +73,19 @@ class StripeClient:  # pragma: no cover
         )
         return StripeSubscriptionId(subscription.id)
 
-    async def create_usage_record(self, subscription_id: str, quantity: Dict[str, int]) -> List[stripe.UsageRecord]:
+    async def create_usage_record(
+        self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
+    ) -> int:
+        # price ids reflect the product tier, price for seat is called "Seat"
+        quantity = {tier: nr_of_accounts, "Seat": nr_of_seats}
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
         used = {price_ids_by_product_id[name]: value for name, value in quantity.items() if value > 0}
         subscription = await stripe.Subscription.retrieve_async(subscription_id)
         now = int(time.time())
         result = []
-        # we will create usage records for all prices
+        # We will create multiple usage records: one for each price item
+        # Reasoning: the usage has "set" mechanics - the latest reported usage overrides a previously defined one.
+        # By reporting all usages of all prices, the complete state is updated.
         for item in subscription["items"]["data"]:
             plan_id = item["plan"]["id"]
             usage_record = await run_async(
@@ -89,7 +96,7 @@ class StripeClient:  # pragma: no cover
                 action="set",
             )
             result.append(usage_record)
-        return result
+        return len(result)
 
     async def refund(self, payment_intent_id: str) -> stripe.Refund:
         return await stripe.Refund.create_async(payment_intent=payment_intent_id)
@@ -133,6 +140,9 @@ class StripeService(Service):
     async def handle_event(self, event: str, signature: str) -> None:
         raise NotImplementedError("No payment service configured.")
 
+    async def report_unreported_usages(self) -> int:
+        raise NotImplementedError("No payment service configured.")
+
 
 class NoStripeService(StripeService):
     pass
@@ -145,8 +155,8 @@ class StripeServiceImpl(StripeService):
         webhook_key: str,
         billing_period: BillingPeriod,
         user_repo: UserRepository,
-        subscription_repository: SubscriptionRepository,
-        workspace_repository: WorkspaceRepository,
+        subscription_repo: SubscriptionRepository,
+        workspace_repo: WorkspaceRepository,
         session_maker: AsyncSessionMaker,
         domain_event_publisher: DomainEventPublisher,
     ) -> None:
@@ -154,8 +164,8 @@ class StripeServiceImpl(StripeService):
         self.webhook_key = webhook_key
         self.billing_period = billing_period
         self.user_repo = user_repo
-        self.subscription_repository = subscription_repository
-        self.workspace_repository = workspace_repository
+        self.subscription_repository = subscription_repo
+        self.workspace_repository = workspace_repo
         self.domain_event_publisher = domain_event_publisher
         self.stripe_customer_repo = StripeCustomerRepository(session_maker)
 
@@ -186,6 +196,27 @@ class StripeServiceImpl(StripeService):
             # subscription exists: use the customer portal to review payment data and invoices
             url = await self.client.billing_portal_session(customer=customer_id, return_url=return_url)
         return url
+
+    async def report_unreported_usages(self, raise_exception: bool = False) -> int:
+        async def send(be: BillingEntry, subscription: StripeSubscription) -> None:
+            try:
+                await self.client.create_usage_record(
+                    subscription.stripe_subscription_id, be.tier, be.nr_of_accounts_charged, nr_of_seats=0
+                )
+                await self.subscription_repository.mark_billing_entry_reported(entry.id)
+            except Exception:
+                log.error(f"Could not report usage for billing entry {be.id}", exc_info=True)
+                if raise_exception:
+                    raise
+
+        counter = 0
+        max_parallel = Semaphore(64)  # up to 64 parallel tasks
+        async with TaskGroup() as group:
+            async for entry, subscription in self.subscription_repository.unreported_stripe_billing_entries():
+                counter += 1
+                async with max_parallel:
+                    await group.create_task(send(entry, subscription))
+        return counter
 
     async def handle_event(self, event: str, signature: str) -> None:  # pragma: no cover
         # This will validate the event using the secret key you provided
