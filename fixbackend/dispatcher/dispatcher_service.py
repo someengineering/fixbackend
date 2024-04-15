@@ -261,6 +261,11 @@ class DispatcherService(Service):
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionSuccess)
             }
+
+            if len(collected_accounts) == 0:
+                log.info(f"No accounts were collected for workspace {workspace_id}. Not sending domain event.")
+                return
+
             next_run = await self.next_run_repo.get(workspace_id)
             event = TenantAccountsCollected(workspace_id, collected_accounts, next_run)
             await self.domain_event_sender.publish(event)
