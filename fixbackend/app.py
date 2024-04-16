@@ -65,7 +65,12 @@ from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.consumers import CustomerIoEventConsumer, EmailOnSignupConsumer
+from fixbackend.domain_events.consumers import (
+    CustomerIoEventConsumer,
+    EmailOnSignupConsumer,
+    ScheduleTrialEndReminder,
+    UnscheduleTrialEndReminder,
+)
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
@@ -78,6 +83,7 @@ from fixbackend.jwt import JwtServiceImpl
 from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
+from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.notification.notification_service import NotificationService
@@ -266,6 +272,19 @@ def fast_api_app(cfg: Config) -> FastAPI:
             ),
         )
         deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl(session_maker))
+        one_time_email_service = deps.add(
+            SN.one_time_email_service,
+            OneTimeEmailService(notification_service, user_repo, session_maker, dispatching=False),
+        )
+        deps.add(
+            SN.schedule_trial_end_reminder_consumer,
+            ScheduleTrialEndReminder(domain_event_subscriber, one_time_email_service),
+        )
+        deps.add(
+            SN.unschedule_trial_end_reminder_consumer,
+            UnscheduleTrialEndReminder(domain_event_subscriber, one_time_email_service),
+        )
+
         if not cfg.static_assets:
             await load_app_from_cdn()
         async with deps:
@@ -362,6 +381,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 jwt_service,
                 handle_events=False,  # fixbackend will handle events. dispatching should ignore them.
             ),
+        )
+        deps.add(
+            SN.one_time_email_service,
+            OneTimeEmailService(notification_service, user_repo, session_maker, dispatching=True),
         )
         analytics_event_sender = deps.add(
             SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)

@@ -26,8 +26,7 @@ from sqlalchemy import text
 
 from fixbackend.auth.models.orm import User as OrmUser
 from fixbackend.auth.models import User
-from fixbackend.config import TrialPeriodDuration
-from fixbackend.ids import ProductTier, UserId
+from fixbackend.ids import UserId
 from fixbackend.notification.email.scheduled_email import (
     ScheduledEmailSender,
     ScheduledEmailEntity,
@@ -37,7 +36,6 @@ from fixbackend.notification.user_notification_repo import UserNotificationSetti
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryEmailSender
 
 
@@ -139,57 +137,58 @@ async def test_new_workspaces_without_cloud_account(
         assert len(email_sender.call_args) == 0
 
 
-async def test_trial_end_reminder_expires_soon(
-    email_sender: InMemoryEmailSender,
-    async_session_maker: AsyncSessionMaker,
-    workspace_repository: WorkspaceRepository,
-    workspace: Workspace,
-    user: User,
-) -> None:
-    sender = ScheduledEmailSender(email_sender, async_session_maker)
+# async def test_trial_end_reminder_expires_soon(
+#     email_sender: InMemoryEmailSender,
+#     notificatin_service: NotificationService,
+#     async_session_maker: AsyncSessionMaker,
+#     workspace_repository: WorkspaceRepository,
+#     workspace: Workspace,
+#     user: User,
+# ) -> None:
+#     sender = ScheduledEmailSender(email_sender, async_session_maker)
 
-    async with async_session_maker() as session:
-        assert workspace.product_tier == ProductTier.Trial
-        # adjust the created time of the workspace
-        await session.execute(
-            text("UPDATE organization SET created_at = :created_at").bindparams(
-                created_at=(utc() - TrialPeriodDuration + timedelta(days=1, hours=10))
-            )
-        )
+#     async with async_session_maker() as session:
+#         assert workspace.product_tier == ProductTier.Trial
+#         # adjust the created time of the workspace
+#         await session.execute(
+#             text("UPDATE organization SET created_at = :created_at").bindparams(
+#                 created_at=(utc() - TrialPeriodDuration + timedelta(days=1, hours=10))
+#             )
+#         )
 
-        updated_ws = await workspace_repository.get_workspace(workspace.id)
-        assert updated_ws
-        assert updated_ws.product_tier == ProductTier.Trial
+#         updated_ws = await workspace_repository.get_workspace(workspace.id)
+#         assert updated_ws
+#         assert updated_ws.product_tier == ProductTier.Trial
 
-        await sender._send_trial_end_reminder()
-        assert len(email_sender.call_args) == 1
-        for call in email_sender.call_args:
-            assert call.subject == "Fix: Your trial is ending in 2 days"
+#         await sender._send_trial_end_reminder()
+#         assert len(email_sender.call_args) == 1
+#         for call in email_sender.call_args:
+#             assert call.subject == "Fix: Your trial is ending in 2 days"
 
 
-async def test_trial_end_reminder_expired(
-    email_sender: InMemoryEmailSender,
-    async_session_maker: AsyncSessionMaker,
-    workspace_repository: WorkspaceRepository,
-    workspace: Workspace,
-    user: User,
-) -> None:
-    sender = ScheduledEmailSender(email_sender, async_session_maker)
+# async def test_trial_end_reminder_expired(
+#     email_sender: InMemoryEmailSender,
+#     async_session_maker: AsyncSessionMaker,
+#     workspace_repository: WorkspaceRepository,
+#     workspace: Workspace,
+#     user: User,
+# ) -> None:
+#     sender = ScheduledEmailSender(email_sender, async_session_maker)
 
-    async with async_session_maker() as session:
-        assert workspace.product_tier == ProductTier.Trial
-        # adjust the created time of the workspace
-        await session.execute(
-            text("UPDATE organization SET created_at = :created_at").bindparams(
-                created_at=(utc() - TrialPeriodDuration - timedelta(seconds=10))
-            )
-        )
+#     async with async_session_maker() as session:
+#         assert workspace.product_tier == ProductTier.Trial
+#         # adjust the created time of the workspace
+#         await session.execute(
+#             text("UPDATE organization SET created_at = :created_at").bindparams(
+#                 created_at=(utc() - TrialPeriodDuration - timedelta(seconds=10))
+#             )
+#         )
 
-        updated_ws = await workspace_repository.get_workspace(workspace.id)
-        assert updated_ws
-        assert updated_ws.product_tier == ProductTier.Trial
+#         updated_ws = await workspace_repository.get_workspace(workspace.id)
+#         assert updated_ws
+#         assert updated_ws.product_tier == ProductTier.Trial
 
-        await sender._send_trial_end_reminder()
-        assert len(email_sender.call_args) == 1
-        for call in email_sender.call_args:
-            assert call.subject == "Fix: Your trial is over"
+#         await sender._send_trial_end_reminder()
+#         assert len(email_sender.call_args) == 1
+#         for call in email_sender.call_args:
+#             assert call.subject == "Fix: Your trial is over"

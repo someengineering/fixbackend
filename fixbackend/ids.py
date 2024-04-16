@@ -22,6 +22,7 @@ TaskId = NewType("TaskId", str)
 BenchmarkName = NewType("BenchmarkName", str)
 UserRoleId = NewType("UserRoleId", UUID)
 Email = NewType("Email", str)
+OneTimeEmailId = NewType("OneTimeEmailId", UUID)
 
 
 class NotificationProvider(StrEnum):

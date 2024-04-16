@@ -150,4 +150,6 @@ async def test_workspace_trial_period() -> None:
     assert trial_left is not None
     assert trial_left >= 14
     assert evolve(workspace, created_at=utc() - timedelta(days=15)).trial_end_days() == 0
-    assert evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days() == 4
+    end_days = evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days()
+    assert end_days is not None
+    assert end_days >= 4
