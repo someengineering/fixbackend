@@ -374,6 +374,9 @@ async def test_receive_collect_error_message(
         "error": error,
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
+
+    error_context = MessageContext("test", "job-failed", "test", utc(), utc())
+
     now = utc()
     external_id = ExternalId(uuid.uuid4())
     await dispatcher.collect_progress.track_account_collection_progress(
@@ -394,6 +397,11 @@ async def test_receive_collect_error_message(
     assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
 
     await dispatcher.process_collect_done_message(message, context)
+    assert await in_progress_hash_len() == 0
+    assert await jobs_mapping_hash_len() == 0
+    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
+
+    await dispatcher.process_collect_done_message(message, error_context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
     assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
