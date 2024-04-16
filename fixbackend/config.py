@@ -16,7 +16,7 @@ import os
 import sys
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Literal, Optional, Sequence, List, Tuple
 from pathlib import Path
 
@@ -74,6 +74,7 @@ class Config(BaseSettings):
     profiling_interval: float
     google_analytics_measurement_id: Optional[str]
     google_analytics_api_secret: Optional[str]
+    posthog_api_key: Optional[str]
     aws_marketplace_url: str
     billing_period: Literal["month", "day"]
     discord_oauth_client_id: str
@@ -176,6 +177,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--profiling-enabled", action="store_true", default=os.environ.get("PROFILING_ENABLED", False))
     parser.add_argument("--profiling-interval", type=float, default=os.environ.get("PROFILING_INTERVAL", 0.001))
     parser.add_argument("--google-analytics-measurement-id", default=os.environ.get("GOOGLE_ANALYTICS_MEASUREMENT_ID"))
+    parser.add_argument("--posthog-api-key", default=os.environ.get("POSTHOG_API_KEY"))
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
     parser.add_argument("--aws-marketplace-url", default=os.environ.get("AWS_MARKETPLACE_URL", ""))
     parser.add_argument("--service-base-url", default=os.environ.get("SERVICE_BASE_URL", ""))
@@ -202,6 +204,15 @@ def config() -> Config:
 
 
 ConfigDependency = Annotated[Config, Depends(config)]
+
+
+def trial_period_duration() -> timedelta:
+    # todo: use a constant here
+    # timedelta(days=14)
+    # until we have payment set up, we always promise you 14 days of trial
+    day_of_the_commit = datetime(2024, 4, 15)  # when this line of code was addded.
+    now = datetime.now()
+    return now - day_of_the_commit + timedelta(days=14)
 
 
 @frozen

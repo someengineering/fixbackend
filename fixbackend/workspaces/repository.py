@@ -138,6 +138,13 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
         async with self.session_maker() as session:
             workspace_id = WorkspaceId(uuid.uuid4())
+
+            # get workspace by slug
+            statement = select(orm.Organization).where(orm.Organization.slug == slug)
+            slug_exists = (await session.execute(statement)).unique().scalar_one_or_none()
+            if slug_exists:
+                slug = f"{slug}-{workspace_id}"
+
             organization = orm.Organization(
                 id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
             )
@@ -147,7 +154,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             # create a database access object for this organization in the same transaction
             await self.graph_db_access_manager.create_database_access(workspace_id, session=session)
             await self.role_repository.add_roles(owner.id, workspace_id, Roles.workspace_owner, session=session)
-            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, owner.id))
+            await self.domain_event_sender.publish(WorkspaceCreated(workspace_id, name, slug, owner.id))
 
             await session.commit()
             await session.refresh(organization)

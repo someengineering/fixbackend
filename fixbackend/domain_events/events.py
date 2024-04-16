@@ -195,6 +195,8 @@ class WorkspaceCreated(Event):
     kind: ClassVar[str] = "workspace_created"
 
     workspace_id: WorkspaceId
+    name: str
+    slug: str
     user_id: UserId
 
 

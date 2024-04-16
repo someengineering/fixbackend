@@ -47,6 +47,7 @@ class AnalyticsEvent(ABC):
 class AEUserRegistered(AnalyticsEvent):
     kind: ClassVar[str] = "fix_user_registered"
     workspace_id: WorkspaceId
+    email: str
 
 
 @frozen
@@ -109,6 +110,8 @@ class AEFirstAccountCollectFinished(AnalyticsEvent):
 class AEWorkspaceCreated(AnalyticsEvent):
     kind: ClassVar[str] = "fix_workspace_created"
     workspace_id: WorkspaceId
+    name: str
+    slug: str
 
 
 @frozen

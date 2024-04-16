@@ -11,19 +11,28 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from __future__ import annotations
+
+import asyncio
 import logging
 import uuid
 from asyncio import Lock
+from collections import deque
 from datetime import timedelta
 from typing import List, Optional, Any
+from typing import MutableSequence
 
 from async_lru import alru_cache
 from fixcloudutils.asyncio.periodic import Periodic
+from fixcloudutils.service import Service
 from fixcloudutils.types import Json
+from fixcloudutils.util import uuid_str, utc
 from httpx import AsyncClient
+from posthog.client import Client
 from prometheus_client import Counter
 
 from fixbackend.analytics import AnalyticsEventSender
+from fixbackend.analytics.events import AEWorkspaceCreated, AEUserRegistered
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.ids import WorkspaceId, UserId
 from fixbackend.utils import group_by, md5
@@ -42,6 +51,29 @@ class NoAnalyticsEventSender(AnalyticsEventSender):
         return UserId(uuid.uuid5(uuid.NAMESPACE_DNS, "fixbackend"))
 
 
+class MultiAnalyticsEventSender(AnalyticsEventSender, Service):
+    def __init__(self, senders: List[AnalyticsEventSender]) -> None:
+        self.senders = senders
+        self.event_handler: Optional[Any] = None
+
+    async def send(self, event: AnalyticsEvent) -> None:
+        for sender in self.senders:
+            await sender.send(event)
+
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        for sender in self.senders:
+            return await sender.user_id_from_workspace(workspace_id)
+        raise ValueError("No senders configured")
+
+    async def start(self) -> Any:
+        for sender in self.senders:
+            await sender.start()
+
+    async def stop(self) -> None:
+        for sender in self.senders:
+            await sender.stop()
+
+
 class GoogleAnalyticsEventSender(AnalyticsEventSender):
     def __init__(
         self, client: AsyncClient, measurement_id: str, api_secret: str, workspace_repo: WorkspaceRepository
@@ -54,7 +86,6 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
         self.events: List[AnalyticsEvent] = []
         self.lock = Lock()
         self.sender = Periodic("send_events", self.send_events, timedelta(seconds=30))
-        self.event_handler: Optional[Any] = None
 
     async def start(self) -> None:
         await self.sender.start()
@@ -75,7 +106,7 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
             ev.pop("user_id", None)
             return dict(name=event.kind, params=ev)
 
-        # return early, if there are no events to send
+        # return early if there are no events to send
         if not self.events:
             return
 
@@ -109,7 +140,83 @@ class GoogleAnalyticsEventSender(AnalyticsEventSender):
 
     @alru_cache(maxsize=1024)
     async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
-        if (workspace := await self.workspace_repo.get_workspace(workspace_id)) and (workspace.all_users()):
-            return workspace.all_users()[0]
+        if workspace := await self.workspace_repo.get_workspace(workspace_id):
+            return workspace.owner_id
         else:
             return UserId(uuid.uuid5(uuid.NAMESPACE_DNS, "fixbackend"))
+
+
+class PostHogEventSender(AnalyticsEventSender):
+    def __init__(
+        self,
+        api_key: str,
+        workspace_repo: WorkspaceRepository,
+        flush_at: int = 100,
+        interval: timedelta = timedelta(minutes=1),
+        host: str = "https://eu.posthog.com",
+    ) -> None:
+        super().__init__()
+        self.client = Client(  # type: ignore
+            project_api_key=api_key, host=host, flush_interval=0.5, max_retries=3, gzip=True
+        )
+        self.workspace_repo = workspace_repo
+        self.run_id = uuid_str()  # create a unique id for this instance run
+        self.queue: MutableSequence[AnalyticsEvent] = deque()
+        self.flush_at = flush_at
+        self.flusher = Periodic("flush_analytics", self.flush, interval)
+        self.lock = asyncio.Lock()
+
+    async def send(self, event: AnalyticsEvent) -> None:
+        async with self.lock:
+            self.queue.append(event)
+
+        if len(self.queue) >= self.flush_at:
+            await self.flush()
+
+    @alru_cache(maxsize=1024)
+    async def user_id_from_workspace(self, workspace_id: WorkspaceId) -> UserId:
+        if workspace := await self.workspace_repo.get_workspace(workspace_id):
+            return workspace.owner_id
+        else:
+            raise ValueError(f"Workspace with id {workspace_id} not found")
+
+    async def flush(self) -> None:
+        async with self.lock:
+            for event in self.queue:
+                # when a user is registered, identify it as user
+                if isinstance(event, AEUserRegistered):
+                    self.client.identify(  # type: ignore
+                        distinct_id=str(event.user_id),
+                        properties={"email": event.email},
+                        timestamp=utc(),
+                        uuid=uuid_str(),
+                    )
+                # when a workspace is created, identify it as a group
+                if isinstance(event, AEWorkspaceCreated):
+                    self.client.group_identify(  # type: ignore
+                        group_type="workspace_id",
+                        group_key=str(event.workspace_id),
+                        properties={"name": event.name, "slug": event.slug},
+                        timestamp=utc(),
+                        uuid=uuid_str(),
+                    )
+                # if the event has a workspace_id, use it to define the group
+                groups = {"workspace_id": str(ws)} if (ws := getattr(event, "workspace_id", None)) else None
+                self.client.capture(  # type: ignore
+                    distinct_id=str(event.user_id),
+                    event=event.kind,
+                    properties=event.to_json(),
+                    timestamp=utc(),
+                    groups=groups,
+                    uuid=uuid_str(),
+                )
+            self.queue.clear()
+
+    async def start(self) -> PostHogEventSender:
+        await self.flusher.start()
+        return self
+
+    async def stop(self) -> None:
+        await self.flusher.stop()
+        await self.flush()
+        self.client.shutdown()  # type: ignore

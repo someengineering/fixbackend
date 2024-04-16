@@ -242,8 +242,10 @@ class DispatcherService(Service):
         match context.kind:
             case "collect-done":
                 await self.collect_job_finished(message)
+            case "job-failed":
+                await self.collect_job_finished(message, failed=True)
             case _:
-                log.info(f"Collect messages: will ignore messages of kine {context.kind}")
+                log.info(f"Collect messages: will ignore messages of kind {context.kind}")
 
     async def complete_collect_job(
         self,
@@ -261,6 +263,11 @@ class DispatcherService(Service):
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionSuccess)
             }
+
+            if len(collected_accounts) == 0:
+                log.info(f"No accounts were collected for workspace {workspace_id}. Not sending domain event.")
+                return
+
             next_run = await self.next_run_repo.get(workspace_id)
             event = TenantAccountsCollected(workspace_id, collected_accounts, next_run)
             await self.domain_event_sender.publish(event)
@@ -276,12 +283,12 @@ class DispatcherService(Service):
         await send_domain_event(tenant_collect_state)
         await self.collect_progress.delete_tenant_collect_state(workspace_id)
 
-    async def collect_job_finished(self, message: Json) -> None:
+    async def collect_job_finished(self, message: Json, failed: bool = False) -> None:
         job_id = message["job_id"]
 
         async def handle_error(error: str) -> None:
             await self.collect_progress.mark_job_as_failed(job_id, error)
-            log.warning(f"Collect job finished with an error: job_id={job_id}.")
+            log.warning(f"Collect job finished with an error: error={error} job_id={job_id}")
 
         async def handle_success() -> None:
             task_id = message["task_id"]
@@ -333,6 +340,8 @@ class DispatcherService(Service):
             )
 
         error: Optional[str] = message.get("error")
+        if failed:
+            error = error or "received job failed message"
         if error:
             await handle_error(error)
         else:

@@ -367,7 +367,14 @@ async def test_workspace_created(
         raise ValueError(f"Unexpected request: {request.url}: {content}")
 
     request_handler_mock.append(inventory_call)
-    await inventory_service._process_workspace_created(WorkspaceCreated(workspace.id, user.id))
+    await inventory_service._process_workspace_created(
+        WorkspaceCreated(
+            workspace.id,
+            workspace.name,
+            workspace.slug,
+            user.id,
+        )
+    )
     assert len(inventory_requests) == 2
 
 
