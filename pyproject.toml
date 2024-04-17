@@ -29,6 +29,7 @@ cattrs = ">=23.2.3"
 bcrypt = "4.0.1"
 pyotp = "^2.9.0"
 posthog = "^3.5.0"
+stripe = "^9.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -56,6 +57,8 @@ types-setuptools = "*"
 types-ujson = "*"
 types-urllib3 = "*"
 types-aiofiles = "*"
+types-six = "*"
+types-pycurl = "*"
 
 [build-system]
 requires = ["poetry-core"]

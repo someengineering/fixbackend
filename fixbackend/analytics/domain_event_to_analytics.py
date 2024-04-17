@@ -52,7 +52,7 @@ from fixbackend.domain_events.events import (
     UserJoinedWorkspace,
     ProductTierChanged,
     Event,
-    AwsMarketplaceSubscriptionCreated,
+    SubscriptionCreated,
     UserLoggedIn,
     FailingBenchmarkChecksAlertSend,
     BillingEntryCreated,
@@ -76,7 +76,7 @@ class DomainEventToAnalyticsEventHandler:
         domain_event_subscriber.subscribe(InvitationAccepted, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(UserJoinedWorkspace, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(ProductTierChanged, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsMarketplaceSubscriptionCreated, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(SubscriptionCreated, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(UserLoggedIn, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(FailingBenchmarkChecksAlertSend, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(BillingEntryCreated, self.handle, "domain_event_to_analytics")
@@ -108,7 +108,7 @@ class DomainEventToAnalyticsEventHandler:
                 await self.sender.send(AEUserJoinedWorkspace(event.user_id, event.workspace_id))
             case ProductTierChanged() as event:
                 await self.sender.send(AEProductTierChanged(event.user_id, event.workspace_id, event.product_tier))
-            case AwsMarketplaceSubscriptionCreated() as event:
+            case SubscriptionCreated() as event:
                 if ws_id := event.workspace_id:
                     await self.sender.send(AESubscriptionCreated(event.user_id, ws_id, "aws_marketplace"))
             case UserLoggedIn() as event:

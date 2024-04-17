@@ -23,7 +23,7 @@ import json
 import logging
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta, datetime
-from typing import Annotated, Any, Literal, Optional, Tuple, List
+from typing import Annotated, Any, Optional, Tuple, List, cast
 from uuid import uuid4
 
 import boto3
@@ -32,16 +32,17 @@ from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
+from prometheus_client import Counter
 
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import (
     AwsMarketplaceSubscriptionCancelled,
-    AwsMarketplaceSubscriptionCreated,
+    SubscriptionCreated,
     BillingEntryCreated,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import ProductTier, SubscriptionId
+from fixbackend.ids import ProductTier, SubscriptionId, BillingPeriod
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
@@ -50,7 +51,6 @@ from fixbackend.subscription.subscription_repository import (
 )
 from fixbackend.utils import start_of_next_period
 from fixbackend.workspaces.repository import WorkspaceRepository
-from prometheus_client import Counter
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class AwsMarketplaceHandler(Service):
         session: boto3.Session,
         sqs_queue_url: Optional[str],
         domain_event_sender: DomainEventPublisher,
-        billing_period: Literal["month", "day"],
+        billing_period: BillingPeriod,
     ) -> None:
         self.subscription_repo = subscription_repo
         self.workspace_repo = workspace_repo
@@ -106,7 +106,7 @@ class AwsMarketplaceHandler(Service):
         )
         self.marketplace_client: Any = session.client("meteringmarketplace")
         self.domain_event_sender = domain_event_sender
-        self.billing_period: Literal["month", "day"] = billing_period
+        self.billing_period: BillingPeriod = billing_period
 
     async def start(self) -> None:
         if self.listener is not None:
@@ -116,7 +116,7 @@ class AwsMarketplaceHandler(Service):
         if self.listener is not None:
             await self.listener.stop()
 
-    async def subscribed(self, user: User, token: str) -> Tuple[SubscriptionMethod, bool]:
+    async def subscribed(self, user: User, token: str) -> Tuple[AwsMarketplaceSubscription, bool]:
         log.info(f"AWS Marketplace subscription for user {user.email} with token {token}")
         # Get the related data from AWS. Will throw in case of an error.
         customer_data = self.marketplace_client.resolve_customer(RegistrationToken=token)
@@ -153,10 +153,10 @@ class AwsMarketplaceHandler(Service):
                 last_charge_timestamp=utc(),
                 next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
             )
-            event = AwsMarketplaceSubscriptionCreated(
-                workspace_id=workspace_id, user_id=user.id, subscription_id=subscription.id
+            event = SubscriptionCreated(
+                workspace_id=workspace_id, user_id=user.id, subscription_id=subscription.id, method="aws_marketplace"
             )
-            result = await self.subscription_repo.create(subscription)
+            result = cast(AwsMarketplaceSubscription, await self.subscription_repo.create(subscription))
             if workspace and workspace.subscription_id is None:
                 await self.workspace_repo.update_subscription(workspace.id, result.id)
                 workspace_assigned = True
@@ -164,7 +164,7 @@ class AwsMarketplaceHandler(Service):
             return result, workspace_assigned
 
     async def create_billing_entry(
-        self, subscription: AwsMarketplaceSubscription, now: Optional[datetime] = None
+        self, subscription: SubscriptionMethod, now: Optional[datetime] = None
     ) -> Optional[BillingEntry]:
         if not subscription.active:
             log.info(f"AWS Marketplace: subscription {subscription.id} is not active")
@@ -180,7 +180,7 @@ class AwsMarketplaceHandler(Service):
                     billing_period_value = timedelta(days=1)
 
             last_charged = subscription.last_charge_timestamp or billing_time
-            customer = subscription.customer_identifier
+            kind = subscription.__class__.__name__
 
             month_factor = compute_billing_period_factor(
                 billing_time=billing_time,
@@ -209,12 +209,12 @@ class AwsMarketplaceHandler(Service):
                 usage = int(len(summaries) * month_factor)
                 on_payment_free_tier = product_tier.paid is False
                 if on_payment_free_tier or usage == 0:
-                    log.info(f"AWS Marketplace: customer {customer} has no usage")
+                    log.info(f"{kind}: subscription {subscription.id} has no usage")
                     # move the charge timestamp tp
                     await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
                     return None
 
-                log.info(f"AWS Marketplace: customer {customer} collected {usage} times: {summaries}")
+                log.info(f"{kind}: subscription {subscription.id} collected {usage} times: {summaries}")
                 AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
                 billing_entry = await self.subscription_repo.add_billing_entry(
                     subscription.id,
@@ -230,7 +230,7 @@ class AwsMarketplaceHandler(Service):
                 )
                 return billing_entry
             else:
-                log.info(f"AWS Marketplace: customer {customer} has no workspace")
+                log.info(f"{kind}: subscription {subscription.id} has no workspace")
                 return None
         except Exception:
             log.error("Could not create a billing entry", exc_info=True)
@@ -269,12 +269,13 @@ class AwsMarketplaceHandler(Service):
 
         max_parallel = Semaphore(64)  # up to 64 parallel tasks
         async with TaskGroup() as group:
-            async for entry, subscription in self.subscription_repo.unreported_billing_entries():
+            async for entry, subscription in self.subscription_repo.unreported_aws_billing_entries():
                 async with max_parallel:
                     await group.create_task(send(entry, subscription))
 
     async def subscription_canceled(self, customer_id: str) -> None:
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
+            assert isinstance(subscription, AwsMarketplaceSubscription), "Subscription is not from AWS Marketplace"
             await self.domain_event_sender.publish(AwsMarketplaceSubscriptionCancelled(subscription.id))
             if billing := await self.create_billing_entry(subscription):
                 await self.report_usage(subscription.product_code, [(subscription, billing)])
