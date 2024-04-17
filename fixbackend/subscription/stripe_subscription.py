@@ -240,11 +240,11 @@ class StripeServiceImpl(StripeService):
                     raise
 
         counter = 0
-        max_parallel = Semaphore(64)  # up to 64 concurrent tasks
+        max_concurrent = Semaphore(64)  # up to 64 concurrent tasks
         async with TaskGroup() as group:
             async for entry, subscription in self.subscription_repository.unreported_stripe_billing_entries():
                 counter += 1
-                async with max_parallel:
+                async with max_concurrent:
                     await group.create_task(send(entry, subscription))
         return counter
 
