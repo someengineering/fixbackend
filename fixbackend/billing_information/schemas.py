@@ -86,14 +86,19 @@ class BillingEntryRead(BaseModel):
 
 class AwsSubscription(BaseModel):
     method: Literal["aws_marketplace"]
-    subscription_id: SubscriptionId = Field(description="AWS Marketplace subscription identifier")
+    subscription_id: SubscriptionId = Field(description="Subscription identifier")
+
+
+class StripeSubscription(BaseModel):
+    method: Literal["stripe"]
+    subscription_id: SubscriptionId = Field(description="Subscription identifier")
 
 
 class NoPaymentMethod(BaseModel):
     method: Literal["none"]
 
 
-PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
+PaymentMethod = Union[AwsSubscription, StripeSubscription, NoPaymentMethod]
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
@@ -137,6 +142,8 @@ class WorkspaceBillingSettingsRead(BaseModel):
         def payment(payment_method: models.PaymentMethod) -> PaymentMethod:
             match payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
+                    return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
+                case PaymentMethods.StripeSubscription(subscription_id):
                     return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
                 case PaymentMethods.NoPaymentMethod():
                     return NoPaymentMethod(method="none")

@@ -21,15 +21,17 @@ from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from pathlib import Path
 import random
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional, Unpack
 from unittest.mock import patch
 
 import jwt
 import pytest
+import stripe
 from alembic.command import upgrade as alembic_upgrade, check as alembic_check
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from async_lru import alru_cache
 from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
@@ -60,7 +62,17 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId, UserId
+from fixbackend.ids import (
+    SubscriptionId,
+    WorkspaceId,
+    BenchmarkName,
+    NodeId,
+    UserId,
+    StripeCustomerId,
+    StripeSubscriptionId,
+    BillingPeriod,
+    ProductTier,
+)
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.jwt import JwtService
@@ -73,6 +85,7 @@ from fixbackend.permissions.role_repository import RoleRepository, RoleRepositor
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_month, uid
@@ -179,6 +192,8 @@ def default_config() -> Config:
         service_base_url="http://localhost:8000",
         push_gateway_url=None,
         posthog_api_key=None,
+        stripe_api_key=None,
+        stripe_webhook_key=None,
     )
 
 
@@ -306,7 +321,9 @@ async def graph_db_access(
 
 
 @pytest.fixture
-async def subscription(subscription_repository: SubscriptionRepository, user: User) -> AwsMarketplaceSubscription:
+async def aws_marketplace_subscription(
+    subscription_repository: SubscriptionRepository, user: User
+) -> AwsMarketplaceSubscription:
     return await subscription_repository.create(
         AwsMarketplaceSubscription(
             id=SubscriptionId(uid()),
@@ -760,14 +777,104 @@ async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: 
         yield ac
 
 
+stripe_customer_id = StripeCustomerId("dummy_customer_id")
+stripe_payment_intent_id = "dummy_payment_intent_id"
+stripe_payment_method_id = "dummy_payment_method_id"
+stripe_subscription_id = StripeSubscriptionId("dummy_subscription_id")
+stripe_refund_id = "dummy_refund_id"
+
+
+class StripeDummyClient(StripeClient):
+    def __init__(self) -> None:
+        self.requests: List[Json] = []
+        super().__init__("some dummy key")
+
+    async def create_customer(self, email: str) -> StripeCustomerId:
+        self.requests.append(dict(call="create_customer", email=email))
+        return stripe_customer_id
+
+    async def create_subscription(
+        self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
+    ) -> StripeSubscriptionId:
+        self.requests.append(
+            dict(call="create_subscription", customer_id=customer_id, payment_method_id=payment_method_id)
+        )
+        return stripe_subscription_id
+
+    async def create_usage_record(
+        self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
+    ) -> int:
+        return 4
+
+    async def refund(self, payment_intent_id: str) -> stripe.Refund:
+        self.requests.append(dict(call="refund", payment_intent_id=payment_intent_id))
+        return stripe.Refund(id=stripe_refund_id)
+
+    async def activation_price_id(self) -> str:
+        self.requests.append(dict(call="activation_price_id"))
+        return "activate_price_id"
+
+    async def get_price_ids_by_product_id(self) -> Dict[str, str]:
+        self.requests.append(dict(call="get_price_ids_by_product_id"))
+        return {"Enterprise": "p1", "Business": "p2", "Plus": "p3"}
+
+    @alru_cache(ttl=600)
+    async def get_prices(self) -> List[stripe.Price]:
+        self.requests.append(dict(call="get_prices"))
+        return []
+
+    async def checkout_session(self, customer: str, **params: Any) -> str:  # type: ignore
+        self.requests.append(dict(call="checkout_session", customer=customer))
+        return f"https://localhost/{customer}/checkout"
+
+    async def billing_portal_session(self, customer: str, **params: Any) -> str:  # type: ignore
+        self.requests.append(dict(call="billing_portal_session", customer=customer))
+        return f"https://localhost/{customer}/billing"
+
+    async def payment_method_id_from_intent(
+        self, id: str, **params: Unpack[stripe.PaymentIntent.RetrieveParams]
+    ) -> str:
+        self.requests.append(dict(call="payment_method_id_from_intent", id=id))
+        return stripe_payment_method_id
+
+
+@pytest.fixture
+def stripe_client() -> StripeDummyClient:
+    return StripeDummyClient()
+
+
+@pytest.fixture
+def stripe_service(
+    user_repository: UserRepository,
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
+    async_session_maker: AsyncSessionMaker,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    stripe_client: StripeDummyClient,
+) -> StripeServiceImpl:
+    return StripeServiceImpl(
+        stripe_client,
+        "dummy_secret",
+        "day",
+        user_repository,
+        subscription_repository,
+        workspace_repository,
+        async_session_maker,
+        domain_event_sender,
+    )
+
+
 @pytest.fixture
 async def billing_service(
     aws_marketplace_handler: AwsMarketplaceHandler,
+    stripe_service: StripeServiceImpl,
     subscription_repository: SubscriptionRepository,
     workspace_repository: WorkspaceRepository,
     default_config: Config,
 ) -> BillingService:
-    return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository, default_config)
+    return BillingService(
+        aws_marketplace_handler, stripe_service, subscription_repository, workspace_repository, default_config
+    )
 
 
 @frozen

@@ -24,11 +24,15 @@ class PaymentMethods:
         subscription_id: SubscriptionId
 
     @frozen
+    class StripeSubscription:
+        subscription_id: SubscriptionId
+
+    @frozen
     class NoPaymentMethod:
         pass
 
 
-PaymentMethod = Union[PaymentMethods.AwsSubscription, PaymentMethods.NoPaymentMethod]
+PaymentMethod = Union[PaymentMethods.AwsSubscription, PaymentMethods.StripeSubscription, PaymentMethods.NoPaymentMethod]
 
 
 @frozen

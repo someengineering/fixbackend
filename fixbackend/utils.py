@@ -34,10 +34,12 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from itertools import islice
-from typing import Literal, Optional, Callable, TypeVar, Iterable, Dict, List, Any, Iterator
+from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any, Iterator
 from uuid import UUID
 
 from fixcloudutils.util import utc
+
+from fixbackend.ids import BillingPeriod
 
 AnyT = TypeVar("AnyT")
 AnyR = TypeVar("AnyR")
@@ -82,9 +84,7 @@ def start_of_next_day(current_time: Optional[datetime] = None, hour: int = 0) ->
     return next_day
 
 
-def start_of_next_period(
-    *, period: Literal["month", "day"], current_time: Optional[datetime] = None, hour: int = 0
-) -> datetime:
+def start_of_next_period(*, period: BillingPeriod, current_time: Optional[datetime] = None, hour: int = 0) -> datetime:
     return start_of_next_month(current_time, hour) if period == "month" else start_of_next_day(current_time, hour)
 
 

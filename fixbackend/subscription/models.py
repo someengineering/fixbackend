@@ -20,11 +20,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union, Optional, TypeVar
 
 from attr import frozen
 
-from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId, UserId, BillingId
+from fixbackend.ids import (
+    ProductTier,
+    SubscriptionId,
+    WorkspaceId,
+    UserId,
+    BillingId,
+    StripeSubscriptionId,
+    StripeCustomerId,
+)
 
 
 @frozen
@@ -34,6 +42,16 @@ class AwsMarketplaceSubscription:
     customer_identifier: str
     customer_aws_account_id: str
     product_code: str
+    active: bool
+    last_charge_timestamp: Optional[datetime]
+    next_charge_timestamp: Optional[datetime]
+
+
+@frozen
+class StripeSubscription:
+    id: SubscriptionId
+    customer_identifier: StripeCustomerId
+    stripe_subscription_id: StripeSubscriptionId
     active: bool
     last_charge_timestamp: Optional[datetime]
     next_charge_timestamp: Optional[datetime]
@@ -52,4 +70,6 @@ class BillingEntry:
 
 
 # Multiple payment methods are possible, but for now we only support AWS Marketplace
-SubscriptionMethod = Union[AwsMarketplaceSubscription]
+SubscriptionMethod = Union[AwsMarketplaceSubscription, StripeSubscription]
+
+SubscriptionMethodType = TypeVar("SubscriptionMethodType", bound=SubscriptionMethod)
