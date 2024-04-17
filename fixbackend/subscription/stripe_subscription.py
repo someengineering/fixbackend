@@ -77,7 +77,7 @@ class StripeClient:  # pragma: no cover
         self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
     ) -> StripeSubscriptionId:
         # Get the money two days after the next billing period.
-        # Usage is reported on 1.th - charged on 3.th
+        # Usage is reported on 1st - charged on 3rd
         subscription_at = start_of_next_period(period=billing_period) + timedelta(days=2)
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
         subscription = await stripe.Subscription.create_async(
@@ -240,7 +240,7 @@ class StripeServiceImpl(StripeService):
                     raise
 
         counter = 0
-        max_parallel = Semaphore(64)  # up to 64 parallel tasks
+        max_parallel = Semaphore(64)  # up to 64 concurrent tasks
         async with TaskGroup() as group:
             async for entry, subscription in self.subscription_repository.unreported_stripe_billing_entries():
                 counter += 1
