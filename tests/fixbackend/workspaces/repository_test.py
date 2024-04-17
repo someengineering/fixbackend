@@ -12,19 +12,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import datetime
 import uuid
 from attr import evolve
 
 import pytest
+from sqlalchemy import select
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ProductTier
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.types import AsyncSessionMaker
 from fixcloudutils.util import utc
@@ -230,11 +230,20 @@ async def test_on_hold(
 async def test_expired_trials(
     workspace_repository: WorkspaceRepository,
     workspace: Workspace,
+    async_session_maker: AsyncSessionMaker,
 ) -> None:
 
-    assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(days=14)) == []
+    async with async_session_maker() as session:
+        statement = select(orm.Organization).where(orm.Organization.id == workspace.id)
+        results = await session.execute(statement)
+        org = results.unique().scalar_one_or_none()
+        assert org
+        org.created_at = utc() - datetime.timedelta(days=1)
+        await session.commit()
+        await session.refresh(org)
+        workspace = org.to_model()
 
-    await asyncio.sleep(1)
+    assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(days=14)) == []
 
     assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(seconds=0)) == [
         workspace
