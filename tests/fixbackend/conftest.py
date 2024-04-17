@@ -16,11 +16,11 @@ import asyncio
 import hashlib
 import json
 import os
+import random
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from pathlib import Path
-import random
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional, Unpack
 from unittest.mock import patch
 
@@ -35,6 +35,7 @@ from async_lru import alru_cache
 from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
+from fastapi_users.password import PasswordHelper
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
@@ -43,7 +44,6 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from fastapi_users.password import PasswordHelper
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
@@ -709,6 +709,7 @@ async def cert_store(default_config: Config) -> CertificateStore:
 
 
 class InsecureFastPasswordHelper(PasswordHelper):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         pass
 
@@ -789,8 +790,10 @@ class StripeDummyClient(StripeClient):
         self.requests: List[Json] = []
         super().__init__("some dummy key")
 
-    async def create_customer(self, email: str) -> StripeCustomerId:
-        self.requests.append(dict(call="create_customer", email=email))
+    async def create_customer(
+        self, workspace_id: WorkspaceId, **params: Unpack[stripe.Customer.CreateParams]
+    ) -> StripeCustomerId:
+        self.requests.append(dict(call="create_customer", **params))
         return stripe_customer_id
 
     async def create_subscription(
@@ -836,6 +839,9 @@ class StripeDummyClient(StripeClient):
     ) -> str:
         self.requests.append(dict(call="payment_method_id_from_intent", id=id))
         return stripe_payment_method_id
+
+    async def update_customer(self, cid: StripeCustomerId, **params: Unpack[stripe.Customer.ModifyParams]) -> None:
+        self.requests.append(dict(call="update_customer", id=id, **params))
 
 
 @pytest.fixture

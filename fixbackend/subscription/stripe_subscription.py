@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import json
 import logging
 import time
 from asyncio import Semaphore, TaskGroup
@@ -38,7 +39,14 @@ from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import SubscriptionCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import BillingPeriod, StripeCustomerId, SubscriptionId, StripeSubscriptionId, ProductTier
+from fixbackend.ids import (
+    BillingPeriod,
+    StripeCustomerId,
+    SubscriptionId,
+    StripeSubscriptionId,
+    ProductTier,
+    WorkspaceId,
+)
 from fixbackend.subscription.models import StripeSubscription, BillingEntry
 from fixbackend.subscription.subscription_repository import StripeCustomerRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
@@ -48,20 +56,28 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
 
+# EU countries
+EU = {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"}  # fmt: skip # noqa: E501
+# Countries accepting reverse-charge
+REVERSE_CHARGE = EU | {"IS", "LI", "NO", "CH", "GB", "AU", "CA", "IN", "NZ", "SG", "ZA", "AE", "JP"}
+
 
 class StripeClient:  # pragma: no cover
     def __init__(self, api_key: str) -> None:
         stripe.api_key = api_key
 
-    async def create_customer(self, email: str) -> StripeCustomerId:
-        customer = await stripe.Customer.create_async(email=email)
+    async def create_customer(
+        self, workspace_id: WorkspaceId, **params: Unpack[stripe.Customer.CreateParams]
+    ) -> StripeCustomerId:
+        params["metadata"] = {**params.get("metadata", {}), "workspace_id": workspace_id}  # type: ignore
+        customer = await stripe.Customer.create_async(**params)
         return StripeCustomerId(customer.id)
 
     async def create_subscription(
         self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
     ) -> StripeSubscriptionId:
         # Get the money two days after the next billing period.
-        # Usage is reported on 1.th - charged on 3.th
+        # Usage is reported on 1st - charged on 3rd
         subscription_at = start_of_next_period(period=billing_period) + timedelta(days=2)
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
         subscription = await stripe.Subscription.create_async(
@@ -120,6 +136,9 @@ class StripeClient:  # pragma: no cover
     async def billing_portal_session(self, **params: Unpack[stripe.billing_portal.Session.CreateParams]) -> str:
         session = await stripe.billing_portal.Session.create_async(**params)
         return session.url
+
+    async def update_customer(self, cid: StripeCustomerId, **params: Unpack[stripe.Customer.ModifyParams]) -> None:
+        await stripe.Customer.modify_async(cid, **params)
 
     async def payment_method_id_from_intent(
         self, id: str, **params: Unpack[stripe.PaymentIntent.RetrieveParams]
@@ -191,6 +210,17 @@ class StripeServiceImpl(StripeService):
                         "quantity": 1,
                     }
                 ],
+                customer_update=dict(name="auto", address="auto"),  # is allowed to update customer data
+                automatic_tax=dict(enabled=False),  # no tax for this item, the money will be refunded immediately
+                invoice_creation=dict(enabled=False),  # we do not want to create an invoice for this item
+                billing_address_collection="required",  # we need the billing address for the subscription
+                custom_fields=[  # allow definition of the company name (will become the customer name)
+                    dict(key="company", label=dict(type="custom", custom="Company"), optional=False, type="text"),
+                ],
+                consent_collection=dict(  # we need the consent to store the payment method
+                    payment_method_reuse_agreement=dict(position="auto"), terms_of_service="required"
+                ),
+                submit_type="book",  # the button text to order
             )
         else:
             # subscription exists: use the customer portal to review payment data and invoices
@@ -210,16 +240,18 @@ class StripeServiceImpl(StripeService):
                     raise
 
         counter = 0
-        max_parallel = Semaphore(64)  # up to 64 parallel tasks
+        max_concurrent = Semaphore(64)  # up to 64 concurrent tasks
         async with TaskGroup() as group:
             async for entry, subscription in self.subscription_repository.unreported_stripe_billing_entries():
                 counter += 1
-                async with max_parallel:
+                async with max_concurrent:
                     await group.create_task(send(entry, subscription))
         return counter
 
     async def handle_event(self, event: str, signature: str) -> None:  # pragma: no cover
         # This will validate the event using the secret key you provided
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("Stripe event: %s", json.dumps(json.loads(event), indent=2))
         await self.handle_verified_event(Webhook.construct_event(event, signature, self.webhook_key))  # type: ignore
 
     async def handle_verified_event(self, event: stripe.Event) -> None:
@@ -227,20 +259,34 @@ class StripeServiceImpl(StripeService):
         log.info(f"Received Stripe event: {event.type}: {event.id}")
         match event.type:
             case "checkout.session.completed":
-                customer_id = do.get("customer")
+                cid = do.get("customer")
                 intent_id = do.get("payment_intent")
-                if customer_id and isinstance(pid := intent_id, str):
-                    await self._create_stripe_subscription(StripeCustomerId(customer_id), pid)
+                custom_fields = {f["key"]: value_in_path(f, ["text", "value"]) for f in do.get("custom_fields", [])}
+                company = custom_fields.get("company")
+                country_code = value_in_path(do, ["customer_details", "address", "country"])
+                # Update the customer: set company name and tax_exemption based on country code
+                if cid and company and country_code:
+                    await self._update_customer(StripeCustomerId(cid), company=company, country_code=country_code)
+                # Create a subscription for the customer
+                if cid and isinstance(pid := intent_id, str):
+                    await self._create_stripe_subscription(StripeCustomerId(cid), pid)
                 else:
                     log.error("Invalid checkout session event: missing customer or payment intent")
             case "payment_intent.succeeded":
                 reason = value_in_path(do, ["metadata", "reason"])
-                customer_id = do.get("customer")
+                cid = do.get("customer")
                 intent_id = do.get("id")
                 # activation payments should be refunded
-                if reason == "activation" and intent_id and customer_id:
-                    log.info(f"Activation payment found for customer {customer_id}. Refund.")
+                if reason == "activation" and intent_id and cid:
+                    log.info(f"Activation payment found for customer {cid}. Refund.")
                     await self.client.refund(intent_id)
+            case "customer.updated":
+                # check if country has changed, which might involve a change in tax settings
+                cid = do.get("customer")
+                country_changed = value_in_path(do, ["previous_attributes", "address", "country"])
+                country = value_in_path(do, ["address", "country"])
+                if cid and country_changed and country:
+                    await self._update_customer(StripeCustomerId(cid), country_code=country)
             case "invoice.finalized":
                 # we could send the invoice via email to the customer
                 pass
@@ -253,6 +299,12 @@ class StripeServiceImpl(StripeService):
     async def _create_stripe_subscription(self, customer_id: StripeCustomerId, payment_intent_id: str) -> None:
         # get workspace of customer:
         if workspace_id := await self.stripe_customer_repo.workspace_of_customer(customer_id):
+            # idempotency: do nothing if we already have an active stripe subscription
+            if (ws := await self.workspace_repository.get_workspace(workspace_id)) and ws.subscription_id:
+                existing = await self.subscription_repository.get_subscription(ws.subscription_id)
+                if isinstance(existing, StripeSubscription) and existing.active:
+                    log.info(f"Workspace {workspace_id} already has a stripe subscription {existing.id}")
+                    return
             # lookup the payment method of the related payment intent
             pm_id = await self.client.payment_method_id_from_intent(payment_intent_id)
             # create a subscription for customer using given payment method for defined billing period
@@ -276,12 +328,25 @@ class StripeServiceImpl(StripeService):
         else:
             raise ValueError(f"Stripe customer {customer_id} has no workspace?")
 
+    async def _update_customer(
+        self, cid: StripeCustomerId, *, company: Optional[str] = None, country_code: Optional[str] = None
+    ) -> None:
+        update = {}
+        if company:
+            update["name"] = company
+        if country_code and country_code.upper() in REVERSE_CHARGE:  # set reverse-charge if the country accepts it
+            update["tax_exempt"] = "reverse"
+        if country_code and country_code.upper() == "US":  # unset any value if the country is US
+            update["tax_exempt"] = "none"
+        if update:
+            await self.client.update_customer(cid, **update)  # type: ignore
+
     async def _get_stripe_customer_id(self, workspace: Workspace) -> StripeCustomerId:
         customer_id = await self.stripe_customer_repo.get(workspace.id)
         if customer_id is None:
             owner = await self.user_repo.get(workspace.owner_id)
             assert owner is not None, f"Workspace {workspace.id} does not have an owner?"
-            customer_id = await self.client.create_customer(owner.email)
+            customer_id = await self.client.create_customer(workspace.id, email=owner.email)
             await self.stripe_customer_repo.create(workspace.id, customer_id)
         return customer_id
 

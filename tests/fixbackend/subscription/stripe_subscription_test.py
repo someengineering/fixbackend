@@ -100,3 +100,31 @@ async def test_report_usage(stripe_service: StripeServiceImpl, workspace: Worksp
 
     # A later call does not report anything, since it has already been reported
     assert await stripe_service.report_unreported_usages(True) == 0
+
+
+async def test_tax_exemption(stripe_service: StripeServiceImpl, stripe_client: StripeDummyClient) -> None:
+    def move(a: str, b: str) -> stripe.Event:
+        return event(
+            "customer.updated",
+            {
+                "customer": stripe_customer_id,
+                "address": {"country": b},
+                "previous_attributes": {"address": {"country": a}},
+            },
+        )
+
+    # moving from us to de should change the tax exemption to reverse
+    await stripe_service.handle_verified_event(move("US", "DE"))
+    assert len(stripe_client.requests) == 1
+    assert stripe_client.requests[0]["call"] == "update_customer"
+    assert stripe_client.requests[0]["tax_exempt"] == "reverse"
+    stripe_client.requests.clear()
+    # moving from de to us should change the tax exemption to none
+    await stripe_service.handle_verified_event(move("DE", "US"))
+    assert len(stripe_client.requests) == 1
+    assert stripe_client.requests[0]["call"] == "update_customer"
+    assert stripe_client.requests[0]["tax_exempt"] == "none"
+    stripe_client.requests.clear()
+    # moving from china to russia should not change the tax exemption
+    await stripe_service.handle_verified_event(move("CN", "RU"))
+    assert len(stripe_client.requests) == 0
