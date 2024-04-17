@@ -37,7 +37,7 @@ from prometheus_client import Counter
 from fixbackend.auth.models import User
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import (
-    AwsMarketplaceSubscriptionCancelled,
+    SubscriptionCancelled,
     SubscriptionCreated,
     BillingEntryCreated,
 )
@@ -276,7 +276,7 @@ class AwsMarketplaceHandler(Service):
     async def subscription_canceled(self, customer_id: str) -> None:
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
             assert isinstance(subscription, AwsMarketplaceSubscription), "Subscription is not from AWS Marketplace"
-            await self.domain_event_sender.publish(AwsMarketplaceSubscriptionCancelled(subscription.id))
+            await self.domain_event_sender.publish(SubscriptionCancelled(subscription.id, "aws_marketplace"))
             if billing := await self.create_billing_entry(subscription):
                 await self.report_usage(subscription.product_code, [(subscription, billing)])
 

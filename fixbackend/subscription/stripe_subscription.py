@@ -37,7 +37,7 @@ from stripe import Webhook
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.domain_events.events import SubscriptionCreated
+from fixbackend.domain_events.events import SubscriptionCreated, SubscriptionCancelled
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import (
     BillingPeriod,
@@ -266,9 +266,11 @@ class StripeServiceImpl(StripeService):
                 country_code = value_in_path(do, ["customer_details", "address", "country"])
                 # Update the customer: set company name and tax_exemption based on country code
                 if cid and company and country_code:
+                    log.info(f"Checkout session completed. customer: {cid} company={company} country={country_code}")
                     await self._update_customer(StripeCustomerId(cid), company=company, country_code=country_code)
                 # Create a subscription for the customer
                 if cid and isinstance(pid := intent_id, str):
+                    log.info(f"Checkout session completed. customer: {cid} create subscription payment_intent: {pid}")
                     await self._create_stripe_subscription(StripeCustomerId(cid), pid)
                 else:
                     log.error("Invalid checkout session event: missing customer or payment intent")
@@ -286,13 +288,12 @@ class StripeServiceImpl(StripeService):
                 country_changed = value_in_path(do, ["previous_attributes", "address", "country"])
                 country = value_in_path(do, ["address", "country"])
                 if cid and country_changed and country:
+                    log.info("Country of customer has changed. Updating tax settings.")
                     await self._update_customer(StripeCustomerId(cid), country_code=country)
-            case "invoice.finalized":
-                # we could send the invoice via email to the customer
-                pass
-            case "invoice.payment_failed":
-                # start the dunning process
-                pass
+            case "customer.subscription.deleted":
+                if sid := do.get("id"):
+                    log.info(f"Customer subscription deleted on stripe side: {sid}")
+                    await self._stripe_subscription_cancelled(StripeSubscriptionId(sid))
             case _:
                 pass
 
@@ -355,6 +356,14 @@ class StripeServiceImpl(StripeService):
             if isinstance(sub, StripeSubscription) and sub.stripe_subscription_id:
                 return sub.stripe_subscription_id
         return None
+
+    async def _stripe_subscription_cancelled(self, sid: StripeSubscriptionId) -> None:
+        async for sub in self.subscription_repository.subscriptions(stripe_subscription_identifier=sid):
+            log.info(f"Fix Subscription {sub.id} cancelled. Delete.")
+            # delete the subscription from the repository
+            await self.subscription_repository.delete_subscriptions(sub.id)
+            # publish event to let others know
+            await self.domain_event_publisher.publish(SubscriptionCancelled(sub.id, "stripe"))
 
 
 def create_stripe_service(

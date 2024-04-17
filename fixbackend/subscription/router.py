@@ -94,8 +94,8 @@ def subscription_router() -> APIRouter:
         # in case the user did the checkout successfully, we want to show a message
         # otherwise nothing is shown - the user can visit the checkout as often as they want
         if success:
-            return RedirectResponse("/?message=stripe-subscribed")
-        return RedirectResponse("/")
+            return RedirectResponse("/workspace-settings/billing-receipts?message=stripe-subscribed")
+        return RedirectResponse("/workspace-settings/billing-receipts")
 
     @router.post("/subscriptions/stripe/events", include_in_schema=False)
     async def stripe_callback(request: Request, stripe_service: StripeServiceDependency) -> Response:
