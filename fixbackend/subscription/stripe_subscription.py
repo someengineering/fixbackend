@@ -214,12 +214,12 @@ class StripeServiceImpl(StripeService):
                 automatic_tax=dict(enabled=False),  # no tax for this item, the money will be refunded immediately
                 invoice_creation=dict(enabled=False),  # we do not want to create an invoice for this item
                 billing_address_collection="required",  # we need the billing address for the subscription
-                custom_fields=[  # allow definition of the tax id for the subscription
+                custom_fields=[  # allow definition of the company name (will become the customer name)
                     dict(key="company", label=dict(type="custom", custom="Company"), optional=False, type="text"),
                 ],
-                consent_collection=dict(
+                consent_collection=dict(  # we need the consent to store the payment method
                     payment_method_reuse_agreement=dict(position="auto"), terms_of_service="required"
-                ),  # we need the consent to store the payment method
+                ),
                 submit_type="book",  # the button text to order
             )
         else:
