@@ -16,8 +16,6 @@
 from typing import AsyncIterator
 
 import pytest
-from _datetime import timedelta
-from attr import evolve
 from fastapi import FastAPI
 from fixcloudutils.util import utc
 from httpx import AsyncClient
