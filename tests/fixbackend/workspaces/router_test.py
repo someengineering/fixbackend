@@ -149,5 +149,6 @@ async def test_workspace_trial_period() -> None:
     trial_left = workspace.trial_end_days()
     assert trial_left is not None
     assert trial_left >= 14
-    assert evolve(workspace, created_at=utc() - timedelta(days=15)).trial_end_days() == 0
-    assert evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days() == 4
+    # todo: ucomment this once we disable rolling trial period duration
+    # assert evolve(workspace, created_at=utc() - timedelta(days=15)).trial_end_days() == 0
+    # assert evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days() == 4
