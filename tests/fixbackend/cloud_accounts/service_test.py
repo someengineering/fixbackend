@@ -47,7 +47,7 @@ from fixbackend.domain_events.events import (
     Event,
     TenantAccountsCollected,
     ProductTierChanged,
-    AwsMarketplaceSubscriptionCancelled,
+    SubscriptionCancelled,
     AwsAccountDeleted,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -1063,6 +1063,6 @@ async def test_handle_events(
             is_higher_tier=False,
             previous_tier=ProductTier.Business,
         ),
-        AwsMarketplaceSubscriptionCancelled(subscription_id=subscription_id),
+        SubscriptionCancelled(subscription_id=subscription_id, method="aws_marketplace"),
     ]:
         await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))

@@ -51,7 +51,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
-    AwsMarketplaceSubscriptionCancelled,
+    SubscriptionCancelled,
     ProductTierChanged,
     CloudAccountActiveToggled,
     CloudAccountNameChanged,
@@ -424,8 +424,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                                     self.delete_cloud_account(ptc_evt.user_id, cloud_account.id, ptc_evt.workspace_id)
                                 )
 
-                case AwsMarketplaceSubscriptionCancelled.kind:
-                    evt = AwsMarketplaceSubscriptionCancelled.from_json(message)
+                case SubscriptionCancelled.kind:
+                    evt = SubscriptionCancelled.from_json(message)
                     workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
                     for ws in workspaces:
                         # first move the tier to free

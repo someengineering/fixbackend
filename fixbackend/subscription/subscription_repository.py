@@ -195,6 +195,7 @@ class SubscriptionRepository:
         user_id: Optional[UserId] = None,
         aws_customer_identifier: Optional[str] = None,
         stripe_customer_identifier: Optional[str] = None,
+        stripe_subscription_identifier: Optional[StripeSubscriptionId] = None,
         active: Optional[bool] = None,
         next_charge_timestamp_before: Optional[datetime] = None,
         next_charge_timestamp_after: Optional[datetime] = None,
@@ -215,6 +216,8 @@ class SubscriptionRepository:
             query = query.where(SubscriptionEntity.next_charge_timestamp > next_charge_timestamp_after)
         if stripe_customer_identifier:
             query = query.where(SubscriptionEntity.stripe_customer_identifier == stripe_customer_identifier)
+        if stripe_subscription_identifier:
+            query = query.where(SubscriptionEntity.stripe_subscription_id == stripe_subscription_identifier)
         if (is_aws := is_aws_marketplace_subscription) is not None:
             aws_customer = SubscriptionEntity.aws_customer_identifier
             query = query.where(aws_customer.isnot(None) if is_aws else aws_customer.is_(None))
@@ -301,11 +304,18 @@ class SubscriptionRepository:
             await session.commit()
             return result.rowcount  # noqa
 
+    async def delete_subscriptions(self, sid: SubscriptionId) -> int:
+        async with self.session_maker() as session:
+            result = await session.execute(delete(SubscriptionEntity).where(SubscriptionEntity.id == sid))
+            await session.commit()
+            return result.rowcount  # noqa
+
     async def delete_aws_marketplace_subscriptions(self, customer_identifier: str) -> int:
         async with self.session_maker() as session:
             result = await session.execute(
                 delete(SubscriptionEntity).where(SubscriptionEntity.aws_customer_identifier == customer_identifier)
             )
+            await session.commit()
             return result.rowcount  # noqa
 
     async def create(self, subscription: SubscriptionMethodType) -> SubscriptionMethodType:

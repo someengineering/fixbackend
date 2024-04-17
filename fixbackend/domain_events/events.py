@@ -243,14 +243,15 @@ class SubscriptionCreated(Event):
 
 
 @frozen
-class AwsMarketplaceSubscriptionCancelled(Event):
+class SubscriptionCancelled(Event):
     """
     This event is emitted when a user cancels an AWS Marketplace subscription.
     """
 
-    kind: ClassVar[str] = "aws_marketplace_subscription_cancelled"
+    kind: ClassVar[str] = "subscription_cancelled"
 
     subscription_id: SubscriptionId
+    method: Literal["aws_marketplace", "stripe"]
 
 
 @frozen
