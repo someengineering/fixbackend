@@ -51,8 +51,9 @@ from fixbackend.auth.oauth_router import github_client, google_client
 from fixbackend.auth.router import auth_router
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.users_router import users_router
-from fixbackend.billing_information.router import billing_info_router
-from fixbackend.billing_information.service import BillingEntryService
+from fixbackend.billing.billing_job import BillingJob
+from fixbackend.billing.router import billing_info_router
+from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
@@ -86,7 +87,6 @@ from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.permissions.router import roles_router
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.router import subscription_router
 from fixbackend.subscription.stripe_subscription import create_stripe_service
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
@@ -195,8 +195,11 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 role_repo,
             ),
         )
-        deps.add(
-            SN.billing_entry_service, BillingEntryService(subscription_repo, workspace_repo, domain_event_publisher)
+        billing_entry_service = deps.add(
+            SN.billing_entry_service,
+            BillingEntryService(
+                subscription_repo, workspace_repo, metering_repo, domain_event_publisher, cfg.billing_period
+            ),
         )
         analytics_event_sender = deps.add(
             SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
@@ -210,11 +213,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
             AwsMarketplaceHandler(
                 subscription_repo,
                 workspace_repo,
-                metering_repo,
                 boto_session,
-                cfg.args.aws_marketplace_metering_sqs_url,
                 domain_event_publisher,
-                cfg.billing_period,
+                billing_entry_service,
+                cfg.args.aws_marketplace_metering_sqs_url,
             ),
         )
         deps.add(
@@ -447,16 +449,21 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 role_repo,
             ),
         )
+        billing_entry_service = deps.add(
+            SN.billing_entry_service,
+            BillingEntryService(
+                subscription_repo, workspace_repo, metering_repo, domain_event_publisher, cfg.billing_period
+            ),
+        )
         aws_marketplace = deps.add(
             SN.aws_marketplace_handler,
             AwsMarketplaceHandler(
                 subscription_repo,
                 workspace_repo,
-                metering_repo,
                 boto_session,
-                cfg.args.aws_marketplace_metering_sqs_url,
                 domain_event_publisher,
-                cfg.billing_period,
+                billing_entry_service,
+                cfg.args.aws_marketplace_metering_sqs_url,
             ),
         )
         stripe = deps.add(
@@ -465,7 +472,10 @@ def fast_api_app(cfg: Config) -> FastAPI:
                 cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher
             ),
         )
-        deps.add(SN.billing, BillingService(aws_marketplace, stripe, subscription_repo, workspace_repo, cfg))
+        deps.add(
+            SN.billing_job,
+            BillingJob(aws_marketplace, stripe, subscription_repo, workspace_repo, billing_entry_service, cfg),
+        )
 
         async with deps:
             log.info("Application services started.")

@@ -53,7 +53,7 @@ class ServiceNames:
     workspace_repo = "workspace_repo"
     user_repo = "user_repo"
     subscription_repo = "subscription_repo"
-    billing = "billing"
+    billing_job = "billing_job"
     cloud_account_service = "cloud_account_service"
     domain_event_subscriber = "domain_event_subscriber"
     invitation_repository = "invitation_repository"

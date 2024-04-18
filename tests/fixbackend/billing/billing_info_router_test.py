@@ -20,13 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
-from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
 from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence, override
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
 from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
-from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
+from fixbackend.billing.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.models import BillingEntry
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
 from fixbackend.utils import uid

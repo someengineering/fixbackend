@@ -22,7 +22,7 @@
 import json
 import logging
 from asyncio import Semaphore, TaskGroup
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import Annotated, Any, Optional, Tuple, List, cast
 from uuid import uuid4
 
@@ -32,20 +32,18 @@ from fixcloudutils.asyncio.async_extensions import run_async
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
-from prometheus_client import Counter
 
 from fixbackend.auth.models import User
+from fixbackend.billing.service import BillingEntryService
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import (
     SubscriptionCancelled,
     SubscriptionCreated,
-    BillingEntryCreated,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
-from fixbackend.ids import ProductTier, SubscriptionId, BillingPeriod
-from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.sqs import SQSRawListener
-from fixbackend.subscription.models import AwsMarketplaceSubscription, SubscriptionMethod, BillingEntry
+from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
 )
@@ -55,22 +53,6 @@ from fixbackend.workspaces.repository import WorkspaceRepository
 log = logging.getLogger(__name__)
 
 
-def compute_billing_period_factor(
-    *,
-    billing_time: datetime,
-    last_charged: datetime,
-    period_value: timedelta,
-) -> float:
-    delta = billing_time - last_charged
-    # Default should be a single month. For shorter or longer periods, we use a fraction/factor of the month
-    period_lower_bound = period_value - period_value * 0.1667  # - 5 days in case of 30 days
-    period_upper_bound = period_value + period_value * 0.1667  # + 5 days in case of 30 days
-    is_full_period = period_lower_bound < delta < period_upper_bound
-    billing_factor = 1.0 if is_full_period else delta / period_value
-    return billing_factor
-
-
-AccountsCharged = Counter("aws_marketplace_accounts_charged", "Accounts charged by security tier", ["product_tier"])
 ProductTierToMarketplaceDimension = {
     ProductTier.Plus: "PlusAccount",
     ProductTier.Business: "BusinessAccount",
@@ -83,15 +65,13 @@ class AwsMarketplaceHandler(Service):
         self,
         subscription_repo: SubscriptionRepository,
         workspace_repo: WorkspaceRepository,
-        metering_repo: MeteringRepository,
         session: boto3.Session,
-        sqs_queue_url: Optional[str],
         domain_event_sender: DomainEventPublisher,
-        billing_period: BillingPeriod,
+        billing_entry_service: BillingEntryService,
+        sqs_queue_url: Optional[str],
     ) -> None:
         self.subscription_repo = subscription_repo
         self.workspace_repo = workspace_repo
-        self.metering_repo = metering_repo
         self.listener = (
             SQSRawListener(
                 session,
@@ -106,7 +86,7 @@ class AwsMarketplaceHandler(Service):
         )
         self.marketplace_client: Any = session.client("meteringmarketplace")
         self.domain_event_sender = domain_event_sender
-        self.billing_period: BillingPeriod = billing_period
+        self.billing_entry_service = billing_entry_service
 
     async def start(self) -> None:
         if self.listener is not None:
@@ -151,7 +131,7 @@ class AwsMarketplaceHandler(Service):
                 product_code=product_code,
                 active=True,
                 last_charge_timestamp=utc(),
-                next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
+                next_charge_timestamp=start_of_next_period(period=self.billing_entry_service.billing_period, hour=9),
             )
             event = SubscriptionCreated(
                 workspace_id=workspace_id, user_id=user.id, subscription_id=subscription.id, method="aws_marketplace"
@@ -162,79 +142,6 @@ class AwsMarketplaceHandler(Service):
                 workspace_assigned = True
             await self.domain_event_sender.publish(event)
             return result, workspace_assigned
-
-    async def create_billing_entry(
-        self, subscription: SubscriptionMethod, now: Optional[datetime] = None
-    ) -> Optional[BillingEntry]:
-        if not subscription.active:
-            log.info(f"AWS Marketplace: subscription {subscription.id} is not active")
-            return None
-        try:
-            billing_time = now or utc()
-
-            next_charge = start_of_next_period(period=self.billing_period, current_time=billing_time, hour=9)
-            match self.billing_period:
-                case "month":
-                    billing_period_value = timedelta(days=30)
-                case "day":
-                    billing_period_value = timedelta(days=1)
-
-            last_charged = subscription.last_charge_timestamp or billing_time
-            kind = subscription.__class__.__name__
-
-            month_factor = compute_billing_period_factor(
-                billing_time=billing_time,
-                last_charged=last_charged,
-                period_value=billing_period_value,
-            )
-            workspaces = await self.workspace_repo.list_workspaces_by_subscription_id(subscription.id)
-
-            for workspace in workspaces:
-                # Get the summaries for the last period, with at least 100 resources collected and at least 3 collects
-                summaries = [
-                    summary
-                    async for summary in self.metering_repo.collect_summary(
-                        workspace.id,
-                        start=last_charged,
-                        end=billing_time,
-                        min_resources_collected=100,
-                        min_nr_of_collects=3,
-                    )
-                ]
-
-                tiers = [summary.product_tier for summary in summaries]
-                # highest recorded tier
-                product_tier = max(tiers, default=ProductTier.Free)
-                # We only count the number of accounts, no matter how many runs we had
-                usage = int(len(summaries) * month_factor)
-                on_payment_free_tier = product_tier.paid is False
-                if on_payment_free_tier or usage == 0:
-                    log.info(f"{kind}: subscription {subscription.id} has no usage")
-                    # move the charge timestamp tp
-                    await self.subscription_repo.update_charge_timestamp(subscription.id, billing_time, next_charge)
-                    return None
-
-                log.info(f"{kind}: subscription {subscription.id} collected {usage} times: {summaries}")
-                AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
-                billing_entry = await self.subscription_repo.add_billing_entry(
-                    subscription.id,
-                    workspace.id,
-                    product_tier,
-                    usage,
-                    last_charged,
-                    billing_time,
-                    next_charge,
-                )
-                await self.domain_event_sender.publish(
-                    BillingEntryCreated(workspace.id, subscription.id, product_tier, usage)
-                )
-                return billing_entry
-            else:
-                log.info(f"{kind}: subscription {subscription.id} has no workspace")
-                return None
-        except Exception:
-            log.error("Could not create a billing entry", exc_info=True)
-            raise
 
     async def report_usage(
         self, product_code: str, entries: List[Tuple[AwsMarketplaceSubscription, BillingEntry]]
@@ -277,7 +184,7 @@ class AwsMarketplaceHandler(Service):
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
             assert isinstance(subscription, AwsMarketplaceSubscription), "Subscription is not from AWS Marketplace"
             await self.domain_event_sender.publish(SubscriptionCancelled(subscription.id, "aws_marketplace"))
-            if billing := await self.create_billing_entry(subscription):
+            if billing := await self.billing_entry_service.create_billing_entry(subscription):
                 await self.report_usage(subscription.product_code, [(subscription, billing)])
 
     async def handle_message(self, message: Json) -> None:

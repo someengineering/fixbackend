@@ -21,14 +21,14 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.config import Config
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
-from fixbackend.billing_information import schemas
-from fixbackend.billing_information.models import PaymentMethod, PaymentMethods
-from fixbackend.billing_information.schemas import (
+from fixbackend.billing import schemas
+from fixbackend.billing.models import PaymentMethod, PaymentMethods
+from fixbackend.billing.schemas import (
     BillingEntryRead,
     WorkspaceBillingSettingsRead,
     WorkspaceBillingSettingsUpdate,
 )
-from fixbackend.billing_information.service import BillingEntryServiceDependency
+from fixbackend.billing.service import BillingEntryServiceDependency
 from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId
 from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency

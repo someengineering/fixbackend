@@ -85,7 +85,9 @@ async def test_create_billing_entry(
         [mr1free(), mr1free(), mr1free(), mr1enterprise(), mr1enterprise(), mr1enterprise(), mr2(), mr2(), mr2()]
     )
     # create billing entry
-    billing = await aws_marketplace_handler.create_billing_entry(aws_marketplace_subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
@@ -118,7 +120,7 @@ async def test_create_daily_billing_entry(
     workspace_repository: WorkspaceRepository,
 ) -> None:
     # set billing period to daily
-    aws_marketplace_handler.billing_period = "day"
+    aws_marketplace_handler.billing_entry_service.billing_period = "day"
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
     now = datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
@@ -140,7 +142,9 @@ async def test_create_daily_billing_entry(
         [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
     )
     # create billing entry
-    billing = await aws_marketplace_handler.create_billing_entry(aws_marketplace_subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
@@ -189,5 +193,7 @@ async def test_create_free_tier_billing_entry(
     # create 3 metering records for acc1 and acc2, all with free tiers
     await metering_repository.add([mr1free(), mr1free(), mr1free(), mrTrial(), mrTrial(), mr2(), mr2(), mr2()])
     # billing entry is not created for free tier accounts because we have a job that reports dummy zero usage for such cases
-    billing = await aws_marketplace_handler.create_billing_entry(aws_marketplace_subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is None

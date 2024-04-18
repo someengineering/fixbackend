@@ -49,6 +49,8 @@ from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
+from fixbackend.billing.billing_job import BillingJob
+from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -83,7 +85,6 @@ from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
@@ -658,21 +659,38 @@ async def invitation_repository(
 
 
 @pytest.fixture
+async def billing_entry_service(
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
+    metering_repository: MeteringRepository,
+    domain_event_sender: DomainEventPublisher,
+    default_config: Config,
+) -> BillingEntryService:
+    return BillingEntryService(
+        subscription_repository,
+        workspace_repository,
+        metering_repository,
+        domain_event_sender,
+        default_config.billing_period,
+    )
+
+
+@pytest.fixture
 async def aws_marketplace_handler(
     subscription_repository: SubscriptionRepository,
     metering_repository: MeteringRepository,
     workspace_repository: WorkspaceRepository,
     boto_session: BotoSession,
     domain_event_sender: DomainEventPublisher,
+    billing_entry_service: BillingEntryService,
 ) -> AwsMarketplaceHandler:
     return AwsMarketplaceHandler(
         subscription_repository,
         workspace_repository,
-        metering_repository,
         boto_session,
-        None,
         domain_event_sender,
-        "month",
+        billing_entry_service,
+        None,
     )
 
 
@@ -871,15 +889,21 @@ def stripe_service(
 
 
 @pytest.fixture
-async def billing_service(
+async def billing_job(
     aws_marketplace_handler: AwsMarketplaceHandler,
     stripe_service: StripeServiceImpl,
     subscription_repository: SubscriptionRepository,
     workspace_repository: WorkspaceRepository,
     default_config: Config,
-) -> BillingService:
-    return BillingService(
-        aws_marketplace_handler, stripe_service, subscription_repository, workspace_repository, default_config
+    billing_entry_service: BillingEntryService,
+) -> BillingJob:
+    return BillingJob(
+        aws_marketplace_handler,
+        stripe_service,
+        subscription_repository,
+        workspace_repository,
+        billing_entry_service,
+        default_config,
     )
 
 

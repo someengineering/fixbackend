@@ -17,8 +17,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from typing import List, Literal, Optional, Union
-from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
-from fixbackend.billing_information import models
+from fixbackend.billing.models import PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing import models
 
 from fixbackend.ids import BillingId, ProductTier, SubscriptionId, WorkspaceId
 from fixbackend.subscription.models import BillingEntry
