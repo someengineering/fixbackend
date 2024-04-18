@@ -63,9 +63,6 @@ class Config(BaseSettings):
     signing_key_1: Optional[Path]
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
-    customerio_baseurl: str
-    customerio_site_id: Optional[str]
-    customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
     aws_cf_stack_notification_sqs_url: Optional[str]
     oauth_state_token_ttl: int
@@ -161,11 +158,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
-    parser.add_argument(
-        "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
-    )
-    parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
-    parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
     parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
     parser.add_argument(
         "--cloud-account-service-event-parallelism",

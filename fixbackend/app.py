@@ -66,7 +66,7 @@ from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.consumers import CustomerIoEventConsumer, EmailOnSignupConsumer
+from fixbackend.domain_events.consumers import EmailOnSignupConsumer
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
@@ -224,10 +224,6 @@ def fast_api_app(cfg: Config) -> FastAPI:
             create_stripe_service(
                 cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher
             ),
-        )
-        deps.add(
-            SN.customerio_consumer,
-            CustomerIoEventConsumer(http_client, cfg, domain_event_subscriber),
         )
         cloud_accounts_redis_publisher = RedisPubSubPublisher(
             redis=readwrite_redis,
