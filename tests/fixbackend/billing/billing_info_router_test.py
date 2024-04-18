@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -20,14 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
-from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods, BillingEntry
 from fixbackend.config import Config, get_config
 from typing import AsyncIterator, List, Optional, Sequence, override
 from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
 from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
-from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
-from fixbackend.subscription.models import BillingEntry
+from fixbackend.billing.service import BillingEntryService, get_billing_entry_service
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
 from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace

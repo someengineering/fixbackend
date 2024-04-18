@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base, CreatedUpdatedMixin
+from fixbackend.billing.models import BillingEntry
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.ids import (
     ProductTier,
@@ -44,7 +45,6 @@ from fixbackend.ids import (
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.subscription.models import (
     AwsMarketplaceSubscription,
-    BillingEntry,
     StripeSubscription,
     SubscriptionMethod,
     SubscriptionMethodType,

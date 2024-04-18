@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -17,30 +17,33 @@ from asyncio import Task, TaskGroup
 from datetime import datetime
 from typing import Any, Optional, AsyncIterator, List, Tuple
 
+import prometheus_client
 from fixcloudutils.asyncio import stop_running_task
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
-import prometheus_client
 
+from fixbackend.billing.models import BillingEntry
+from fixbackend.billing.service import BillingEntryService
+from fixbackend.config import Config
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.models import SubscriptionMethod, BillingEntry, AwsMarketplaceSubscription
+from fixbackend.subscription.models import SubscriptionMethod, AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeService
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.config import Config
 
 log = logging.getLogger(__name__)
 
 
-class BillingService(Service):
+class BillingJob(Service):
     def __init__(
         self,
         aws_marketplace: AwsMarketplaceHandler,
         stripe_service: StripeService,
         subscription_repository: SubscriptionRepository,
         workspace_repository: WorkspaceRepository,
+        billing_entry_service: BillingEntryService,
         config: Config,
     ) -> None:
         self.aws_marketplace = aws_marketplace
@@ -49,6 +52,7 @@ class BillingService(Service):
         self.workspace_repository = workspace_repository
         self.handler: Optional[Task[Any]] = None
         self.config = config
+        self.billing_entry_service = billing_entry_service
 
     async def start(self) -> Any:
         self.handler = asyncio.create_task(self.handle_outstanding_subscriptions())
@@ -86,21 +90,24 @@ class BillingService(Service):
 
     async def create_overdue_billing_entries(self, now: datetime, parallel_requests: int) -> None:
         semaphore = asyncio.Semaphore(parallel_requests)
+        counter = 0
 
         async def create_billing_entry(subscription: SubscriptionMethod) -> None:
             try:
                 async with semaphore:
-                    await self.aws_marketplace.create_billing_entry(subscription)
+                    if await self.billing_entry_service.create_billing_entry(subscription):
+                        nonlocal counter
+                        counter += 1
             except Exception as e:
                 log.error(
                     f"Failed to create billing entry for subscription {subscription.id}: {e}. Ignore.", exc_info=True
                 )
 
         async with TaskGroup() as group:
-            async for subscription in self.subscription_repository.subscriptions(
-                active=True, next_charge_timestamp_before=now
-            ):
-                group.create_task(create_billing_entry(subscription))
+            async for sub in self.subscription_repository.subscriptions(active=True, next_charge_timestamp_before=now):
+                group.create_task(create_billing_entry(sub))
+        if counter > 0:
+            log.info(f"Created {counter} overdue billing entries")
 
     async def report_no_usage_for_active_aws_marketplace_subscriptions(
         self, now: datetime, parallel_requests: int

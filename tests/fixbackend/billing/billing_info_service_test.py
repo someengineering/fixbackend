@@ -16,24 +16,14 @@ import pytest
 from fixcloudutils.util import utc
 
 from fixbackend.auth.models import User
-from fixbackend.billing_information.models import PaymentMethods
-from fixbackend.billing_information.service import BillingEntryService
-from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.billing.models import PaymentMethods
+from fixbackend.billing.service import BillingEntryService
+from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.errors import NotAllowed
-
-
-@pytest.fixture
-async def billing_entry_service(
-    subscription_repository: SubscriptionRepository,
-    workspace_repository: WorkspaceRepository,
-    domain_event_sender: DomainEventPublisher,
-) -> BillingEntryService:
-    return BillingEntryService(subscription_repository, workspace_repository, domain_event_sender)
 
 
 @pytest.mark.asyncio
