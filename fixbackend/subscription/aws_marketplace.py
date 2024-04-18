@@ -34,6 +34,7 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
 
 from fixbackend.auth.models import User
+from fixbackend.billing.models import BillingEntry
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import (
@@ -43,7 +44,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.sqs import SQSRawListener
-from fixbackend.subscription.models import AwsMarketplaceSubscription, BillingEntry
+from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
 )

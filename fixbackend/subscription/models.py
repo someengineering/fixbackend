@@ -24,15 +24,7 @@ from typing import Union, Optional, TypeVar
 
 from attr import frozen
 
-from fixbackend.ids import (
-    ProductTier,
-    SubscriptionId,
-    WorkspaceId,
-    UserId,
-    BillingId,
-    StripeSubscriptionId,
-    StripeCustomerId,
-)
+from fixbackend.ids import SubscriptionId, UserId, StripeSubscriptionId, StripeCustomerId
 
 
 @frozen
@@ -55,18 +47,6 @@ class StripeSubscription:
     active: bool
     last_charge_timestamp: Optional[datetime]
     next_charge_timestamp: Optional[datetime]
-
-
-@frozen
-class BillingEntry:
-    id: BillingId
-    workspace_id: WorkspaceId
-    subscription_id: SubscriptionId
-    tier: ProductTier
-    nr_of_accounts_charged: int
-    period_start: datetime
-    period_end: datetime
-    reported: bool
 
 
 # Multiple payment methods are possible, but for now we only support AWS Marketplace

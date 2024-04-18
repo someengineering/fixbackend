@@ -1,8 +1,16 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,6 +35,7 @@ from fixbackend.billing.models import (
     PaymentMethod,
     PaymentMethods,
     WorkspacePaymentMethods,
+    BillingEntry,
 )
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import BillingEntryCreated
@@ -36,7 +45,7 @@ from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier, BillingPeriod
 from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.subscription.models import SubscriptionMethod, BillingEntry
+from fixbackend.subscription.models import SubscriptionMethod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import start_of_next_period
 from fixbackend.workspaces.models import Workspace

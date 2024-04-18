@@ -35,6 +35,7 @@ from fixcloudutils.util import utc, value_in_path
 from stripe import Webhook
 
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.billing.models import BillingEntry
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import SubscriptionCreated, SubscriptionCancelled
@@ -47,7 +48,7 @@ from fixbackend.ids import (
     ProductTier,
     WorkspaceId,
 )
-from fixbackend.subscription.models import StripeSubscription, BillingEntry
+from fixbackend.subscription.models import StripeSubscription
 from fixbackend.subscription.subscription_repository import StripeCustomerRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_period, uid

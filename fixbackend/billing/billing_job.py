@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -22,11 +22,12 @@ from fixcloudutils.asyncio import stop_running_task
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
 
+from fixbackend.billing.models import BillingEntry
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.config import Config
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.models import SubscriptionMethod, BillingEntry, AwsMarketplaceSubscription
+from fixbackend.subscription.models import SubscriptionMethod, AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeService
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
