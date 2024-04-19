@@ -23,6 +23,7 @@ from alembic import command
 from alembic.config import Config
 
 from fixbackend.alembic_startup_utils import database_revision, all_migration_revisions
+from fixbackend.app import setup_process
 from fixbackend.config import parse_args, get_config
 
 
@@ -51,7 +52,7 @@ def main() -> None:
 
 async def start(args: Namespace) -> None:
     config = uvicorn.Config(
-        "fixbackend.app:setup_process",
+        await setup_process(),
         host="0.0.0.0",
         port=args.port,
         log_level="info",
@@ -60,7 +61,8 @@ async def start(args: Namespace) -> None:
         ssl_ca_certs=args.ca_cert,
         ssl_certfile=args.host_cert,
         ssl_keyfile=args.host_key,
-        factory=True,
+        log_config={"version": 1},  # minimal config to disable uvicorns logger and use the default one
+        factory=False,
     )
     server = uvicorn.Server(config)
     wait_for_shutdown: Optional[Task[Any]] = None

@@ -163,7 +163,7 @@ def default_config() -> Config:
         available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
-        args=Namespace(dispatcher=False, mode="app"),
+        args=Namespace(dispatcher=False, mode="app", redis_password=None, aws_marketplace_metering_sqs_url=None),
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_region="",
@@ -745,6 +745,7 @@ def password_helper() -> InsecureFastPasswordHelper:
 
 @pytest.fixture
 async def fix_deps(
+    default_config: Config,
     db_engine: AsyncEngine,
     graph_database_access_manager: GraphDatabaseAccessManager,
     async_session_maker: AsyncSessionMaker,
@@ -758,6 +759,7 @@ async def fix_deps(
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
         **{
+            ServiceNames.config: default_config,
             ServiceNames.async_engine: db_engine,
             ServiceNames.graph_db_access: graph_database_access_manager,
             ServiceNames.session_maker: async_session_maker,
@@ -779,7 +781,7 @@ async def fix_deps(
 async def fast_api(
     fix_deps: FixDependencies, session: AsyncSession, default_config: Config, async_session_maker: AsyncSessionMaker
 ) -> FastAPI:
-    app: FastAPI = fast_api_app(default_config)
+    app: FastAPI = await fast_api_app(default_config, fix_deps)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_async_session_maker] = lambda: async_session_maker
     app.dependency_overrides[get_config] = lambda: default_config

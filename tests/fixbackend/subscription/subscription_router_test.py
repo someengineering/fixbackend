@@ -18,10 +18,10 @@ from types import SimpleNamespace
 from typing import AsyncIterator, Dict, Optional, Tuple, override
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import maybe_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config, get_config
@@ -75,14 +75,15 @@ handler = AwsMarketplaceHandlerMock()
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[maybe_current_active_verified_user] = get_user
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_marketplace_handler] = lambda: handler
+async def client(
+    session: AsyncSession, default_config: Config, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[maybe_current_active_verified_user] = get_user
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_marketplace_handler] = lambda: handler
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 
