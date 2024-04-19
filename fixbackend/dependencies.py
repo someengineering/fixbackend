@@ -122,9 +122,9 @@ class FixDependencies(Dependencies):
     async def stop(self) -> None:
         await super().stop()
         # non-service objects that need to be stopped explicitly
-        if engine := self.service(ServiceNames.async_engine, AsyncEngine):
+        if isinstance(engine := self.lookup.get(ServiceNames.async_engine), AsyncEngine):
             await engine.dispose()
-        if arq_redis := self.service(ServiceNames.arq_redis, ArqRedis):
+        if isinstance(arq_redis := self.lookup.get(ServiceNames.arq_redis), ArqRedis):
             await arq_redis.aclose()
 
 
