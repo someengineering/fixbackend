@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
+import logging
 from argparse import Namespace
 from asyncio import Task
 from signal import signal, SIGINT
@@ -23,7 +24,10 @@ from alembic import command
 from alembic.config import Config
 
 from fixbackend.alembic_startup_utils import database_revision, all_migration_revisions
+from fixbackend.app import setup_fast_api
 from fixbackend.config import parse_args, get_config
+
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -50,8 +54,10 @@ def main() -> None:
 
 
 async def start(args: Namespace) -> None:
+    # after the setup, the logger is configured and can be used.
+    app = await setup_fast_api()
     config = uvicorn.Config(
-        "fixbackend.app:setup_process",
+        app,
         host="0.0.0.0",
         port=args.port,
         log_level="info",
@@ -60,7 +66,12 @@ async def start(args: Namespace) -> None:
         ssl_ca_certs=args.ca_cert,
         ssl_certfile=args.host_cert,
         ssl_keyfile=args.host_key,
-        factory=True,
+        log_config={
+            "version": 1,
+            "disable_existing_loggers": False,
+            "loggers": {},
+        },  # minimal config to disable uvicorns logger and use the default one
+        factory=False,
     )
     server = uvicorn.Server(config)
     wait_for_shutdown: Optional[Task[Any]] = None
@@ -68,12 +79,13 @@ async def start(args: Namespace) -> None:
     def signal_handler(_: int, __: Optional[FrameType]) -> None:
         nonlocal wait_for_shutdown
         if wait_for_shutdown is None:
-            print("Interrupt received, shutting down...")
+            log.info("Interrupt received, shutting down.")
             wait_for_shutdown = asyncio.create_task(server.shutdown())
 
     # register signal handler to gracefully shutdown the server
     signal(SIGINT, signal_handler)
     # this will block until the server is stopped
+    log.info("Setup complete. Starting HTTP server.")
     await server.serve()
     # wait for the server to finish shutting down
     if wait_for_shutdown:

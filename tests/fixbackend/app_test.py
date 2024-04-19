@@ -16,23 +16,23 @@
 from typing import AsyncIterator
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
+async def client(
+    session: AsyncSession, default_config: Config, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[get_config] = lambda: default_config
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 

@@ -15,29 +15,27 @@
 from typing import AsyncIterator
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 
-from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
-from fixbackend.dependencies import FixDependencies, fix_dependencies
+from fixbackend.dependencies import fix_dependencies, FixDependencies
 
 
 @pytest.fixture
 async def client(
-    default_config: Config, user: User, fix_deps: FixDependencies
+    default_config: Config, user: User, fast_api: FastAPI, fix_deps: FixDependencies
 ) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
-
     # app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_config] = lambda: default_config
     # app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
-    app.dependency_overrides[get_current_active_verified_user] = lambda: user
-    app.dependency_overrides[fix_dependencies] = lambda: fix_deps
+    fast_api.dependency_overrides[get_current_active_verified_user] = lambda: user
+    fast_api.dependency_overrides[fix_dependencies] = lambda: fix_deps
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 

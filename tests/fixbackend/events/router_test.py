@@ -17,13 +17,13 @@ import uuid
 from typing import Any, AsyncIterator, Dict
 
 import pytest
-from fastapi import WebSocket
+from fastapi import WebSocket, FastAPI
+from fixcloudutils.util import utc
 from httpx import AsyncClient
 from httpx_ws import aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
@@ -32,7 +32,6 @@ from fixbackend.ids import ExternalId, UserId, WorkspaceId, ProductTier
 from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_optional_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixcloudutils.util import utc
 
 workspace_id = WorkspaceId(uuid.uuid4())
 workspace = Workspace(
@@ -63,15 +62,15 @@ event_service = WebsocketHandlerMock()
 
 
 @pytest.fixture
-async def websocket_client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
+async def websocket_client(
+    session: AsyncSession, default_config: Config, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_optional_user_workspace] = lambda: workspace
+    fast_api.dependency_overrides[get_websocket_event_handler] = lambda: event_service
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_optional_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_websocket_event_handler] = lambda: event_service
-
-    async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:
+    async with AsyncClient(base_url="http://test", transport=ASGIWebSocketTransport(fast_api)) as ac:
         yield ac
 
 

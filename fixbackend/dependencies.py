@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Annotated, cast
 
+import boto3
 from arq import ArqRedis
 from fastapi.params import Depends
 from fixcloudutils.service import Dependencies
@@ -30,6 +31,7 @@ from fixbackend.types import AsyncSessionMaker
 
 class ServiceNames:
     config = "config"
+    boto_session = "boto_session"
     http_client = "http_client"
     arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
@@ -78,6 +80,10 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.http_client, AsyncClient)
 
     @property
+    def boto_session(self) -> boto3.Session:
+        return self.service(ServiceNames.boto_session, boto3.Session)
+
+    @property
     def arq_redis(self) -> ArqRedis:
         return self.service(ServiceNames.arq_redis, ArqRedis)
 
@@ -118,6 +124,8 @@ class FixDependencies(Dependencies):
         # non-service objects that need to be stopped explicitly
         if engine := self.service(ServiceNames.async_engine, AsyncEngine):
             await engine.dispose()
+        if arq_redis := self.service(ServiceNames.arq_redis, ArqRedis):
+            await arq_redis.aclose()
 
 
 # placeholder for dependencies, will be replaced during the app initialization
