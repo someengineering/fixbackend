@@ -290,7 +290,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     return app
 
 
-async def setup_process() -> FastAPI:
+async def setup_fast_api() -> FastAPI:
     """
     This function is used by uvicorn to start the server.
     Entrypoint for the application to start the server.
@@ -302,6 +302,5 @@ async def setup_process() -> FastAPI:
         level=level,
         get_logging_context=get_logging_context,
     )
-
     deps = await create_dependencies(current_config)
     return await fast_api_app(current_config, deps)
