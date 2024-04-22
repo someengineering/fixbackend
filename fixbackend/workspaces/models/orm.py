@@ -62,7 +62,7 @@ class OrganizationInvite(Base):
 
     id: Mapped[InvitationId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[WorkspaceId] = mapped_column(GUID, ForeignKey("organization.id"), nullable=False)
-    user_email: Mapped[str] = mapped_column(String(length=320), nullable=False, unique=True)
+    user_email: Mapped[str] = mapped_column(String(length=320), nullable=False, unique=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
