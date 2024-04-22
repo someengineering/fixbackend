@@ -22,6 +22,7 @@ from fixbackend.auth.models import User
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.workspaces.models import Workspace
 
 
 async def create_user(email: str, async_session_maker: AsyncSessionMaker) -> User:
@@ -41,8 +42,9 @@ async def test_create_invitation(
     workspace_repository: WorkspaceRepository,
     invitation_repository: InvitationRepository,
     async_session_maker: AsyncSessionMaker,
+    workspace: Workspace,
 ) -> None:
-    user = await create_user("foo@bar.com", async_session_maker)
+    user = await create_user("foo1@bar.com", async_session_maker)
     organization = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
     )
@@ -57,6 +59,11 @@ async def test_create_invitation(
     # create invitation is idempotent
     invitation2 = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
     assert invitation2 == invitation
+
+    # can invite users to multiple workspaces
+    invitation3 = await invitation_repository.create_invitation(workspace_id=workspace.id, email=user2.email)
+    assert invitation3.workspace_id == workspace.id
+    assert invitation3.email == user2.email
 
     external_email = "i_do_not_exist@bar.com"
     non_user_invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=external_email)
