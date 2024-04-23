@@ -138,6 +138,13 @@ class NotificationService(Service):
         await self.send_email(to=to, subject=message.subject(), text=message.text(), html=message.html())
 
     async def send_message_to_workspace(self, *, workspace_id: WorkspaceId, message: EmailMessage) -> None:
+        await self.send_email_to_workspace(
+            workspace_id=workspace_id, subject=message.subject(), text=message.text(), html=message.html()
+        )
+
+    async def send_email_to_workspace(
+        self, *, workspace_id: WorkspaceId, subject: str, text: str, html: Optional[str]
+    ) -> None:
         set_workspace_id(workspace_id)
         workspace = await self.workspace_repository.get_workspace(workspace_id)
         if not workspace:
@@ -147,9 +154,7 @@ class NotificationService(Service):
         emails = [user.email for user in await self.user_repository.get_by_ids(workspace.all_users())]
         for email in emails:
             try:
-                await self.email_sender.send_email(
-                    to=email, subject=message.subject(), text=message.text(), html=message.html()
-                )
+                await self.email_sender.send_email(to=email, subject=subject, text=text, html=html)
             except Exception as e:
                 log.error(f"Failed to send message to workspace {workspace_id}: {e}")
 

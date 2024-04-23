@@ -66,7 +66,9 @@ class ServiceNames:
     role_repository = "role_repository"
     jwt_service = "jwt_service"
     scheduled_email_sender = "scheduled_email_sender"
-    trial_end_service = "trial_end_service"
+    one_time_email_service = "one_time_email_service"
+    schedule_trial_end_reminder_consumer = "schedule_trial_end_reminder_consumer"
+    unschedule_trial_end_reminder_consumer = "unschedule_trial_end_reminder_consumer"
     stripe_service = "stripe_service"
 
 
