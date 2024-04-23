@@ -164,7 +164,7 @@ class AccountDegraded:
     def text(self) -> str:
         return f"""We were not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary permissions are granted for access.
 
-Please visit https://app.fix.security/workspace-settings/accounts#{self.tenant_id} for more details."""
+Please visit https://app.fix.security/workspace-settings/accounts#{self.tenant_id} for more details."""  # noqa
 
     def html(self) -> str:
         return render(
@@ -188,6 +188,111 @@ class UserJoinedWorkspaceMail:
         return render("user_joined_workspace.html", message=self, user_id=self.user.id)
 
 
+@frozen(kw_only=True)
+class TrialExpiresSoon:
+    days_till_expire: int
+
+    def expires_days(self) -> str:
+        day = "days"
+        if self.days_till_expire == 1:
+            day = "day"
+
+        expires_in = f"{self.days_till_expire} {day}"
+        return expires_in
+
+    def subject(self) -> str:
+        return f"Fix: Your trial is ending in {self.expires_days()}"
+
+    def text(self) -> str:
+        return f"""Your Fix trial is ending in { self.expires_days() }. Don't miss out on the benefits of a subscription.
+
+We noticed you haven't bought a Fix subscription yet.
+
+Easy Steps to get a Fix subscription:
+
+ - Log in to Fix (https://app.fix.security), then navigate to Workspace Settings, and click on the Billing tab.
+ - Follow the instructions to add your payment method and subscribe to a plan.
+
+
+What Happens Next?
+
+If you won't get a subscription, soon after your trial expires your account will downgraded to the Free plan.
+Only a single user will be able to log in, and the data we collected about your cloud accounts will no longer be available in Fix.
+You will also lose access to the features available in the paid plans.
+
+Here for You
+
+If any step in the process feels unclear,
+or if you encounter any bumps along the road, our team is standing by.
+Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
+
+Warm regards,
+The Fix Team
+"""  # noqa
+
+    def html(self) -> str:
+        return render(
+            "trial_expires.html",
+            title=self.subject(),
+            period=self.expires_days(),
+            visit_our_blog_url="https://fix.security/blog",
+            connect_with_fix_on_linkedin_url="https://www.linkedin.com/company/fix/",
+            discord_url="https://discord.gg/KQ3JeMbE",
+            support_email="support@fix.security",
+        )
+
+
+@frozen(kw_only=True)
+class TrialExpired:
+
+    def subject(self) -> str:
+        return "Fix: Your trial is over"
+
+    def text(self) -> str:
+        return """Your trial period is over, but you can still access your account and data. Please upgrade to continue using Fix.
+
+We noticed you haven't bought a Fix subscription yet.
+
+Easy Steps to get a Fix subscription:
+
+ - Log in to Fix (https://app.fix.security), then navigate to Workspace Settings, and click on the Billing tab.
+ - Follow the instructions to add your payment method and subscribe to a plan.
+
+
+What Happens Next?
+
+Only a single user will be able to log in, and the data collected about your cloud accounts will no longer be available in Fix.
+You will also lose access to the features available in the paid plans.
+
+Here for You
+
+If any step in the process feels unclear,
+or if you encounter any bumps along the road, our team is standing by.
+Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
+
+Warm regards,
+The Fix Team
+"""  # noqa
+
+    def html(self) -> str:
+        return render(
+            "trial_expired.html",
+            title=self.subject(),
+            visit_our_blog_url="https://fix.security/blog",
+            connect_with_fix_on_linkedin_url="https://www.linkedin.com/company/fix/",
+            discord_url="https://discord.gg/KQ3JeMbE",
+            support_email="support@fix.security",
+        )
+
+
 EmailMessage = Union[
-    Signup, Invite, VerifyEmail, SecurityScanFinished, PasswordReset, AccountDegraded, UserJoinedWorkspaceMail
+    Signup,
+    Invite,
+    VerifyEmail,
+    SecurityScanFinished,
+    PasswordReset,
+    AccountDegraded,
+    UserJoinedWorkspaceMail,
+    TrialExpiresSoon,
+    TrialExpired,
 ]

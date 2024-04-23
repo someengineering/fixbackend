@@ -49,7 +49,7 @@ from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.consumers import EmailOnSignupConsumer
+from fixbackend.domain_events.consumers import EmailOnSignupConsumer, ScheduleTrialEndReminder
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
@@ -57,6 +57,7 @@ from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.jwt import JwtServiceImpl
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
@@ -226,7 +227,12 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
             jwt_service,
         ),
     )
+    one_time_email = deps.add(
+        SN.one_time_email_service,
+        OneTimeEmailService(notification_service, user_repo, session_maker, dispatching=False),
+    )
     deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
+    deps.add(SN.schedule_trial_end_reminder_consumer, ScheduleTrialEndReminder(domain_event_subscriber, one_time_email))
     deps.add(
         SN.cloud_account_service,
         CloudAccountServiceImpl(
@@ -341,6 +347,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             jwt_service,
             handle_events=False,  # fixbackend will handle events. dispatching should ignore them.
         ),
+    )
+    deps.add(
+        SN.one_time_email_service,
+        OneTimeEmailService(notification_service, user_repo, session_maker, dispatching=True),
     )
     analytics_event_sender = deps.add(
         SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
