@@ -16,16 +16,15 @@ from typing import Annotated, cast
 import boto3
 from arq import ArqRedis
 from fastapi.params import Depends
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.service import Dependencies
 from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.jwt import JwtService, JwtServiceImpl
 from fixbackend.types import AsyncSessionMaker
 
 
@@ -68,6 +67,7 @@ class ServiceNames:
     scheduled_email_sender = "scheduled_email_sender"
     trial_end_service = "trial_end_service"
     stripe_service = "stripe_service"
+    async_process_pool = "async_process_pool"
 
 
 class FixDependencies(Dependencies):
@@ -108,16 +108,12 @@ class FixDependencies(Dependencies):
         return self.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
 
     @property
-    def certificate_store(self) -> CertificateStore:
-        return self.service(ServiceNames.certificate_store, CertificateStore)
-
-    @property
     def domain_event_sender(self) -> DomainEventPublisher:
         return self.service(ServiceNames.domain_event_sender, DomainEventPublisher)  # type: ignore
 
     @property
-    def jwt_service(self) -> JwtService:
-        return self.service(ServiceNames.jwt_service, JwtServiceImpl)
+    def async_process_pool(self) -> AsyncProcessPool:
+        return self.service(ServiceNames.async_process_pool, AsyncProcessPool)
 
     async def stop(self) -> None:
         await super().stop()

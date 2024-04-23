@@ -28,6 +28,7 @@ from typing import Any, Dict
 import boto3
 from arq import create_pool
 from arq.connections import RedisSettings
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from httpx import AsyncClient, Limits, Timeout
@@ -106,6 +107,7 @@ async def base_dependencies(cfg: Config) -> FixDependencies:
     EngineMetrics.register(engine)
     deps.add(SN.session_maker, async_sessionmaker(engine))
     deps.add(SN.boto_session, boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key, region_name="us-east-1"))
+    deps.add(SN.async_process_pool, AsyncProcessPool(max_workers=10))
     return deps
 
 
