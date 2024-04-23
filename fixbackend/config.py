@@ -11,21 +11,20 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import os
 import sys
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Annotated, Literal, Optional, Sequence, List, Tuple
+from functools import lru_cache
 from pathlib import Path
+from typing import Annotated, Literal, Optional, Sequence, List, Tuple
 
 from attr import frozen
 from fastapi import Depends
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 
-from fixbackend.ids import ProductTier
+from fixbackend.ids import ProductTier, BillingPeriod
 
 
 class Config(BaseSettings):
@@ -64,9 +63,6 @@ class Config(BaseSettings):
     signing_key_1: Optional[Path]
     signing_cert_2: Optional[Path]
     signing_key_2: Optional[Path]
-    customerio_baseurl: str
-    customerio_site_id: Optional[str]
-    customerio_api_key: Optional[str]
     cloud_account_service_event_parallelism: int
     aws_cf_stack_notification_sqs_url: Optional[str]
     oauth_state_token_ttl: int
@@ -76,13 +72,15 @@ class Config(BaseSettings):
     google_analytics_api_secret: Optional[str]
     posthog_api_key: Optional[str]
     aws_marketplace_url: str
-    billing_period: Literal["month", "day"]
+    billing_period: BillingPeriod
     discord_oauth_client_id: str
     discord_oauth_client_secret: str
     slack_oauth_client_id: str
     slack_oauth_client_secret: str
     service_base_url: str
     push_gateway_url: Optional[str]
+    stripe_api_key: Optional[str]
+    stripe_webhook_key: Optional[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -160,11 +158,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
-    parser.add_argument(
-        "--customerio-baseurl", default=os.environ.get("CUSTOMERIO_BASEURL", "https://track.customer.io")
-    )
-    parser.add_argument("--customerio-site-id", default=os.environ.get("CUSTOMERIO_SITE_ID"))
-    parser.add_argument("--customerio-api-key", default=os.environ.get("CUSTOMERIO_API_KEY"))
     parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
     parser.add_argument(
         "--cloud-account-service-event-parallelism",
@@ -187,6 +180,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         default=os.environ.get("BILLING_PERIOD", "month"),
     )
     parser.add_argument("--push-gateway-url", default=os.environ.get("PUSH_GATEWAY_URL"))
+    parser.add_argument("--port", type=int, default=os.environ.get("PORT", 8000))
+    parser.add_argument("--stripe-api-key", default=os.environ.get("STRIPE_API_KEY"))
+    parser.add_argument("--stripe-webhook-key", default=os.environ.get("STRIPE_WEBHOOK_KEY"))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

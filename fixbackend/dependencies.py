@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Annotated, cast
 
+import boto3
 from arq import ArqRedis
 from fastapi.params import Depends
 from fixcloudutils.service import Dependencies
@@ -30,6 +31,7 @@ from fixbackend.types import AsyncSessionMaker
 
 class ServiceNames:
     config = "config"
+    boto_session = "boto_session"
     http_client = "http_client"
     arq_redis = "arq_redis"
     readonly_redis = "readonly_redis"
@@ -48,12 +50,11 @@ class ServiceNames:
     certificate_store = "certificate_store"
     domain_event_redis_stream_publisher = "domain_event_redis_stream_publisher"
     domain_event_sender = "domain_event_sender"
-    customerio_consumer = "customerio_consumer"
     aws_marketplace_handler = "aws_marketplace_handler"
     workspace_repo = "workspace_repo"
     user_repo = "user_repo"
     subscription_repo = "subscription_repo"
-    billing = "billing"
+    billing_job = "billing_job"
     cloud_account_service = "cloud_account_service"
     domain_event_subscriber = "domain_event_subscriber"
     invitation_repository = "invitation_repository"
@@ -68,6 +69,7 @@ class ServiceNames:
     one_time_email_service = "one_time_email_service"
     schedule_trial_end_reminder_consumer = "schedule_trial_end_reminder_consumer"
     unschedule_trial_end_reminder_consumer = "unschedule_trial_end_reminder_consumer"
+    stripe_service = "stripe_service"
 
 
 class FixDependencies(Dependencies):
@@ -78,6 +80,10 @@ class FixDependencies(Dependencies):
     @property
     def http_client(self) -> AsyncClient:
         return self.service(ServiceNames.http_client, AsyncClient)
+
+    @property
+    def boto_session(self) -> boto3.Session:
+        return self.service(ServiceNames.boto_session, boto3.Session)
 
     @property
     def arq_redis(self) -> ArqRedis:
@@ -118,8 +124,10 @@ class FixDependencies(Dependencies):
     async def stop(self) -> None:
         await super().stop()
         # non-service objects that need to be stopped explicitly
-        if engine := self.service(ServiceNames.async_engine, AsyncEngine):
+        if isinstance(engine := self.lookup.get(ServiceNames.async_engine), AsyncEngine):
             await engine.dispose()
+        if isinstance(arq_redis := self.lookup.get(ServiceNames.arq_redis), ArqRedis):
+            await arq_redis.aclose()
 
 
 # placeholder for dependencies, will be replaced during the app initialization

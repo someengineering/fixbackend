@@ -13,22 +13,22 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import uuid
 from types import SimpleNamespace
 from typing import AsyncIterator, Dict, Optional, Tuple, override
-import uuid
+
+import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.config import Config, get_config
-from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import maybe_current_active_verified_user
 from fixbackend.auth.models import User
+from fixbackend.config import Config, get_config
 from fixbackend.db import get_async_session
-import pytest
-
 from fixbackend.ids import SubscriptionId, UserId, WorkspaceId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler, get_marketplace_handler
-from fixbackend.subscription.models import SubscriptionMethod
+from fixbackend.subscription.models import AwsMarketplaceSubscription
 
 user_id = UserId(uuid.uuid4())
 
@@ -64,10 +64,10 @@ def get_user() -> Optional[User]:
 
 class AwsMarketplaceHandlerMock(AwsMarketplaceHandler):
     def __init__(self) -> None:
-        self.subcriptions: Dict[UserId, SubscriptionMethod] = {user.id: subscription}  # type: ignore
+        self.subcriptions: Dict[UserId, AwsMarketplaceSubscription] = {user.id: subscription}  # type: ignore
 
     @override
-    async def subscribed(self, user: User, token: str) -> Tuple[SubscriptionMethod, bool]:
+    async def subscribed(self, user: User, token: str) -> Tuple[AwsMarketplaceSubscription, bool]:
         return self.subcriptions[user.id], False
 
 
@@ -75,14 +75,15 @@ handler = AwsMarketplaceHandlerMock()
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[maybe_current_active_verified_user] = get_user
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_marketplace_handler] = lambda: handler
+async def client(
+    session: AsyncSession, default_config: Config, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[maybe_current_active_verified_user] = get_user
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_marketplace_handler] = lambda: handler
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 

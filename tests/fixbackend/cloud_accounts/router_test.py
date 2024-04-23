@@ -19,11 +19,11 @@ from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
 from attrs import evolve
+from fastapi import FastAPI
 from fixcloudutils.util import utc
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.dependencies import get_cloud_account_service
@@ -151,18 +151,17 @@ account_id = CloudAccountId("123456789012")
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config, user: User) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
-
+async def client(
+    session: AsyncSession, default_config: Config, user: User, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
     admin_user = evolve(user, roles=[UserRole(user.id, workspace_id, Roles.workspace_admin)])
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
+    fast_api.dependency_overrides[get_user_workspace] = lambda: workspace
+    fast_api.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
-    app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 

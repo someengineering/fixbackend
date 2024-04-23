@@ -16,23 +16,26 @@ import asyncio
 import hashlib
 import json
 import os
+import random
 from argparse import Namespace
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone
 from pathlib import Path
-import random
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional, Unpack
 from unittest.mock import patch
 
 import jwt
 import pytest
+import stripe
 from alembic.command import upgrade as alembic_upgrade, check as alembic_check
 from alembic.config import Config as AlembicConfig
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from async_lru import alru_cache
 from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
+from fastapi_users.password import PasswordHelper
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
@@ -41,12 +44,13 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from fastapi_users.password import PasswordHelper
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
+from fixbackend.billing.billing_job import BillingJob
+from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -60,7 +64,17 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import SubscriptionId, WorkspaceId, BenchmarkName, NodeId, UserId
+from fixbackend.ids import (
+    SubscriptionId,
+    WorkspaceId,
+    BenchmarkName,
+    NodeId,
+    UserId,
+    StripeCustomerId,
+    StripeSubscriptionId,
+    BillingPeriod,
+    ProductTier,
+)
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.jwt import JwtService
@@ -71,8 +85,8 @@ from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.billing import BillingService
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_month, uid
@@ -149,7 +163,7 @@ def default_config() -> Config:
         available_db_server=["http://localhost:8529", "http://127.0.0.1:8529"],
         inventory_url="http://localhost:8980",
         cf_template_url="dev-eu",
-        args=Namespace(dispatcher=False, mode="app"),
+        args=Namespace(dispatcher=False, mode="app", redis_password=None, aws_marketplace_metering_sqs_url=None),
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_region="",
@@ -160,9 +174,6 @@ def default_config() -> Config:
         signing_key_1=None,
         signing_cert_2=None,
         signing_key_2=None,
-        customerio_baseurl="",
-        customerio_site_id=None,
-        customerio_api_key=None,
         cloud_account_service_event_parallelism=1000,
         aws_cf_stack_notification_sqs_url=None,
         oauth_state_token_ttl=3600,
@@ -179,6 +190,8 @@ def default_config() -> Config:
         service_base_url="http://localhost:8000",
         push_gateway_url=None,
         posthog_api_key=None,
+        stripe_api_key=None,
+        stripe_webhook_key=None,
     )
 
 
@@ -306,7 +319,9 @@ async def graph_db_access(
 
 
 @pytest.fixture
-async def subscription(subscription_repository: SubscriptionRepository, user: User) -> AwsMarketplaceSubscription:
+async def aws_marketplace_subscription(
+    subscription_repository: SubscriptionRepository, user: User
+) -> AwsMarketplaceSubscription:
     return await subscription_repository.create(
         AwsMarketplaceSubscription(
             id=SubscriptionId(uid()),
@@ -641,21 +656,38 @@ async def invitation_repository(
 
 
 @pytest.fixture
+async def billing_entry_service(
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
+    metering_repository: MeteringRepository,
+    domain_event_sender: DomainEventPublisher,
+    default_config: Config,
+) -> BillingEntryService:
+    return BillingEntryService(
+        subscription_repository,
+        workspace_repository,
+        metering_repository,
+        domain_event_sender,
+        default_config.billing_period,
+    )
+
+
+@pytest.fixture
 async def aws_marketplace_handler(
     subscription_repository: SubscriptionRepository,
     metering_repository: MeteringRepository,
     workspace_repository: WorkspaceRepository,
     boto_session: BotoSession,
     domain_event_sender: DomainEventPublisher,
+    billing_entry_service: BillingEntryService,
 ) -> AwsMarketplaceHandler:
     return AwsMarketplaceHandler(
         subscription_repository,
         workspace_repository,
-        metering_repository,
         boto_session,
-        None,
         domain_event_sender,
-        "month",
+        billing_entry_service,
+        None,
     )
 
 
@@ -692,6 +724,7 @@ async def cert_store(default_config: Config) -> CertificateStore:
 
 
 class InsecureFastPasswordHelper(PasswordHelper):
+    # noinspection PyMissingConstructor
     def __init__(self) -> None:
         pass
 
@@ -712,6 +745,7 @@ def password_helper() -> InsecureFastPasswordHelper:
 
 @pytest.fixture
 async def fix_deps(
+    default_config: Config,
     db_engine: AsyncEngine,
     graph_database_access_manager: GraphDatabaseAccessManager,
     async_session_maker: AsyncSessionMaker,
@@ -725,6 +759,7 @@ async def fix_deps(
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
         **{
+            ServiceNames.config: default_config,
             ServiceNames.async_engine: db_engine,
             ServiceNames.graph_db_access: graph_database_access_manager,
             ServiceNames.session_maker: async_session_maker,
@@ -746,7 +781,7 @@ async def fix_deps(
 async def fast_api(
     fix_deps: FixDependencies, session: AsyncSession, default_config: Config, async_session_maker: AsyncSessionMaker
 ) -> FastAPI:
-    app: FastAPI = fast_api_app(default_config)
+    app: FastAPI = await fast_api_app(default_config, fix_deps)
     app.dependency_overrides[get_async_session] = lambda: session
     app.dependency_overrides[get_async_session_maker] = lambda: async_session_maker
     app.dependency_overrides[get_config] = lambda: default_config
@@ -760,14 +795,115 @@ async def api_client(fast_api: FastAPI) -> AsyncIterator[AsyncClient]:  # noqa: 
         yield ac
 
 
+stripe_customer_id = StripeCustomerId("dummy_customer_id")
+stripe_payment_intent_id = "dummy_payment_intent_id"
+stripe_payment_method_id = "dummy_payment_method_id"
+stripe_subscription_id = StripeSubscriptionId("dummy_subscription_id")
+stripe_refund_id = "dummy_refund_id"
+
+
+class StripeDummyClient(StripeClient):
+    def __init__(self) -> None:
+        self.requests: List[Json] = []
+        super().__init__("some dummy key")
+
+    async def create_customer(
+        self, workspace_id: WorkspaceId, **params: Unpack[stripe.Customer.CreateParams]
+    ) -> StripeCustomerId:
+        self.requests.append(dict(call="create_customer", **params))
+        return stripe_customer_id
+
+    async def create_subscription(
+        self, customer_id: StripeCustomerId, payment_method_id: str, billing_period: BillingPeriod
+    ) -> StripeSubscriptionId:
+        self.requests.append(
+            dict(call="create_subscription", customer_id=customer_id, payment_method_id=payment_method_id)
+        )
+        return stripe_subscription_id
+
+    async def create_usage_record(
+        self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
+    ) -> int:
+        return 4
+
+    async def refund(self, payment_intent_id: str) -> stripe.Refund:
+        self.requests.append(dict(call="refund", payment_intent_id=payment_intent_id))
+        return stripe.Refund(id=stripe_refund_id)
+
+    async def activation_price_id(self) -> str:
+        self.requests.append(dict(call="activation_price_id"))
+        return "activate_price_id"
+
+    async def get_price_ids_by_product_id(self) -> Dict[str, str]:
+        self.requests.append(dict(call="get_price_ids_by_product_id"))
+        return {"Enterprise": "p1", "Business": "p2", "Plus": "p3"}
+
+    @alru_cache(ttl=600)
+    async def get_prices(self) -> List[stripe.Price]:
+        self.requests.append(dict(call="get_prices"))
+        return []
+
+    async def checkout_session(self, customer: str, **params: Any) -> str:  # type: ignore
+        self.requests.append(dict(call="checkout_session", customer=customer))
+        return f"https://localhost/{customer}/checkout"
+
+    async def billing_portal_session(self, customer: str, **params: Any) -> str:  # type: ignore
+        self.requests.append(dict(call="billing_portal_session", customer=customer))
+        return f"https://localhost/{customer}/billing"
+
+    async def payment_method_id_from_intent(
+        self, id: str, **params: Unpack[stripe.PaymentIntent.RetrieveParams]
+    ) -> str:
+        self.requests.append(dict(call="payment_method_id_from_intent", id=id))
+        return stripe_payment_method_id
+
+    async def update_customer(self, cid: StripeCustomerId, **params: Unpack[stripe.Customer.ModifyParams]) -> None:
+        self.requests.append(dict(call="update_customer", id=id, **params))
+
+
 @pytest.fixture
-async def billing_service(
+def stripe_client() -> StripeDummyClient:
+    return StripeDummyClient()
+
+
+@pytest.fixture
+def stripe_service(
+    user_repository: UserRepository,
+    subscription_repository: SubscriptionRepository,
+    workspace_repository: WorkspaceRepository,
+    async_session_maker: AsyncSessionMaker,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    stripe_client: StripeDummyClient,
+) -> StripeServiceImpl:
+    return StripeServiceImpl(
+        stripe_client,
+        "dummy_secret",
+        "day",
+        user_repository,
+        subscription_repository,
+        workspace_repository,
+        async_session_maker,
+        domain_event_sender,
+    )
+
+
+@pytest.fixture
+async def billing_job(
     aws_marketplace_handler: AwsMarketplaceHandler,
+    stripe_service: StripeServiceImpl,
     subscription_repository: SubscriptionRepository,
     workspace_repository: WorkspaceRepository,
     default_config: Config,
-) -> BillingService:
-    return BillingService(aws_marketplace_handler, subscription_repository, workspace_repository, default_config)
+    billing_entry_service: BillingEntryService,
+) -> BillingJob:
+    return BillingJob(
+        aws_marketplace_handler,
+        stripe_service,
+        subscription_repository,
+        workspace_repository,
+        billing_entry_service,
+        default_config,
+    )
 
 
 @frozen

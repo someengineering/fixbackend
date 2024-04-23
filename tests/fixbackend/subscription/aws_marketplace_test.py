@@ -58,7 +58,7 @@ async def test_create_billing_entry(
     aws_marketplace_handler: AwsMarketplaceHandler,
     user: User,
     workspace: Workspace,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
     boto_requests: List[Tuple[str, Any]],
     boto_answers: Dict[str, Any],
     metering_repository: MeteringRepository,
@@ -70,7 +70,7 @@ async def test_create_billing_entry(
         "Results": [{"MeteringRecordId": "123", "Status": "Success"}],
         "UnprocessedRecords": [],
     }
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     # factories to create metering records
     mr1free = partial(
         create_metering_record, workspace_id=workspace.id, account_id="acc1", product_tier=ProductTier.Free
@@ -85,7 +85,9 @@ async def test_create_billing_entry(
         [mr1free(), mr1free(), mr1free(), mr1enterprise(), mr1enterprise(), mr1enterprise(), mr2(), mr2(), mr2()]
     )
     # create billing entry
-    billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
@@ -93,7 +95,7 @@ async def test_create_billing_entry(
     assert billing.reported is False
     assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
-    assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 1
+    assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 1
     assert len(boto_requests) == 0
     await aws_marketplace_handler.report_unreported_usages()
     assert len(boto_requests) == 1
@@ -103,14 +105,14 @@ async def test_create_billing_entry(
         "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
-    assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
+    assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 0
 
 
 async def test_create_daily_billing_entry(
     aws_marketplace_handler: AwsMarketplaceHandler,
     user: User,
     workspace: Workspace,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
     boto_requests: List[Tuple[str, Any]],
     boto_answers: Dict[str, Any],
     metering_repository: MeteringRepository,
@@ -118,8 +120,8 @@ async def test_create_daily_billing_entry(
     workspace_repository: WorkspaceRepository,
 ) -> None:
     # set billing period to daily
-    aws_marketplace_handler.billing_period = "day"
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    aws_marketplace_handler.billing_entry_service.billing_period = "day"
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
     now = datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
     boto_answers["BatchMeterUsage"] = {
@@ -140,7 +142,9 @@ async def test_create_daily_billing_entry(
         [mr1free(), mr1free(), mr1free(), mr1high(), mr1high(), mr1high(), mr2(), mr2(), mr2()]
     )
     # create billing entry
-    billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
@@ -148,7 +152,7 @@ async def test_create_daily_billing_entry(
     assert billing.reported is False
     assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
-    assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 1
+    assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 1
     assert len(boto_requests) == 0
     await aws_marketplace_handler.report_unreported_usages()
     assert len(boto_requests) == 1
@@ -158,14 +162,14 @@ async def test_create_daily_billing_entry(
         "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
     }
     # make sure there is no unreported billing entry anymore
-    assert len([i async for i in subscription_repository.unreported_billing_entries()]) == 0
+    assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 0
 
 
 async def test_create_free_tier_billing_entry(
     aws_marketplace_handler: AwsMarketplaceHandler,
     user: User,
     workspace: Workspace,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
     boto_requests: List[Tuple[str, Any]],
     boto_answers: Dict[str, Any],
     metering_repository: MeteringRepository,
@@ -189,5 +193,7 @@ async def test_create_free_tier_billing_entry(
     # create 3 metering records for acc1 and acc2, all with free tiers
     await metering_repository.add([mr1free(), mr1free(), mr1free(), mrTrial(), mrTrial(), mr2(), mr2(), mr2()])
     # billing entry is not created for free tier accounts because we have a job that reports dummy zero usage for such cases
-    billing = await aws_marketplace_handler.create_billing_entry(subscription, now=now)
+    billing = await aws_marketplace_handler.billing_entry_service.create_billing_entry(
+        aws_marketplace_subscription, now=now
+    )
     assert billing is None

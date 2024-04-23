@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -17,35 +17,42 @@ from asyncio import Task, TaskGroup
 from datetime import datetime
 from typing import Any, Optional, AsyncIterator, List, Tuple
 
+import prometheus_client
 from fixcloudutils.asyncio import stop_running_task
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
-import prometheus_client
 
+from fixbackend.billing.models import BillingEntry
+from fixbackend.billing.service import BillingEntryService
+from fixbackend.config import Config
 from fixbackend.ids import BillingId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
-from fixbackend.subscription.models import SubscriptionMethod, BillingEntry
+from fixbackend.subscription.models import SubscriptionMethod, AwsMarketplaceSubscription
+from fixbackend.subscription.stripe_subscription import StripeService
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import kill_running_process, uid
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.config import Config
 
 log = logging.getLogger(__name__)
 
 
-class BillingService(Service):
+class BillingJob(Service):
     def __init__(
         self,
         aws_marketplace: AwsMarketplaceHandler,
+        stripe_service: StripeService,
         subscription_repository: SubscriptionRepository,
         workspace_repository: WorkspaceRepository,
+        billing_entry_service: BillingEntryService,
         config: Config,
     ) -> None:
         self.aws_marketplace = aws_marketplace
+        self.stripe_service = stripe_service
         self.subscription_repository = subscription_repository
         self.workspace_repository = workspace_repository
         self.handler: Optional[Task[Any]] = None
         self.config = config
+        self.billing_entry_service = billing_entry_service
 
     async def start(self) -> Any:
         self.handler = asyncio.create_task(self.handle_outstanding_subscriptions())
@@ -64,8 +71,10 @@ class BillingService(Service):
             await self.create_overdue_billing_entries(now, parallel_requests)
             log.info("Report usages to AWS Marketplace")
             await self.aws_marketplace.report_unreported_usages()
-            log.info("Report no usage for all active subscriptions")
-            await self.report_no_usage_for_active_subscriptions(now, parallel_requests)
+            log.info("Report usages to Stripe")
+            await self.stripe_service.report_unreported_usages()
+            log.info("Report no usage for all active AWS Marketplace subscriptions")
+            await self.report_no_usage_for_active_aws_marketplace_subscriptions(now, parallel_requests)
             await self.push_metrics()
         finally:
             kill_running_process()
@@ -81,30 +90,40 @@ class BillingService(Service):
 
     async def create_overdue_billing_entries(self, now: datetime, parallel_requests: int) -> None:
         semaphore = asyncio.Semaphore(parallel_requests)
+        counter = 0
 
         async def create_billing_entry(subscription: SubscriptionMethod) -> None:
             try:
                 async with semaphore:
-                    await self.aws_marketplace.create_billing_entry(subscription)
+                    if await self.billing_entry_service.create_billing_entry(subscription):
+                        nonlocal counter
+                        counter += 1
             except Exception as e:
                 log.error(
                     f"Failed to create billing entry for subscription {subscription.id}: {e}. Ignore.", exc_info=True
                 )
 
         async with TaskGroup() as group:
-            async for subscription in self.subscription_repository.subscriptions(
-                active=True, next_charge_timestamp_before=now
-            ):
-                group.create_task(create_billing_entry(subscription))
+            async for sub in self.subscription_repository.subscriptions(active=True, next_charge_timestamp_before=now):
+                group.create_task(create_billing_entry(sub))
+        if counter > 0:
+            log.info(f"Created {counter} overdue billing entries")
 
-    async def report_no_usage_for_active_subscriptions(self, now: datetime, parallel_requests: int) -> None:
+    async def report_no_usage_for_active_aws_marketplace_subscriptions(
+        self, now: datetime, parallel_requests: int
+    ) -> None:
         semaphore = asyncio.Semaphore(parallel_requests)
 
-        async def chunked_subscriptions(size: int) -> AsyncIterator[List[Tuple[SubscriptionMethod, BillingEntry]]]:
-            chunk: List[Tuple[SubscriptionMethod, BillingEntry]] = []
+        async def chunked_subscriptions(
+            size: int,
+        ) -> AsyncIterator[List[Tuple[AwsMarketplaceSubscription, BillingEntry]]]:
+            chunk: List[Tuple[AwsMarketplaceSubscription, BillingEntry]] = []
             async for subscription in self.subscription_repository.subscriptions(
-                active=True, next_charge_timestamp_after=now
+                active=True, is_aws_marketplace_subscription=True, next_charge_timestamp_after=now
             ):
+                assert isinstance(
+                    subscription, AwsMarketplaceSubscription
+                ), f"Expected AwsMarketplaceSubscription, but got {subscription}"
                 for workspace in await self.workspace_repository.list_workspaces_by_subscription_id(subscription.id):
                     # create a dummy billing entry with no usage
                     entry = BillingEntry(
@@ -124,7 +143,7 @@ class BillingService(Service):
             if len(chunk) > 0:
                 yield chunk
 
-        async def report_usages(chunk: List[Tuple[SubscriptionMethod, BillingEntry]]) -> None:
+        async def report_usages(chunk: List[Tuple[AwsMarketplaceSubscription, BillingEntry]]) -> None:
             assert 0 < len(chunk) <= 25, f"Chunk size must be between 1 and 25, but got {len(chunk)}"
             product_code = chunk[0][0].product_code  # all subscriptions in a chunk have the same product code
             async with semaphore:

@@ -2,7 +2,7 @@
 
 Revision ID: 9e047608dacc
 Revises: 8907ec70cc77
-Create Date: 2024-04-16 17:18:40.217272+00:00
+Create Date: 2024-04-23 17:18:40.217272+00:00
 
 """
 
@@ -15,7 +15,7 @@ from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "9e047608dacc"
-down_revision: Union[str, None] = "8907ec70cc77"
+down_revision: Union[str, None] = "95147d1ca43e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

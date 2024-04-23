@@ -47,7 +47,7 @@ from fixbackend.domain_events.events import (
     Event,
     TenantAccountsCollected,
     ProductTierChanged,
-    AwsMarketplaceSubscriptionCancelled,
+    SubscriptionCancelled,
     AwsAccountDeleted,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -187,7 +187,7 @@ async def test_create_aws_account(
     user: User,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
     # happy case
     acc = await service.create_aws_account(
@@ -220,7 +220,7 @@ async def test_create_aws_account(
 
     # reaching the account limit of the free tier, expext a Discovered account with enabled=False
     previous_tier = workspace.product_tier
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
     new_account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -721,7 +721,7 @@ async def test_enable_disable_cloud_account(
     service: CloudAccountServiceImpl,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
-    subscription: AwsMarketplaceSubscription,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -765,7 +765,7 @@ async def test_enable_disable_cloud_account(
 
     # when limit on accounts reached, update is not possible
     await service.update_cloud_account_enabled(workspace.id, account.id, enabled=True)
-    await workspace_repository.update_subscription(workspace.id, subscription.id)
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
     new_account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -1063,6 +1063,6 @@ async def test_handle_events(
             is_higher_tier=False,
             previous_tier=ProductTier.Business,
         ),
-        AwsMarketplaceSubscriptionCancelled(subscription_id=subscription_id),
+        SubscriptionCancelled(subscription_id=subscription_id, method="aws_marketplace"),
     ]:
         await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))

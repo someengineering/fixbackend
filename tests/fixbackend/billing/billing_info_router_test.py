@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -14,28 +14,28 @@
 
 
 import uuid
+from typing import AsyncIterator, List, Optional, Sequence, override
+
 import pytest
+from attrs import evolve
+from fastapi import FastAPI
+from fixcloudutils.util import utc, UTC_Date_Format
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from fixbackend.auth.depedencies import get_current_active_verified_user
-from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.auth.models import User
-from fixbackend.billing_information.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods
+from fixbackend.billing.models import PaymentMethod, PaymentMethods, WorkspacePaymentMethods, BillingEntry
+from fixbackend.billing.service import BillingEntryService, get_billing_entry_service
 from fixbackend.config import Config, get_config
-from typing import AsyncIterator, List, Optional, Sequence, override
-from fixbackend.app import fast_api_app
 from fixbackend.db import get_async_session
 from fixbackend.ids import BillingId, ExternalId, ProductTier, SubscriptionId, UserId, WorkspaceId
-from fixbackend.billing_information.service import BillingEntryService, get_billing_entry_service
-from fixbackend.subscription.models import BillingEntry
+from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.subscription.subscription_repository import SubscriptionRepository, get_subscription_repository
 from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixcloudutils.util import utc, UTC_Date_Format
-
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
-from attrs import evolve
 
 external_id = ExternalId(uuid.uuid4())
 workspace_id = WorkspaceId(uuid.uuid4())
@@ -137,18 +137,19 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
 
 
 @pytest.fixture
-async def client(session: AsyncSession, default_config: Config) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
+async def client(
+    session: AsyncSession, default_config: Config, fast_api: FastAPI
+) -> AsyncIterator[AsyncClient]:  # noqa: F811
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_current_active_verified_user] = lambda: user
-    app.dependency_overrides[get_billing_entry_service] = lambda: BillingEntryServiceMock()
-    app.dependency_overrides[get_subscription_repository] = lambda: SubscriptionRepositoryMock()
-    app.dependency_overrides[get_workspace_repository] = lambda: WorkspaceRepositoryMock()
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_user_workspace] = lambda: workspace
+    fast_api.dependency_overrides[get_current_active_verified_user] = lambda: user
+    fast_api.dependency_overrides[get_billing_entry_service] = lambda: BillingEntryServiceMock()
+    fast_api.dependency_overrides[get_subscription_repository] = lambda: SubscriptionRepositoryMock()
+    fast_api.dependency_overrides[get_workspace_repository] = lambda: WorkspaceRepositoryMock()
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 

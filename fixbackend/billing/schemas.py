@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Some Engineering
+#  Copyright (c) 2023-2024. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -17,11 +17,10 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from typing import List, Literal, Optional, Union
-from fixbackend.billing_information.models import PaymentMethods, WorkspacePaymentMethods
-from fixbackend.billing_information import models
+from fixbackend.billing.models import PaymentMethods, WorkspacePaymentMethods, BillingEntry
+from fixbackend.billing import models
 
 from fixbackend.ids import BillingId, ProductTier, SubscriptionId, WorkspaceId
-from fixbackend.subscription.models import BillingEntry
 from enum import Enum
 
 from fixbackend.workspaces.models import Workspace
@@ -86,14 +85,19 @@ class BillingEntryRead(BaseModel):
 
 class AwsSubscription(BaseModel):
     method: Literal["aws_marketplace"]
-    subscription_id: SubscriptionId = Field(description="AWS Marketplace subscription identifier")
+    subscription_id: SubscriptionId = Field(description="Subscription identifier")
+
+
+class StripeSubscription(BaseModel):
+    method: Literal["stripe"]
+    subscription_id: SubscriptionId = Field(description="Subscription identifier")
 
 
 class NoPaymentMethod(BaseModel):
     method: Literal["none"]
 
 
-PaymentMethod = Union[AwsSubscription, NoPaymentMethod]
+PaymentMethod = Union[AwsSubscription, StripeSubscription, NoPaymentMethod]
 
 
 class WorkspaceBillingSettingsRead(BaseModel):
@@ -137,6 +141,8 @@ class WorkspaceBillingSettingsRead(BaseModel):
         def payment(payment_method: models.PaymentMethod) -> PaymentMethod:
             match payment_method:
                 case PaymentMethods.AwsSubscription(subscription_id):
+                    return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
+                case PaymentMethods.StripeSubscription(subscription_id):
                     return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
                 case PaymentMethods.NoPaymentMethod():
                     return NoPaymentMethod(method="none")

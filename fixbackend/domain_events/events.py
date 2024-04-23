@@ -23,7 +23,7 @@
 
 from abc import ABC
 from datetime import datetime
-from typing import ClassVar, Dict, Optional, TypeVar, Type, List
+from typing import ClassVar, Dict, Optional, TypeVar, Type, List, Literal
 
 from attrs import frozen
 from fixcloudutils.types import Json
@@ -230,27 +230,28 @@ class ProductTierChanged(Event):
 
 
 @frozen
-class AwsMarketplaceSubscriptionCreated(Event):
+class SubscriptionCreated(Event):
     """
     This event is emitted when a user gets an AWS Marketplace subscription.
     """
 
-    kind: ClassVar[str] = "aws_marketplace_subscription_created"
-
+    kind: ClassVar[str] = "subscription_created"
     workspace_id: Optional[WorkspaceId]
     user_id: UserId
     subscription_id: SubscriptionId
+    method: Literal["aws_marketplace", "stripe"]
 
 
 @frozen
-class AwsMarketplaceSubscriptionCancelled(Event):
+class SubscriptionCancelled(Event):
     """
     This event is emitted when a user cancels an AWS Marketplace subscription.
     """
 
-    kind: ClassVar[str] = "aws_marketplace_subscription_cancelled"
+    kind: ClassVar[str] = "subscription_cancelled"
 
     subscription_id: SubscriptionId
+    method: Literal["aws_marketplace", "stripe"]
 
 
 @frozen

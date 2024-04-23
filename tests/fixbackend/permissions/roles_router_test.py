@@ -13,25 +13,24 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from attrs import evolve
+from typing import AsyncIterator
+
 import pytest
+from attrs import evolve
+from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.app import fast_api_app
 from fixbackend.auth.depedencies import get_current_active_verified_user
 from fixbackend.auth.models import User
-
+from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
 from fixbackend.permissions.models import Roles, UserRole
-
+from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
-from typing import AsyncIterator
-from fixbackend.auth.user_repository import UserRepository
 from fixbackend.workspaces.repository import WorkspaceRepository, get_workspace_repository
 
 
@@ -43,19 +42,17 @@ async def client(
     workspace: Workspace,
     role_repository: RoleRepository,
     workspace_repository: WorkspaceRepository,
+    fast_api: FastAPI,
 ) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    app = fast_api_app(default_config)
-
     admin_user = evolve(user, roles=[UserRole(user.id, workspace.id, role_names=Roles.workspace_admin)])
+    fast_api.dependency_overrides[get_async_session] = lambda: session
+    fast_api.dependency_overrides[get_config] = lambda: default_config
+    fast_api.dependency_overrides[get_user_workspace] = lambda: workspace
+    fast_api.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
+    fast_api.dependency_overrides[get_role_repository] = lambda: role_repository
+    fast_api.dependency_overrides[get_workspace_repository] = lambda: workspace_repository
 
-    app.dependency_overrides[get_async_session] = lambda: session
-    app.dependency_overrides[get_config] = lambda: default_config
-    app.dependency_overrides[get_user_workspace] = lambda: workspace
-    app.dependency_overrides[get_current_active_verified_user] = lambda: admin_user
-    app.dependency_overrides[get_role_repository] = lambda: role_repository
-    app.dependency_overrides[get_workspace_repository] = lambda: workspace_repository
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=fast_api, base_url="http://test") as ac:
         yield ac
 
 
