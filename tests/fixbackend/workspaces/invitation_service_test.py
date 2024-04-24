@@ -116,6 +116,7 @@ async def test_invite_accept_user(
         workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
     )
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
+    assert invite.role == Roles.workspace_billing_admin
 
     # idempotency
     second_invite, _ = await service.invite_user(
