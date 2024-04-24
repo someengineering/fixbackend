@@ -38,5 +38,9 @@ class WorkspacePermissionChecker:
 
         error = validate_workspace_permissions(user, workspace_id, self.required_permissions)
         if error:
-            raise HTTPException(status_code=403, detail=error)
+            detail = {
+                "error": "permission",
+                "message": error,
+            }
+            raise HTTPException(status_code=403, detail=detail)
         return True
