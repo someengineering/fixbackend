@@ -192,6 +192,35 @@ class FixUserSource(BaseModel):
 UserSource = Union[FixUserSource]
 
 
+class WorkspaceRoleListRead(BaseModel):
+    roles: List[str] = Field(description="The roles available in the workspace")
+
+    @staticmethod
+    def from_model(role_names: Roles) -> "WorkspaceRoleListRead":
+
+        result = []
+        if Roles.workspace_member in role_names:
+            result.append("member")
+        if Roles.workspace_admin in role_names:
+            result.append("admin")
+        if Roles.workspace_owner in role_names:
+            result.append("owner")
+        if Roles.workspace_billing_admin in role_names:
+            result.append("billing_admin")
+
+        return WorkspaceRoleListRead(roles=result)
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "roles": ["member", "admin", "owner", "billing_admin"],
+                }
+            ]
+        }
+    }
+
+
 class WorkspaceUserRoleRead(BaseModel):
     member: bool = Field(description="if user has member role")
     admin: bool = Field(description="if user has admin role")

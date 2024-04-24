@@ -131,6 +131,16 @@ async def test_list_workspace_users(
     }
 
 
+@pytest.mark.asyncio
+async def test_list_workspace_roles(
+    client: AsyncClient, workspace: Workspace, user: User, role_repository: RoleRepository
+) -> None:
+
+    response = await client.get(f"/api/workspaces/{workspace.id}/roles/")
+    user_json = response.json()
+    assert set(user_json.get("roles")) == {"member", "admin", "owner", "billing_admin"}
+
+
 @pytest.mark.skip("TODO: fix")
 async def test_workspace_trial_period() -> None:
     workspace = Workspace(
