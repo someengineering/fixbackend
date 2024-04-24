@@ -28,20 +28,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
+import base64
 from datetime import timedelta
 from typing import Optional, Tuple, Set
 
 import plotly.graph_objects as go
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
-from fixcloudutils.util import utc
-from httpx import AsyncClient
+from fixcloudutils.util import utc, utc_str, value_in_path_get, value_in_path
 
-from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import WorkspaceId, ExternalId, ProductTier, UserId
-from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import ProductTier
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.schemas import Scatters
-from fixbackend.utils import uid
+from fixbackend.notification.email.email_messages import render
 from fixbackend.workspaces.models import Workspace
 
 # color_codes = ["#1e234d", "#2b357d", "#2f3b9e", "#3447c1", "#3d58d3", "#5275df"]
@@ -70,10 +69,10 @@ def create_timeline_figure(
     x_axis: Optional[str] = None,
     y_axis: Optional[str] = None,
     legend_title: Optional[str] = None,
-    stacked: bool = False
-) -> bytes:
-    format = "%d.%m.%y" if scatters.granularity >= timedelta(days=1) else "%d.%m.%y %H:%M"
-    x = [at.strftime(format) for at in scatters.ats]
+    stacked: bool = False,
+) -> str:
+    date_fmt = "%d.%m.%y" if scatters.granularity >= timedelta(days=1) else "%d.%m.%y %H:%M"
+    x = [at.strftime(date_fmt) for at in scatters.ats]
     fig = go.Figure()
     for idx, scatter in enumerate(scatters.groups):
         color = colors(idx)
@@ -88,10 +87,10 @@ def create_timeline_figure(
             )
         )
     fig.update_layout(title=title, xaxis_title=x_axis, yaxis_title=y_axis, legend_title=legend_title)
-    return fig.to_image(format="png")
+    return base64.b64encode(fig.to_image(format="png")).decode("utf-8")
 
 
-def create_gauge_percent(title: str, value: float, previous: float) -> bytes:
+def create_gauge_percent(title: str, value: float, previous: float) -> str:
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number+delta",
@@ -111,30 +110,32 @@ def create_gauge_percent(title: str, value: float, previous: float) -> bytes:
                 "borderwidth": 0,
                 "steps": [{"range": [0, 100], "color": "#dfe7fa"}],
             },
-        )
+        ),
+        # layout=go.Layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"), # transparent background
     )
-    return fig.to_image(format="png")
+    return base64.b64encode(fig.to_image(format="png")).decode("utf-8")
 
 
-class WeeklyEmailSummary:
+class StatusUpdateEmailCreator:
 
     def __init__(
         self,
         inventory_service: InventoryService,
-        # db_access: GraphDatabaseAccessManager,
-        # email_sender: EmailSender,
+        db_access: GraphDatabaseAccessManager,
         process_pool: AsyncProcessPool,
     ):
         self.inventory_service = inventory_service
-        # self.db_access = db_access
-        # self.email_sender = email_sender
+        self.db_access = db_access
         self.process_pool = process_pool
 
-    async def send(self, workspace: Workspace) -> None:
-        # dba = await self.db_access.get_database_access(workspace.id)
-        dba = local
+    async def html_content(self, workspace: Workspace) -> str:
+        dba = await self.db_access.get_database_access(workspace.id)
+        assert dba is not None, f"No database access for workspace: {workspace.id}"
+
         duration = timedelta(days=31) if workspace.product_tier == ProductTier.Free else timedelta(days=7)
+        duration_name = "month" if workspace.product_tier == ProductTier.Free else "week"
         now = utc()
+        start = now - duration
 
         async with self.inventory_service.client.search(dba, "is(account)") as response:
             account_names = {acc["reported"]["id"]: acc["reported"]["name"] async for acc in response}
@@ -147,13 +148,13 @@ class WeeklyEmailSummary:
             ) as response:
                 entries = [int(r["v"]) async for r in response]
                 if len(entries) == 0:  # timeseries haven't been created yet
-                    return not_exist, not_exist
+                    return not_exist, 0
                 elif len(entries) == 1:  # the timeseries does not exist longer than the current period
-                    return entries[0], entries[0]
+                    return entries[0], 0
                 else:
-                    return entries[0], entries[1]
+                    return entries[1], entries[1] - entries[0]
 
-        async def resources_per_account_timeline() -> bytes:
+        async def resources_per_account_timeline() -> Tuple[Scatters, str]:
             scatters = await self.inventory_service.timeseries_scattered(
                 dba,
                 "resources",
@@ -166,7 +167,7 @@ class WeeklyEmailSummary:
             for scatter in scatters.groups:
                 acc_id = scatter.group["account_id"]
                 scatter.attributes["name"] = account_names.get(acc_id, acc_id)
-            return await self.process_pool.submit(
+            return scatters, await self.process_pool.submit(
                 create_timeline_figure,
                 scatters,
                 title="Resources per account",
@@ -175,14 +176,24 @@ class WeeklyEmailSummary:
                 stacked=True,
             )
 
-        async def overall_score() -> Tuple[bytes, Tuple[int, int]]:
-            previous, current = await progress("account_score", 100, group=set(), aggregation="avg")
-            image = await self.process_pool.submit(create_gauge_percent, "Security Score", current, previous)
-            return image, (current, previous)
+        async def nr_of_changes() -> Tuple[int, int, int]:
+            cmd = (
+                f"history --after {utc_str(start)} --change node_created --change node_updated --change node_deleted | "
+                "aggregate /change: sum(1) as count | dump"
+            )
+            async with self.inventory_service.client.execute_single(dba, cmd) as result:
+                changes = {value_in_path(r, "group.change"): value_in_path_get(r, "count", 0) async for r in result}
+                return changes.get("node_created", 0), changes.get("node_updated", 0), changes.get("node_deleted", 0)
+
+        async def overall_score() -> Tuple[str, Tuple[int, int]]:
+            current, diff = await progress("account_score", 100, group=set(), aggregation="avg")
+            image = await self.process_pool.submit(create_gauge_percent, "Security Score", current, current + diff)
+            return image, (current, diff)
 
         (
-            account_timeline_image,
+            (scatters, account_timeline_image),
             (score_image, score_progress),
+            resource_changes,
             instances_progress,
             cores_progress,
             memory_progress,
@@ -193,6 +204,7 @@ class WeeklyEmailSummary:
         ) = await asyncio.gather(
             resources_per_account_timeline(),
             overall_score(),
+            nr_of_changes(),
             progress("instances", 0, group=set(), aggregation="sum"),
             progress("cores_total", 0, group=set(), aggregation="sum"),
             progress("memory_bytes", 0, group=set(), aggregation="sum"),
@@ -201,31 +213,20 @@ class WeeklyEmailSummary:
             progress("databases_total", 0, group=set(), aggregation="sum"),
             progress("databases_bytes", 0, group=set(), aggregation="sum"),
         )
-
-
-async def main():
-    ws = Workspace(
-        id=WorkspaceId(uid()),
-        slug="t",
-        name="t",
-        external_id=ExternalId(uid()),
-        owner_id=UserId(uid()),
-        members=[],
-        product_tier=ProductTier.Trial,
-        created_at=utc(),
-        updated_at=utc(),
-        subscription_id=None,
-        payment_on_hold_since=None,
-    )
-
-    async with AsyncProcessPool() as pool:
-        async with AsyncClient(verify=False) as client:
-            service = InventoryService(
-                InventoryClient("http://inventory.fix.svc.cluster.local", client), None, None, None, None
-            )
-            summary = WeeklyEmailSummary(service, pool)
-            await summary.send(ws)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        return render(
+            "status-update.html",
+            workspace_name=workspace.name,
+            duration=duration_name,
+            accounts=len(scatters.groups),  # type: ignore
+            resource_changes=resource_changes,
+            account_timeline_image=account_timeline_image,
+            score_image=score_image,
+            score_progress=score_progress,
+            instances_progress=instances_progress,
+            cores_progress=cores_progress,
+            memory_progress=memory_progress,
+            volumes_progress=volumes_progress,
+            volume_bytes_progress=volume_bytes_progress,
+            databases_progress=databases_progress,
+            databases_bytes_progress=databases_bytes_progress,
+        )
