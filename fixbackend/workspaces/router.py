@@ -162,11 +162,14 @@ def workspaces_router() -> APIRouter:
 
         accept_invite_url = str(request.url_for(ACCEPT_INVITE_ROUTE_NAME, workspace_id=workspace.id))
 
+        role = reduce(lambda acc, role_name: role_name.to_role() | acc, user_invite.roles, Roles(0))
+
         invite, _ = await invitation_service.invite_user(
             workspace_id=workspace.id,
             inviter=user,
             invitee_email=user_invite.email,
             accept_invite_base_url=accept_invite_url,
+            role=role,
         )
 
         return WorkspaceInviteRead.from_model(invite, workspace)

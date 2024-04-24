@@ -20,6 +20,7 @@ from fixcloudutils.util import utc
 
 from fixbackend.config import trial_period_duration
 from fixbackend.ids import InvitationId, SubscriptionId, WorkspaceId, UserId, ExternalId, ProductTier
+from fixbackend.permissions.models import Roles
 
 
 @frozen
@@ -68,5 +69,6 @@ class WorkspaceInvitation:
     id: InvitationId
     workspace_id: WorkspaceId
     email: str
+    role: Roles
     expires_at: datetime
     accepted_at: Optional[datetime]

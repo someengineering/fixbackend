@@ -11,6 +11,7 @@ from fixbackend.auth.user_repository import UserRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.errors import ResourceNotFound, WrongState
 from fixbackend.ids import InvitationId, WorkspaceId
+from fixbackend.permissions.models import Roles
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import WorkspaceInvitation, orm
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -22,7 +23,7 @@ log = getLogger(__name__)
 
 class InvitationRepository(ABC):
     @abstractmethod
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str, role: Roles) -> WorkspaceInvitation:
         """Create an invite for a workspace."""
         raise NotImplementedError
 
@@ -67,7 +68,7 @@ class InvitationRepositoryImpl(InvitationRepository):
         self.workspace_repository = workspace_repository
         self.user_repository = user_repository
 
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str, role: Roles) -> WorkspaceInvitation:
         async with self.session_maker() as session:
             existing_invitation = (
                 await session.execute(
@@ -92,6 +93,7 @@ class InvitationRepositoryImpl(InvitationRepository):
             invite = orm.OrganizationInvite(
                 organization_id=workspace_id,
                 user_email=email,
+                role=role.value,
                 expires_at=utc() + timedelta(days=7),
             )
             session.add(invite)
@@ -141,6 +143,7 @@ class InvitationRepositoryImpl(InvitationRepository):
                 stored_invite.user_email = invite.email
                 stored_invite.expires_at = invite.expires_at
                 stored_invite.accepted_at = invite.accepted_at
+                stored_invite.role = invite.role.value
 
                 await session.commit()
                 await session.refresh(stored_invite)
