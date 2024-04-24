@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from functools import reduce
 from typing import Annotated, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -19,7 +20,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.models import WorkspacePermissions, Roles
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
@@ -39,6 +40,7 @@ from fixbackend.workspaces.schemas import (
     WorkspaceCreate,
     WorkspaceInviteRead,
     WorkspaceRead,
+    WorkspaceRoleListRead,
     WorkspaceSettingsRead,
     WorkspaceSettingsUpdate,
     WorkspaceUserRead,
@@ -126,6 +128,16 @@ def workspaces_router() -> APIRouter:
         invites = await invitation_service.list_invitations(workspace_id=workspace.id)
 
         return [WorkspaceInviteRead.from_model(invite, workspace) for invite in invites]
+
+    @router.get("/{workspace_id}/roles/")
+    async def list_roles(
+        workspace: UserWorkspaceDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read))],
+    ) -> WorkspaceRoleListRead:
+
+        all_roles = reduce(lambda x, y: x | y, Roles, Roles(0))  # type: ignore
+
+        return WorkspaceRoleListRead.from_model(all_roles)
 
     @router.get("/{workspace_id}/users/")
     async def list_users(
