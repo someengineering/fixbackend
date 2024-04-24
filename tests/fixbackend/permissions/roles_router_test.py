@@ -73,7 +73,7 @@ async def test_list_roles(
     }
 
     new_user = await user_repository.create(user_dict)
-    await workspace_repository.add_to_workspace(workspace.id, new_user.id)
+    await workspace_repository.add_to_workspace(workspace.id, new_user.id, Roles.workspace_billing_admin)
     response = await client.get(f"/api/workspaces/{workspace.id}/roles")
     assert response.status_code == 200
     json = response.json()
@@ -94,10 +94,10 @@ async def test_list_roles(
         {
             "user_id": str(new_user.id),
             "workspace_id": str(workspace.id),
-            "member": True,
+            "member": False,
             "admin": False,
             "owner": False,
-            "billing_admin": False,
+            "billing_admin": True,
         },
     ]
 

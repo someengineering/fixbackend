@@ -24,6 +24,7 @@ from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ProductTier
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.workspaces.models import Workspace, orm
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.types import AsyncSessionMaker
@@ -113,7 +114,9 @@ async def test_list_workspaces(
     member_only_workspace = await workspace_repository.create_workspace(
         name="Test Organization 3", slug="test-organization-3", owner=new_user
     )
-    await workspace_repository.add_to_workspace(workspace_id=member_only_workspace.id, user_id=user.id)
+    await workspace_repository.add_to_workspace(
+        workspace_id=member_only_workspace.id, user_id=user.id, role=Roles.workspace_member
+    )
 
     # the user should be the owner of the organization
     workspaces = await workspace_repository.list_workspaces(user)
@@ -130,7 +133,10 @@ async def test_list_workspaces(
 
 @pytest.mark.asyncio
 async def test_add_to_workspace(
-    workspace_repository: WorkspaceRepository, async_session_maker: AsyncSessionMaker, user: User
+    workspace_repository: WorkspaceRepository,
+    async_session_maker: AsyncSessionMaker,
+    user: User,
+    role_repository: RoleRepository,
 ) -> None:
     # add an existing user to the organization
     organization = await workspace_repository.create_workspace(
@@ -142,7 +148,9 @@ async def test_add_to_workspace(
     new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
     new_user = await user_db.create(new_user_dict)
     new_user_id = new_user.id
-    await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=new_user.id)
+    await workspace_repository.add_to_workspace(
+        workspace_id=org_id, user_id=new_user.id, role=Roles.workspace_billing_admin
+    )
 
     retrieved_organization = await workspace_repository.get_workspace(org_id)
     assert retrieved_organization
@@ -152,12 +160,23 @@ async def test_add_to_workspace(
     assert retrieved_organization.owner_id == user.id
     assert user.id in retrieved_organization.members
 
+    # role should be added to the user
+    roles = await role_repository.list_roles(new_user_id)
+    assert len(roles) == 1
+    assert roles[0].user_id == new_user_id
+    assert roles[0].workspace_id == org_id
+    assert roles[0].role_names == Roles.workspace_billing_admin
+
     # when adding a user which is already a member of the organization, nothing should happen
-    await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=new_user_id)
+    await workspace_repository.add_to_workspace(
+        workspace_id=org_id, user_id=new_user_id, role=Roles.workspace_billing_admin
+    )
 
     # when adding a non-existing user to the organization, an exception should be raised
     with pytest.raises(Exception):
-        await workspace_repository.add_to_workspace(workspace_id=org_id, user_id=UserId(uuid.uuid4()))
+        await workspace_repository.add_to_workspace(
+            workspace_id=org_id, user_id=UserId(uuid.uuid4()), role=Roles.workspace_billing_admin
+        )
 
 
 @pytest.mark.asyncio
