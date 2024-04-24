@@ -63,7 +63,7 @@ class InMemoryInvitationRepo(InvitationRepository):
     async def get_invitation_by_email(self, email: str) -> Optional[WorkspaceInvitation]:
         return None
 
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str) -> WorkspaceInvitation:
+    async def create_invitation(self, workspace_id: WorkspaceId, email: str, role: Roles) -> WorkspaceInvitation:
         """Create an invite for a workspace."""
         raise NotImplementedError
 

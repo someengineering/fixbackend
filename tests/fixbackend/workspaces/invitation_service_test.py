@@ -26,6 +26,7 @@ from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier
 from fixbackend.notification.email.email_messages import EmailMessage, Invite
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.permissions.models import Roles
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.invitation_service import (
@@ -35,6 +36,7 @@ from fixbackend.workspaces.invitation_service import (
     NoFreeSeats,
 )
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.permissions.role_repository import RoleRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -88,6 +90,7 @@ async def test_invite_accept_user(
     notification_service: NotificationServiceMock,
     user_repository: UserRepository,
     domain_event_sender: InMemoryDomainEventPublisher,
+    role_repository: RoleRepository,
     user: User,
     aws_marketplace_subscription: AwsMarketplaceSubscription,
 ) -> None:
@@ -102,16 +105,22 @@ async def test_invite_accept_user(
     # invite can't be done if the workspace has payment on hold
     await workspace_repository.update_payment_on_hold(workspace.id, utc())
     with pytest.raises(NotAllowed):
-        await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
+        await service.invite_user(
+            workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
+        )
     await workspace_repository.update_payment_on_hold(workspace.id, None)
 
     # can invite a new user on a better tier
     workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
-    invite, _ = await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
+    invite, _ = await service.invite_user(
+        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
+    )
     assert await invitation_repository.list_invitations(workspace.id) == [invite]
 
     # idempotency
-    second_invite, _ = await service.invite_user(workspace.id, user, new_user_email, "https://example.com")
+    second_invite, _ = await service.invite_user(
+        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
+    )
     assert second_invite == invite
 
     # list invitations
@@ -133,7 +142,9 @@ async def test_invite_accept_user(
             "is_verified": True,
         }
     )
-    existing_invite, token = await service.invite_user(workspace.id, user, existing_user.email, "https://example.com")
+    existing_invite, token = await service.invite_user(
+        workspace.id, user, existing_user.email, "https://example.com", Roles.workspace_billing_admin
+    )
 
     # accepting the invite should fail if there are not enough seats
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
@@ -155,6 +166,11 @@ async def test_invite_accept_user(
     assert len(domain_event_sender.events) == 3
     assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
     assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
+
+    # role is correct after the user accepts the invite
+    user_roles = await role_repository.list_roles(existing_user.id)
+    assert len(user_roles) == 1
+    assert user_roles[0].role_names == Roles.workspace_billing_admin
 
     # accepting the invite again returns NotFound
     assert await service.accept_invitation(token) == InvitationNotFound()

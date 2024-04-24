@@ -36,6 +36,7 @@ from fixbackend.errors import NotAllowed, ResourceNotFound
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.notification.email.email_messages import Invite
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.permissions.models import Roles
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
@@ -71,7 +72,7 @@ InvitationError = Union[InvitationNotFound, NoFreeSeats, WorkspaceNotFound]
 class InvitationService(ABC):
     @abstractmethod
     async def invite_user(
-        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str
+        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str, role: Roles
     ) -> Tuple[WorkspaceInvitation, str]:
         """Create an invitation to a workspace."""
         raise NotImplementedError()
@@ -110,7 +111,7 @@ class InvitationServiceImpl(InvitationService):
         self.config = config
 
     async def invite_user(
-        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str
+        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str, role: Roles
     ) -> Tuple[WorkspaceInvitation, str]:
         workspace = await self.workspace_repository.get_workspace(workspace_id)
         if workspace is None:
@@ -122,7 +123,7 @@ class InvitationServiceImpl(InvitationService):
             raise NotAllowed("Cannot add more users to this workspace.")
 
         # this is idempotent and will return the existing invitation if it exists
-        invitation = await self.invitation_repository.create_invitation(workspace_id, invitee_email)
+        invitation = await self.invitation_repository.create_invitation(workspace_id, invitee_email, role)
 
         state_data: Dict[str, str] = {
             "invitation_id": str(invitation.id),
@@ -163,7 +164,7 @@ class InvitationServiceImpl(InvitationService):
 
         # in case the user already exists, add it to the workspace and delete the invitation
         if user := await self.user_repository.get_by_email(invitation.email):
-            await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id)
+            await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id, invitation.role)
             await self.invitation_repository.delete_invitation(invitation_id)
 
         event = InvitationAccepted(invitation.workspace_id, user.id if user else None, invitation.email)
