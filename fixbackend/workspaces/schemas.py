@@ -15,6 +15,7 @@
 from datetime import datetime
 from enum import StrEnum
 from functools import reduce
+import logging
 from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
 from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
@@ -23,6 +24,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
+
+log = logging.getLogger(__name__)
 
 
 class WorkspaceRead(BaseModel):
@@ -185,7 +188,8 @@ class JsonRoleName(StrEnum):
             case JsonRoleName.billing_admin:
                 return Roles.workspace_billing_admin
             case _:
-                raise ValueError(f"Unknown role: {self}")
+                log.warn(f"Unknown role: {self}")
+                return Roles.workspace_member
 
 
 class UserInvite(BaseModel):
