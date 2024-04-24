@@ -15,6 +15,8 @@
 
 from typing import Annotated, List
 from fastapi import APIRouter, Depends
+from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.errors import NotAllowed
 from fixbackend.permissions.models import Roles, UserRole, WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.permissions.role_repository import RoleRepositoryDependency
@@ -52,8 +54,11 @@ def roles_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         update: UserRolesUpdate,
         repository: RoleRepositoryDependency,
+        user: AuthenticatedUser,
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_roles))],
     ) -> UserRolesRead:
+        if update.user_id == user.id:
+            raise NotAllowed("You cannot change your own role")
         update_model = update.to_model(workspace.id)
         role = await repository.add_roles(
             update_model.user_id, workspace.id, update_model.role_names, replace_existing=True
