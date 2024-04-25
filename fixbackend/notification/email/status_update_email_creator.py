@@ -29,15 +29,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import base64
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Optional, Tuple, Set
 
 import plotly.graph_objects as go
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
-from fixcloudutils.util import utc, utc_str, value_in_path_get, value_in_path
+from fixcloudutils.util import utc_str, value_in_path_get, value_in_path
 
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import ProductTier
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.schemas import Scatters
 from fixbackend.notification.email.email_messages import render
@@ -128,17 +127,16 @@ class StatusUpdateEmailCreator:
         self.db_access = db_access
         self.process_pool = process_pool
 
-    async def html_content(self, workspace: Workspace) -> str:
+    async def create_messages(self, workspace: Workspace, now: datetime, duration: timedelta) -> Tuple[str, str, str]:
         dba = await self.db_access.get_database_access(workspace.id)
         assert dba is not None, f"No database access for workspace: {workspace.id}"
-
-        duration = timedelta(days=31) if workspace.product_tier == ProductTier.Free else timedelta(days=7)
-        duration_name = "month" if workspace.product_tier == ProductTier.Free else "week"
-        now = utc()
+        duration_name = "month" if duration.days > 27 else "week"
         start = now - duration
 
         async with self.inventory_service.client.search(dba, "is(account)") as response:
-            account_names = {acc["reported"]["id"]: acc["reported"]["name"] async for acc in response}
+            account_names = {
+                value_in_path(acc, "reported.id"): value_in_path(acc, "reported.name") async for acc in response
+            }
 
         async def progress(
             metric: str, not_exist: int, group: Optional[Set[str]] = None, aggregation: Optional[str] = None
@@ -165,7 +163,7 @@ class StatusUpdateEmailCreator:
                 aggregation="sum",
             )
             for scatter in scatters.groups:
-                acc_id = scatter.group["account_id"]
+                acc_id = scatter.group.get("account_id", "<no account name>")
                 scatter.attributes["name"] = account_names.get(acc_id, acc_id)
             return scatters, await self.process_pool.submit(
                 create_timeline_figure,
@@ -213,8 +211,7 @@ class StatusUpdateEmailCreator:
             progress("databases_total", 0, group=set(), aggregation="sum"),
             progress("databases_bytes", 0, group=set(), aggregation="sum"),
         )
-        return render(
-            "status-update.html",
+        args = dict(
             workspace_name=workspace.name,
             duration=duration_name,
             accounts=len(scatters.groups),  # type: ignore
@@ -230,3 +227,7 @@ class StatusUpdateEmailCreator:
             databases_progress=databases_progress,
             databases_bytes_progress=databases_bytes_progress,
         )
+        subject = render("status-update.subject", **args).strip()
+        html = render("status-update.html", **args)
+        txt = render("status-update.txt", **args)
+        return subject, html, txt

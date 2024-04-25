@@ -59,6 +59,7 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.jwt import JwtServiceImpl
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
+from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
@@ -380,7 +381,14 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             workspace_repo,
         ),
     )
-    deps.add(SN.scheduled_email_sender, ScheduledEmailSender(notification_service.email_sender, session_maker))
+    deps.add(
+        SN.scheduled_email_sender,
+        ScheduledEmailSender(
+            notification_service.email_sender,
+            session_maker,
+            StatusUpdateEmailCreator(inventory_service, graph_db_access, deps.async_process_pool),
+        ),
+    )
     return deps
 
 
