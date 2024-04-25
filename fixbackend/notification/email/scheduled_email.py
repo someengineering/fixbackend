@@ -122,7 +122,13 @@ class ScheduledEmailSender(Service):
                         content_to_send = await self.status_update_creator.create_messages(workspace, now, duration)
                     if content_to_send:
                         subject, html, txt = content_to_send
-                        await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
+                        await self.email_sender.send_email(
+                            to=user.email,
+                            subject=subject,
+                            text=txt,
+                            html=html,
+                            unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
+                        )
                         session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
                         counter += 1
                 await session.commit()
