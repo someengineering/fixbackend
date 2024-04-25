@@ -31,3 +31,4 @@ from fixbackend.notification.notification_provider_config_repo import Notificati
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity  # noqa
 from fixbackend.permissions.role_repository import UserRoleAssignmentEntity  # noqa
 from fixbackend.notification.email.scheduled_email import ScheduledEmailEntity, ScheduledEmailSentEntity  # noqa
+from fixbackend.notification.email.one_time_email import OneTimeEmailEntity  # noqa

@@ -45,8 +45,8 @@ class Roles(IntFlag):
 
 
 # todo: remove giving members all permissions after FE supports permissions feature.
-all_permissions = reduce(lambda x, y: x | y, WorkspacePermissions, WorkspacePermissions(0))  # type: ignore
-workspace_member_permissions = WorkspacePermissions.read | WorkspacePermissions.create | all_permissions
+all_read_permissions = WorkspacePermissions.read | WorkspacePermissions.read_settings | WorkspacePermissions.read_roles
+workspace_member_permissions = WorkspacePermissions.read | WorkspacePermissions.create | all_read_permissions
 
 workspace_billing_admin_permissions = WorkspacePermissions.read_billing | WorkspacePermissions.update_billing
 workspace_admin_permissions = (

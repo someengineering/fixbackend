@@ -19,6 +19,7 @@ import pytest
 
 from fixbackend.auth.user_repository import get_user_repository
 from fixbackend.auth.models import User
+from fixbackend.permissions.models import Roles
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -52,21 +53,30 @@ async def test_create_invitation(
 
     user2 = await create_user("123foo@bar.com", async_session_maker)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=org_id, email=user2.email, role=Roles.workspace_billing_admin
+    )
     assert invitation.workspace_id == org_id
     assert invitation.email == user2.email
+    assert invitation.role == Roles.workspace_billing_admin
 
     # create invitation is idempotent
-    invitation2 = await invitation_repository.create_invitation(workspace_id=org_id, email=user2.email)
+    invitation2 = await invitation_repository.create_invitation(
+        workspace_id=org_id, email=user2.email, role=Roles.workspace_billing_admin
+    )
     assert invitation2 == invitation
 
     # can invite users to multiple workspaces
-    invitation3 = await invitation_repository.create_invitation(workspace_id=workspace.id, email=user2.email)
+    invitation3 = await invitation_repository.create_invitation(
+        workspace_id=workspace.id, email=user2.email, role=Roles.workspace_billing_admin
+    )
     assert invitation3.workspace_id == workspace.id
     assert invitation3.email == user2.email
 
     external_email = "i_do_not_exist@bar.com"
-    non_user_invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=external_email)
+    non_user_invitation = await invitation_repository.create_invitation(
+        workspace_id=org_id, email=external_email, role=Roles.workspace_billing_admin
+    )
     assert non_user_invitation.workspace_id == org_id
     assert non_user_invitation.email == external_email
 
@@ -90,7 +100,9 @@ async def test_list_invitations(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=workspace.id, email=new_user.email, role=Roles.workspace_member
+    )
 
     # list the invitations
     invitations = await invitation_repository.list_invitations(workspace_id=workspace.id)
@@ -116,7 +128,9 @@ async def test_get_invitation(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=workspace.id, email=new_user.email, role=Roles.workspace_member
+    )
 
     stored_invitation = await invitation_repository.get_invitation(invitation_id=invitation.id)
     assert stored_invitation == invitation
@@ -140,7 +154,9 @@ async def test_get_invitation_by_email(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=workspace.id, email=new_user.email, role=Roles.workspace_member
+    )
 
     stored_invitation = await invitation_repository.get_invitation_by_email(email=new_user.email)
     assert stored_invitation == invitation
@@ -164,7 +180,9 @@ async def test_update_invitation(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=workspace.id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=workspace.id, email=new_user.email, role=Roles.workspace_member
+    )
     assert invitation.accepted_at is None
 
     now = utc()
@@ -193,7 +211,9 @@ async def test_delete_invitation(
     }
     new_user = await user_db.create(user_dict)
 
-    invitation = await invitation_repository.create_invitation(workspace_id=org_id, email=new_user.email)
+    invitation = await invitation_repository.create_invitation(
+        workspace_id=org_id, email=new_user.email, role=Roles.workspace_member
+    )
 
     # delete the invitation
     await invitation_repository.delete_invitation(invitation_id=invitation.id)

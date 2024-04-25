@@ -73,7 +73,7 @@ async def test_list_roles(
     }
 
     new_user = await user_repository.create(user_dict)
-    await workspace_repository.add_to_workspace(workspace.id, new_user.id)
+    await workspace_repository.add_to_workspace(workspace.id, new_user.id, Roles.workspace_billing_admin)
     response = await client.get(f"/api/workspaces/{workspace.id}/roles")
     assert response.status_code == 200
     json = response.json()
@@ -94,10 +94,10 @@ async def test_list_roles(
         {
             "user_id": str(new_user.id),
             "workspace_id": str(workspace.id),
-            "member": True,
+            "member": False,
             "admin": False,
             "owner": False,
-            "billing_admin": False,
+            "billing_admin": True,
         },
     ]
 
@@ -106,15 +106,31 @@ async def test_list_roles(
 async def test_update_roles(
     client: AsyncClient,
     workspace: Workspace,
+    user_repository: UserRepository,
     user: User,
 ) -> None:
 
-    payload = {"user_id": str(user.id), "member": False, "admin": False, "owner": False, "billing_admin": True}
+    user_dict = {
+        "email": "foo_bar123@bar.com",
+        "hashed_password": "notreallyhashed",
+        "is_verified": True,
+    }
 
-    response = await client.put(f"/api/workspaces/{workspace.id}/roles/{user.id}", json=payload)
+    someone_else = await user_repository.create(user_dict)
+
+    own_payload = {"user_id": str(user.id), "member": False, "admin": False, "owner": False, "billing_admin": True}
+
+    # self update is not allowed
+    response = await client.put(f"/api/workspaces/{workspace.id}/roles/{user.id}", json=own_payload)
+    assert response.status_code == 403
+
+    # update someone else is fine
+    payload = {"user_id": str(someone_else.id), "member": False, "admin": False, "owner": False, "billing_admin": True}
+
+    response = await client.put(f"/api/workspaces/{workspace.id}/roles/{someone_else.id}", json=payload)
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": str(user.id),
+        "user_id": str(someone_else.id),
         "workspace_id": str(workspace.id),
         "member": False,
         "admin": False,

@@ -43,6 +43,7 @@ from fixbackend.notification.model import (
     AlertOnChannel,
 )
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.permissions.models import Roles
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -71,7 +72,7 @@ async def test_sent_to_workspace(
             "is_verified": True,
         }
         user = await user_repository.create(user_dict)
-        await workspace_repository.add_to_workspace(workspace.id, user.id)
+        await workspace_repository.add_to_workspace(workspace.id, user.id, Roles.workspace_member)
 
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=SecurityScanFinished())
 

@@ -13,7 +13,9 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
+from enum import StrEnum
 from functools import reduce
+import logging
 from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
 from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
@@ -22,6 +24,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
+
+log = logging.getLogger(__name__)
 
 
 class WorkspaceRead(BaseModel):
@@ -167,10 +171,31 @@ class ExternalIdRead(BaseModel):
     }
 
 
+class JsonRoleName(StrEnum):
+    member = "member"
+    admin = "admin"
+    owner = "owner"
+    billing_admin = "billing_admin"
+
+    def to_role(self) -> Roles:
+        match self:
+            case JsonRoleName.member:
+                return Roles.workspace_member
+            case JsonRoleName.admin:
+                return Roles.workspace_admin
+            case JsonRoleName.owner:
+                return Roles.workspace_owner
+            case JsonRoleName.billing_admin:
+                return Roles.workspace_billing_admin
+            case _:
+                log.warn(f"Unknown role: {self}")
+                return Roles.workspace_member
+
+
 class UserInvite(BaseModel):
     name: str = Field(description="The name of the user")
     email: EmailStr = Field(description="The email of the user")
-    roles: List[str] = Field(description="The role of the user")
+    roles: List[JsonRoleName] = Field(description="The role of the user")
 
     model_config = {
         "json_schema_extra": {
@@ -190,6 +215,35 @@ class FixUserSource(BaseModel):
 
 
 UserSource = Union[FixUserSource]
+
+
+class WorkspaceRoleListRead(BaseModel):
+    roles: List[str] = Field(description="The roles available in the workspace")
+
+    @staticmethod
+    def from_model(role_names: Roles) -> "WorkspaceRoleListRead":
+
+        result = []
+        if Roles.workspace_member in role_names:
+            result.append(JsonRoleName.member)
+        if Roles.workspace_admin in role_names:
+            result.append(JsonRoleName.admin)
+        if Roles.workspace_owner in role_names:
+            result.append(JsonRoleName.owner)
+        if Roles.workspace_billing_admin in role_names:
+            result.append(JsonRoleName.billing_admin)
+
+        return WorkspaceRoleListRead(roles=[r.value for r in result])
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "roles": ["member", "admin", "owner", "billing_admin"],
+                }
+            ]
+        }
+    }
 
 
 class WorkspaceUserRoleRead(BaseModel):

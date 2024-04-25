@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from functools import reduce
 from typing import Annotated, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -19,7 +20,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.models import WorkspacePermissions, Roles
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.auth.user_repository import UserRepositoryDependency
 from fixbackend.config import ConfigDependency
@@ -39,6 +40,7 @@ from fixbackend.workspaces.schemas import (
     WorkspaceCreate,
     WorkspaceInviteRead,
     WorkspaceRead,
+    WorkspaceRoleListRead,
     WorkspaceSettingsRead,
     WorkspaceSettingsUpdate,
     WorkspaceUserRead,
@@ -127,6 +129,16 @@ def workspaces_router() -> APIRouter:
 
         return [WorkspaceInviteRead.from_model(invite, workspace) for invite in invites]
 
+    @router.get("/{workspace_id}/roles/")
+    async def list_roles(
+        workspace: UserWorkspaceDependency,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.read))],
+    ) -> WorkspaceRoleListRead:
+
+        all_roles = reduce(lambda x, y: x | y, Roles, Roles(0))  # type: ignore
+
+        return WorkspaceRoleListRead.from_model(all_roles)
+
     @router.get("/{workspace_id}/users/")
     async def list_users(
         workspace: UserWorkspaceDependency,
@@ -150,11 +162,14 @@ def workspaces_router() -> APIRouter:
 
         accept_invite_url = str(request.url_for(ACCEPT_INVITE_ROUTE_NAME, workspace_id=workspace.id))
 
+        role = reduce(lambda acc, role_name: role_name.to_role() | acc, user_invite.roles, Roles.workspace_member)
+
         invite, _ = await invitation_service.invite_user(
             workspace_id=workspace.id,
             inviter=user,
             invitee_email=user_invite.email,
             accept_invite_base_url=accept_invite_url,
+            role=role,
         )
 
         return WorkspaceInviteRead.from_model(invite, workspace)

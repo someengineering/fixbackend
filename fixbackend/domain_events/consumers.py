@@ -21,14 +21,19 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from datetime import timedelta
 import logging
 
 from fixcloudutils.service import Service
 
-from fixbackend.domain_events.events import UserRegistered
+from fixbackend.config import trial_period_duration
+from fixbackend.domain_events.events import ProductTierChanged, UserRegistered, WorkspaceCreated
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
-from fixbackend.notification.email.email_messages import Signup
+from fixbackend.ids import ProductTier
+from fixbackend.notification.email.email_messages import Signup, TrialExpired, TrialExpiresSoon
+from fixbackend.notification.email.one_time_email import OneTimeEmailKind, OneTimeEmailService
 from fixbackend.notification.notification_service import NotificationService
+from fixcloudutils.util import utc
 
 log = logging.getLogger(__name__)
 
@@ -45,3 +50,50 @@ class EmailOnSignupConsumer(Service):
     async def process_user_registered_event(self, event: UserRegistered) -> None:
         message = Signup(recipient=event.email)
         await self.notification_service.send_message(to=event.email, message=message)
+
+
+class ScheduleTrialEndReminder(Service):
+    def __init__(
+        self,
+        subscriber: DomainEventSubscriber,
+        one_time_email_service: OneTimeEmailService,
+    ) -> None:
+        self.one_time_email_service = one_time_email_service
+        # uncomment once we have payment
+        # subscriber.subscribe(WorkspaceCreated, self.schedule_trial_end_reminder, "schedule_trial_end_reminder")
+
+    async def schedule_trial_end_reminder(self, event: WorkspaceCreated) -> None:
+        for days_before_expiration in [2, 1]:
+            await self.one_time_email_service.schedule_one_time_email(
+                kind=OneTimeEmailKind.TrialEndNotification,
+                scheduled_at=utc() + trial_period_duration() - timedelta(days=days_before_expiration),
+                user_id=None,
+                workspace_id=event.workspace_id,
+                message=TrialExpiresSoon(days_till_expire=days_before_expiration),
+            )
+
+        await self.one_time_email_service.schedule_one_time_email(
+            kind=OneTimeEmailKind.TrialEndNotification,
+            scheduled_at=utc() + trial_period_duration(),
+            user_id=None,
+            workspace_id=event.workspace_id,
+            message=TrialExpired(),
+        )
+
+
+class UnscheduleTrialEndReminder(Service):
+    def __init__(
+        self,
+        subscriber: DomainEventSubscriber,
+        one_time_email_service: OneTimeEmailService,
+    ) -> None:
+        self.one_time_email_service = one_time_email_service
+        # uncomment once we have payment
+        # subscriber.subscribe(ProductTierChanged, self.unschedule_trial_end_reminder, "unschedule_trial_end_reminder")
+
+    async def unschedule_trial_end_reminder(self, event: ProductTierChanged) -> None:
+        moved_from_trial = event.previous_tier == ProductTier.Trial and event.product_tier != ProductTier.Trial
+        if moved_from_trial:
+            await self.one_time_email_service.unschedule_one_time_email(
+                user_id=None, workspace_id=event.workspace_id, kind=OneTimeEmailKind.TrialEndNotification
+            )

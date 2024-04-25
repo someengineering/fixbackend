@@ -67,7 +67,7 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId, role: Roles) -> None:
         """Add a user to a workspace."""
         raise NotImplementedError
 
@@ -243,7 +243,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.refresh(workspace)
             return workspace.to_model()
 
-    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
+    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId, role: Roles) -> None:
         async with self.session_maker() as session:
             existing_membership = await session.get(orm.OrganizationMembers, (workspace_id, user_id))
             if existing_membership is not None:
@@ -252,7 +252,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
             member_relationship = orm.OrganizationMembers(user_id=user_id, organization_id=workspace_id)
             session.add(member_relationship)
-            await self.role_repository.add_roles(user_id, workspace_id, Roles.workspace_member, session=session)
+            await self.role_repository.add_roles(user_id, workspace_id, role, session=session)
             try:
                 await session.commit()
             except IntegrityError:

@@ -110,7 +110,7 @@ class UserManager(BaseUserManager[User, UserId]):
         ) and pending_invitation.accepted_at:
             if workspace := await self.workspace_repository.get_workspace(pending_invitation.workspace_id):
                 log.info(f"Add user {user.email} to workspace {workspace.id}")
-                await self.workspace_repository.add_to_workspace(workspace.id, user.id)
+                await self.workspace_repository.add_to_workspace(workspace.id, user.id, pending_invitation.role)
             else:
                 # wtf?
                 workspace = await self.create_default_workspace(user)
