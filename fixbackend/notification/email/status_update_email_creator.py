@@ -26,7 +26,6 @@ from fixbackend.inventory.schemas import Scatters
 from fixbackend.notification.email.email_messages import render
 from fixbackend.workspaces.models import Workspace
 
-# color_codes = ["#1e234d", "#2b357d", "#2f3b9e", "#3447c1", "#3d58d3", "#5275df"]
 color_codes = [
     "#B7B8D3",  # Light Periwinkle
     "#FF9E80",  # Salmon Pink
