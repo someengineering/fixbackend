@@ -36,6 +36,7 @@ from attrs import frozen
 from boto3 import Session as BotoSession
 from fastapi import FastAPI
 from fastapi_users.password import PasswordHelper
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
@@ -193,6 +194,12 @@ def default_config() -> Config:
         stripe_api_key=None,
         stripe_webhook_key=None,
     )
+
+
+@pytest.fixture
+async def async_process_pool() -> AsyncIterator[AsyncProcessPool]:
+    async with AsyncProcessPool() as pool:
+        yield pool
 
 
 @pytest.fixture(scope="session")

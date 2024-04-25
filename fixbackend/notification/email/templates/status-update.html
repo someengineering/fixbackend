@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block style %}
+  <style>
+  .td-bottom-line {
+      border-bottom: 1px solid #85878E;
+  }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h1>Your Cloud Infrastructure Status Update ☁️☁️☁️</h1>
+
+  <h2>Workspace: "{{ workspace_name }}"</h2>
+  <p>
+    Fix collected information from <strong>{{ 'cloud account'|pluralize(accounts) }}</strong>.<br/>
+    All account names with the number of resources are shown in the timeline diagram below.
+  </p>
+  <h2>Security Score</h2>
+  <p>The current weighted security score across all accounts stands at <strong>{{ score_progress[0] }}</strong>.<br/>
+    {% if score_progress[1] < 0 %}
+      This represents a decline of <strong>{{ score_progress[1] | abs }}</strong> points over the last {{ duration }}.<br/>
+      <strong>It's time to take action!</strong>
+      The Fix dashboard provides you with detailed information about what needs to be done to improve your security
+      score.
+    {% elif score_progress[1] > 0 %}
+      This marks an improvement of <strong>{{ score_progress[1] }}</strong> points over the last {{ duration }}.<br/>
+      <strong>Excellent progress!</strong> Keep up the good work.
+    {% else %}
+      There has been no change in the score over the last {{ duration }}.
+    {% endif %}
+  </p>
+
+
+  <figure>
+    <img width="400" src="data:image/png;base64,{{ score_image }}" alt="Overall Score"/>
+    <figcaption>Security Score over all {{ 'cloud account'|pluralize(accounts) }}.</figcaption>
+  </figure>
+
+  <h2>Compute Resources</h2>
+  <p>
+    The diagram below displays compute and database resources.
+    This information is usually a valuable indicator, providing
+    insights into cloud usage across various scenarios.
+
+  <table class="purchase">
+    <thead class="purchase_heading">
+    <tr>
+      <th style="text-align: left;"></th>
+      <th style="text-align: left;"></th>
+      <th style="text-align: left;">Current</th>
+      <th style="text-align: left;">Change</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- Compute Section -->
+    <tr class="purchase_item">
+      <td rowspan="3" style="vertical-align: top;">Compute</td>
+      <td class="td-bottom-line">Virtual Machines</td>
+      <td class="td-bottom-line">{{ instances_progress[0] }}</td>
+      <td class="td-bottom-line">{{ instances_progress[1] }}</td>
+    </tr>
+    <tr class="purchase_item">
+      <td class="td-bottom-line">Cores</td>
+      <td class="td-bottom-line">{{ cores_progress[0] }}</td>
+      <td class="td-bottom-line">{{ cores_progress[1] }}</td>
+    </tr>
+    <tr class="purchase_item">
+      <td class="td-bottom-line">Memory</td>
+      <td class="td-bottom-line">{{ memory_progress[0] | readable_bytes }}</td>
+      <td class="td-bottom-line">{{ memory_progress[1] | readable_bytes(with_sign=true) }}</td>
+    </tr>
+    <tr>
+      <td colspan="4">&nbsp;</td>
+    </tr>
+    <!-- Storage Section -->
+    <tr class="purchase_item">
+      <td rowspan="2" style="vertical-align: top;">Storage</td>
+      <td class="td-bottom-line">Volumes</td>
+      <td class="td-bottom-line">{{ volumes_progress[0] }}</td>
+      <td class="td-bottom-line">{{ volumes_progress[1] | with_sign }}</td>
+    </tr>
+    <tr class="purchase_item">
+      <td class="td-bottom-line">Size</td>
+      <td class="td-bottom-line">{{ volume_bytes_progress[0] | readable_bytes }}</td>
+      <td class="td-bottom-line">{{ volume_bytes_progress[1] | readable_bytes(with_sign=true) }}</td>
+    </tr>
+    <tr>
+      <td colspan="4">&nbsp;</td>
+    </tr>
+    <!-- Databases Section -->
+    <tr class="purchase_item">
+      <td rowspan="2" style="vertical-align: top;">Databases</td>
+      <td class="td-bottom-line">Instances</td>
+      <td class="td-bottom-line">{{ databases_progress[0] }}</td>
+      <td class="td-bottom-line">{{ databases_progress[1] | with_sign }}</td>
+    </tr>
+    <tr class="purchase_item">
+      <td class="td-bottom-line">Size</td>
+      <td class="td-bottom-line">{{ databases_bytes_progress[0] | readable_bytes }}</td>
+      <td class="td-bottom-line">{{ databases_bytes_progress[1] | readable_bytes(with_sign=true) }}</td>
+    </tr>
+    </tbody>
+  </table>
+  </p>
+  <h2>Resources under control</h2>
+  <p>
+    This diagram provides a breakdown of the total number of resources by cloud account over the past {{ duration }}. It
+    is important to analyze any spikes in the diagram to understand their origins. Additionally, please note that an
+    increase in the number of resources over time typically leads to higher costs.
+
+  </p>
+  <figure>
+    <img src="data:image/png;base64,{{ account_timeline_image }}" alt="Account Timeline"/>
+    <figcaption>Number of Resources by account.</figcaption>
+  </figure>
+
+  <h2>Resource Changes</h2>
+  Fix has recorded the following changes in your infrastructure over the past {{ duration }}:
+  <table class="purchase" style="max-width: 75%">
+  <thead class="purchase_heading">
+  <tr>
+    <th style="text-align: left;">Kind of Change</th>
+    <th style="text-align: left;">Nr of Resources</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr class="purchase_item">
+    <td class="td-bottom-line">New Resources Created</td>
+    <td class="td-bottom-line">{{ resource_changes[0] }}</td>
+  </tr>
+  <tr class="purchase_item">
+    <td class="td-bottom-line">Existing Resources Updated</td>
+    <td class="td-bottom-line">{{ resource_changes[1] }}</td>
+  </tr>
+  <tr class="purchase_item">
+    <td class="td-bottom-line">Existing Resources Deleted</td>
+    <td class="td-bottom-line">{{ resource_changes[2] }}</td>
+  </tr>
+  </tbody>
+  </table>
+
+  <p>
+    That is all for today. To get more details and insights, visit the Fix app by using the "Login" button below.
+    If you have any questions, feel free to contact us at <a href="mailto:support@fix.security">support@fix.security</a> or join our supportive community on <a href="https://discord.gg/fixsecurity">Discord</a>.
+  </p>
+
+  <p>
+    <a href="https://app.fix.security?origin=email&tpl={{ template_name }}" class="button" target="_blank">Login to Fix</a>
+  </p>
+
+  <p>
+  The Fix Team
+  </p>
+
+{% endblock %}

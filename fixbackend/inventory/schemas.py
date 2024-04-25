@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import List, Dict, Optional, Literal, Union
+from typing import List, Dict, Optional, Literal, Union, Any
 from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
@@ -70,6 +70,25 @@ class VulnerabilitiesChanged(BaseModel):
     resource_count_by_kind_selection: Dict[str, int] = Field(
         default="A selection of resource kinds with highest impact."
     )
+
+
+class Scatter(BaseModel):
+    group_name: str
+    group: Dict[str, Optional[str]]
+    values: Dict[datetime, float]
+    attributes: Dict[str, Any] = Field(default_factory=dict)
+
+    def get_values(self, ats: List[datetime]) -> List[float]:
+        # Assume 0 if no value is present
+        return [self.values.get(at, 0) for at in ats]
+
+
+class Scatters(BaseModel):
+    start: datetime
+    end: datetime
+    granularity: timedelta
+    ats: List[datetime]
+    groups: List[Scatter]
 
 
 NoVulnerabilitiesChanged = VulnerabilitiesChanged(

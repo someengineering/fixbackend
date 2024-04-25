@@ -27,6 +27,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email
+from fixbackend.jwt import JwtServiceImpl
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
@@ -362,7 +363,9 @@ def unsubscribe_router(fix: FixDependencies) -> APIRouter:
     @router.get("/unsubscribe", include_in_schema=False)
     async def unsubscribe(token: str) -> Response:
 
-        decoded = await fix.jwt_service.decode(token, [EMAIL_UNSUBSCRIBE_AUDIENCE])
+        decoded = await fix.service(ServiceNames.jwt_service, JwtServiceImpl).decode(
+            token, [EMAIL_UNSUBSCRIBE_AUDIENCE]
+        )
         if not decoded:
             log.info("invalid token")
             raise NotAllowed("Invalid token")

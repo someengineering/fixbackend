@@ -11,7 +11,6 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -25,11 +24,43 @@ from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 
 TemplatesPath = Path(__file__).parent / "templates"
+_readable_numbers = {0: "zero", 1: "one", 2: "two", 3: "three"}
+_bytes_power = {5: "PB", 4: "TB", 3: "GB", 2: "MB", 1: "KB", 0: "B"}
+
+
+def _readable_number(number: int) -> str:
+    return _readable_numbers.get(number, str(number))
+
+
+def _with_sign(number: int) -> str:
+    return str(number) if number < 0 else ("±0" if number == 0 else f"+{number}")
+
+
+def _readable_bytes(number: int, *, with_sign: Optional[bool] = None) -> str:
+    sign = "-" if number < 0 else ("+" if with_sign and number > 0 else "")
+    number = abs(number)
+    if number < 1024:
+        return f"{sign}{number} B"
+    for power, unit in _bytes_power.items():
+        pot = 1024**power
+        if number >= pot:
+            return f"{sign}{number // pot} {unit}"
+    return f"{sign}{number} B"
+
+
+def _pluralize(word: str, count: int) -> str:
+    plural = "" if count == 1 else "s"
+    return f"{_readable_number(count)} {word}{plural}"
 
 
 @lru_cache(maxsize=1)
 def get_env() -> Environment:
-    return Environment(loader=FileSystemLoader(TemplatesPath), undefined=StrictUndefined)
+    env = Environment(loader=FileSystemLoader(TemplatesPath), undefined=StrictUndefined)
+    env.filters["pluralize"] = _pluralize
+    env.filters["readable_number"] = _readable_number
+    env.filters["readable_bytes"] = _readable_bytes
+    env.filters["with_sign"] = _with_sign
+    return env
 
 
 def render(template_name: str, **kwargs: Any) -> str:
