@@ -83,3 +83,6 @@ venv:
 
 setup: clean clean-env venv
 
+# hot reload for css recompilation
+tailwind:
+	@npx tailwindcss -i ./fixbackend/customer_support/templates/app.css -o ./static/css/style.css --watch

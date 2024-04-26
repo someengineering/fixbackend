@@ -464,11 +464,22 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
     return deps
 
 
+async def support_dependencies(cfg: Config) -> FixDependencies:
+    deps = await base_dependencies(cfg)
+    session_maker = deps.session_maker
+    deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    deps.add(SN.user_repo, UserRepository(session_maker))
+
+    return deps
+
+
 async def create_dependencies(config: Config) -> FixDependencies:
     match config.args.mode:
         case "dispatcher":
             return await dispatcher_dependencies(config)
         case "billing":
             return await billing_dependencies(config)
+        case "support":
+            return await support_dependencies(config)
         case _:
             return await application_dependencies(config)

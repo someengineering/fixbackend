@@ -1,0 +1,28 @@
+<div class="overflow-x-auto">
+    <table id="search-table" class="table" hx-trigger="roleUpdate from:body" hx-get="/roles/table" hx-include="#search"
+        hx-swap="outerHTML">
+        <thead>
+            <tr>
+                <th>Workspace Id</th>
+                <th>Roles</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user_role in roles %}
+            <tr class="cursor-pointer" hx-get="/roles/user/{{ user.id }}/workspace/{{ user_role.workspace_id }}"
+                hx-target=".table" hx-swap="afterend">
+                <td>{{ user_role.workspace_id }}</td>
+                <td>
+                    <div class="flex items-start gap-2 flex-col">
+                        {% for name, enabled in user_role.roles.items() %}
+                        {% if enabled %}
+                        <span class="badge badge-secondary">{{ name }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
