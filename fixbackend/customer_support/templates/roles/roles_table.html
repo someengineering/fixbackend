@@ -9,7 +9,7 @@
         </thead>
         <tbody>
             {% for user_role in roles %}
-            <tr class=" cursor-pointer" hx-get="/roles/user/{{ user.id }}/workspace/{{ user_role.workspace_id }}"
+            <tr class="cursor-pointer" hx-get="/roles/user/{{ user.id }}/workspace/{{ user_role.workspace_id }}"
                 hx-target=".table" hx-swap="afterend">
                 <td>{{ user_role.workspace_id }}</td>
                 <td>
