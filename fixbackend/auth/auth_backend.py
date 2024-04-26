@@ -23,8 +23,9 @@ from fastapi_users.manager import BaseUserManager
 
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
+from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import ConfigDependency
-from fixbackend.dependencies import FixDependency
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.ids import UserId
 from fixbackend import jwt
 
@@ -81,7 +82,7 @@ class FixJWTStrategy(Strategy[User, UserId]):
 
 
 async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UserId]:
-    cert_key_pairs = await fix.certificate_store.get_signing_cert_key_pair()
+    cert_key_pairs = await fix.service(ServiceNames.certificate_store, CertificateStore).get_signing_cert_key_pair()
     return FixJWTStrategy(
         public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
         private_key=cert_key_pairs[0].private_key,

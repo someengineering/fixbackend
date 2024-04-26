@@ -34,6 +34,13 @@
             word-break: break-word;
         }
 
+        figure {
+            display: block;
+            text-align: center;
+            margin: 20px auto; /* Automatically calculates the left and right margins to center */
+            width: fit-content; /* Adapts the width to its content */
+        }
+
 
         /* Type ------------------------------ */
 
@@ -434,7 +441,7 @@
         font-family: Arial, sans-serif;
       }
     </style>
-  <![endif]-->
+    <![endif]-->
     <style type="text/css" rel="stylesheet" media="all">
         body {
             width: 100% !important;
@@ -452,6 +459,7 @@
             color: #333;
         }
     </style>
+    {% block style %} {% endblock style %}
 </head>
 
 <body

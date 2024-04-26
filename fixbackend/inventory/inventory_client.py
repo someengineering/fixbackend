@@ -476,6 +476,7 @@ class InventoryClient(Service):
         group: Optional[Set[str]] = None,
         filter_group: Optional[List[str]] = None,
         granularity: Optional[int | timedelta] = None,
+        aggregation: Optional[str] = None,
     ) -> AsyncContextManager[AsyncIteratorWithContext[Json]]:
         log.info(
             f"Get timeseries with name: {name}, start: {start}, end: {end}, "
@@ -487,13 +488,15 @@ class InventoryClient(Service):
             body["start"] = utc_str(start)
         if end:
             body["end"] = utc_str(end)
-        if group:
+        if group is not None:
             body["group"] = list(group)
-        if filter_group:
+        if filter_group is not None:
             body["filter"] = filter_group
         if granularity:
             value = granularity if isinstance(granularity, int) else f"{granularity.total_seconds()}s"
             body["granularity"] = value
+        if aggregation:
+            body["aggregation"] = aggregation
         return self._stream(
             "POST",
             f"/timeseries/{name}",

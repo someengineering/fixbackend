@@ -1,0 +1,44 @@
+Your Cloud Infrastructure Status Update ☁️☁️☁️
+
+Workspace: "{{ workspace_name }}"
+Fix collected information from {{ 'cloud account'|pluralize(accounts) }}.
+
+Security Score
+The current weighted security score across all accounts stands at {{ score_progress[0] }}.
+{% if score_progress[1] < 0 %}This represents a decline of {{ score_progress[1] | abs }} points over the last {{ duration }}.
+It's time to take action!
+The Fix dashboard provides you with detailed information about what needs to be done to improve your security score.
+{% elif score_progress[1] > 0 %}This marks an improvement of {{ score_progress[1] }} points over the last {{ duration }}.
+Excellent progress! Keep up the good work.
+{% else %} There has been no change in the score over the last {{ duration }}.
+{% endif %}
+
+Resources
+
+Compute
+  Virtual Machines: {{ instances_progress[0] }} ({{ instances_progress[1] }})
+  Cores: {{ cores_progress[0] }} ({{ cores_progress[1] }})
+  Memory: {{ memory_progress[0] | readable_bytes }} ({{ memory_progress[1] | readable_bytes(with_sign=true) }})
+
+Storage
+  Volumes: {{ volumes_progress[0] }} ({{ volumes_progress[1] | with_sign }})
+  Size {{ volume_bytes_progress[0] | readable_bytes }} ({{ volume_bytes_progress[1] | readable_bytes(with_sign=true) }})
+
+Databases
+  Instances {{ databases_progress[0] }} ({{ databases_progress[1] | with_sign }})
+  Size {{ databases_bytes_progress[0] | readable_bytes }} ({{ databases_bytes_progress[1] | readable_bytes(with_sign=true) }})
+
+
+Resource Changes
+Fix has recorded the following changes in your infrastructure over the past {{ duration }}:
+
+New Resources Created: {{ resource_changes[0] }}
+Existing Resources Updated: {{ resource_changes[1] }}
+Existing Resources Deleted: {{ resource_changes[2] }}
+
+
+That is all for today. To get more details and insights, visit the Fix app by using the "Login" button below.
+If you have any questions, feel free to contact us at support@fix.security or join our supportive community on Discord at https://discord.gg/fixsecurity.
+
+The Fix Team
+

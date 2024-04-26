@@ -23,7 +23,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, datetime
 from itertools import islice
 from typing import (
     List,
@@ -44,7 +44,7 @@ from typing import (
 from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
-from fixcloudutils.util import value_in_path, utc_str, utc
+from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str
 from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
@@ -82,6 +82,8 @@ from fixbackend.inventory.schemas import (
     SearchRequest,
     TimeSeries,
     ReportConfig,
+    Scatter,
+    Scatters,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 
@@ -633,6 +635,43 @@ class InventoryService(Service):
                 changed_compliant=NoVulnerabilitiesChanged,
                 top_checks=[],
             )
+
+    async def timeseries_scattered(
+        self,
+        access: GraphDatabaseAccess,
+        name: str,
+        *,
+        start: datetime,
+        end: datetime,
+        granularity: timedelta,
+        group: Optional[Set[str]] = None,
+        filter_group: Optional[List[str]] = None,
+        aggregation: Optional[str] = None,
+    ) -> Scatters:
+        scatters: Dict[str, Scatter] = {}
+        ats: Set[datetime] = set()
+        async with self.client.timeseries(
+            access,
+            name,
+            start=start,
+            end=end,
+            group=group,
+            filter_group=filter_group,
+            granularity=granularity,
+            aggregation=aggregation,
+        ) as cursor:
+            async for entry in cursor:
+                if (atstr := entry.get("at")) and (group := entry.get("group")) and (v := entry.get("v")):
+                    at = parse_utc_str(str(atstr))
+                    group_name = "::".join(f"{k}={v}" for k, v in sorted(group.items()))
+                    ats.add(at)
+                    points = {at: v}
+                    scatter = Scatter(group_name=group_name, group=group, values=points)
+                    if existing := scatters.get(scatter.group_name):
+                        existing.values.update(scatter.values)
+                    else:
+                        scatters[scatter.group_name] = scatter
+        return Scatters(start=start, end=end, granularity=granularity, ats=sorted(ats), groups=list(scatters.values()))
 
     async def __aggregate_roots(self, db: GraphDatabaseAccess) -> Dict[str, Json]:
         if self.__cached_aggregate_roots is not None:

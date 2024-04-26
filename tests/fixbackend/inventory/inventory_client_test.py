@@ -75,7 +75,7 @@ def mocked_inventory_client(
             js = json.loads(request.content)
             azure_virtual_machine_resource_json["reported"] = azure_virtual_machine_resource_json["reported"] | js
             return json_response(azure_virtual_machine_resource_json)
-        elif request.url.path == "/timeseries/infected_resources":
+        elif request.url.path.startswith("/timeseries/"):
             return nd_json_response(
                 [
                     {"at": "2023-12-05T16:52:38Z", "group": {"severity": "critical"}, "v": 5},
@@ -88,6 +88,8 @@ def mocked_inventory_client(
                     {"at": "2023-12-06T16:52:38Z", "group": {"severity": "low"}, "v": 2},
                 ]
             )
+        elif request.url.path == "/cli/execute":
+            return Response(200, content=b"", headers={"content-type": "application/x-ndjson"})
 
         else:
             raise AttributeError(f"Unexpected request: {request.method} {request.url.path} with content {content}")

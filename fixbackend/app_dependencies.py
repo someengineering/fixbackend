@@ -28,6 +28,7 @@ from typing import Any, Dict
 import boto3
 from arq import create_pool
 from arq.connections import RedisSettings
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from httpx import AsyncClient, Limits, Timeout
@@ -59,6 +60,7 @@ from fixbackend.jwt import JwtServiceImpl
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
+from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
@@ -107,6 +109,7 @@ async def base_dependencies(cfg: Config) -> FixDependencies:
     EngineMetrics.register(engine)
     deps.add(SN.session_maker, async_sessionmaker(engine))
     deps.add(SN.boto_session, boto3.Session(cfg.aws_access_key_id, cfg.aws_secret_access_key, region_name="us-east-1"))
+    deps.add(SN.async_process_pool, AsyncProcessPool(max_workers=10))
     return deps
 
 
@@ -388,7 +391,14 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             workspace_repo,
         ),
     )
-    deps.add(SN.scheduled_email_sender, ScheduledEmailSender(notification_service.email_sender, session_maker))
+    deps.add(
+        SN.scheduled_email_sender,
+        ScheduledEmailSender(
+            notification_service.email_sender,
+            session_maker,
+            StatusUpdateEmailCreator(inventory_service, graph_db_access, deps.async_process_pool),
+        ),
+    )
     return deps
 
 

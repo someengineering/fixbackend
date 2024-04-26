@@ -19,29 +19,56 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
+import pytest
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.util import utc
 from sqlalchemy import text
 
-from fixbackend.auth.models.orm import User as OrmUser
 from fixbackend.auth.models import User
-from fixbackend.ids import UserId
+from fixbackend.auth.models.orm import User as OrmUser
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
+from fixbackend.ids import UserId, ProductTier
+from fixbackend.inventory.inventory_client import InventoryClient
+from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.notification.email.scheduled_email import (
     ScheduledEmailSender,
     ScheduledEmailEntity,
     ScheduledEmailSentEntity,
 )
+from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryEmailSender
+from tests.fixbackend.inventory.inventory_client_test import mocked_inventory_client  # noqa
+
+
+@pytest.fixture
+async def scheduled_email_sender(
+    email_sender: InMemoryEmailSender,
+    async_session_maker: AsyncSessionMaker,
+    inventory_service: InventoryService,
+    graph_database_access_manager: GraphDatabaseAccessManager,
+    async_process_pool: AsyncProcessPool,
+    mocked_inventory_client: InventoryClient,  # noqa
+) -> ScheduledEmailSender:
+
+    return ScheduledEmailSender(
+        email_sender,
+        async_session_maker,
+        StatusUpdateEmailCreator(inventory_service, graph_database_access_manager, async_process_pool),
+    )
 
 
 # noinspection SqlWithoutWhere
-async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session_maker: AsyncSessionMaker) -> None:
-    sender = ScheduledEmailSender(email_sender, async_session_maker)
+async def test_scheduled_emails(
+    scheduled_email_sender: ScheduledEmailSender,
+    email_sender: InMemoryEmailSender,
+    async_session_maker: AsyncSessionMaker,
+) -> None:
     pref = UserNotificationSettingsRepositoryImpl(async_session_maker)
     now = utc()
 
@@ -79,47 +106,46 @@ async def test_scheduled_emails(email_sender: InMemoryEmailSender, async_session
         # user a signed up 100 days ago. He will receive 5 emails
         a = create_user("a", now - timedelta(days=100, hours=1))
         email_send(a, "day1", "day2", "day3", "day4")
-        await sender._send_scheduled_emails()
+        await scheduled_email_sender._send_scheduled_emails()
         assert len(email_sender.call_args) == 1
         email_sender.call_args.clear()
 
         # user b signed up 5 days ago. He will also receive 5 emails
         b = create_user("b", now - timedelta(days=5, hours=1))
         email_send(b, "day1", "day2")
-        await sender._send_scheduled_emails()
+        await scheduled_email_sender._send_scheduled_emails()
         assert len(email_sender.call_args) == 3
         email_sender.call_args.clear()
 
         # user c signed up 3 days ago. He will receive 3 emails
         c = create_user("c", now - timedelta(days=3, hours=1))
         email_send(c, "day1", "day2", "day3")
-        await sender._send_scheduled_emails()
+        await scheduled_email_sender._send_scheduled_emails()
         assert len(email_sender.call_args) == 0
         email_sender.call_args.clear()
 
         # user d signed up 4 days ago and already received 2 emails. He will receive 2 emails
         d = create_user("d", now - timedelta(days=4, hours=1))
         email_send(d, "day1", "day2")
-        await sender._send_scheduled_emails()
+        await scheduled_email_sender._send_scheduled_emails()
         assert len(email_sender.call_args) == 2
         email_sender.call_args.clear()
 
         # user e signed up 5 days ago and opted out of emails. He will receive 0 emails
         e = create_user("e", now - timedelta(days=5, hours=1))
         await pref.update_notification_settings(UserId(e.id), tutorial=False)
-        await sender._send_scheduled_emails()
+        await scheduled_email_sender._send_scheduled_emails()
         assert len(email_sender.call_args) == 0
 
 
 # noinspection SqlWithoutWhere
 async def test_new_workspaces_without_cloud_account(
+    scheduled_email_sender: ScheduledEmailSender,
     email_sender: InMemoryEmailSender,
     async_session_maker: AsyncSessionMaker,
     workspace_repository: WorkspaceRepository,
     user: User,
 ) -> None:
-    sender = ScheduledEmailSender(email_sender, async_session_maker)
-
     async with async_session_maker() as session:
         await workspace_repository.create_workspace("some_new", "some_new", user)
         # adjust the created time of the workspace
@@ -130,8 +156,67 @@ async def test_new_workspaces_without_cloud_account(
         )
         await session.execute(text("DELETE FROM scheduled_email"))
         await session.execute(text("DELETE FROM scheduled_email_sent"))
-        await sender._new_workspaces_without_cloud_account()
+        await scheduled_email_sender._new_workspaces_without_cloud_account(utc())
         assert len(email_sender.call_args) == 1
         email_sender.call_args.clear()
-        await sender._new_workspaces_without_cloud_account()
+        await scheduled_email_sender._new_workspaces_without_cloud_account(utc())
         assert len(email_sender.call_args) == 0
+
+
+# noinspection SqlWithoutWhere
+async def test_scheduled_updates(
+    scheduled_email_sender: ScheduledEmailSender,
+    email_sender: InMemoryEmailSender,
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    user: User,
+) -> None:
+
+    first_of_month = datetime(2024, 4, 1, hour=10, tzinfo=timezone.utc)  # wednesday
+    middle_of_the_month = datetime(2024, 4, 24, tzinfo=timezone.utc)  # wednesday
+    friday = datetime(2024, 4, 26, hour=10, tzinfo=timezone.utc)  # wednesday
+
+    async with async_session_maker() as session:
+
+        async def clear() -> None:
+            email_sender.call_args.clear()
+            await session.execute(text("DELETE FROM scheduled_email"))
+            await session.execute(text("DELETE FROM scheduled_email_sent"))
+
+        big_corp = await workspace_repository.create_workspace("big_corp", "big_corp", user)
+        free_corp = await workspace_repository.create_workspace("free_corp", "free_corp", user)
+        update = text("UPDATE organization SET tier=:tier WHERE name=:name")
+        await session.execute(update.bindparams(tier=ProductTier.Free, name=free_corp.name))
+        await session.execute(update.bindparams(tier=ProductTier.Enterprise, name=big_corp.name))
+
+        # the account should be older than a month
+        await session.execute(
+            text("UPDATE organization SET created_at = :created_at").bindparams(created_at=utc() - timedelta(days=128))
+        )
+
+        # nothing is sent
+        await clear()
+        sent = await scheduled_email_sender._send_scheduled_status_update(middle_of_the_month)
+        assert sent == 0  # no email is sent, since not a Friday and no start of month
+
+        # first_of_month: only free_corp receives an email
+        await clear()
+        sent = await scheduled_email_sender._send_scheduled_status_update(first_of_month)
+        assert sent == 1
+        assert email_sender.call_args[0].to == user.email
+        assert "monthly" in email_sender.call_args[0].subject
+        assert 'Workspace: "free_corp"' in email_sender.call_args[0].text
+        # doing it again does not send another email
+        sent = await scheduled_email_sender._send_scheduled_status_update(first_of_month)
+        assert sent == 0
+
+        # friday in enterprise tier
+        await clear()
+        sent = await scheduled_email_sender._send_scheduled_status_update(friday)
+        assert sent == 1
+        assert email_sender.call_args[0].to == user.email
+        assert "weekly" in email_sender.call_args[0].subject
+        assert 'Workspace: "big_corp"' in email_sender.call_args[0].text
+        # doing it again does not send another email
+        sent = await scheduled_email_sender._send_scheduled_status_update(friday)
+        assert sent == 0
