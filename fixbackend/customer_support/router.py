@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import Dict, List
+from typing import Any, Dict
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from attrs import frozen
 
 from fixbackend.permissions.models import Roles, UserRole
-from fixbackend.permissions.role_repository import RoleRepository
+from fixbackend.permissions.role_repository import RoleRepositoryImpl
 
 
 log = logging.getLogger(__name__)
@@ -42,8 +42,8 @@ class UserRoleRow:
         for role in Roles:
             if role & user_role.role_names:  # check if the role is in the user_role
                 roles[role] = True
-        roles = {role.name: value for role, value in roles.items()}
-        return UserRoleRow(workspace_id=user_role.workspace_id, roles=roles)
+        html_roles = {role.name: value for role, value in roles.items() if role.name}
+        return UserRoleRow(workspace_id=user_role.workspace_id, roles=html_roles)
 
 
 def admin_console_router(dependencies: FixDependencies) -> APIRouter:
@@ -51,7 +51,7 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
 
     templates = Jinja2Templates(directory="fixbackend/customer_support/templates")
 
-    role_repo = dependencies.service(ServiceNames.role_repository, RoleRepository)
+    role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
     user_repo = dependencies.service(ServiceNames.user_repo, UserRepository)
 
     @router.get("/", response_class=HTMLResponse)
@@ -73,7 +73,7 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
         if user:
             roles = [UserRoleRow.from_user_role(role) for role in user.roles]
 
-        context = {"request": request, "user": user, "roles": roles, "query": query}
+        context: Dict[str, Any] = {"request": request, "user": user, "roles": roles, "query": query}
 
         if request.headers.get("HX-Request"):
             context["partial"] = True
