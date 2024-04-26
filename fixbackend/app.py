@@ -31,6 +31,7 @@ from sqlalchemy import select
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.customer_support.router import admin_console_router
 from fixbackend.analytics.router import analytics_router
 from fixbackend.app_dependencies import create_dependencies
 from fixbackend.auth.auth_backend import cookie_transport
@@ -211,6 +212,16 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         should_only_respect_2xx_for_highr=True,
         latency_lowr_buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2),
     ).expose(app, tags=["system"])
+
+    if cfg.args.mode == "support":
+
+        @app.get("/hello")
+        async def hello() -> Response:
+            return Response(content="Hello, World!")
+
+        app.include_router(admin_console_router(deps), include_in_schema=False)
+
+        app.mount("/static", StaticFiles(directory="static"), name="static")
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)

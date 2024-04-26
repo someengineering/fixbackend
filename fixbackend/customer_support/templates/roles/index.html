@@ -1,0 +1,26 @@
+{% if not partial %}
+{% extends "base.html" %}
+{% endif %}
+
+
+{% block content %}
+<main id="roles-main" class="flex-1 overflow-y-auto md:pt-4 pt-4 px-6 bg-base-200">
+
+    <div class="flex items-center justify-start gap-4 mb-4">
+        <input id="search" type="text" name="query" placeholder="type UUID or user email"
+            class="input input-bordered w-full max-w-xs" hx-get="/roles" hx-target="#roles-main" hx-swap="outerHTML"
+            hx-trigger="change changed" hx-push-url="true" value="{{ query or '' }}" />
+    </div>
+
+    {% if user %}
+    <div class="card card-compact w-96 bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">{{ user.email }}</h2>
+            <p>id: {{ user.id }}</p>
+        </div>
+    </div>
+    {% endif %}
+    <div class="divider"></div>
+    {% include "roles/roles_table.html" %}
+</main>
+{% endblock %}

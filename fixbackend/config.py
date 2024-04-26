@@ -158,7 +158,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--signing-key-1", type=Path, default=os.environ.get("SIGNING_KEY_1"))
     parser.add_argument("--signing-cert-2", type=Path, default=os.environ.get("SIGNING_CERT_2"))
     parser.add_argument("--signing-key-2", type=Path, default=os.environ.get("SIGNING_KEY_2"))
-    parser.add_argument("--mode", choices=["app", "dispatcher", "billing"], default=os.environ.get("MODE", "app"))
+    parser.add_argument(
+        "--mode", choices=["app", "dispatcher", "billing", "support"], default=os.environ.get("MODE", "app")
+    )
     parser.add_argument(
         "--cloud-account-service-event-parallelism",
         type=int,
