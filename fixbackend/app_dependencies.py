@@ -470,6 +470,36 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
     deps.add(SN.user_repo, UserRepository(session_maker))
 
+    graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
+    readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url, cfg))
+    fixbackend_events = deps.add(
+        SN.domain_event_redis_stream_publisher,
+        RedisStreamPublisher(
+            readwrite_redis,
+            DomainEventsStreamName,
+            "fixbackend",
+            keep_unprocessed_messages_for=timedelta(days=7),
+        ),
+    )
+    domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
+    subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
+    role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    deps.add(
+        SN.workspace_repo,
+        WorkspaceRepositoryImpl(
+            session_maker,
+            graph_db_access,
+            domain_event_publisher,
+            RedisPubSubPublisher(
+                redis=readwrite_redis,
+                channel="workspaces",
+                publisher_name="workspace_service",
+            ),
+            subscription_repo,
+            role_repo,
+        ),
+    )
+
     return deps
 
 

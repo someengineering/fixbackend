@@ -1,0 +1,39 @@
+{% if not partial %}
+{% extends "base.html" %}
+{% endif %}
+
+
+{% block content %}
+<main id="workspaces-main" class="flex-1 overflow-y-auto md:pt-4 pt-4 px-6 bg-base-200">
+    <div class="flex items-center justify-start gap-4 mb-4">
+        <div class="dropdown dropdown-open">
+            <input id="search" type="text" name="query" placeholder="start typing user email or uuid" tabindex="0"
+                class="input input-bordered w-80" hx-get="{{ url_for('user_workspaces_search')}}"
+                hx-target="#searchResults" hx-trigger="keyup changed delay:200ms" value="{{ user_id or '' }}" />
+            <div id="searchResults">
+                {% include "user_workspaces/select.html" %}
+            </div>
+        </div>
+
+    </div>
+
+    {% if user %}
+    <div class="card card-compact w-96 bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">{{ user.email }}</h2>
+            <p>id: {{ user.id }}</p>
+            <div class="card-actions justify-end mt-4">
+                <button class="btn btn-primary" hx-get="{{ url_for('add_to_workspace_modal', user_id=user.id)}}"
+                    hx-target="#workspaces-main" hx-swap="afterend">Add to
+                    workspace</button>
+            </div>
+        </div>
+    </div>
+    <div>
+
+    </div>
+    {% endif %}
+    <div class="divider"></div>
+    {% include "user_workspaces/table.html" %}
+</main>
+{% endblock %}

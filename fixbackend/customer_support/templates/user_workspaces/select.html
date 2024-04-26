@@ -1,0 +1,11 @@
+{% if users %}
+<ul tabindex="0" class="dropdown-content z-[1] cursor-pointer card card-compact bg-base-100 p-2 shadow">
+    {% for user in users %}
+    <div class="card-body w-96" hx-get="{{ url_for('user_workspaces') }}?user_id={{user.id}}" hx-swap="outerHTML"
+        hx-target="#workspaces-main" hx-push-url="true">
+        <h3 class="card-title">{{ user.email }}</h3>
+        <p>id: {{ user.id }}</p>
+    </div>
+    {% endfor %}
+</ul>
+{% endif %}
