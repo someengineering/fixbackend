@@ -20,7 +20,7 @@ from fastapi_users.db.base import BaseUserDatabase
 from fastapi_users.password import PasswordHelperProtocol
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import or_, select, delete
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import OAuthAccount, User, orm

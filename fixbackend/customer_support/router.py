@@ -12,9 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from pdb import Restart
-from tkinter import N
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any, Dict, Optional, Sequence
 import uuid
 
 from fastapi import APIRouter, Form, HTTPException, Request, Response
@@ -28,6 +26,7 @@ from attrs import frozen
 
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
 
@@ -155,7 +154,7 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
 
         user_id_query = request.query_params.get("user_id")
         user = None
-        workspaces = []
+        workspaces: Sequence[Workspace] = []
         user_id: Optional[UserId] = None
         if user_id_query:
             try:
@@ -183,7 +182,7 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
     async def workspaces_table(request: Request) -> Response:
         user_id_query = request.query_params.get("query")
         user = None
-        workspaces = []
+        workspaces: Sequence[Workspace] = []
         user_id: Optional[UserId] = None
         if user_id_query:
             try:
