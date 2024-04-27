@@ -165,7 +165,7 @@ class InventoryService(Service):
             async with self.client.search(db, q) as result:
                 accounts = [a async for a in result]
             if accounts and (account := accounts[0]) and (node_id := account.get("id")):
-                await self.client.update_node(db, NodeId(node_id), {"name": name})
+                await self.client.update_node(db, NodeId(node_id), {"name": name}, force=True)
                 # account name has changed: invalidate the cache for the tenant
                 await self.evict_cache(event.tenant_id)
             else:

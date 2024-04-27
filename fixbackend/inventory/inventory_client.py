@@ -513,6 +513,7 @@ class InventoryClient(Service):
         *,
         graph: str = DefaultGraph,
         section: str = DefaultSection,
+        force: bool = False,
     ) -> Json:
         log.info(f"Update node with id: {id}")
         response = await self._request(
@@ -520,7 +521,7 @@ class InventoryClient(Service):
             f"/graph/{graph}/node/{node_id}",
             json=patch,
             headers=self.__headers(access, accept=MediaTypeJson, content_type=MediaTypeJson),
-            params={"section": section},
+            params={"section": section, "force": json.dumps(force)},
             expected_media_types=MediaTypeJson,
             read_content=True,
         )
