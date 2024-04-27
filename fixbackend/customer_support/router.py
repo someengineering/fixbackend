@@ -12,10 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import Any, Dict
+from typing import Annotated, Any, Dict, Optional, Sequence
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from fixbackend.auth.user_repository import UserRepository
@@ -26,6 +26,8 @@ from attrs import frozen
 
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
 
 log = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
 
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
     user_repo = dependencies.service(ServiceNames.user_repo, UserRepository)
+    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
 
     @router.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> Response:
@@ -144,6 +147,125 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
             name="roles/modal.html",
             headers=headers,
             context={"request": request, "user": user, "role": UserRoleRow.from_user_role(updated_user_role)},
+        )
+
+    @router.get("/user_workspaces", response_class=HTMLResponse, name="user_workspaces")
+    async def workspaces(request: Request) -> Response:
+
+        user_id_query = request.query_params.get("user_id")
+        user = None
+        workspaces: Sequence[Workspace] = []
+        user_id: Optional[UserId] = None
+        if user_id_query:
+            try:
+                user_id = UserId(uuid.UUID(user_id_query))
+                user = await user_repo.get(user_id)
+            except ValueError:
+                pass
+
+        if user:
+            workspaces = await workspace_repo.list_workspaces(user)
+            user_id = user.id
+
+        context: Dict[str, Any] = {
+            "request": request,
+            "user": user,
+            "workspaces": workspaces,
+            "user_id": user_id,
+        }
+        if request.headers.get("HX-Request"):
+            context["partial"] = True
+
+        return templates.TemplateResponse(request=request, name="user_workspaces/index.html", context=context)
+
+    @router.get("/user_workspaces/table", response_class=HTMLResponse, name="user_workspaces_table")
+    async def workspaces_table(request: Request) -> Response:
+        user_id_query = request.query_params.get("query")
+        user = None
+        workspaces: Sequence[Workspace] = []
+        user_id: Optional[UserId] = None
+        if user_id_query:
+            try:
+                user_id = UserId(uuid.UUID(user_id_query))
+                user = await user_repo.get(user_id)
+                print("user", user)
+            except ValueError:
+                pass
+
+        if user:
+            workspaces = await workspace_repo.list_workspaces(user)
+            user_id = user.id
+
+        context: Dict[str, Any] = {
+            "request": request,
+            "user": user,
+            "workspaces": workspaces,
+        }
+        print(context)
+
+        return templates.TemplateResponse(request=request, name="user_workspaces/table.html", context=context)
+
+    @router.get("/user_workspaces/search", response_class=HTMLResponse, name="user_workspaces_search")
+    async def workspace_user_search(request: Request) -> Response:
+        query = request.query_params.get("query")
+        if not query:
+            raise HTTPException(status_code=404)
+        users = await user_repo.search(query)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="user_workspaces/select.html",
+            context={
+                "request": request,
+                "users": users,
+            },
+        )
+
+    @router.get("/user_workspaces/user/{user_id}/add", response_class=HTMLResponse, name="add_to_workspace_modal")
+    async def add_to_workspace_modal(request: Request, user_id: UserId) -> Response:
+        user = await user_repo.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404)
+
+        roles = [role.name for role in Roles]
+
+        return templates.TemplateResponse(
+            request=request,
+            name="user_workspaces/workspace_modal.html",
+            context={"request": request, "user": user, "roles": roles},
+        )
+
+    @router.post("/user_workspaces/user/{user_id}/add", response_class=HTMLResponse, name="add_to_workspace_submit")
+    async def submit_add_to_workspace(
+        request: Request, user_id: UserId, workspace_id: Annotated[str, Form()]
+    ) -> Response:
+
+        workspace_uuid = WorkspaceId(uuid.UUID(workspace_id.strip()))
+
+        print(user_id, workspace_uuid)
+        user = await user_repo.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404)
+
+        roles = Roles(0)
+
+        form_data = await request.form()
+        for key in form_data.keys():
+            try:
+                role = Roles[key]
+                roles |= role
+            except KeyError:
+                continue
+
+        await workspace_repo.add_to_workspace(workspace_uuid, user_id, roles)
+
+        headers = {"HX-Trigger": "workspaceAdded"}
+
+        return templates.TemplateResponse(
+            request=request,
+            name="user_workspaces/add_success.html",
+            headers=headers,
+            context={"request": request, "user": user, "workspace_id": workspace_uuid},
         )
 
     return router

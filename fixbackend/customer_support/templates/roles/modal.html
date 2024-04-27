@@ -1,4 +1,5 @@
-<dialog id="permission-modal" class="modal" hx-boost="false" hx-on:htmx:load="this.showModal()">
+<dialog id="permission-modal" class="modal" hx-boost="false" hx-on:htmx:load="this.showModal()"
+    hx-on:close="this.remove()">
     <div class="modal-box">
         <form method="dialog">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>

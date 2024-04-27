@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, Any, AsyncIterator, Dict, List, Optional
+from typing import Annotated, Any, AsyncIterator, Dict, List, Optional, Sequence
 from uuid import UUID
 
 from fastapi import Depends
@@ -59,6 +59,23 @@ class UserRepository(BaseUserDatabase[User, UserId]):
         async with self.user_db(session) as db:
             user = await db.get_by_email(email)
             return user.to_model() if user else None
+
+    async def search(self, query: str) -> Sequence[User]:
+        async with self.session_maker() as session:
+
+            try:
+                uuid_query = UUID(query)
+            except ValueError:
+                uuid_query = None
+
+            if uuid_query:
+                statement = select(orm.User).where(orm.User.id == uuid_query)  # type: ignore
+            else:
+                statement = select(orm.User).where(orm.User.email.ilike(f"%{query}%"))  # type: ignore
+
+            result = await session.execute(statement)
+            users = result.scalars().unique().all()
+            return [user.to_model() for user in users]
 
     async def get_by_ids(self, ids: List[UserId]) -> List[User]:
         """Get a list of users by ids."""
