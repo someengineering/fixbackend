@@ -795,16 +795,17 @@ sqlalchemy = {version = ">=2.0.0,<2.1.0", extras = ["asyncio"]}
 
 [[package]]
 name = "fixcloudutils"
-version = "1.14.1"
+version = "1.15.0"
 description = "Utilities for fixcloud."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "fixcloudutils-1.14.1-py3-none-any.whl", hash = "sha256:80dfb2d78d6cf7cfe003960d4a1a0ee685f180fc22dd2f7aaacffc6d7e525a7c"},
-    {file = "fixcloudutils-1.14.1.tar.gz", hash = "sha256:1ca65a9cff355360038adbacaf15bc8baf6dd775b447fa50d716d68e7bff5676"},
+    {file = "fixcloudutils-1.15.0-py3-none-any.whl", hash = "sha256:9cdd5927d1214a75ee63d956e81d81e97fe3abe2e1b6971e9bfb5ba02ee6bb4f"},
+    {file = "fixcloudutils-1.15.0.tar.gz", hash = "sha256:831d7bc1e7b38f0735e79dcb6d1043512f7c5ab06311a2be60831daec570aff4"},
 ]
 
 [package.dependencies]
+arq = {version = "*", optional = true, markers = "extra == \"redis\""}
 attrs = "*"
 cattrs = "*"
 python-arango = {version = "*", optional = true, markers = "extra == \"arango\""}
@@ -813,7 +814,7 @@ redis = {version = "*", optional = true, markers = "extra == \"redis\""}
 [package.extras]
 arango = ["python-arango"]
 prometheus = ["prometheus-client"]
-redis = ["redis"]
+redis = ["arq", "redis"]
 test = ["black", "coverage", "flake8", "hypothesis", "mypy", "pep8-naming", "pip-tools", "pylint", "pytest", "pytest-asyncio", "pytest-cov", "tox"]
 
 [[package]]

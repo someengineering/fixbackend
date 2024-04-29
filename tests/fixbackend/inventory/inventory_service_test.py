@@ -27,20 +27,16 @@ from uuid import uuid4
 
 import pytest
 from fixcloudutils.types import Json
-from httpx import AsyncClient, MockTransport, Request, Response
-from redis.asyncio import Redis
+from httpx import Request, Response
 
 from fixbackend.auth.models import User
-from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.domain_events.events import (
     AwsAccountDeleted,
     CloudAccountNameChanged,
     WorkspaceCreated,
     ProductTierChanged,
 )
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import (
     CloudAccountId,
     FixCloudAccountId,
@@ -51,7 +47,6 @@ from fixbackend.ids import (
     UserId,
     ProductTier,
 )
-from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
 from fixbackend.inventory.schemas import (
     BenchmarkAccountSummary,
@@ -67,7 +62,7 @@ from fixbackend.inventory.schemas import (
 )
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
-from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response
+from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response, eventually
 
 db = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")
 
@@ -222,36 +217,30 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
 
 
 async def test_no_graph_db_access(
-    domain_event_subscriber: DomainEventSubscriber,
-    graph_database_access_manager: GraphDatabaseAccessManager,
-    cloud_account_repository: CloudAccountRepository,
-    redis: Redis,
+    inventory_service: InventoryService,
+    request_handler_mock: RequestHandlerMock,
 ) -> None:
     async def app(_: Request) -> Response:
         return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
 
-    async_client = AsyncClient(transport=MockTransport(app))
-    async with InventoryClient("http://localhost:8980", client=async_client) as client:
-        service = InventoryService(
-            client, graph_database_access_manager, cloud_account_repository, domain_event_subscriber, redis
-        )
-        empty = CheckSummary(
-            available_checks=0,
-            failed_checks=0,
-            failed_checks_by_severity={},
-            available_resources=0,
-            failed_resources=0,
-            failed_resources_by_severity={},
-        )
-        assert await service.summary(db) == ReportSummary(
-            check_summary=empty,
-            overall_score=0,
-            accounts=[],
-            benchmarks=[],
-            changed_vulnerable=NoVulnerabilitiesChanged,
-            changed_compliant=NoVulnerabilitiesChanged,
-            top_checks=[],
-        )
+    request_handler_mock.append(app)
+    empty = CheckSummary(
+        available_checks=0,
+        failed_checks=0,
+        failed_checks_by_severity={},
+        available_resources=0,
+        failed_resources=0,
+        failed_resources_by_severity={},
+    )
+    assert await inventory_service.summary(db) == ReportSummary(
+        check_summary=empty,
+        overall_score=0,
+        accounts=[],
+        benchmarks=[],
+        changed_vulnerable=NoVulnerabilitiesChanged,
+        changed_compliant=NoVulnerabilitiesChanged,
+        top_checks=[],
+    )
 
 
 async def test_dict_values_by() -> None:
@@ -402,8 +391,12 @@ async def test_process_account_name(
         UserCloudAccountName("test"),
         "test",
     )
+    inventory_service.update_name_again_after = timedelta(seconds=0.2)  # reapply the name change after 0.2 seconds
     await inventory_service._process_account_name_changed(message)
     assert len(inventory_requests) == 2
+    # Directly after the change, we see 2 requests
+    # Then after some time the name change is reapplied by the worker
+    await eventually(lambda: len(inventory_requests) == 4, timeout=3)
 
 
 @pytest.mark.asyncio

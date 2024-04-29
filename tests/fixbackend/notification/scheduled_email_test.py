@@ -25,6 +25,7 @@ import pytest
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.util import utc
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from fixbackend.auth.models import User
 from fixbackend.auth.models.orm import User as OrmUser
@@ -220,3 +221,51 @@ async def test_scheduled_updates(
         # doing it again does not send another email
         sent = await scheduled_email_sender._send_scheduled_status_update(friday)
         assert sent == 0
+
+
+async def test_foo() -> None:
+    from sqlalchemy import select, and_, or_
+
+    from fixbackend.auth.models.orm import User
+    from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity
+    from fixbackend.workspaces.models.orm import Organization, OrganizationMembers
+
+    DATABASE_URL = "mysql+aiomysql://fixuser:JRrab5hHwDwqdLZ5@database.db.svc.cluster.local:3306/fix-database"
+    engine = create_async_engine(DATABASE_URL)
+    now = utc()
+    duration = timedelta(days=31)
+    unique_id = "unique_id"
+    org_filter = Organization.tier == ProductTier.Free
+    async_session_maker = async_sessionmaker(engine)
+    async with async_session_maker() as session:
+        statement = (
+            (select(Organization, User))
+            .join(OrganizationMembers, Organization.id == OrganizationMembers.organization_id)
+            .join(User, OrganizationMembers.user_id == User.id)
+            .outerjoin(UserNotificationSettingsEntity, User.id == UserNotificationSettingsEntity.user_id)  # type: ignore # noqa
+            .outerjoin(
+                ScheduledEmailSentEntity,
+                and_(
+                    User.id == ScheduledEmailSentEntity.user_id,  # type: ignore
+                    ScheduledEmailSentEntity.kind == unique_id,
+                ),
+            )
+            .where(
+                and_(
+                    org_filter,
+                    Organization.created_at < (now - duration),  # org is older than min age
+                    ScheduledEmailSentEntity.id.is_(None),  # user has not received this email yet
+                    or_(
+                        UserNotificationSettingsEntity.weekly_report.is_(None),  # no setting
+                        UserNotificationSettingsEntity.weekly_report.is_(True),  # setting, not opted out
+                    ),
+                )
+            )
+            .order_by(Organization.id, User.id)  # type: ignore
+        )
+        print(statement)
+        async with async_session_maker() as session:
+            for org, user in (await session.execute(statement)).unique().all():
+                workspace = org.to_model()
+                print(f"- to: {user.email}, workspace: {workspace.name}")
+        await engine.dispose()
