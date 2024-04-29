@@ -95,6 +95,7 @@ class DomainEventSubscriber(Service):
         if not handler:
             return
         event = handler.event_cls.from_json(message)
+        log.info(f"Processing domain event {event}")
         async with asyncio.TaskGroup() as g:
             for callback in handler.callbacks:
                 g.create_task(self.timed(callback, event))

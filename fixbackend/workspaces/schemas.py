@@ -32,8 +32,8 @@ class WorkspaceRead(BaseModel):
     id: WorkspaceId = Field(description="The workspace's unique identifier")
     slug: str = Field(description="The workspace's unique slug, used in URLs")
     name: str = Field(description="The workspace's name, a human-readable string")
-    owners: List[UserId] = Field(description="The workspace's owners, who can manage the organization")
-    members: List[UserId] = Field(description="The workspace's members, who can view the organizatione")
+    owners: List[UserId] = Field(description="Deprecated, do not use.")
+    members: List[UserId] = Field(description="Deprecated, do no use.")
     on_hold_since: Optional[datetime] = Field(description="The time at which the workspace was put on hold")
     created_at: datetime = Field(description="The time at which the workspace was created")
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
@@ -63,8 +63,8 @@ class WorkspaceRead(BaseModel):
             id=model.id,
             slug=model.slug,
             name=model.name,
-            owners=[model.owner_id],
-            members=model.members,
+            owners=[],
+            members=[],
             on_hold_since=model.payment_on_hold_since,
             created_at=model.created_at,
             trial_end_days=model.trial_end_days(),
