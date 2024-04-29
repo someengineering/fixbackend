@@ -117,9 +117,11 @@ RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
 
 
-async def eventually[
-    T
-](fn: Callable[[], Union[bool, Awaitable[bool]]], timeout: float = 10, interval: float = 0.1,) -> None:
+async def eventually(
+    fn: Callable[[], Union[bool, Awaitable[bool]]],
+    timeout: float = 10,
+    interval: float = 0.1,
+) -> None:
     deadline = utc() + timedelta(seconds=timeout)
     while True:
         with suppress(Exception):
