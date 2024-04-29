@@ -45,7 +45,7 @@ from fixbackend.errors import NotAllowed
 from fixbackend.ids import ProductTier, BillingPeriod
 from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.subscription.models import SubscriptionMethod
+from fixbackend.subscription.models import AwsMarketplaceSubscription, StripeSubscription, SubscriptionMethod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.utils import start_of_next_period
 from fixbackend.workspaces.models import Workspace
@@ -112,11 +112,18 @@ class BillingEntryService:
             return subscription
 
         if current_subscription := await get_current_subscription():
-            current = PaymentMethods.AwsSubscription(subscription_id=current_subscription.id)
+            match current_subscription:
+                case AwsMarketplaceSubscription():
+                    current = PaymentMethods.AwsSubscription(subscription_id=current_subscription.id)
+                case StripeSubscription():
+                    current = PaymentMethods.StripeSubscription(subscription_id=current_subscription.id)
 
         async for subscription in self.subscription_repository.subscriptions(user_id=user_id, active=True):
-
-            payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+            match subscription:
+                case AwsMarketplaceSubscription():
+                    payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+                case StripeSubscription():
+                    payment_methods.append(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 
         return WorkspacePaymentMethods(current=current, available=payment_methods)
 
