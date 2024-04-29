@@ -33,7 +33,7 @@ class WorkspaceRead(BaseModel):
     slug: str = Field(description="The workspace's unique slug, used in URLs")
     name: str = Field(description="The workspace's name, a human-readable string")
     owners: List[UserId] = Field(description="Deprecated, do not use.")
-    members: List[UserId] = Field(description="Deprecated, do no use")
+    members: List[UserId] = Field(description="Deprecated, do no use.")
     on_hold_since: Optional[datetime] = Field(description="The time at which the workspace was put on hold")
     created_at: datetime = Field(description="The time at which the workspace was created")
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
