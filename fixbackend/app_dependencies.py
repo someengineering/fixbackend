@@ -118,16 +118,12 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
     session_maker = deps.session_maker
     http_client = deps.http_client
-    arq_redis = deps.add(
-        SN.arq_redis,
-        await create_pool(
-            replace(
-                RedisSettings.from_dsn(cfg.redis_queue_url),
-                ssl_ca_certs=ca_cert_path,
-                password=cfg.args.redis_password,
-            )
-        ),
+    arq_settings = replace(
+        RedisSettings.from_dsn(cfg.redis_queue_url),
+        ssl_ca_certs=ca_cert_path,
+        password=cfg.args.redis_password,
     )
+    arq_redis = deps.add(SN.arq_redis, await create_pool(arq_settings))
     deps.add(SN.readonly_redis, create_redis(cfg.redis_readonly_url, cfg))
     readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url, cfg))
     temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url, cfg))
@@ -144,7 +140,12 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     inventory_service = deps.add(
         SN.inventory,
         InventoryService(
-            inventory_client, graph_db_access, cloud_account_repo, domain_event_subscriber, temp_store_redis
+            inventory_client,
+            graph_db_access,
+            cloud_account_repo,
+            domain_event_subscriber,
+            temp_store_redis,
+            arq_settings,
         ),
     )
     fixbackend_events = deps.add(
@@ -264,16 +265,12 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     session_maker = deps.session_maker
     http_client = deps.http_client
     boto_session = deps.boto_session
-    arq_redis = deps.add(
-        SN.arq_redis,
-        await create_pool(
-            replace(
-                RedisSettings.from_dsn(cfg.redis_queue_url),
-                ssl_ca_certs=ca_cert_path,
-                password=cfg.args.redis_password,
-            )
-        ),
+    arq_settings = replace(
+        RedisSettings.from_dsn(cfg.redis_queue_url),
+        ssl_ca_certs=ca_cert_path,
+        password=cfg.args.redis_password,
     )
+    arq_redis = deps.add(SN.arq_redis, await create_pool(arq_settings))
     readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url, cfg))
     domain_event_subscriber = deps.add(
         SN.domain_event_subscriber,
@@ -327,7 +324,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     # in dispatching we do not want to handle domain events: leave it to the app
     inventory_service = deps.add(
         SN.inventory,
-        InventoryService(inventory_client, graph_db_access, cloud_account_repo, None, temp_store_redis),
+        InventoryService(inventory_client, graph_db_access, cloud_account_repo, None, temp_store_redis, arq_settings),
     )
 
     cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))

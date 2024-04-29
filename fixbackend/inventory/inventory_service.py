@@ -41,7 +41,10 @@ from typing import (
     AsyncContextManager,
 )
 
+from arq import func
+from arq.connections import RedisSettings
 from fixcloudutils.redis.cache import RedisCache
+from fixcloudutils.redis.worker_queue import WorkDispatcher, WorkerInstance
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str
@@ -124,12 +127,21 @@ class InventoryService(Service):
         cloud_account_repository: CloudAccountRepository,
         domain_event_subscriber: Optional[DomainEventSubscriber],
         redis: Redis,
+        redis_settings: RedisSettings,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
         self.db_access_manager = db_access_manager
         self.cloud_account_repository = cloud_account_repository
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
+        worker_queue_name = "arq:inventory_service_queue"
+        self.dispatcher = WorkDispatcher(redis_settings, worker_queue_name)
+        self.worker = WorkerInstance(
+            redis_settings=redis_settings,
+            queue_name=worker_queue_name,
+            functions=[func(self._update_cloud_account_name_again, name="update_cloud_account_name_again")],
+        )
+        self.update_name_again_after = timedelta(hours=1)
         if sub := domain_event_subscriber:
             sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
             sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
@@ -141,8 +153,12 @@ class InventoryService(Service):
 
     async def start(self) -> Any:
         await self.cache.start()
+        await self.worker.start()
+        await self.dispatcher.start()
 
     async def stop(self) -> Any:
+        await self.dispatcher.stop()
+        await self.worker.stop()
         await self.cache.stop()
 
     async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
@@ -159,6 +175,18 @@ class InventoryService(Service):
         await self.evict_cache(event.tenant_id)
 
     async def _process_account_name_changed(self, event: CloudAccountNameChanged) -> None:
+        # update the name now
+        if await self._update_cloud_account_name(event):
+            # update the name again after 1 hour to capture all inflight collections
+            await self.dispatcher.enqueue(
+                "update_cloud_account_name_again", event, _defer_by=self.update_name_again_after
+            )
+
+    async def _update_cloud_account_name_again(self, ctx: Dict[str, str], event: CloudAccountNameChanged) -> None:
+        log.info(f"Update cloud account name again: {event}")
+        await self._update_cloud_account_name(event)
+
+    async def _update_cloud_account_name(self, event: CloudAccountNameChanged) -> bool:
         if (name := event.final_name) and (db := await self.db_access_manager.get_database_access(event.tenant_id)):
             log.info(f"Cloud account name changed. Update in inventory: {event}.")
             q = f"is(account) and id={event.account_id} and /ancestors.cloud.reported.name={event.cloud} limit 1"
@@ -168,8 +196,10 @@ class InventoryService(Service):
                 await self.client.update_node(db, NodeId(node_id), {"name": name}, force=True)
                 # account name has changed: invalidate the cache for the tenant
                 await self.evict_cache(event.tenant_id)
+                return True
             else:
                 log.info(f"Cloud account not found in inventory. Ignore. {event}.")
+        return False
 
     async def _process_workspace_created(self, event: WorkspaceCreated) -> None:
         access = await self.db_access_manager.get_database_access(event.workspace_id)

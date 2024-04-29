@@ -19,9 +19,23 @@ import os
 import random
 from argparse import Namespace
 from asyncio import AbstractEventLoop
-from datetime import datetime, timezone
+from contextlib import suppress
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Sequence, Tuple, Optional, Unpack
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Sequence,
+    Tuple,
+    Optional,
+    Unpack,
+    Union,
+)
 from unittest.mock import patch
 
 import jwt
@@ -40,6 +54,7 @@ from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
+from fixcloudutils.util import utc
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
@@ -100,6 +115,24 @@ DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
 SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
 RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
+
+
+async def eventually(
+    fn: Callable[[], Union[bool, Awaitable[bool]]],
+    timeout: float = 10,
+    interval: float = 0.1,
+) -> None:
+    deadline = utc() + timedelta(seconds=timeout)
+    while True:
+        with suppress(Exception):
+            res = fn()
+            if isinstance(res, Awaitable):
+                res = await res
+            if res:
+                return
+        if datetime.now(timezone.utc) > deadline:
+            raise TimeoutError(f"Timeout after {timeout} seconds")
+        await asyncio.sleep(interval)
 
 
 class RedisStreamPublisherMock(RedisStreamPublisher):
@@ -344,8 +377,13 @@ async def aws_marketplace_subscription(
 
 
 @pytest.fixture
-async def arq_redis() -> AsyncIterator[ArqRedis]:
-    redis = await create_pool(RedisSettings(host="localhost", port=6379, database=5))
+async def arq_redis_settings() -> RedisSettings:
+    return RedisSettings(host="localhost", port=6379, database=5)
+
+
+@pytest.fixture
+async def arq_redis(arq_redis_settings: RedisSettings) -> AsyncIterator[ArqRedis]:
+    redis = await create_pool(arq_redis_settings)
     # make sure we have a clean database
     keys = await redis.keys()
     if keys:
@@ -566,9 +604,15 @@ async def inventory_service(
     domain_event_subscriber: DomainEventSubscriber,
     cloud_account_repository: CloudAccountRepository,
     redis: Redis,
+    arq_redis_settings: RedisSettings,
 ) -> AsyncIterator[InventoryService]:
     async with InventoryService(
-        inventory_client, graph_database_access_manager, cloud_account_repository, domain_event_subscriber, redis
+        inventory_client,
+        graph_database_access_manager,
+        cloud_account_repository,
+        domain_event_subscriber,
+        redis,
+        arq_redis_settings,
     ) as service:
         yield service
 
