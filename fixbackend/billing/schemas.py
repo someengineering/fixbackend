@@ -119,7 +119,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
                             "subscription_id": "00000000-0000-0000-0000-000000000000",
                         },
                         {
-                            "method": "aws_marketplace",
+                            "method": "stripe",
                             "subscription_id": "00000000-0000-0000-0000-000000000000",
                         },
                         {
@@ -143,7 +143,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
                 case PaymentMethods.AwsSubscription(subscription_id):
                     return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
                 case PaymentMethods.StripeSubscription(subscription_id):
-                    return AwsSubscription(method="aws_marketplace", subscription_id=subscription_id)
+                    return StripeSubscription(method="stripe", subscription_id=subscription_id)
                 case PaymentMethods.NoPaymentMethod():
                     return NoPaymentMethod(method="none")
 
