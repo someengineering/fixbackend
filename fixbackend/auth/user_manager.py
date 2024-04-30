@@ -16,29 +16,29 @@ import asyncio
 import logging
 import re
 import secrets
-from typing import Annotated, Any, AsyncIterator, Optional, Tuple
-from uuid import UUID
 from concurrent.futures import ProcessPoolExecutor
+from typing import Annotated, Any, Optional, Tuple
+from uuid import UUID
 
 import pyotp
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, exceptions
-from fastapi_users.password import PasswordHelperProtocol
+from fastapi_users.password import PasswordHelperProtocol, PasswordHelper
+from passlib.context import CryptContext
 from starlette.responses import Response
 
 from fixbackend.auth.models import User
 from fixbackend.auth.schemas import OTPConfig
-from fixbackend.auth.user_repository import UserRepository, UserRepositoryDependency
-from fixbackend.auth.user_verifier import AuthEmailSender, AuthEmailSenderDependency
-from fixbackend.config import Config, ConfigDependency
-from fixbackend.domain_events.dependencies import DomainEventPublisherDependency
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.auth.user_verifier import AuthEmailSender
+from fixbackend.config import Config
+from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import UserLoggedIn, UserRegistered
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import UserId
-from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryDependency
+from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryDependency
-from passlib.context import CryptContext
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 # do not change this without regenerating MFA recovery codes in the db
 crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -286,31 +286,15 @@ class UserManager(BaseUserManager[User, UserId]):
         return False
 
 
-def get_password_helper() -> PasswordHelperProtocol | None:
-    return None
+def get_password_helper(deps: FixDependency) -> PasswordHelperProtocol | None:
+    return deps.service(ServiceNames.password_helper, PasswordHelper)
 
 
 PasswordHelperDependency = Annotated[PasswordHelperProtocol | None, Depends(get_password_helper)]
 
 
-async def get_user_manager(
-    config: ConfigDependency,
-    user_repository: UserRepositoryDependency,
-    password_helper: PasswordHelperDependency,
-    user_verifier: AuthEmailSenderDependency,
-    workspace_repository: WorkspaceRepositoryDependency,
-    domain_event_publisher: DomainEventPublisherDependency,
-    invitation_repository: InvitationRepositoryDependency,
-) -> AsyncIterator[UserManager]:
-    yield UserManager(
-        config,
-        user_repository,
-        password_helper,
-        user_verifier,
-        workspace_repository,
-        domain_event_publisher,
-        invitation_repository,
-    )
+async def get_user_manager(fix_deps: FixDependency) -> UserManager:
+    return fix_deps.service(ServiceNames.user_manager, UserManager)
 
 
 UserManagerDependency = Annotated[UserManager, Depends(get_user_manager)]

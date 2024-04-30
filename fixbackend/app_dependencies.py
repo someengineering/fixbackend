@@ -28,6 +28,7 @@ from typing import Any, Dict
 import boto3
 from arq import create_pool
 from arq.connections import RedisSettings
+from fastapi_users.password import PasswordHelper
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
@@ -36,7 +37,11 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from fixbackend.analytics.domain_event_to_analytics import analytics
+from fixbackend.auth.api_token_service import ApiTokenService
+from fixbackend.auth.auth_backend import FixJWTStrategy
+from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
@@ -186,7 +191,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     analytics_event_sender = deps.add(
         SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
     )
-    deps.add(
+    invitation_repo = deps.add(
         SN.invitation_repository,
         InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
     )
@@ -256,6 +261,34 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         ),
     )
     deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl(session_maker))
+
+    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service))
+    password_helper = deps.add(SN.password_helper, PasswordHelper())
+    deps.add(
+        SN.user_manager,
+        UserManager(
+            config=cfg,
+            user_repository=user_repo,
+            password_helper=password_helper,
+            auth_email_sender=auth_email_sender,
+            workspace_repository=workspace_repo,
+            domain_events_publisher=domain_event_publisher,
+            invitation_repository=invitation_repo,
+        ),
+    )
+    cert_key_pairs = await cert_store.get_signing_cert_key_pair()
+    jwt_strategy = deps.add(
+        SN.jwt_strategy,
+        FixJWTStrategy(
+            public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
+            private_key=cert_key_pairs[0].private_key,
+            lifetime_seconds=cfg.session_ttl,
+        ),
+    )
+    deps.add(
+        SN.api_token_service,
+        ApiTokenService(session_maker, jwt_strategy, user_repo, password_helper, workspace_repo),
+    )
     return deps
 
 

@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -20,14 +20,14 @@ from fastapi_users import exceptions
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroyNotSupportedError
 from fastapi_users.manager import BaseUserManager
+from fixcloudutils.util import utc
 
+from fixbackend import jwt
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
-from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import UserId
-from fixbackend import jwt
+from fixbackend.ids import UserId, WorkspaceId
 
 
 class FixJWTStrategy(Strategy[User, UserId]):
@@ -68,12 +68,17 @@ class FixJWTStrategy(Strategy[User, UserId]):
             return None
 
     async def write_token(self, user: User) -> str:
+        permissions = {role.workspace_id: role.permissions().value for role in user.roles}
+        return self.create_token(str(user.id), "login", permissions)
+
+    def create_token(self, sub: str, token_origin: str, permissions: Dict[WorkspaceId, int]) -> str:
         payload: Dict[str, Any] = {
-            "sub": str(user.id),
-            "permissions": {str(role.workspace_id): role.permissions().value for role in user.roles},
+            "sub": sub,
+            "token_origin": token_origin,
+            "permissions": {str(ws): perms for ws, perms in permissions.items()},
         }
         if self.lifetime_seconds:
-            expire = datetime.utcnow() + timedelta(seconds=self.lifetime_seconds)
+            expire = utc() + timedelta(seconds=self.lifetime_seconds)
             payload["exp"] = expire
         return jwt.encode_token(payload, self.token_audience, self.private_key)
 
@@ -81,13 +86,8 @@ class FixJWTStrategy(Strategy[User, UserId]):
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UserId]:
-    cert_key_pairs = await fix.service(ServiceNames.certificate_store, CertificateStore).get_signing_cert_key_pair()
-    return FixJWTStrategy(
-        public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
-        private_key=cert_key_pairs[0].private_key,
-        lifetime_seconds=config.session_ttl,
-    )
+async def get_session_strategy(fix: FixDependency) -> Strategy[User, UserId]:
+    return fix.service(ServiceNames.jwt_strategy, FixJWTStrategy)
 
 
 session_cookie_name = "session_token"

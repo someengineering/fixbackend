@@ -11,15 +11,14 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
 from attrs import frozen
 from fastapi_users.models import OAuthAccountProtocol, UserOAuthProtocol
 
-from fixbackend.ids import UserId
+from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.permissions.models import UserRole
 
 
@@ -47,3 +46,16 @@ class User(UserOAuthProtocol[UserId, OAuthAccount]):
     otp_secret: Optional[str]
     oauth_accounts: List[OAuthAccount]
     roles: List[UserRole]
+
+
+@frozen
+class ApiToken:
+    id: UUID
+    name: str
+    hash: str
+    user_id: UserId
+    workspace_id: Optional[WorkspaceId]
+    permission: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    last_used_at: Optional[datetime]

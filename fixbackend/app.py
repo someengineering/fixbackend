@@ -31,6 +31,7 @@ from sqlalchemy import select
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
+from fixbackend.auth.api_token_router import api_token_router
 from fixbackend.customer_support.router import admin_console_router
 from fixbackend.analytics.router import analytics_router
 from fixbackend.app_dependencies import create_dependencies
@@ -148,6 +149,10 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     async def client_error_handler(_: Request, exception: ClientError) -> Response:
         return JSONResponse(status_code=400, content={"message": str(exception)})
 
+    @app.exception_handler(AssertionError)
+    async def invalid_data(_: Request, exception: AssertionError) -> Response:
+        return JSONResponse({"detail": str(exception)}, status_code=422)
+
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
             "/health",
@@ -239,6 +244,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router.include_router(unsubscribe_router(deps), include_in_schema=False)
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
         api_router.include_router(analytics_router(deps))
+        api_router.include_router(api_token_router(deps))
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")

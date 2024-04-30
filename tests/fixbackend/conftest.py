@@ -63,6 +63,8 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
+from fixbackend.auth.api_token_service import ApiTokenService
+from fixbackend.auth.auth_backend import FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.billing.billing_job import BillingJob
@@ -795,6 +797,27 @@ def password_helper() -> InsecureFastPasswordHelper:
 
 
 @pytest.fixture
+async def jwt_strategy(cert_store: CertificateStore) -> FixJWTStrategy:
+    cert_key_pairs = await cert_store.get_signing_cert_key_pair()
+    return FixJWTStrategy(
+        public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
+        private_key=cert_key_pairs[0].private_key,
+        lifetime_seconds=3600,
+    )
+
+
+@pytest.fixture
+def api_token_service(
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    jwt_strategy: FixJWTStrategy,
+    user_repository: UserRepository,
+    password_helper: InsecureFastPasswordHelper,
+) -> ApiTokenService:
+    return ApiTokenService(async_session_maker, jwt_strategy, user_repository, password_helper, workspace_repository)
+
+
+@pytest.fixture
 async def fix_deps(
     default_config: Config,
     db_engine: AsyncEngine,
@@ -806,6 +829,9 @@ async def fix_deps(
     domain_event_sender: DomainEventPublisher,
     invitation_repository: InvitationRepository,
     analytics_event_sender: AnalyticsEventSender,
+    api_token_service: ApiTokenService,
+    password_helper: InsecureFastPasswordHelper,
+    jwt_strategy: FixJWTStrategy,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -823,6 +849,9 @@ async def fix_deps(
                 async_session_maker
             ),
             ServiceNames.analytics_event_sender: analytics_event_sender,
+            ServiceNames.api_token_service: api_token_service,
+            ServiceNames.password_helper: password_helper,
+            ServiceNames.jwt_strategy: jwt_strategy,
         }
     )
 
