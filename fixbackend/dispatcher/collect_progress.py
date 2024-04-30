@@ -15,6 +15,8 @@ json_converter.register_unstructure_hook(UUID, lambda v: str(v))
 
 @frozen
 class CollectionFailure:
+    duration_seconds: int
+    task_id: TaskId
     error: str
 
 
@@ -22,7 +24,7 @@ class CollectionFailure:
 class CollectionSuccess:
     scanned_resources: int
     duration_seconds: int
-    task_id: Optional[TaskId]  # todo: make non-optional after we have a release with this change
+    task_id: TaskId
 
 
 CollectionResult = Union[CollectionFailure, CollectionSuccess]
@@ -43,8 +45,8 @@ class AccountCollectProgress:
     ) -> "AccountCollectProgress":
         return evolve(self, collection_done=CollectionSuccess(scanned_resources, scan_duration, task_id))
 
-    def failed(self, error: str) -> "AccountCollectProgress":
-        return evolve(self, collection_done=CollectionFailure(error))
+    def failed(self, error: str, scan_duration: int, task_id: TaskId) -> "AccountCollectProgress":
+        return evolve(self, collection_done=CollectionFailure(scan_duration, task_id, error))
 
     def is_done(self) -> bool:
         return self.collection_done is not None

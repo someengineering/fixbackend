@@ -28,11 +28,13 @@ from redis.asyncio import Redis
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInformation, CollectQueue
-from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionSuccess
+from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionFailure, CollectionSuccess
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
     CloudAccountCollectInfo,
+    Event,
+    TenantAccountsCollectFailed,
     TenantAccountsCollected,
     WorkspaceCreated,
 )
@@ -170,6 +172,8 @@ class CollectAccountProgress:
     async def mark_job_as_failed(
         self,
         job_id: str,
+        duration: int,
+        task_id: TaskId,
         error: str,
     ) -> None:
         workspace_id = await self.workspace_id_from_job_id(job_id)
@@ -183,7 +187,7 @@ class CollectAccountProgress:
             logging.warning(f"Could not find cloud account state for job id {job_id}")
             return
 
-        failed = cloud_account_state.failed(error)
+        failed = cloud_account_state.failed(error, duration, task_id)
         await self.redis.hset(hash_key, key=str(failed.cloud_account_id), value=failed.to_json_str())  # type: ignore
 
     async def delete_tenant_collect_state(self, workspace_id: WorkspaceId) -> None:
@@ -252,7 +256,7 @@ class DispatcherService(Service):
         workspace_id: WorkspaceId,
     ) -> None:
         async def send_domain_event(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> None:
-            collected_accounts = {
+            collected_success = {
                 k: CloudAccountCollectInfo(
                     v.account_id,
                     v.collection_done.scanned_resources,
@@ -264,13 +268,28 @@ class DispatcherService(Service):
                 if isinstance(v.collection_done, CollectionSuccess)
             }
 
-            if len(collected_accounts) == 0:
-                log.info(f"No accounts were collected for workspace {workspace_id}. Not sending domain event.")
-                return
+            collected_failed = {
+                k: CloudAccountCollectInfo(
+                    v.account_id,
+                    0,
+                    v.collection_done.duration_seconds,
+                    v.started_at,
+                    v.collection_done.task_id,
+                )
+                for k, v in collect_state.items()
+                if isinstance(v.collection_done, CollectionFailure)
+            }
 
             next_run = await self.next_run_repo.get(workspace_id)
-            event = TenantAccountsCollected(workspace_id, collected_accounts, next_run)
-            await self.domain_event_sender.publish(event)
+
+            if len(collected_success) > 0:
+                event: Event = TenantAccountsCollected(workspace_id, collected_success, next_run)
+                await self.domain_event_sender.publish(event)
+            elif len(collected_failed) > 0:
+                event = TenantAccountsCollectFailed(workspace_id, collected_failed, next_run)
+                await self.domain_event_sender.publish(event)
+            else:
+                log.info(f"No accounts were collected for workspace {workspace_id}. Not sending domain event.")
 
         # check if we can send the domain event
         tenant_collect_state = await self.collect_progress.get_tenant_collect_state(workspace_id)
@@ -287,7 +306,9 @@ class DispatcherService(Service):
         job_id = message["job_id"]
 
         async def handle_error(error: str) -> None:
-            await self.collect_progress.mark_job_as_failed(job_id, error)
+            task_id = message["task_id"]
+            duration = message["duration"]
+            await self.collect_progress.mark_job_as_failed(job_id, duration, task_id, error)
             log.warning(f"Collect job finished with an error: error={error} job_id={job_id}")
 
         async def handle_success() -> None:
@@ -328,7 +349,7 @@ class DispatcherService(Service):
             await self.metering_repo.add(records)
             account_progress = await self.collect_progress.get_account_collect_state_by_job_id(workspace_id, job_id)
             if account_progress is None:
-                log.error(f"Could not find collect job context for job_id {job_id}")
+                log.error(f"Could not find context for job_id {job_id}")
                 return
             set_fix_cloud_account_id(account_progress.cloud_account_id)
             await self.collect_progress.mark_account_as_collected(
