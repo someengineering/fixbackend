@@ -99,7 +99,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             client_secret=cfg.slack_oauth_client_secret,
             code=code,
             grant_type="authorization_code",
-            redirect_uri=str(request.url_for(AddSlack, workspace_id=workspace_id)),
+            redirect_uri=str(request.url_for(AddSlack)),
         )
         log.debug("Slack confirm: send this data to oauth.v2.access: %s", data)
         try:
