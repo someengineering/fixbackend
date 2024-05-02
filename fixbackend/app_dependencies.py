@@ -287,7 +287,9 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.api_token_service,
-        ApiTokenService(session_maker, jwt_strategy, user_repo, password_helper, workspace_repo),
+        ApiTokenService(
+            session_maker, jwt_strategy, user_repo, password_helper, workspace_repo, deps.async_process_pool
+        ),
     )
     return deps
 

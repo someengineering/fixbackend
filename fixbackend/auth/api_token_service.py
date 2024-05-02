@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.util import utc
 from sqlalchemy.exc import IntegrityError
 from typing import Optional, Tuple, List
@@ -50,12 +51,14 @@ class ApiTokenService(Service):
         user_repo: UserRepository,
         password_helper: PasswordHelperProtocol,
         workspace_repo: WorkspaceRepository,
+        process_pool: AsyncProcessPool,
     ) -> None:
         self.session_maker = session_maker
         self.jwt_strategy = jwt_strategy
         self.user_repo = user_repo
         self.password_helper = password_helper
         self.workspace_repo = workspace_repo
+        self.process_pool = process_pool
 
     async def login(self, api_token: str) -> str:
         tkn = await self._get_user_token(api_token, update_last_used=True)
@@ -139,7 +142,9 @@ class ApiTokenService(Service):
                 .scalars()
                 .one_or_none()
             ):
-                verified, updated_password_hash = self.password_helper.verify_and_update(api_token, row.hash)
+                verified, updated_password_hash = await self.process_pool.submit(
+                    self.password_helper.verify_and_update, api_token, row.hash
+                )
                 if not verified:
                     raise NotAllowed("Invalid token")
                 # Update password hash to a more robust one if needed
