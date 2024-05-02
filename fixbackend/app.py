@@ -88,6 +88,19 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     app.dependency_overrides[config.config] = lambda: cfg
     app.dependency_overrides[dependencies.fix_dependencies] = lambda: deps
 
+    # This middleware is used to silece the error in case a client disconnect too early
+    @app.middleware("http")
+    async def silence_no_response_returned(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        try:
+            return await call_next(request)
+        except RuntimeError as err:
+            if "No response returned" in str(err):
+                log.info("Client disconnected before response was returned")
+                return Response(status_code=500)
+            raise
+
     if cfg.profiling_enabled:
         from pyinstrument import Profiler
 
