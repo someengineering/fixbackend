@@ -551,7 +551,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
     jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
-    deps.add(
+    notification_service = deps.add(
         SN.notification_service,
         NotificationService(
             cfg,
@@ -568,10 +568,25 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
             handle_events=False,  # support should not handle domain events
         ),
     )
-    deps.add(
+    invitation_repo = deps.add(
         SN.invitation_repository,
         InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
     )
+    password_helper = deps.add(SN.password_helper, PasswordHelper())
+    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service))
+    deps.add(
+        SN.user_manager,
+        UserManager(
+            config=cfg,
+            user_repository=user_repo,
+            password_helper=password_helper,
+            auth_email_sender=auth_email_sender,
+            workspace_repository=workspace_repo,
+            domain_events_publisher=domain_event_publisher,
+            invitation_repository=invitation_repo,
+        ),
+    )
+    deps.add(SN.jwt_strategy, FixJWTStrategy(cert_store, lifetime_seconds=cfg.session_ttl))
 
     return deps
 
