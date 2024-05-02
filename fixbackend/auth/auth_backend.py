@@ -12,47 +12,47 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi_users import exceptions
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroyNotSupportedError
 from fastapi_users.manager import BaseUserManager
+from fixcloudutils.util import utc
 
+from fixbackend import jwt
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.config import ConfigDependency
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.ids import UserId
-from fixbackend import jwt
+from fixbackend.ids import UserId, WorkspaceId
 
 
 class FixJWTStrategy(Strategy[User, UserId]):
     def __init__(
         self,
-        public_keys: List[rsa.RSAPublicKey],
-        private_key: rsa.RSAPrivateKey,
+        certstore: CertificateStore,
         lifetime_seconds: Optional[int],
-        token_audience: List[str] = ["fastapi-users:auth"],
+        token_audience: Optional[List[str]] = None,
         algorithm: str = "RS256",
     ):
-        self.public_keys = public_keys
-        self.private_key = private_key
+        self.certstore = certstore
         self.lifetime_seconds = lifetime_seconds
-        self.token_audience = token_audience
+        self.token_audience = token_audience or ["fastapi-users:auth"]
         self.algorithm = algorithm
 
-    def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
-        return jwt.decode_token(token, self.token_audience, self.public_keys)
+    async def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
+        public_keys = await self.certstore.public_keys()
+        return jwt.decode_token(token, self.token_audience, public_keys)
 
     async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UserId]) -> Optional[User]:
         if token is None:
             return None
 
-        data = jwt.decode_token(token, self.token_audience, self.public_keys)
+        public_keys = await self.certstore.public_keys()
+        data = jwt.decode_token(token, self.token_audience, public_keys)
         if data is None:
             return None
 
@@ -68,26 +68,28 @@ class FixJWTStrategy(Strategy[User, UserId]):
             return None
 
     async def write_token(self, user: User) -> str:
+        permissions = {role.workspace_id: role.permissions().value for role in user.roles}
+        return await self.create_token(str(user.id), "login", permissions)
+
+    async def create_token(self, sub: str, token_origin: str, permissions: Dict[WorkspaceId, int]) -> str:
         payload: Dict[str, Any] = {
-            "sub": str(user.id),
-            "permissions": {str(role.workspace_id): role.permissions().value for role in user.roles},
+            "sub": sub,
+            "token_origin": token_origin,
+            "permissions": {str(ws): perms for ws, perms in permissions.items()},
         }
         if self.lifetime_seconds:
-            expire = datetime.utcnow() + timedelta(seconds=self.lifetime_seconds)
+            expire = utc() + timedelta(seconds=self.lifetime_seconds)
             payload["exp"] = expire
-        return jwt.encode_token(payload, self.token_audience, self.private_key)
+
+        private_key = await self.certstore.private_key()
+        return jwt.encode_token(payload, self.token_audience, private_key)
 
     async def destroy_token(self, token: str, user: User) -> None:
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
 
 
-async def get_session_strategy(config: ConfigDependency, fix: FixDependency) -> Strategy[User, UserId]:
-    cert_key_pairs = await fix.service(ServiceNames.certificate_store, CertificateStore).get_signing_cert_key_pair()
-    return FixJWTStrategy(
-        public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
-        private_key=cert_key_pairs[0].private_key,
-        lifetime_seconds=config.session_ttl,
-    )
+async def get_session_strategy(fix: FixDependency) -> Strategy[User, UserId]:
+    return fix.service(ServiceNames.jwt_strategy, FixJWTStrategy)
 
 
 session_cookie_name = "session_token"

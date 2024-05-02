@@ -63,6 +63,8 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AnalyticsEvent
 from fixbackend.app import fast_api_app
+from fixbackend.auth.api_token_service import ApiTokenService
+from fixbackend.auth.auth_backend import FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.billing.billing_job import BillingJob
@@ -796,6 +798,25 @@ def password_helper() -> InsecureFastPasswordHelper:
 
 
 @pytest.fixture
+async def jwt_strategy(cert_store: CertificateStore) -> FixJWTStrategy:
+    return FixJWTStrategy(cert_store, lifetime_seconds=3600)
+
+
+@pytest.fixture
+def api_token_service(
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    jwt_strategy: FixJWTStrategy,
+    user_repository: UserRepository,
+    password_helper: InsecureFastPasswordHelper,
+    async_process_pool: AsyncProcessPool,
+) -> ApiTokenService:
+    return ApiTokenService(
+        async_session_maker, jwt_strategy, user_repository, password_helper, workspace_repository, async_process_pool
+    )
+
+
+@pytest.fixture
 async def fix_deps(
     default_config: Config,
     db_engine: AsyncEngine,
@@ -807,6 +828,9 @@ async def fix_deps(
     domain_event_sender: DomainEventPublisher,
     invitation_repository: InvitationRepository,
     analytics_event_sender: AnalyticsEventSender,
+    api_token_service: ApiTokenService,
+    password_helper: InsecureFastPasswordHelper,
+    jwt_strategy: FixJWTStrategy,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -824,6 +848,9 @@ async def fix_deps(
                 async_session_maker
             ),
             ServiceNames.analytics_event_sender: analytics_event_sender,
+            ServiceNames.api_token_service: api_token_service,
+            ServiceNames.password_helper: password_helper,
+            ServiceNames.jwt_strategy: jwt_strategy,
         }
     )
 

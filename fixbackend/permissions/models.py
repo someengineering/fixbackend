@@ -11,8 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
+from operator import or_
 from typing import Dict
 from fixbackend.ids import UserId, WorkspaceId
 from enum import IntFlag
@@ -69,6 +68,7 @@ roles_to_permissions: Dict[Roles, WorkspacePermissions] = {
     Roles.workspace_owner: workspace_owner_permissions,
     Roles.workspace_billing_admin: workspace_billing_admin_permissions,
 }
+all_permissions = reduce(or_, [perm.value for perm in WorkspacePermissions])
 
 
 @frozen

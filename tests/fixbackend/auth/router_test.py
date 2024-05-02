@@ -22,24 +22,24 @@ from pyotp import TOTP
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.auth_backend import session_cookie_name
+from fixbackend.auth.auth_backend import session_cookie_name, FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.models.orm import UserMFARecoveryCode
 from fixbackend.auth.schemas import OTPConfig
-from fixbackend.auth.user_manager import get_password_helper
+from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
-from fixbackend.auth.user_verifier import AuthEmailSender, get_auth_email_sender
-from fixbackend.domain_events.dependencies import get_domain_event_publisher
+from fixbackend.auth.user_verifier import AuthEmailSender
+from fixbackend.certificates.cert_store import CertificateStore
+from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
 from fixbackend.permissions.models import UserRole, Roles, workspace_owner_permissions
-from fixbackend.permissions.role_repository import RoleRepository, get_role_repository
-from fixbackend.workspaces.invitation_repository import InvitationRepository, get_invitation_repository
+from fixbackend.permissions.role_repository import RoleRepository
+from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InsecureFastPasswordHelper
-from fixbackend.certificates.cert_store import CertificateStore
 
 
 class InMemoryVerifier(AuthEmailSender):
@@ -121,6 +121,33 @@ class InMemoryRoleRepository(RoleRepository):
         pass
 
 
+@pytest.fixture
+async def user_manager(
+    api_client: AsyncClient,
+    fast_api: FastAPI,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
+    cert_store: CertificateStore,
+    password_helper: InsecureFastPasswordHelper,
+    fix_deps: FixDependencies,
+) -> UserManager:
+    verifier = fix_deps.add(ServiceNames.auth_email_sender, InMemoryVerifier())
+    invitation_repo = fix_deps.add(ServiceNames.invitation_repository, InMemoryInvitationRepo())
+    return fix_deps.add(
+        ServiceNames.user_manager,
+        UserManager(
+            fix_deps.config,
+            user_repository,
+            password_helper,
+            verifier,
+            workspace_repository,
+            domain_event_sender,
+            invitation_repo,
+        ),
+    )
+
+
 @pytest.mark.asyncio
 async def test_registration_flow(
     api_client: AsyncClient,
@@ -130,16 +157,12 @@ async def test_registration_flow(
     user_repository: UserRepository,
     cert_store: CertificateStore,
     password_helper: InsecureFastPasswordHelper,
+    user_manager: UserManager,
+    jwt_strategy: FixJWTStrategy,
+    fix_deps: FixDependencies,
 ) -> None:
-    verifier = InMemoryVerifier()
-    invitation_repo = InMemoryInvitationRepo()
-    role_repo = InMemoryRoleRepository()
-    fast_api.dependency_overrides[get_auth_email_sender] = lambda: verifier
-    fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
-    fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
-    fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
-    fast_api.dependency_overrides[get_password_helper] = lambda: password_helper
-
+    verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
+    role_repo = fix_deps.add(ServiceNames.role_repository, InMemoryRoleRepository())
     registration_json = {
         "email": "user@example.com",
         "password": "changeme",
@@ -219,15 +242,11 @@ async def test_mfa_flow(
     domain_event_sender: InMemoryDomainEventPublisher,
     user_repository: UserRepository,
     password_helper: InsecureFastPasswordHelper,
+    user_manager: UserManager,
+    jwt_strategy: FixJWTStrategy,
+    fix_deps: FixDependencies,
 ) -> None:
-    verifier = InMemoryVerifier()
-    invitation_repo = InMemoryInvitationRepo()
-    role_repo = InMemoryRoleRepository()
-    fast_api.dependency_overrides[get_auth_email_sender] = lambda: verifier
-    fast_api.dependency_overrides[get_domain_event_publisher] = lambda: domain_event_sender
-    fast_api.dependency_overrides[get_invitation_repository] = lambda: invitation_repo
-    fast_api.dependency_overrides[get_role_repository] = lambda: role_repo
-    fast_api.dependency_overrides[get_password_helper] = lambda: password_helper
+    verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
 
     # register user
     registration_json = {"email": "user2@example.com", "password": "changeme"}

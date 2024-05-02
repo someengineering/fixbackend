@@ -70,6 +70,11 @@ class ServiceNames:
     unschedule_trial_end_reminder_consumer = "unschedule_trial_end_reminder_consumer"
     stripe_service = "stripe_service"
     async_process_pool = "async_process_pool"
+    password_helper = "password_helper"
+    jwt_strategy = "jwt_strategy"
+    user_manager = "user_manager"
+    auth_email_sender = "auth_email_sender"
+    api_token_service = "api_token_service"
 
 
 class FixDependencies(Dependencies):

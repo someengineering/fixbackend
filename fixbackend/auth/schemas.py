@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import Form
@@ -20,7 +21,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users import schemas
 from pydantic import BaseModel, Field
 
-from fixbackend.ids import UserId
+from fixbackend.auth.models import ApiToken
+from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.notification.user_notification_repo import UserNotificationSettings
 
 
@@ -107,3 +109,38 @@ class UserNotificationSettingsWrite(BaseModel):
 class OTPConfig(BaseModel):
     secret: str = Field(description="TOTP secret")
     recovery_codes: List[str] = Field(description="List of recovery codes")
+
+
+class ApiTokenData(BaseModel):
+    token: str = Field(description="API token")
+
+
+class ApiTokenCreate(BaseModel):
+    name: str = Field(description="Name of the token")
+    workspace_id: Optional[WorkspaceId] = Field(None, description="Workspace ID")
+    permission: Optional[int] = Field(None, description="Permission level")
+
+
+class ApiTokenDelete(BaseModel):
+    name: Optional[str] = Field(None, description="Name of the token")
+    token: Optional[str] = Field(None, description="API token")
+
+
+class ApiTokenDetails(BaseModel):
+    name: str = Field(description="Name of the token")
+    workspace_id: Optional[WorkspaceId] = Field(None, description="Workspace ID")
+    permission: Optional[int] = Field(None, description="Permission level")
+    last_used_at: Optional[datetime] = Field(None, description="Last used at")
+    created_at: datetime = Field(description="Created at")
+    updated_at: datetime = Field(description="Updated at")
+
+    @staticmethod
+    def from_token(token: ApiToken) -> "ApiTokenDetails":
+        return ApiTokenDetails(
+            name=token.name,
+            workspace_id=token.workspace_id,
+            permission=token.permission,
+            created_at=token.created_at,
+            updated_at=token.updated_at,
+            last_used_at=token.last_used_at,
+        )
