@@ -12,8 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from math import e
-from typing import Annotated, Any, Callable, Dict, Optional, Sequence
+from typing import Annotated, Any, Callable, Coroutine, Dict, Optional, Sequence
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
@@ -56,7 +55,7 @@ class UserRoleRow:
 
 
 class RedirectToLoginOn401Route(APIRoute):
-    def get_route_handler(self) -> Callable:
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         original_route_handler = super().get_route_handler()
 
         async def custom_route_handler(request: Request) -> Response:
