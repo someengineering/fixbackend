@@ -24,7 +24,7 @@ from fixbackend.dependencies import FixDependencies, ServiceNames
 
 
 def api_token_router(deps: FixDependencies) -> APIRouter:
-    router = APIRouter(prefix="/token", tags=["api_token"])
+    router = APIRouter()
     api_token_service = deps.service(ServiceNames.api_token_service, ApiTokenService)
 
     @router.post("/access", summary="Get JWT access token from API Token")

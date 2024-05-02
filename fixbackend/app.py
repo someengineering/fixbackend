@@ -257,7 +257,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router.include_router(unsubscribe_router(deps), include_in_schema=False)
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
         api_router.include_router(analytics_router(deps))
-        api_router.include_router(api_token_router(deps))
+        api_router.include_router(api_token_router(deps), prefix="/token", tags=["api_token"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
