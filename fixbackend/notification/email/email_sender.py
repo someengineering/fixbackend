@@ -84,18 +84,22 @@ class Boto3EmailSender(EmailSender):
             additional_headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
 
         def send_email() -> None:
-            msg = MIMEMultipart("alternative")
+            # Main message with 'mixed' for overall structure (if there are attachments)
+            msg = MIMEMultipart("mixed")
             msg["Subject"] = subject
             msg["From"] = "Fix Security <noreply@fix.security>"
             msg["To"] = to
             for key, value in additional_headers.items():
                 msg.add_header(key, value)
-            plain_part = MIMEText(text, "plain")
-            msg.attach(plain_part)
 
-            if html:
-                html_part = MIMEText(html, "html")
-                msg.attach(html_part)
+            # 'Related' part for images and HTML
+            related = MIMEMultipart("related")
+            msg.attach(related)
+
+            # 'Alternative' part for plain and HTML text versions
+            alternative = MIMEMultipart("alternative")
+            related.attach(alternative)
+
             if images:
                 for name, content in images.items():
                     attachment = MIMEImage(content)
@@ -103,7 +107,14 @@ class Boto3EmailSender(EmailSender):
                     attachment.add_header("Content-ID", f"<{name}>")
                     # mark the content as inline (not attachment)
                     attachment.add_header("Content-Disposition", "inline", filename=name)
-                    msg.attach(attachment)
+                    related.attach(attachment)
+
+            plain_part = MIMEText(text, "plain")
+            alternative.attach(plain_part)
+
+            if html:
+                html_part = MIMEText(html, "html")
+                alternative.attach(html_part)
 
             self.ses.send_raw_email(
                 Source="noreply@fix.security",
