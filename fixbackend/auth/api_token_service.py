@@ -71,7 +71,7 @@ class ApiTokenService(Service):
             for role in user.roles
             if workspace is None or workspace == role.workspace_id
         }
-        return self.jwt_strategy.create_token(str(user.id), "api_token", permissions)
+        return await self.jwt_strategy.create_token(str(user.id), "api_token", permissions)
 
     async def create_token(
         self, user: User, name: str, permission: Optional[int] = None, workspace_id: Optional[WorkspaceId] = None

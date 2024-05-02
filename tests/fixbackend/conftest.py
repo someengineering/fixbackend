@@ -798,12 +798,7 @@ def password_helper() -> InsecureFastPasswordHelper:
 
 @pytest.fixture
 async def jwt_strategy(cert_store: CertificateStore) -> FixJWTStrategy:
-    cert_key_pairs = await cert_store.get_signing_cert_key_pair()
-    return FixJWTStrategy(
-        public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
-        private_key=cert_key_pairs[0].private_key,
-        lifetime_seconds=3600,
-    )
+    return FixJWTStrategy(cert_store, lifetime_seconds=3600)
 
 
 @pytest.fixture

@@ -36,7 +36,7 @@ async def test_token_crud(
 
     # it is possible to create an access token
     jwt = await api_token_service.login(tk_str)
-    values = jwt_strategy.decode_token(jwt)
+    values = await jwt_strategy.decode_token(jwt)
     assert values is not None
     assert values["sub"] == str(user.id)
     assert values["token_origin"] == "api_token"

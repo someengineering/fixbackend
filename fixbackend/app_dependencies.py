@@ -276,15 +276,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
             invitation_repository=invitation_repo,
         ),
     )
-    cert_key_pairs = await cert_store.get_signing_cert_key_pair()
-    jwt_strategy = deps.add(
-        SN.jwt_strategy,
-        FixJWTStrategy(
-            public_keys=[ckp.private_key.public_key() for ckp in cert_key_pairs],
-            private_key=cert_key_pairs[0].private_key,
-            lifetime_seconds=cfg.session_ttl,
-        ),
-    )
+    jwt_strategy = deps.add(SN.jwt_strategy, FixJWTStrategy(cert_store, lifetime_seconds=cfg.session_ttl))
     deps.add(
         SN.api_token_service,
         ApiTokenService(

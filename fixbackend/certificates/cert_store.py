@@ -12,10 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List
-from datetime import datetime, timedelta
-import os
 
 from aiofiles import open as aopen
 from async_lru import alru_cache
