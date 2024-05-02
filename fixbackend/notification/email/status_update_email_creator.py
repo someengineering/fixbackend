@@ -169,7 +169,7 @@ class StatusUpdateEmailCreator:
 
         async def overall_score() -> Tuple[bytes, Tuple[int, int]]:
             current, diff = await progress("account_score", 100, group=set(), aggregation="avg")
-            image = await self.process_pool.submit(create_gauge_percent, "Security Score", current, current + diff)
+            image = await self.process_pool.submit(create_gauge_percent, "Security Score", current, current - diff)
             return image, (current, diff)
 
         (
