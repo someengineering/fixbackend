@@ -87,7 +87,7 @@ class Boto3EmailSender(EmailSender):
             # Main message with 'mixed' for overall structure (if there are attachments)
             msg = MIMEMultipart("mixed")
             msg["Subject"] = subject
-            msg["From"] = "Fix Security <noreply@fix.security>"
+            msg["From"] = "Fix Security <support@fix.security>"
             msg["To"] = to
             for key, value in additional_headers.items():
                 msg.add_header(key, value)
@@ -117,7 +117,7 @@ class Boto3EmailSender(EmailSender):
                 alternative.attach(html_part)
 
             self.ses.send_raw_email(
-                Source="noreply@fix.security",
+                Source="support@fix.security",
                 Destinations=[to],
                 RawMessage={"Data": msg.as_string().encode("utf-8")},
             )
