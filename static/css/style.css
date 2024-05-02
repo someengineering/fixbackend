@@ -2433,10 +2433,6 @@ html:has(.drawer-toggle:checked) {
   margin-top: 1rem;
 }
 
-.mt-6 {
-  margin-top: 1.5rem;
-}
-
 .block {
   display: block;
 }
@@ -2582,15 +2578,6 @@ html:has(.drawer-toggle:checked) {
   padding-top: 1rem;
 }
 
-.text-center {
-  text-align: center;
-}
-
-.text-5xl {
-  font-size: 3rem;
-  line-height: 1;
-}
-
 .text-lg {
   font-size: 1.125rem;
   line-height: 1.75rem;
@@ -2702,9 +2689,5 @@ html:has(.drawer-toggle:checked) {
 
   .lg\:flex-row-reverse {
     flex-direction: row-reverse;
-  }
-
-  .lg\:text-left {
-    text-align: left;
   }
 }
