@@ -969,9 +969,7 @@ class InMemoryEmailSender(EmailSender):
     def __init__(self) -> None:
         self.call_args: List[NotificationEmail] = []
 
-    async def send_email(
-        self, *, to: str, subject: str, text: str, html: str | None, unsubscribe: Optional[str] = None
-    ) -> None:
+    async def send_email(self, *, to: str, subject: str, text: str, html: str | None, **kwargs: Any) -> None:
         self.call_args.append(NotificationEmail(to, subject, text, html))
 
 
