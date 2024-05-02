@@ -14,7 +14,7 @@
 import logging
 import calendar
 from datetime import datetime, timedelta
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from fixcloudutils.asyncio.periodic import Periodic
@@ -115,19 +115,20 @@ class ScheduledEmailSender(Service):
             )
             async with self.session_maker() as session:
                 last_workspace: Optional[Workspace] = None
-                content_to_send: Optional[Tuple[str, str, str]] = None
+                content_to_send: Optional[Tuple[str, str, str, Dict[str, bytes]]] = None
                 for org, user in (await session.execute(statement)).unique().all():
                     workspace = org.to_model()
                     if last_workspace != workspace:
                         content_to_send = await self.status_update_creator.create_messages(workspace, now, duration)
                     if content_to_send:
-                        subject, html, txt = content_to_send
+                        subject, html, txt, images = content_to_send
                         await self.email_sender.send_email(
                             to=user.email,
                             subject=subject,
                             text=txt,
                             html=html,
                             unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
+                            images=images,
                         )
                         session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
                         counter += 1

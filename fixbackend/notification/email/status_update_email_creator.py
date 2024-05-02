@@ -12,9 +12,8 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
-import base64
 from datetime import timedelta, datetime
-from typing import Optional, Tuple, Set
+from typing import Optional, Tuple, Set, Dict, cast
 
 import plotly.graph_objects as go
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
@@ -52,7 +51,7 @@ def create_timeline_figure(
     y_axis: Optional[str] = None,
     legend_title: Optional[str] = None,
     stacked: bool = False,
-) -> str:
+) -> bytes:
     date_fmt = "%d.%m.%y" if scatters.granularity >= timedelta(days=1) else "%d.%m.%y %H:%M"
     x = [at.strftime(date_fmt) for at in scatters.ats]
     fig = go.Figure()
@@ -69,10 +68,10 @@ def create_timeline_figure(
             )
         )
     fig.update_layout(title=title, xaxis_title=x_axis, yaxis_title=y_axis, legend_title=legend_title)
-    return base64.b64encode(fig.to_image(format="png")).decode("utf-8")
+    return cast(bytes, fig.to_image(format="png"))
 
 
-def create_gauge_percent(title: str, value: float, previous: float) -> str:
+def create_gauge_percent(title: str, value: float, previous: float) -> bytes:
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number+delta",
@@ -95,7 +94,7 @@ def create_gauge_percent(title: str, value: float, previous: float) -> str:
         ),
         # layout=go.Layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"), # transparent background
     )
-    return base64.b64encode(fig.to_image(format="png")).decode("utf-8")
+    return cast(bytes, fig.to_image(format="png"))
 
 
 class StatusUpdateEmailCreator:
@@ -110,7 +109,9 @@ class StatusUpdateEmailCreator:
         self.db_access = db_access
         self.process_pool = process_pool
 
-    async def create_messages(self, workspace: Workspace, now: datetime, duration: timedelta) -> Tuple[str, str, str]:
+    async def create_messages(
+        self, workspace: Workspace, now: datetime, duration: timedelta
+    ) -> Tuple[str, str, str, Dict[str, bytes]]:
         dba = await self.db_access.get_database_access(workspace.id)
         assert dba is not None, f"No database access for workspace: {workspace.id}"
         duration_name = "month" if duration.days > 27 else "week"
@@ -135,7 +136,7 @@ class StatusUpdateEmailCreator:
                 else:
                     return entries[1], entries[1] - entries[0]
 
-        async def resources_per_account_timeline() -> Tuple[Scatters, str]:
+        async def resources_per_account_timeline() -> Tuple[Scatters, bytes]:
             scatters = await self.inventory_service.timeseries_scattered(
                 dba,
                 "resources",
@@ -166,7 +167,7 @@ class StatusUpdateEmailCreator:
                 changes = {value_in_path(r, "group.change"): value_in_path_get(r, "count", 0) async for r in result}
                 return changes.get("node_created", 0), changes.get("node_updated", 0), changes.get("node_deleted", 0)
 
-        async def overall_score() -> Tuple[str, Tuple[int, int]]:
+        async def overall_score() -> Tuple[bytes, Tuple[int, int]]:
             current, diff = await progress("account_score", 100, group=set(), aggregation="avg")
             image = await self.process_pool.submit(create_gauge_percent, "Security Score", current, current + diff)
             return image, (current, diff)
@@ -194,13 +195,17 @@ class StatusUpdateEmailCreator:
             progress("databases_total", 0, group=set(), aggregation="sum"),
             progress("databases_bytes", 0, group=set(), aggregation="sum"),
         )
+        images: Dict[str, bytes] = {
+            "account_timeline.png": cast(bytes, account_timeline_image),
+            "score.png": cast(bytes, score_image),
+        }
         args = dict(
             workspace_name=workspace.name,
             duration=duration_name,
             accounts=len(scatters.groups),  # type: ignore
             resource_changes=resource_changes,
-            account_timeline_image=account_timeline_image,
-            score_image=score_image,
+            account_timeline_image="account_timeline.png",
+            score_image="score.png",
             score_progress=score_progress,
             instances_progress=instances_progress,
             cores_progress=cores_progress,
@@ -213,4 +218,4 @@ class StatusUpdateEmailCreator:
         subject = render("status-update.subject", **args).strip()
         html = render("status-update.html", **args)
         txt = render("status-update.txt", **args)
-        return subject, html, txt
+        return subject, html, txt, images

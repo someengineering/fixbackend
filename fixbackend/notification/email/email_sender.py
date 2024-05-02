@@ -21,9 +21,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 from abc import ABC, abstractmethod
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
+from typing import Optional, Dict
 from urllib.parse import urlencode
 
 import boto3
@@ -41,6 +42,7 @@ class EmailSender(ABC):
         text: str,
         html: Optional[str],
         unsubscribe: Optional[str] = None,  # kind of emails to unsubscribe from
+        images: Optional[Dict[str, bytes]] = None,  # inline images to include in the email
     ) -> None:
         """Email the given address."""
         raise NotImplementedError()
@@ -68,6 +70,7 @@ class Boto3EmailSender(EmailSender):
         text: str,
         html: Optional[str],
         unsubscribe: Optional[str] = None,
+        images: Optional[Dict[str, bytes]] = None,
     ) -> None:  # pragma: no cover
 
         additional_headers = {}
@@ -93,6 +96,14 @@ class Boto3EmailSender(EmailSender):
             if html:
                 html_part = MIMEText(html, "html")
                 msg.attach(html_part)
+            if images:
+                for name, content in images.items():
+                    attachment = MIMEImage(content)
+                    # define the image's ID as referenced in the HTML part
+                    attachment.add_header("Content-ID", f"<{name}>")
+                    # mark the content as inline (not attachment)
+                    attachment.add_header("Content-Disposition", "inline", filename=name)
+                    msg.attach(attachment)
 
             self.ses.send_raw_email(
                 Source="noreply@fix.security",
@@ -111,6 +122,7 @@ class ConsoleEmailSender(EmailSender):
         text: str,
         html: Optional[str],
         unsubscribe: Optional[str] = None,
+        images: Optional[Dict[str, bytes]] = None,
     ) -> None:  # pragma: no cover
         print(f"Sending emails to {to} with subject {subject}")
         print(f"text: {text}")
