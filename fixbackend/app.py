@@ -98,7 +98,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         except RuntimeError as err:
             if "No response returned" in str(err):
                 log.info("Client disconnected before response was returned")
-                return Response(status_code=500)
+                return Response(status_code=400)
             raise
 
     if cfg.profiling_enabled:
