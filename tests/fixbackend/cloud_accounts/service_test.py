@@ -45,6 +45,7 @@ from fixbackend.domain_events.events import (
     CloudAccountCollectInfo,
     CloudAccountNameChanged,
     Event,
+    TenantAccountsCollectFailed,
     TenantAccountsCollected,
     ProductTierChanged,
     SubscriptionCancelled,
@@ -383,6 +384,48 @@ async def test_store_last_run_info(
 
     cloud_account_id = account.id
     event = TenantAccountsCollected(
+        workspace.id,
+        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
+        now_without_micros,
+    )
+    await service.process_domain_event(
+        event.to_json(),
+        MessageContext(
+            id="test",
+            kind=TenantAccountsCollected.kind,
+            publisher="test",
+            sent_at=now_without_micros,
+            received_at=now_without_micros,
+        ),
+    )
+
+    assert len(notification_service.notified_workspaces) == 1
+    assert notification_service.notified_workspaces[0] == workspace.id
+
+    account = await service.get_cloud_account(cloud_account_id, workspace.id)
+
+    assert account.next_scan == now_without_micros
+    assert account.account_id == account_id
+    assert account.last_scan_duration_seconds == 10
+    assert account.last_scan_resources_scanned == 100
+    assert account.last_scan_started_at == now_without_micros
+
+
+@pytest.mark.asyncio
+async def test_store_last_run_info_on_error(
+    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService, workspace: Workspace
+) -> None:
+    now_without_micros = now.replace(microsecond=0)
+    account = await service.create_aws_account(
+        workspace_id=workspace.id,
+        account_id=account_id,
+        role_name=role_name,
+        external_id=workspace.external_id,
+        account_name=None,
+    )
+
+    cloud_account_id = account.id
+    event = TenantAccountsCollectFailed(
         workspace.id,
         {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
         now_without_micros,
