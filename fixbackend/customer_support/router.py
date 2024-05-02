@@ -12,22 +12,29 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from typing import Annotated, Any, Dict, Optional, Sequence
+from math import e
+from typing import Annotated, Any, Callable, Dict, Optional, Sequence
 import uuid
 
-from fastapi import APIRouter, Form, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.routing import APIRoute
 
+from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.customer_support.login_router import auth_router
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import UserId, WorkspaceId
 from fastapi.templating import Jinja2Templates
 from attrs import frozen
+from httpx_oauth.clients.google import GoogleOAuth2
 
 from fixbackend.permissions.models import Roles, UserRole
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fastapi import status
 
 
 log = logging.getLogger(__name__)
@@ -48,10 +55,39 @@ class UserRoleRow:
         return UserRoleRow(workspace_id=user_role.workspace_id, roles=html_roles)
 
 
-def admin_console_router(dependencies: FixDependencies) -> APIRouter:
-    router = APIRouter()
+class RedirectToLoginOn401Route(APIRoute):
+    def get_route_handler(self) -> Callable:
+        original_route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request: Request) -> Response:
+            try:
+                return await original_route_handler(request)
+            except HTTPException as exc:
+                if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                    return RedirectResponse(url=request.url_for("login_page"), status_code=status.HTTP_303_SEE_OTHER)
+                raise
+
+        return custom_route_handler
+
+
+def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAuth2) -> APIRouter:
+
+    async def get_customer_support_user(
+        user: AuthenticatedUser,
+    ) -> User:
+
+        if user.email in dependencies.config.customer_support_users:
+            return user
+
+        raise HTTPException(status_code=401)
+
+    root = APIRouter()
 
     templates = Jinja2Templates(directory="fixbackend/customer_support/templates")
+
+    root.include_router(auth_router(dependencies, templates, google_client), prefix="/auth")
+
+    router = APIRouter(dependencies=[Depends(get_customer_support_user)], route_class=RedirectToLoginOn401Route)
 
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
     user_repo = dependencies.service(ServiceNames.user_repo, UserRepository)
@@ -268,4 +304,6 @@ def admin_console_router(dependencies: FixDependencies) -> APIRouter:
             context={"request": request, "user": user, "workspace_id": workspace_uuid},
         )
 
-    return router
+    root.include_router(router)
+
+    return root
