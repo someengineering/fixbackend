@@ -492,7 +492,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     deps = await base_dependencies(cfg)
     session_maker = deps.session_maker
     deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
-    deps.add(SN.user_repo, UserRepository(session_maker))
+    user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
 
     graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
     readwrite_redis = deps.add(SN.readwrite_redis, create_redis(cfg.redis_readwrite_url, cfg))
@@ -508,7 +508,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
     subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
     role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
-    deps.add(
+    workspace_repo = deps.add(
         SN.workspace_repo,
         WorkspaceRepositoryImpl(
             session_maker,
@@ -522,6 +522,55 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
             subscription_repo,
             role_repo,
         ),
+    )
+    ca_cert_path = str(cfg.ca_cert) if cfg.ca_cert else None
+    arq_settings = replace(
+        RedisSettings.from_dsn(cfg.redis_queue_url),
+        ssl_ca_certs=ca_cert_path,
+        password=cfg.args.redis_password,
+    )
+    temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url, cfg))
+    domain_event_subscriber = deps.add(
+        SN.domain_event_subscriber,
+        DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
+    )
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+    http_client = deps.http_client
+    inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
+    inventory_service = deps.add(
+        SN.inventory,
+        InventoryService(
+            inventory_client,
+            graph_db_access,
+            cloud_account_repo,
+            None,
+            temp_store_redis,
+            arq_settings,
+            start_workers=False,
+        ),
+    )
+    cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
+    jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+    deps.add(
+        SN.notification_service,
+        NotificationService(
+            cfg,
+            workspace_repo,
+            graph_db_access,
+            user_repo,
+            inventory_service,
+            readwrite_redis,
+            session_maker,
+            http_client,
+            domain_event_publisher,
+            domain_event_subscriber,
+            jwt_service,
+            handle_events=False,  # support should not handle domain events
+        ),
+    )
+    deps.add(
+        SN.invitation_repository,
+        InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
     )
 
     return deps

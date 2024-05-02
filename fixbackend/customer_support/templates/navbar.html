@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div id="root">
+    <div class="drawer  lg:drawer-open"><input id="left-sidebar-drawer" type="checkbox" class="drawer-toggle">
+        <div class="drawer-content flex flex-col ">
+            <div class="navbar sticky top-0 bg-base-100  z-10 shadow-md "></div>
+            {% block content %}{% endblock %}
+        </div>
+        <div class="drawer-side  z-30  "><label for="left-sidebar-drawer" class="drawer-overlay"></label>
+            <ul class="menu  pt-2 w-80 bg-base-100 min-h-full   text-base-content"><button
+                    class="btn btn-ghost bg-base-300  btn-circle z-50 top-0 right-0 mt-4 mr-2 absolute lg:hidden"><svg
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" aria-hidden="true" class="h-5 inline-block w-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg></button>
+                <li class="mb-2 font-semibold text-xl"><a href="/"><img class="w-10"
+                            src="https://cdn.some.engineering/assets/fix-logos/fix-logo-256.png" alt="Fix Support">Fix
+                        Support</a> </li>
+                <li class=""><a class="font-normal" href="/roles"><i class="fa-solid fa-user-tag"></i> User
+                        roles</a></li>
+                <li class=""><a class="font-normal" href="{{ url_for('user_workspaces') }}"><i
+                            class="fa-solid fa-user-group"></i> User
+                        workspaces</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
