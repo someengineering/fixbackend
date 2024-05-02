@@ -32,7 +32,7 @@
 
 
   <figure>
-    <img width="400" src="data:image/png;base64,{{ score_image }}" alt="Overall Score"/>
+    <img width="400" src="cid:{{ score_image }}" alt="Overall Score"/>
     <figcaption>Security Score over all {{ 'cloud account'|pluralize(accounts) }}.</figcaption>
   </figure>
 
@@ -110,7 +110,7 @@
 
   </p>
   <figure>
-    <img src="data:image/png;base64,{{ account_timeline_image }}" alt="Account Timeline"/>
+    <img src="cid:{{ account_timeline_image }}" alt="Account Timeline"/>
     <figcaption>Number of Resources by account.</figcaption>
   </figure>
 
