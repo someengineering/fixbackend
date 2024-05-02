@@ -49,6 +49,7 @@ class EmailSender(ABC):
 
 
 EMAIL_UNSUBSCRIBE_AUDIENCE = "fix:unsubscribe"
+EMAIL_FROM_ADDRESS = "support@fix.security"
 
 
 class Boto3EmailSender(EmailSender):
@@ -87,7 +88,7 @@ class Boto3EmailSender(EmailSender):
             # Main message with 'mixed' for overall structure (if there are attachments)
             msg = MIMEMultipart("mixed")
             msg["Subject"] = subject
-            msg["From"] = "Fix Security <noreply@fix.security>"
+            msg["From"] = f"Fix Security <{EMAIL_FROM_ADDRESS}>"
             msg["To"] = to
             for key, value in additional_headers.items():
                 msg.add_header(key, value)
@@ -117,7 +118,7 @@ class Boto3EmailSender(EmailSender):
                 alternative.attach(html_part)
 
             self.ses.send_raw_email(
-                Source="noreply@fix.security",
+                Source=EMAIL_FROM_ADDRESS,
                 Destinations=[to],
                 RawMessage={"Data": msg.as_string().encode("utf-8")},
             )
