@@ -11,20 +11,20 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
+from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
-from sqlalchemy import String, Boolean, ForeignKey
+from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fixbackend.auth import models
 from fixbackend.base_model import Base, CreatedUpdatedMixin
-from fixbackend.ids import UserId
+from fixbackend.ids import UserId, WorkspaceId
 
 from fixbackend.permissions.role_repository import UserRoleAssignmentEntity
-from fixbackend.sqlalechemy_extensions import GUID
+from fixbackend.sqlalechemy_extensions import GUID, UTCDateTime
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
@@ -96,4 +96,30 @@ class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
             otp_secret=user.otp_secret,
             is_mfa_active=user.is_mfa_active,
             oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
+        )
+
+
+class ApiToken(CreatedUpdatedMixin, Base):
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
+    name: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    hash: Mapped[str] = mapped_column(String(length=512), nullable=False)
+    user_id: Mapped[UserId] = mapped_column(GUID, ForeignKey("user.id"), nullable=False)
+    workspace_id: Mapped[Optional[WorkspaceId]] = mapped_column(GUID, ForeignKey("organization.id"), nullable=True)
+    permission: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+
+    __tablename__ = "api_token"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="unique_user_token_name"),)
+
+    def to_model(self) -> models.ApiToken:
+        return models.ApiToken(
+            id=self.id,
+            name=self.name,
+            hash=self.hash,
+            user_id=self.user_id,
+            workspace_id=self.workspace_id,
+            permission=self.permission,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            last_used_at=self.last_used_at,
         )
