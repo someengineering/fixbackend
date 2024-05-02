@@ -191,6 +191,15 @@ class TenantAccountsCollected(Event):
 
 
 @frozen
+class TenantAccountsCollectFailed(Event):
+    kind: ClassVar[str] = "tenant_accounts_collect_failed"
+
+    tenant_id: WorkspaceId
+    cloud_accounts: Dict[FixCloudAccountId, CloudAccountCollectInfo]
+    next_run: Optional[datetime]
+
+
+@frozen
 class WorkspaceCreated(Event):
     kind: ClassVar[str] = "workspace_created"
 

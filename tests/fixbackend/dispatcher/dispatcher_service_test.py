@@ -371,6 +371,8 @@ async def test_receive_collect_error_message(
     error = "some error"
     message = {
         "job_id": str(job_id),
+        "task_id": "t1",
+        "duration": 18,
         "error": error,
     }
     context = MessageContext("test", "collect-done", "test", utc(), utc())
@@ -409,8 +411,8 @@ async def test_receive_collect_error_message(
     result = [n async for n in metering_repository.list(workspace.id)]
     assert len(result) == 0
 
-    # no event is emitted in case of failure
-    assert len(domain_event_sender.events) == current_events_length
+    # failure event is emitted in case of failure
+    assert len(domain_event_sender.events) == current_events_length + 1
 
 
 @pytest.mark.asyncio

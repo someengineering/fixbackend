@@ -56,6 +56,7 @@ from fixbackend.domain_events.events import (
     CloudAccountActiveToggled,
     CloudAccountNameChanged,
     CloudAccountScanToggled,
+    TenantAccountsCollectFailed,
     TenantAccountsCollected,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
@@ -377,6 +378,38 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     if first_account_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
+
+                case TenantAccountsCollectFailed.kind:
+                    event = TenantAccountsCollected.from_json(message)
+
+                    accounts = await self.cloud_account_repository.list(list(event.cloud_accounts.keys()))
+                    collected_accounts = [account for account in accounts if account.id in event.cloud_accounts]
+
+                    set_workspace_id(event.tenant_id)
+                    for account_id, account in event.cloud_accounts.items():
+                        set_fix_cloud_account_id(account_id)
+                        set_cloud_account_id(account.account_id)
+
+                        def compute_failed_scan_count(acc: CloudAccount) -> int:
+                            if account.scanned_resources < 50:
+                                return acc.failed_scan_count + 1
+                            else:
+                                return 0
+
+                        updated = await self.cloud_account_repository.update(
+                            account_id,
+                            lambda acc: evolve(
+                                acc,
+                                last_scan_duration_seconds=account.duration_seconds,
+                                last_scan_resources_scanned=account.scanned_resources,
+                                last_scan_started_at=account.started_at,
+                                next_scan=event.next_run,
+                                failed_scan_count=compute_failed_scan_count(acc),
+                            ),
+                        )
+
+                        if updated.failed_scan_count > 3:
+                            await self.__degrade_account(updated.id, "Too many consecutive failed scans")
 
                 case AwsAccountDiscovered.kind:
                     discovered_event = AwsAccountDiscovered.from_json(message)
