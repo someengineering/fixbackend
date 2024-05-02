@@ -1,9 +1,12 @@
-Your Cloud Infrastructure Status Update ☁️☁️☁️
+Your {{duration}}ly status update ☁️
+
 
 Workspace: "{{ workspace_name }}"
 Fix collected information from {{ 'cloud account'|pluralize(accounts) }}.
 
-Security Score
+
+Security score
+
 The current weighted security score across all accounts stands at {{ score_progress[0] }}.
 {% if score_progress[1] < 0 %}This represents a decline of {{ score_progress[1] | abs }} points over the last {{ duration }}.
 It's time to take action!
@@ -12,6 +15,7 @@ The Fix dashboard provides you with detailed information about what needs to be 
 Excellent progress! Keep up the good work.
 {% else %} There has been no change in the score over the last {{ duration }}.
 {% endif %}
+
 
 Resources
 
@@ -29,12 +33,13 @@ Databases
   Size {{ databases_bytes_progress[0] | readable_bytes }} ({{ databases_bytes_progress[1] | readable_bytes(with_sign=true) }})
 
 
-Resource Changes
+Resource changes
 Fix has recorded the following changes in your infrastructure over the past {{ duration }}:
 
-New Resources Created: {{ resource_changes[0] }}
-Existing Resources Updated: {{ resource_changes[1] }}
-Existing Resources Deleted: {{ resource_changes[2] }}
+
+New resources created: {{ resource_changes[0] }}
+Existing resources updated: {{ resource_changes[1] }}
+Existing Resources deleted: {{ resource_changes[2] }}
 
 
 That is all for today. To get more details and insights, visit the Fix app by using the "Login" button below.

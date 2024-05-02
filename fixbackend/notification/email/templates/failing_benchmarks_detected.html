@@ -4,7 +4,7 @@
 {# can we show all issues #}
 {% set exhaustive = alert.examples|length == alert.failed_checks_count_total %}
 
-<h1 style="font-weight: bold;">New issues Detected in your Infrastructure! </h1>
+<h1 style="font-weight: bold;">New issues detected</h1>
 <p style="font-size: 16px;">We have completed a comprehensive scan of your infrastructure.</p>
 <p style="font-size: 16px;"><strong>{{ alert.failed_checks_count_total }} issues require your attention.</strong> These
   issues are in violation of the benchmark standards set in <code>{{ alert.benchmark }}</code>.</p>
@@ -27,7 +27,9 @@
   You can review the full report with all affected resources using the below link.
 </p>
 {% endif %}
-<p style="font-size: 16px;">To view the full list of issues, please visit <a href="{{ alert.ui_link }}">Fix</a>.</p>
+<p>
+  <a href="{{ alert.ui_link }}" class="button" target="_blank">View all issues in Fix</a>
+</p>
 <div class="email-footer">
   <p style="font-size: 10px;">
     If you believe you have received this email in error,

@@ -76,7 +76,7 @@ def create_gauge_percent(title: str, value: float, previous: float) -> bytes:
         go.Indicator(
             mode="gauge+number+delta",
             value=value,
-            number={"font": {"size": 90, "color": "#1C4396", "family": "Arial Black"}},
+            number={"font": {"size": 90, "color": "#3d58d3", "family": "Arial Black"}},
             title={"text": title, "font": {"color": "#2C3E50", "size": 20}},
             delta={
                 "reference": previous,

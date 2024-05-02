@@ -1,40 +1,52 @@
-Day 5: Exploring the Depths of Fix Together
+Day 5: Exploring the depths of Fix
 
-Congratulations on reaching the fifth and final day of our Fix 101 Series! You've embarked on a comprehensive journey through Fix's features, gaining insights into safeguarding your digital infrastructure.
+
+Congratulations on reaching the fifth and final day of our Fix 101 series! You've embarked on a comprehensive journey through Fix's features, gaining insights into safeguarding your digital infrastructure.
 Yet, there's more to explore.
 Let's dive into some of the platform's nuanced capabilities that enhance collaboration and knowledge sharing.
 
-Empower Your Team by Inviting Users to Your Workspace
+
+Invite users to your workspace
 
 Security is a team effort, and Fix embraces this by enabling you to bring your colleagues into the fold.
 By inviting others to your workspace, you can ensure everyone is aligned and informed.
 Assign roles with specific permissions to each user, tailoring their access level from read-only to write, or even admin privileges, to maintain control while fostering collaboration.
 
-Integrate Fix into your CI/CD pipeline or other CLI based workflows
+
+Integrate with your CI/CD pipeline or other CLI-based workflows
 
 Using our CLI tool fixctl you can export the results of Fix searches in JSON, YAML or CSV format.
 Allowing you to write custom logic that takes Fix's data and further processes it in custom ways, depending on your use-cases.
 Maximize Coverage by Scraping Your Entire AWS Organization
 
-It is easily possible to scrape your full AWS Organization with Fix.
 
-To add all of your Organization's AWS accounts to Fix, copy the Cloudformation Template URL, External Id and Workspace Id from the Cloud Setup page, and use them to create a StackSet that you deploy to one region in each account that you want to add to Fix.
+Scrape your entire AWS Organization
 
-Leverage Comprehensive Reference Documentation
+To add all of your Organization's AWS accounts to Fix, copy the Cloudformation Template URL, External ID, and Workspace ID from the Cloud Setup page, and use them to create a StackSet that you deploy to one region in each account that you want to add to Fix.
 
-For those moments when you need to dig deeper, our reference documentation is your go-to resource.
-Available at https://docs.fix.security, it covers everything from search syntax, detailed data models of cloud resources, to the intricacies of resource relationships.
+
+Leverage comprehensive documentation
+
+For those moments when you need to dig deeper, our documentation is your go-to resource.
+It covers everything from search syntax and cloud resource data models to the intricacies of resource relationships.
 It's an invaluable tool for expanding your understanding and making the most of Fix.
 
-Your Journey with Fix Doesn't End Here
+View docs: https://docs.fix.security
 
-As we conclude our Fix 101 Series, remember that this is just the beginning of your journey toward a more secure and efficient cloud environment.
+
+Your journey with Fix doesn't end here
+
+As we conclude our Fix 101 series, remember that this is just the beginning of your journey toward a more secure and efficient cloud environment.
 Our team remains at your side, ready to assist with any questions or guidance you may need.
 Whether you're setting up your workspace, inviting team members, or navigating through our documentation, we're here to help.
 
 Contact us at support@fix.security or join our supportive community on Discord at https://discord.gg/fixsecurity.
 
+
 Here's to a future where your digital spaces are not only monitored but mastered, with Fix as your constant ally.
 Together, let's continue to safeguard and optimize our digital landscapes.
 
 The Fix Team
+
+
+Log in to Fix: https://app.fix.security?origin=email&tpl={{ template_name }}

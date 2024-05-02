@@ -8,14 +8,14 @@
 {% endblock %}
 
 {% block content %}
-  <h1>Your Cloud Infrastructure Status Update ☁️</h1>
+  <h1>Your {{duration}}ly status update ☁️</h1>
 
   <h2>Workspace: "{{ workspace_name }}"</h2>
   <p>
     Fix collected information from <strong>{{ 'cloud account'|pluralize(accounts) }}</strong>.<br/>
     All account names with the number of resources are shown in the timeline diagram below.
   </p>
-  <h2>Security Score</h2>
+  <h2>Security score</h2>
   <p>The current weighted security score across all accounts stands at <strong>{{ score_progress[0] }}</strong>.<br/>
     {% if score_progress[1] < 0 %}
       This represents a decline of <strong>{{ score_progress[1] | abs }}</strong> points over the last {{ duration }}.<br/>
@@ -36,7 +36,7 @@
     <figcaption>Security Score over all {{ 'cloud account'|pluralize(accounts) }}.</figcaption>
   </figure>
 
-  <h2>Compute Resources</h2>
+  <h2>Resources</h2>
   <p>
     The diagram below displays compute and database resources.
     This information is usually a valuable indicator, providing
@@ -117,23 +117,17 @@
   <h2>Resource Changes</h2>
   Fix has recorded the following changes in your infrastructure over the past {{ duration }}:
   <table class="purchase" style="max-width: 75%">
-  <thead class="purchase_heading">
-  <tr>
-    <th style="text-align: left;">Kind of Change</th>
-    <th style="text-align: left;">Nr of Resources</th>
-  </tr>
-  </thead>
   <tbody>
   <tr class="purchase_item">
-    <td class="td-bottom-line">New Resources Created</td>
+    <td class="td-bottom-line">New resources created</td>
     <td class="td-bottom-line">{{ resource_changes[0] }}</td>
   </tr>
   <tr class="purchase_item">
-    <td class="td-bottom-line">Existing Resources Updated</td>
+    <td class="td-bottom-line">Existing resources updated</td>
     <td class="td-bottom-line">{{ resource_changes[1] }}</td>
   </tr>
   <tr class="purchase_item">
-    <td class="td-bottom-line">Existing Resources Deleted</td>
+    <td class="td-bottom-line">Existing resources deleted</td>
     <td class="td-bottom-line">{{ resource_changes[2] }}</td>
   </tr>
   </tbody>
@@ -145,7 +139,7 @@
   </p>
 
   <p>
-    <a href="https://app.fix.security?origin=email&tpl={{ template_name }}" class="button" target="_blank">Login to Fix</a>
+    <a href="https://app.fix.security?origin=email&tpl={{ template_name }}" class="button" target="_blank">Log in to Fix</a>
   </p>
 
   <p>
