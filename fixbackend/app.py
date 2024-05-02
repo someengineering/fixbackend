@@ -232,7 +232,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         async def hello() -> Response:
             return Response(content="Hello, World!")
 
-        app.include_router(admin_console_router(deps), include_in_schema=False)
+        app.include_router(admin_console_router(deps, google_client(cfg)), include_in_schema=False)
 
         app.mount("/static", StaticFiles(directory="static"), name="static")
 

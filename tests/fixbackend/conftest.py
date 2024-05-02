@@ -226,6 +226,7 @@ def default_config() -> Config:
         posthog_api_key=None,
         stripe_api_key=None,
         stripe_webhook_key=None,
+        customer_support_users=[],
     )
 
 

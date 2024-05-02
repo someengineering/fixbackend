@@ -81,6 +81,7 @@ class Config(BaseSettings):
     push_gateway_url: Optional[str]
     stripe_api_key: Optional[str]
     stripe_webhook_key: Optional[str]
+    customer_support_users: List[str]
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -185,6 +186,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--port", type=int, default=os.environ.get("PORT", 8000))
     parser.add_argument("--stripe-api-key", default=os.environ.get("STRIPE_API_KEY"))
     parser.add_argument("--stripe-webhook-key", default=os.environ.get("STRIPE_WEBHOOK_KEY"))
+    parser.add_argument(
+        "--customer-support-users", nargs="+", default=os.environ.get("CUSTOMER_SUPPORT_USERS", "").split(",")
+    )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

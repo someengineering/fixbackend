@@ -128,6 +128,7 @@ class InventoryService(Service):
         domain_event_subscriber: Optional[DomainEventSubscriber],
         redis: Redis,
         redis_settings: RedisSettings,
+        start_workers: bool = True,
     ) -> None:
         self.client = client
         self.__cached_aggregate_roots: Optional[Dict[str, Json]] = None
@@ -142,6 +143,7 @@ class InventoryService(Service):
             functions=[func(self._update_cloud_account_name_again, name="update_cloud_account_name_again")],
         )
         self.update_name_again_after = timedelta(hours=1)
+        self.start_workers = start_workers
         if sub := domain_event_subscriber:
             sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
             sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
@@ -152,14 +154,16 @@ class InventoryService(Service):
             sub.subscribe(CloudAccountActiveToggled, self._configure_disabled_accounts, Inventory)
 
     async def start(self) -> Any:
-        await self.cache.start()
-        await self.worker.start()
-        await self.dispatcher.start()
+        if self.start_workers:
+            await self.cache.start()
+            await self.worker.start()
+            await self.dispatcher.start()
 
     async def stop(self) -> Any:
-        await self.dispatcher.stop()
-        await self.worker.stop()
-        await self.cache.stop()
+        if self.start_workers:
+            await self.dispatcher.stop()
+            await self.worker.stop()
+            await self.cache.stop()
 
     async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
         set_workspace_id(event.tenant_id)
