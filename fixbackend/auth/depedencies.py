@@ -50,7 +50,7 @@ async def get_current_active_verified_user(
     set_user_id(str(user.id))
 
     # if we get the authenticated user, the jwt cookie should be there.
-    if session_token and (token := strategy.decode_token(session_token)):
+    if session_token and (token := await strategy.decode_token(session_token)):
         # if the token is to be expired in 1 hour, we need to refresh it
         if token.get("exp", 0) < (datetime.utcnow() + timedelta(hours=1)).timestamp():
             connection.scope[refreshed_session_scope] = await strategy.write_token(user)

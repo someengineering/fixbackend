@@ -12,10 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List
-from datetime import datetime, timedelta
-import os
 
 from aiofiles import open as aopen
 from async_lru import alru_cache
@@ -24,7 +24,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.x509 import Certificate
 
 from fixbackend.config import Config
@@ -117,3 +117,11 @@ class CertificateStore:
             cert_key_pairs = await self._get_signing_cert_key_pair()
 
         return cert_key_pairs
+
+    async def private_key(self) -> RSAPrivateKey:
+        cert_key_pairs = await self.get_signing_cert_key_pair()
+        return cert_key_pairs[0].private_key
+
+    async def public_keys(self) -> List[RSAPublicKey]:
+        cert_key_pairs = await self.get_signing_cert_key_pair()
+        return [ckp.private_key.public_key() for ckp in cert_key_pairs]

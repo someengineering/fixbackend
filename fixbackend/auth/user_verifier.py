@@ -52,7 +52,7 @@ class AuthEmailSender:
 
 
 def get_auth_email_sender(deps: FixDependency) -> AuthEmailSender:
-    return AuthEmailSender(deps.service(ServiceNames.notification_service, NotificationService))
+    return deps.service(ServiceNames.auth_email_sender, AuthEmailSender)
 
 
 AuthEmailSenderDependency = Annotated[AuthEmailSender, Depends(get_auth_email_sender)]
