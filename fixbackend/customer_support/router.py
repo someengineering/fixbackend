@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
+from pathlib import Path
 from typing import Annotated, Any, Callable, Coroutine, Dict, Optional, Sequence
 import uuid
 
@@ -37,6 +38,8 @@ from fastapi import status
 
 
 log = logging.getLogger(__name__)
+
+TemplatesPath = Path(__file__).parent / "templates"
 
 
 @frozen
@@ -82,7 +85,7 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
 
     root = APIRouter()
 
-    templates = Jinja2Templates(directory="fixbackend/customer_support/templates")
+    templates = Jinja2Templates(directory=TemplatesPath)
 
     root.include_router(auth_router(dependencies, templates, google_client), prefix="/auth")
 

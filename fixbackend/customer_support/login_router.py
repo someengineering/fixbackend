@@ -68,7 +68,7 @@ def auth_router(dependencies: FixDependencies, templates: Jinja2Templates, googl
 
         auth_url = await get_auth_url(request, state, google_client, auth_backend)
         return templates.TemplateResponse(
-            request=request, name="login/index.html", context={"request": request, "auth_url": auth_url}
+            request=request, name="auth/index.html", context={"request": request, "auth_url": auth_url}
         )
 
     return router
