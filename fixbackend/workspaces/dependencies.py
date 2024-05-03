@@ -61,7 +61,6 @@ async def get_optional_user_workspace(
 
 async def get_user_workspace(
     maybe_workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
-    user: OptionalAuthenticatedUser,
 ) -> Workspace:
     match maybe_workspace:
         case "Unauthorized":
