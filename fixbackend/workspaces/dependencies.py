@@ -58,6 +58,7 @@ async def get_optional_user_workspace(
 
 async def get_user_workspace(
     maybe_workspace: Annotated[Union[Workspace, WorkspaceError], Depends(get_optional_user_workspace)],
+    user: OptionalAuthenticatedUser,
 ) -> Workspace:
     match maybe_workspace:
         case "Unauthorized":
@@ -68,7 +69,7 @@ async def get_user_workspace(
             raise HTTPException(status_code=403, detail="not_a_workspace_member")
         case "TrialEnded":
             raise HTTPException(status_code=403, detail="trial_ended")
-        case workspace if workspace.payment_on_hold_since:
+        case workspace if user and not workspace.paid_tier_access(user.id):
             raise HTTPException(status_code=403, detail="workspace_payment_on_hold")
         case workspace:
             return workspace
