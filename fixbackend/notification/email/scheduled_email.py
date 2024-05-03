@@ -27,6 +27,7 @@ from fixbackend.auth.models.orm import User
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
 from fixbackend.ids import UserId, WorkspaceId, ProductTier
+from fixbackend.inventory.inventory_client import NoSuchGraph
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
@@ -118,20 +119,25 @@ class ScheduledEmailSender(Service):
                 content_to_send: Optional[Tuple[str, str, str, Dict[str, bytes]]] = None
                 for org, user in (await session.execute(statement)).unique().all():
                     workspace = org.to_model()
-                    if last_workspace != workspace:
-                        content_to_send = await self.status_update_creator.create_messages(workspace, now, duration)
-                    if content_to_send:
-                        subject, html, txt, images = content_to_send
-                        await self.email_sender.send_email(
-                            to=user.email,
-                            subject=subject,
-                            text=txt,
-                            html=html,
-                            unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
-                            images=images,
-                        )
-                        session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
-                        counter += 1
+                    try:
+                        if last_workspace != workspace:
+                            content_to_send = await self.status_update_creator.create_messages(workspace, now, duration)
+                        if content_to_send:
+                            subject, html, txt, images = content_to_send
+                            await self.email_sender.send_email(
+                                to=user.email,
+                                subject=subject,
+                                text=txt,
+                                html=html,
+                                unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
+                                images=images,
+                            )
+                            session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
+                            counter += 1
+                    except NoSuchGraph:
+                        pass  # ignore workspaces without graphs
+                    except Exception:
+                        log.exception(f"Failed to send status update email for workspace {workspace.id}", exc_info=True)
                 await session.commit()
 
         if now.weekday() == 4 and 9 <= now.hour <= 12:  # Fridays between 9 and 12
