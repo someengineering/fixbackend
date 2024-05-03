@@ -418,15 +418,14 @@ class InventoryService(Service):
                 accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
                 resource_count_by_severity: Dict[str, int] = defaultdict(int)
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
-                # vulnerable: use current severity, compliant: use previous severity
-                severity_prop = "/security.severity" if change == "node_vulnerable" else "/diff.previous"
                 async with self.client.execute_single(
                     db,
-                    f"history --change {change} --after {duration.total_seconds()}s | aggregate "
+                    f"history --change node_vulnerable --change node_compliant "
+                    f"--after {duration.total_seconds()}s | aggregate "
                     f"/ancestors.account.reported.id as account_id, "
-                    f"{severity_prop} as severity,"
+                    f"/diff.{change}[*].severity as severity,"
                     f"kind as kind"
-                    ": count(name) as count | dump",
+                    ": sum(1) as count | dump",
                 ) as result:
                     async for elem in result:
                         assert isinstance(elem, dict), f"Expected Json object but got {elem}"
