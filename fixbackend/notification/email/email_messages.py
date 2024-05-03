@@ -74,10 +74,10 @@ class Signup:
     recipient: str
 
     def subject(self) -> str:
-        return "Welcome to fix!"
+        return "Welcome to Fix!"
 
     def text(self) -> str:
-        return f"Welcome to fix, {self.recipient}!"
+        return f"Welcome to Fix, {self.recipient}!"
 
     def html(self) -> str:
         return render(
@@ -98,7 +98,7 @@ class Invite:
     recipient: str
 
     def subject(self) -> str:
-        return "You've been invited to join Fix!"
+        return "You've been invited to join a Fix workspace"
 
     def text(self) -> str:
         text = (
@@ -125,10 +125,10 @@ class VerifyEmail:
     verification_link: str
 
     def subject(self) -> str:
-        return "Fix: verify your e-mail address"
+        return "Verify your e-mail address"
 
     def text(self) -> str:
-        return f"Hello fellow Fix user, click this link to verify your email. {self.verification_link}"
+        return f"Hello! Please click this link to verify your email. {self.verification_link}"
 
     def html(self) -> str:
         return render(
@@ -146,10 +146,10 @@ class PasswordReset:
     password_reset_link: str
 
     def subject(self) -> str:
-        return "Fix: password reset"
+        return "Reset your Fix password"
 
     def text(self) -> str:
-        return f"You requested a password reset link for your Fix account. Here it is: {self.password_reset_link}"
+        return f"We received a request to reset the password for your Fix account. To set a new password, click this link: {self.password_reset_link}"
 
     def html(self) -> str:
         return render(
@@ -164,16 +164,18 @@ class PasswordReset:
 @frozen(kw_only=True)
 class SecurityScanFinished:
     def subject(self) -> str:
-        return "Fix: Security Scan Finished"
+        return "Security scan complete"
 
     def text(self) -> str:
-        return "Your first security scan is finished! You can now view the results in the Fix console."
+        return f"""Your first security scan is complete! You can now view the results in the Fix console.
+
+View in Fix: https://app.fix.security"""  # noqa
 
     def html(self) -> str:
         return render(
             "security_scan_finished.html",
             title=self.subject(),
-            fix_console_url="https://app.fix.security/",
+            fix_console_url="https://app.fix.security",
         )
 
 
@@ -190,12 +192,12 @@ class AccountDegraded:
         return formatted
 
     def subject(self) -> str:
-        return f"""Account {self.account_info()} cannot be accessed due to permission issues."""
+        return f"""Unable to access account {self.account_info()}"""
 
     def text(self) -> str:
-        return f"""We were not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary permissions are granted for access.
+        return f"""Fix was not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
 
-Please visit https://app.fix.security/workspace-settings/accounts#{self.tenant_id} for more details."""  # noqa
+View in Fix: https://app.fix.security/workspace-settings/accounts#{self.tenant_id}"""  # noqa
 
     def html(self) -> str:
         return render(
@@ -232,33 +234,37 @@ class TrialExpiresSoon:
         return expires_in
 
     def subject(self) -> str:
-        return f"Fix: Your trial is ending in {self.expires_days()}"
+        return f"Your Fix trial ends in {self.expires_days()}"
 
     def text(self) -> str:
-        return f"""Your Fix trial is ending in { self.expires_days() }. Don't miss out on the benefits of a subscription.
+        return f"""We noticed you haven't bought a Fix subscription yet, and your trial is about to expire.
 
-We noticed you haven't bought a Fix subscription yet.
 
-Easy Steps to get a Fix subscription:
+How to subscribe:
 
  - Log in to Fix (https://app.fix.security), then navigate to Workspace Settings, and click on the Billing tab.
  - Follow the instructions to add your payment method and subscribe to a plan.
 
 
-What Happens Next?
+What happens next?
 
-If you won't get a subscription, soon after your trial expires your account will downgraded to the Free plan.
+If you don't purchase a subscription, your account will downgraded to the Free plan after the trial expires.
 Only a single user will be able to log in, and the data we collected about your cloud accounts will no longer be available in Fix.
-You will also lose access to the features available in the paid plans.
+You will also lose access to features only available in paid plans.
 
-Here for You
 
-If any step in the process feels unclear,
+Here for you
+
+If any step in the process feels unclear
 or if you encounter any bumps along the road, our team is standing by.
 Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
 
+
 Warm regards,
 The Fix Team
+
+
+Log in to Fix: https://app.fix.security
 """  # noqa
 
     def html(self) -> str:
@@ -277,32 +283,39 @@ The Fix Team
 class TrialExpired:
 
     def subject(self) -> str:
-        return "Fix: Your trial is over"
+        return "Your Fix trial has ended"
 
     def text(self) -> str:
-        return """Your trial period is over, but you can still access your account and data. Please upgrade to continue using Fix.
+        return """We noticed you haven't bought a Fix subscription yet, and your trial has expired. Your account has been downgraded to the Free plan, and you have lost access to the features available in the paid plans.
 
-We noticed you haven't bought a Fix subscription yet.
+But don't worry, your account data is still there and you can easily get back on track by subscribing to one of our
+plans.
 
-Easy Steps to get a Fix subscription:
+
+How to subscribe:
 
  - Log in to Fix (https://app.fix.security), then navigate to Workspace Settings, and click on the Billing tab.
  - Follow the instructions to add your payment method and subscribe to a plan.
 
 
-What Happens Next?
+What happens next?
 
-Only a single user will be able to log in, and the data collected about your cloud accounts will no longer be available in Fix.
-You will also lose access to the features available in the paid plans.
+Only a single user will be able to log in, and the data we collected about your cloud accounts will no longer be available in Fix.
+You will also lose access to features only available in paid plans.
 
-Here for You
 
-If any step in the process feels unclear,
+Here for you
+
+If any step in the process feels unclear
 or if you encounter any bumps along the road, our team is standing by.
 Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
 
+
 Warm regards,
 The Fix Team
+
+
+Log in to Fix: https://app.fix.security
 """  # noqa
 
     def html(self) -> str:

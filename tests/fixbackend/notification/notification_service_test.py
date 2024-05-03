@@ -289,15 +289,12 @@ async def test_send_degraded_message(
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)
 
     assert len(email_sender.call_args) == 1
+    assert email_sender.call_args[0].subject == "Unable to access account Development (12345)"
+    assert "Unable to access account Development (12345)" in (email_sender.call_args[0].html or "")
+    assert "Fix was not able to collect latest resource information for account Development (12345)." in (
+        email_sender.call_args[0].html or ""
+    )
     assert (
-        email_sender.call_args[0].subject == "Account Development (12345) cannot be accessed due to permission issues."
-    )
-    assert "Account Development (12345) cannot be accessed due to permission issues." in (
-        email_sender.call_args[0].html or ""
-    )
-    assert "We were not able to collect latest resource information for account Development (12345)." in (
-        email_sender.call_args[0].html or ""
-    )
-    assert f"""Please visit <a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}">""" in (
-        email_sender.call_args[0].html or ""
+        f'<a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}" '
+        'class="button" target="_blank">View in Fix</a>' in (email_sender.call_args[0].html or "")
     )

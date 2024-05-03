@@ -40,6 +40,7 @@ from fixbackend.permissions.role_repository import RoleRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
+# noinspection PyMissingConstructor
 class NotificationServiceMock(NotificationService):
     def __init__(self) -> None:
         self.call_args: List[EmailMessage] = []
@@ -131,7 +132,7 @@ async def test_invite_accept_user(
     email = notification_service.call_args[0]
     assert isinstance(email, Invite)
     assert email.recipient == new_user_email
-    assert email.subject() == "You've been invited to join Fix!"
+    assert email.subject() == "You've been invited to join a Fix workspace"
     assert email.text().startswith(f"{user.email} has invited you to join their workspace")
     assert "https://example.com?token=" in email.text()
 

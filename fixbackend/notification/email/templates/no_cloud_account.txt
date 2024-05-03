@@ -1,14 +1,16 @@
-Connect your Cloud Accounts
+Connect your cloud accounts
+
 
 We noticed you haven't added any cloud account to your Fix workspace yet,
 and we're here to guide you through this final, crucial step.
 It's your gateway to a world of clarity, security, and optimization
 for your cloud infrastructure and takes less than 5 minutes.
 
-Easy Steps to Connect Your Cloud Account
+
+How to connect your first cloud account
 
 1. Workspace Settings:
-   Login to Fix at https://app.fix.security and locate the Workspace
+   Log in to Fix at https://app.fix.security and locate the Workspace
    Settings icon at the bottom left of your screen.
 2. Access Accounts:
    Within the Workspace Settings, you'll find the "Accounts" section.
@@ -28,18 +30,24 @@ Easy Steps to Connect Your Cloud Account
    Now, you can close the AWS tab and head back to Fix.
    Our system will spring into action, detecting your new CloudFormation stack.
 
-What Comes Next?
+
+What's next?
 
 Give us about 20 minutes after the stack creation,
 and we'll conduct our first scan of your cloud environment.
 We will send you a message when the first scan is complete,
 and you can start exploring the insights we've gathered.
 
-Here for You
+
+Here for you
 
 If any step in the process feels unclear,
 or if you encounter any bumps along the road, our team is standing by.
 Contact us at support@fix.security or ping us on Discord at https://discord.gg/fixsecurity.
 
+
 Warm regards,
 The Fix Team
+
+
+Log in to Fix: https://app.fix.security?origin=email&tpl={{ template_name }}
