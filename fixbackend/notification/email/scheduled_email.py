@@ -11,10 +11,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import logging
 import calendar
+import logging
 from datetime import datetime, timedelta
 from typing import Tuple, Optional, Dict
+from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
 from fixcloudutils.asyncio.periodic import Periodic
@@ -26,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.auth.models.orm import User
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
-from fixbackend.ids import UserId, WorkspaceId, ProductTier
+from fixbackend.ids import WorkspaceId, ProductTier
 from fixbackend.inventory.inventory_client import NoSuchGraph
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
@@ -44,15 +45,15 @@ no_cloud_account = "no_cloud_account"
 
 class ScheduledEmailEntity(Base):
     __tablename__ = "scheduled_email"
-    id: Mapped[GUID] = mapped_column(GUID, primary_key=True)
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
     after: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class ScheduledEmailSentEntity(Base):
     __tablename__ = "scheduled_email_sent"
-    id: Mapped[GUID] = mapped_column(GUID, primary_key=True)
-    user_id: Mapped[UserId] = mapped_column(GUID, nullable=False)
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(GUID, nullable=False)
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
     at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
@@ -132,6 +133,10 @@ class ScheduledEmailSender(Service):
                                 unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
                                 images=images,
                             )
+                            log.info(
+                                f"Sent status update email={user.email}, workspace={workspace.id}, "
+                                f"tier={workspace.product_tier}, subject: {subject}"
+                            )
                             session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
                             counter += 1
                     except NoSuchGraph:
@@ -195,7 +200,7 @@ class ScheduledEmailSender(Service):
                 subject = "Fix: Connect your Cloud Accounts  🔌"
                 txt = email_messages.render("no_cloud_account.txt")
                 html = email_messages.render("no_cloud_account.html", user_id=user.id)
-                log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
+                log.info(f"Sending email to {user.email} with subject {subject}.")
                 await self.email_sender.send_email(to=user.email, subject=subject, text=txt, html=html)
                 session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=no_cloud_account, at=now))
             await session.commit()
@@ -237,7 +242,7 @@ class ScheduledEmailSender(Service):
                 subject = email_messages.render(f"{to_send.kind}.subject").strip()
                 txt = email_messages.render(f"{to_send.kind}.txt")
                 html = email_messages.render(f"{to_send.kind}.html", user_id=user.id)
-                log.info(f"Sending email to {user.email} with subject {subject} and body {html}")
+                log.info(f"Sending email to {user.email} with subject {subject}")
                 await self.email_sender.send_email(
                     to=user.email, subject=subject, text=txt, html=html, unsubscribe="tutorial"
                 )

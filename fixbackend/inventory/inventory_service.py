@@ -332,8 +332,8 @@ class InventoryService(Service):
     ) -> AsyncContextManager[AsyncIteratorWithContext[JsonElement]]:
         if history := request.history:
             cmd = "history"
-            if history.change:
-                cmd += f" --change {history.change.value}"
+            for change in history.all_changes():
+                cmd += f" --change {change}"
             if history.before:
                 cmd += f" --before {utc_str(history.before)}"
             if history.after:

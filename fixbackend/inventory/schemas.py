@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import List, Dict, Optional, Literal, Union, Any
 from urllib.parse import urlencode
 
@@ -147,7 +147,7 @@ class CompletePathRequest(BaseModel):
     skip: int = Field(default=0, description="The number of results to skip. If not given, no results are skipped.")
 
 
-class HistoryChange(Enum):
+class HistoryChange(StrEnum):
     node_created = "node_created"  # when the resource is created
     node_updated = "node_updated"  # when the resource is updated
     node_deleted = "node_deleted"  # when the resource is deleted
@@ -158,7 +158,16 @@ class HistoryChange(Enum):
 class HistorySearch(BaseModel):
     before: Optional[datetime] = Field(default=None, description="The time before which to search.")
     after: Optional[datetime] = Field(default=None, description="The time after which to search.")
+    # TODO: remove this field once the frontend uses it
     change: Optional[HistoryChange] = Field(default=None, description="The change to search for.")
+    changes: List[HistoryChange] = Field(default_factory=list, description="The change to search for.")
+
+    def all_changes(self) -> List[HistoryChange]:
+        if self.change:
+            result = set(self.changes)
+            result.add(self.change)
+            return list(result)
+        return self.changes
 
 
 class SortOrder(BaseModel):
@@ -186,8 +195,8 @@ class SearchRequest(BaseModel):
                 params["before"] = utc_str(self.history.before)
             if self.history.after:
                 params["after"] = utc_str(self.history.after)
-            if self.history.change:
-                params["change"] = self.history.change.value
+            if changes := self.history.all_changes():
+                params["change"] = ",".join(changes)
         if self.skip:
             params["skip"] = str(self.skip)
         if self.limit:
