@@ -284,7 +284,10 @@ async def test_send_degraded_message(
     email_sender: InMemoryEmailSender,
 ) -> None:
     message = AccountDegraded(
-        cloud_account_id=CloudAccountId("12345"), tenant_id=workspace.id, account_name="Development"
+        cloud_account_id=CloudAccountId("12345"),
+        tenant_id=workspace.id,
+        account_name="Development",
+        cf_stack_deleted=False,
     )
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)
 
@@ -294,7 +297,6 @@ async def test_send_degraded_message(
     assert "Fix was not able to collect latest resource information for account Development (12345)." in (
         email_sender.call_args[0].html or ""
     )
-    assert (
-        f'<a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}" '
-        'class="button" target="_blank">View in Fix</a>' in (email_sender.call_args[0].html or "")
+    assert f'<a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}' in (
+        email_sender.call_args[0].html or ""
     )

@@ -184,6 +184,7 @@ class AccountDegraded:
     cloud_account_id: CloudAccountId
     account_name: Optional[str]
     tenant_id: WorkspaceId
+    cf_stack_deleted: bool
 
     def account_info(self) -> str:
         formatted = (
@@ -195,6 +196,11 @@ class AccountDegraded:
         return f"""Unable to access account {self.account_info()}"""
 
     def text(self) -> str:
+        if self.cf_stack_deleted:
+            return (
+                f"""Fix was not able to collect latest resource information for account {self.account_info()}"""
+                "because the CloudFormation stack was deleted."
+            )
         return f"""Fix was not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
 
 View in Fix: https://app.fix.security/workspace-settings/accounts#{self.tenant_id}"""  # noqa

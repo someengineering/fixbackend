@@ -51,6 +51,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDegraded,
     AwsAccountDeleted,
     AwsAccountDiscovered,
+    DegradationReason,
     SubscriptionCancelled,
     ProductTierChanged,
     CloudAccountActiveToggled,
@@ -296,7 +297,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 and access.external_id == external_id
             ):
                 account = await self.__degrade_account(
-                    FixCloudAccountId(cloud_account_id), "CloudformationStack deleted"
+                    FixCloudAccountId(cloud_account_id),
+                    "CloudformationStack deleted",
+                    reason=DegradationReason.stack_deleted,
                 )
             await send_response(msg, str(cloud_account_id))
             return account
@@ -364,7 +367,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         )
 
                         if updated.failed_scan_count > 3:
-                            await self.__degrade_account(updated.id, "Too many consecutive failed scans")
+                            await self.__degrade_account(
+                                updated.id, "Too many consecutive failed scans", DegradationReason.other
+                            )
 
                     if first_workspace_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
@@ -409,7 +414,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         )
 
                         if updated.failed_scan_count > 3:
-                            await self.__degrade_account(updated.id, "Too many consecutive failed scans")
+                            await self.__degrade_account(
+                                updated.id, "Too many consecutive failed scans", DegradationReason.other
+                            )
 
                 case AwsAccountDiscovered.kind:
                     discovered_event = AwsAccountDiscovered.from_json(message)
@@ -435,6 +442,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             cloud_account_id=degraded_event.aws_account_id,
                             tenant_id=degraded_event.tenant_id,
                             account_name=degraded_event.aws_account_name,
+                            cf_stack_deleted=degraded_event.reason == DegradationReason.stack_deleted,
                         ),
                     )
                     await send_pub_sub_message(degraded_event)
@@ -486,7 +494,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             # The user will see the degraded state in the UI and can eventually fix the problem.
             if (utc() - account.state_updated_at) > timedelta(minutes=30):
                 log.info(f"Account {account.id} has been in discovered state for too long, degrading account")
-                await self.__degrade_account(account.id, "Account in discovered state for too long")
+                await self.__degrade_account(
+                    account.id, "Account in discovered state for too long", DegradationReason.other
+                )
                 continue
             try:
                 await self.configure_account(account, called_from_event=False)
@@ -542,7 +552,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 if should_move_to_degraded():
                     log.info("failed to assume role, but timeout is reached, moving account to degraded state")
                     error = "Cannot assume role"
-                    await self.__degrade_account(account.id, error)
+                    await self.__degrade_account(account.id, error, DegradationReason.other)
                     return CantAssumeRole(retry_limit_reached=True)
                 elif fast_lane_should_end():
                     log.info("Can't assume role, leaving account in discovered state")
@@ -887,9 +897,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return await self.cloud_account_repository.update(cloud_account_id, update_state)
 
     async def __degrade_account(
-        self,
-        account_id: FixCloudAccountId,
-        error: str,
+        self, account_id: FixCloudAccountId, error: str, reason: DegradationReason
     ) -> CloudAccount:
         def set_degraded(cloud_account: CloudAccount) -> CloudAccount:
             if access := cloud_account.state.cloud_access():
@@ -910,6 +918,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 aws_account_id=account.account_id,
                 aws_account_name=account.final_name(),
                 error=error,
+                reason=reason,
             )
         )
         return account
