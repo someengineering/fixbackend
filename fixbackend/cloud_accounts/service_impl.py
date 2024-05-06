@@ -327,7 +327,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         log.info(f"Received domain event of kind {context.kind}: {message}")
 
         async def send_pub_sub_message(
-            e: Union[AwsAccountDegraded, AwsAccountDiscovered, AwsAccountDeleted, AwsAccountConfigured]
+            e: Union[
+                AwsAccountDegraded,
+                AwsAccountDiscovered,
+                AwsAccountDeleted,
+                AwsAccountConfigured,
+                TenantAccountsCollected,
+            ]
         ) -> None:
             msg = e.to_json()
             msg.pop("tenant_id", None)
@@ -371,6 +377,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                                 updated.id, "Too many consecutive failed scans", DegradationReason.other
                             )
 
+                    await send_pub_sub_message(event)
                     if first_workspace_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(
@@ -386,10 +393,6 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
                 case TenantAccountsCollectFailed.kind:
                     event = TenantAccountsCollected.from_json(message)
-
-                    accounts = await self.cloud_account_repository.list(list(event.cloud_accounts.keys()))
-                    collected_accounts = [account for account in accounts if account.id in event.cloud_accounts]
-
                     set_workspace_id(event.tenant_id)
                     for account_id, account in event.cloud_accounts.items():
                         set_fix_cloud_account_id(account_id)
