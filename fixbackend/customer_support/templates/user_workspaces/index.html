@@ -27,7 +27,12 @@
                     hx-target="#workspaces-main" hx-swap="afterend">Add to
                     workspace</button>
             </div>
+            {% if not user.is_verified %}
+            <button class="btn btn-neutral mt-4" hx-post="{{ url_for('resend_verification_email', user_id=user.id)}}"
+                hx-swap="outerHTML">Resend verification email</button>
+            {% endif %}
         </div>
+
     </div>
     <div>
 

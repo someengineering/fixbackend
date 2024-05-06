@@ -22,7 +22,9 @@ from fastapi.routing import APIRoute
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import User
+from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.customer_support.login_router import auth_router
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.ids import UserId, WorkspaceId
@@ -35,6 +37,7 @@ from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fastapi import status
+from fastapi_users.jwt import generate_jwt
 
 
 log = logging.getLogger(__name__)
@@ -94,6 +97,8 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
     user_repo = dependencies.service(ServiceNames.user_repo, UserRepository)
     workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
+    auth_sender = dependencies.service(ServiceNames.auth_email_sender, AuthEmailSender)
+    user_manager = dependencies.service(ServiceNames.user_manager, UserManager)
 
     @router.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> Response:
@@ -258,6 +263,33 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
                 "users": users,
             },
         )
+
+    @router.post(
+        "/user_workspaces/user/{user_id}/send_verify", response_class=HTMLResponse, name="resend_verification_email"
+    )
+    async def resend_verification_email(request: Request, user_id: UserId) -> Response:
+        user = await user_repo.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404)
+
+        token_data = {
+            "sub": str(user.id),
+            "email": user.email,
+            "aud": user_manager.verification_token_audience,
+        }
+        token = generate_jwt(
+            token_data,
+            user_manager.verification_token_secret,
+            user_manager.verification_token_lifetime_seconds,
+        )
+
+        await auth_sender.send_verify_email(
+            user,
+            token,
+            None,
+        )
+
+        return Response(status_code=201, content="<div>Verification email sent</div>")
 
     @router.get("/user_workspaces/user/{user_id}/add", response_class=HTMLResponse, name="add_to_workspace_modal")
     async def add_to_workspace_modal(request: Request, user_id: UserId) -> Response:

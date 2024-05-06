@@ -262,7 +262,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl(session_maker))
 
-    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service))
+    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service, cfg))
     password_helper = deps.add(SN.password_helper, PasswordHelper())
     deps.add(
         SN.user_manager,
@@ -573,7 +573,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
         InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
     )
     password_helper = deps.add(SN.password_helper, PasswordHelper())
-    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service))
+    auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service, cfg))
     deps.add(
         SN.user_manager,
         UserManager(

@@ -15,22 +15,28 @@
 from typing import Annotated, Optional
 
 from fastapi import Depends, Request
+from fastapi.datastructures import URL
 
 from fixbackend.auth.models import User
+from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.notification.email.email_messages import PasswordReset, VerifyEmail
 from fixbackend.notification.notification_service import NotificationService
 
 
 class AuthEmailSender:
-    def __init__(self, notification_service: NotificationService) -> None:
+    def __init__(self, notification_service: NotificationService, config: Config) -> None:
         self.notification_service = notification_service
+        self.config = config
 
     async def send_verify_email(self, user: User, token: str, request: Optional[Request]) -> None:
-        assert request
 
-        redirect_url = request.query_params.get("redirectUrl", "/")
-        verification_link = request.base_url
+        redirect_url = "/"
+        verification_link = URL(self.config.service_base_url)
+        if request:
+            redirect_url = request.query_params.get("redirectUrl", "/")
+            verification_link = request.base_url
+
         verification_link = verification_link.replace(
             path="/auth/verify-email", query=f"token={token}&redirectUrl={redirect_url}"
         )
