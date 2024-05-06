@@ -23,6 +23,7 @@
 
 from abc import ABC
 from datetime import datetime
+from enum import StrEnum
 from typing import ClassVar, Dict, Optional, TypeVar, Type, List, Literal
 
 from attrs import frozen
@@ -111,10 +112,15 @@ class AwsAccountDeleted(Event):
     aws_account_id: CloudAccountId
 
 
+class DegradationReason(StrEnum):
+    stack_deleted = "stack_deleted"
+    other = "other"
+
+
 @frozen
 class AwsAccountDegraded(Event):
     """
-    This event is emitted when AWS account is ready to be collected.
+    This event is emitted when AWS account is not collectable anymore.
     """
 
     kind: ClassVar[str] = "aws_account_degraded"
@@ -124,6 +130,7 @@ class AwsAccountDegraded(Event):
     aws_account_id: CloudAccountId
     aws_account_name: Optional[str]
     error: str
+    reason: Optional[DegradationReason]
 
 
 @frozen

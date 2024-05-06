@@ -44,6 +44,7 @@ from fixbackend.domain_events.events import (
     AwsAccountDiscovered,
     CloudAccountCollectInfo,
     CloudAccountNameChanged,
+    DegradationReason,
     Event,
     TenantAccountsCollectFailed,
     TenantAccountsCollected,
@@ -1083,6 +1084,7 @@ async def test_handle_events(
             tenant_id=workspace.id,
             aws_account_name="test",
             error="test",
+            reason=DegradationReason.stack_deleted,
         ),
         AwsAccountDeleted(
             cloud_account_id=FixCloudAccountId(uuid.uuid4()),

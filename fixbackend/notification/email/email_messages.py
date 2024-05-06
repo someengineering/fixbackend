@@ -184,6 +184,7 @@ class AccountDegraded:
     cloud_account_id: CloudAccountId
     account_name: Optional[str]
     tenant_id: WorkspaceId
+    cf_stack_deleted: bool
 
     def account_info(self) -> str:
         formatted = (
@@ -192,14 +193,26 @@ class AccountDegraded:
         return formatted
 
     def subject(self) -> str:
+        if self.cf_stack_deleted:
+            return f"""CloudFormation Stack for account {self.account_info()} was deleted"""
         return f"""Unable to access account {self.account_info()}"""
 
     def text(self) -> str:
+        if self.cf_stack_deleted:
+            return (
+                f"""We noticed that you deleted the CloudFormation Stack for account {self.account_info()}."""
+                "The corresponding resources won't be collected."
+            )
         return f"""Fix was not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
 
 View in Fix: https://app.fix.security/workspace-settings/accounts#{self.tenant_id}"""  # noqa
 
     def html(self) -> str:
+        if self.cf_stack_deleted:
+            return render(
+                "account_deleted.html",
+                message=self,
+            )
         return render(
             "account_degraded.html",
             message=self,
