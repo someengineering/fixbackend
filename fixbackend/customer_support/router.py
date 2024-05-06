@@ -272,22 +272,7 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
         if not user:
             raise HTTPException(status_code=404)
 
-        token_data = {
-            "sub": str(user.id),
-            "email": user.email,
-            "aud": user_manager.verification_token_audience,
-        }
-        token = generate_jwt(
-            token_data,
-            user_manager.verification_token_secret,
-            user_manager.verification_token_lifetime_seconds,
-        )
-
-        await auth_sender.send_verify_email(
-            user,
-            token,
-            None,
-        )
+        await user_manager.request_verify(user, request=None)
 
         return Response(status_code=201, content="<div>Verification email sent</div>")
 
