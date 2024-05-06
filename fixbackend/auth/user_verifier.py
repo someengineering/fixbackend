@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from typing import Annotated, Optional
 
 from fastapi import Depends, Request
@@ -22,6 +23,9 @@ from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.notification.email.email_messages import PasswordReset, VerifyEmail
 from fixbackend.notification.notification_service import NotificationService
+
+
+log = logging.getLogger(__name__)
 
 
 class AuthEmailSender:
@@ -44,6 +48,7 @@ class AuthEmailSender:
         message = VerifyEmail(recipient=user.email, verification_link=str(verification_link))
 
         await self.notification_service.send_message(message=message, to=user.email)
+        log.info(f"Sent account verification email to {user.email}")
 
     async def send_password_reset(self, user: User, token: str, request: Optional[Request]) -> None:
         assert request
@@ -55,6 +60,7 @@ class AuthEmailSender:
         message = PasswordReset(recipient=user.email, password_reset_link=str(reset_link))
 
         await self.notification_service.send_message(message=message, to=user.email)
+        log.info(f"Sent password reset email to {user.email}")
 
 
 def get_auth_email_sender(deps: FixDependency) -> AuthEmailSender:
