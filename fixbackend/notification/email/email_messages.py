@@ -200,8 +200,8 @@ class AccountDegraded:
     def text(self) -> str:
         if self.cf_stack_deleted:
             return (
-                f"""Fix was not able to collect latest resource information for account {self.account_info()}."""
-                "Please ensure the account exists and that the necessary access permissions have been granted."
+                f"""We noticed that you deleted the CloudFormation Stack for account {self.account_info()}."""
+                "The corresponding resources won't be collected."
             )
         return f"""Fix was not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
 
