@@ -230,12 +230,9 @@ class NotificationService(Service):
         failing_checks: Dict[str, str] = {}
         failing_resources_count: Dict[str, int] = defaultdict(int)
         total_failed_checks = 0
+        change = [HistoryChange.node_vulnerable, HistoryChange.node_compliant]
         async with self.inventory_client.search_history(
-            access,
-            f"search {query} | aggregate {aggregate}",
-            before=before,
-            after=after,
-            change=[HistoryChange.node_vulnerable, HistoryChange.node_compliant],
+            access, f"search {query} | aggregate {aggregate}", before=before, after=after, change=change
         ) as result:
             async for agg in result:
                 if (
@@ -282,8 +279,7 @@ class NotificationService(Service):
             ]
             # ui link
             ui_link = SearchRequest(
-                query=query,
-                history=HistorySearch(after=after, before=before, change=HistoryChange.node_vulnerable),
+                query=query, history=HistorySearch(after=after, before=before, changes=change)
             ).ui_link(self.config.service_base_url, access.workspace_id)
             return FailingBenchmarkChecksDetected(
                 id=md5(benchmark, *task_ids),
