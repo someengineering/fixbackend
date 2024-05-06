@@ -321,7 +321,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             return None
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
-        log.info(f"Received domain event: {message}")
+        log.info(f"Received domain event of kind {context.kind}: {message}")
 
         async def send_pub_sub_message(
             e: Union[AwsAccountDegraded, AwsAccountDiscovered, AwsAccountDeleted, AwsAccountConfigured]
