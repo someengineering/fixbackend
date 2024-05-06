@@ -39,8 +39,8 @@ from logging import getLogger
 log = getLogger(__name__)
 
 
-def google_client(config: Config) -> GoogleOAuth2:
-    return GoogleOAuth2(config.google_oauth_client_id, config.google_oauth_client_secret)
+def google_client(client_id: str, client_secret: str) -> GoogleOAuth2:
+    return GoogleOAuth2(client_id, client_secret)
 
 
 def github_client(config: Config) -> GithubOauthClient:

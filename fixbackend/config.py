@@ -82,6 +82,8 @@ class Config(BaseSettings):
     stripe_api_key: Optional[str]
     stripe_webhook_key: Optional[str]
     customer_support_users: List[str]
+    customer_support_google_oauth_client_id: str
+    customer_support_google_oauth_client_secret: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -188,6 +190,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--stripe-webhook-key", default=os.environ.get("STRIPE_WEBHOOK_KEY"))
     parser.add_argument(
         "--customer-support-users", nargs="+", default=os.environ.get("CUSTOMER_SUPPORT_USERS", "").split(",")
+    )
+    parser.add_argument(
+        "--customer-support-google-oauth-client-id",
+        default=os.environ.get("CUSTOMER_SUPPORT_GOOGLE_OAUTH_CLIENT_ID", ""),
+    )
+    parser.add_argument(
+        "--customer-support-google-oauth-client-secret",
+        default=os.environ.get("CUSTOMER_SUPPORT_GOOGLE_OAUTH_SECRET", ""),
     )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 

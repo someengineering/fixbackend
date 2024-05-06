@@ -229,6 +229,8 @@ def default_config() -> Config:
         stripe_api_key=None,
         stripe_webhook_key=None,
         customer_support_users=[],
+        customer_support_google_oauth_client_id="",
+        customer_support_google_oauth_client_secret="",
     )
 
 

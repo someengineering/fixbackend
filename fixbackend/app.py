@@ -61,7 +61,7 @@ API_PREFIX = "/api"
 
 # noinspection PyUnresolvedReferences
 async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
-    google = google_client(cfg)
+    google = google_client(cfg.google_oauth_client_id, cfg.google_oauth_client_secret)
     github = github_client(cfg)
 
     @alru_cache(maxsize=1)
@@ -237,7 +237,15 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         async def hello() -> Response:
             return Response(content="Hello, World!")
 
-        app.include_router(admin_console_router(deps, google_client(cfg)), include_in_schema=False)
+        app.include_router(
+            admin_console_router(
+                deps,
+                google_client(
+                    cfg.customer_support_google_oauth_client_id, cfg.customer_support_google_oauth_client_secret
+                ),
+            ),
+            include_in_schema=False,
+        )
 
         app.mount("/static", StaticFiles(directory="static"), name="static")
 
