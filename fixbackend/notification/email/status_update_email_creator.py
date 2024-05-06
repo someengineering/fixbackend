@@ -187,7 +187,7 @@ class StatusUpdateEmailCreator:
             resources_per_account_timeline(),
             overall_score(),
             nr_of_changes(),
-            progress("instances", 0, group=set(), aggregation="sum"),
+            progress("instances_total", 0, group=set(), aggregation="sum"),
             progress("cores_total", 0, group=set(), aggregation="sum"),
             progress("memory_bytes", 0, group=set(), aggregation="sum"),
             progress("volumes_total", 0, group=set(), aggregation="sum"),
