@@ -72,6 +72,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         if self.stripe_subscription_id and self.stripe_customer_identifier:
             return StripeSubscription(
                 id=self.id,
+                user_id=self.user_id,
                 customer_identifier=StripeCustomerId(self.stripe_customer_identifier),
                 stripe_subscription_id=StripeSubscriptionId(self.stripe_subscription_id),
                 active=self.active,
@@ -108,7 +109,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         elif isinstance(subscription, StripeSubscription):
             return SubscriptionEntity(
                 id=subscription.id,
-                user_id=None,
+                user_id=subscription.user_id,
                 stripe_customer_identifier=subscription.customer_identifier,
                 stripe_subscription_id=subscription.stripe_subscription_id,
                 active=subscription.active,

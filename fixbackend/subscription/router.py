@@ -79,13 +79,14 @@ def subscription_router() -> APIRouter:
     @router.get("/workspaces/{workspace_id}/subscriptions/stripe", include_in_schema=False)
     async def redirect_to_stripe(
         workspace: UserWorkspaceDependency,
+        user: AuthenticatedUser,
         stripe_service: StripeServiceDependency,
         request: Request,
         _: bool = Depends(WorkspacePermissionChecker(workspace_billing_admin_permissions)),
     ) -> Response:
         return_url = request.url_for(BackFromStripe, workspace_id=workspace.id)
         print(str(return_url))
-        url = await stripe_service.redirect_to_stripe(workspace, str(return_url))
+        url = await stripe_service.redirect_to_stripe(workspace, user.id, str(return_url))
         return RedirectResponse(url)
 
     @router.get("/workspaces/{workspace_id}/subscriptions/stripe/back", include_in_schema=False, name=BackFromStripe)

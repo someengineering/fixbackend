@@ -48,11 +48,11 @@ def event(kind: str, data: Dict[str, Any]) -> stripe.Event:
 async def test_redirect_to_stripe(stripe_service: StripeServiceImpl, workspace: Workspace) -> None:
     # new customers need to enter payment data
     assert await stripe_service.stripe_customer_repo.get(workspace.id) is None
-    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect = await stripe_service.redirect_to_stripe(workspace, workspace.owner_id, "https://localhost/return")
     assert redirect.endswith("checkout")
     assert await stripe_service.stripe_customer_repo.get(workspace.id) is not None
     # the same customer should be redirected to the same checkout
-    redirect2 = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect2 = await stripe_service.redirect_to_stripe(workspace, workspace.owner_id, "https://localhost/return")
     assert redirect == redirect2
     # send event that the customer bough a subscription
     await stripe_service.handle_verified_event(
@@ -61,7 +61,7 @@ async def test_redirect_to_stripe(stripe_service: StripeServiceImpl, workspace: 
         )
     )
     # now the customer is redirected to the billing portal
-    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect = await stripe_service.redirect_to_stripe(workspace, workspace.owner_id, "https://localhost/return")
     assert redirect.endswith("billing")
 
 
@@ -91,7 +91,9 @@ async def test_report_usage(stripe_service: StripeServiceImpl, workspace: Worksp
 
     # create subscription and billing entry: expect one usage to be reported
     subscription = await stripe_service.subscription_repository.create(
-        StripeSubscription(SubscriptionId(uid()), stripe_customer_id, stripe_subscription_id, True, None, None)
+        StripeSubscription(
+            SubscriptionId(uid()), workspace.owner_id, stripe_customer_id, stripe_subscription_id, True, None, None
+        )
     )
     await stripe_service.subscription_repository.add_billing_entry(
         subscription.id, workspace.id, ProductTier.Enterprise, 23, utc(), utc(), utc() + timedelta(days=1)

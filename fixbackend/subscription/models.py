@@ -42,6 +42,7 @@ class AwsMarketplaceSubscription:
 @frozen
 class StripeSubscription:
     id: SubscriptionId
+    user_id: Optional[UserId]
     customer_identifier: StripeCustomerId
     stripe_subscription_id: StripeSubscriptionId
     active: bool

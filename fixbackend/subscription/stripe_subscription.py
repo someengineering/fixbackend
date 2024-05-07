@@ -25,6 +25,7 @@ import time
 from asyncio import Semaphore, TaskGroup
 from datetime import timedelta
 from typing import Dict, List, Annotated, Optional, Unpack
+import uuid
 
 import stripe
 from async_lru import alru_cache
@@ -46,6 +47,7 @@ from fixbackend.ids import (
     SubscriptionId,
     StripeSubscriptionId,
     ProductTier,
+    UserId,
     WorkspaceId,
 )
 from fixbackend.subscription.models import StripeSubscription
@@ -154,7 +156,7 @@ class StripeClient:  # pragma: no cover
 
 
 class StripeService(Service):
-    async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
+    async def redirect_to_stripe(self, workspace: Workspace, user_id: UserId, return_url: str) -> str:
         raise NotImplementedError("No payment service configured.")
 
     async def handle_event(self, event: str, signature: str) -> None:
@@ -189,7 +191,7 @@ class StripeServiceImpl(StripeService):
         self.domain_event_publisher = domain_event_publisher
         self.stripe_customer_repo = StripeCustomerRepository(session_maker)
 
-    async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
+    async def redirect_to_stripe(self, workspace: Workspace, user_id: UserId, return_url: str) -> str:
         customer_id = await self._get_stripe_customer_id(workspace)
         subscription = await self._get_stripe_subscription_id(customer_id)
         if subscription is None:
@@ -222,6 +224,7 @@ class StripeServiceImpl(StripeService):
                     payment_method_reuse_agreement=dict(position="auto"), terms_of_service="required"
                 ),
                 submit_type="book",  # the button text to order
+                client_reference_id=str(user_id),
             )
         else:
             # subscription exists: use the customer portal to review payment data and invoices
@@ -262,6 +265,13 @@ class StripeServiceImpl(StripeService):
             case "checkout.session.completed":
                 cid = do.get("customer")
                 intent_id = do.get("payment_intent")
+                raw_user_id = do.get("client_reference_id")
+                user_id: Optional[UserId] = None
+                if raw_user_id and isinstance(raw_user_id, str):
+                    try:
+                        user_id = UserId(uuid.UUID(raw_user_id))
+                    except ValueError:
+                        user_id = None
                 custom_fields = {f["key"]: value_in_path(f, ["text", "value"]) for f in do.get("custom_fields", [])}
                 company = custom_fields.get("company")
                 country_code = value_in_path(do, ["customer_details", "address", "country"])
@@ -272,7 +282,7 @@ class StripeServiceImpl(StripeService):
                 # Create a subscription for the customer
                 if cid and isinstance(pid := intent_id, str):
                     log.info(f"Checkout session completed. customer: {cid} create subscription payment_intent: {pid}")
-                    await self._create_stripe_subscription(StripeCustomerId(cid), pid)
+                    await self._create_stripe_subscription(StripeCustomerId(cid), user_id, pid)
                 else:
                     log.error("Invalid checkout session event: missing customer or payment intent")
             case "payment_intent.succeeded":
@@ -298,7 +308,9 @@ class StripeServiceImpl(StripeService):
             case _:
                 pass
 
-    async def _create_stripe_subscription(self, customer_id: StripeCustomerId, payment_intent_id: str) -> None:
+    async def _create_stripe_subscription(
+        self, customer_id: StripeCustomerId, user_id: Optional[UserId], payment_intent_id: str
+    ) -> None:
         # get workspace of customer:
         if workspace_id := await self.stripe_customer_repo.workspace_of_customer(customer_id):
             # idempotency: do nothing if we already have an active stripe subscription
@@ -315,6 +327,7 @@ class StripeServiceImpl(StripeService):
             subscription = await self.subscription_repository.create(
                 StripeSubscription(
                     id=SubscriptionId(uid()),
+                    user_id=user_id,
                     customer_identifier=customer_id,
                     stripe_subscription_id=stripe_subscription,
                     active=True,
