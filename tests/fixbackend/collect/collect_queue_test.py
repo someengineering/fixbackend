@@ -97,7 +97,7 @@ def test_gcp_project_info_json() -> None:
         google_application_credentials={"test": "test"},
     )
     assert project.to_json() == {
-        "kind": "gcp_account_information",
+        "kind": "gcp_project_information",
         "gcp_project_id": "test",
         "google_application_credentials": {"test": "test"},
     }
@@ -111,7 +111,7 @@ def test_azure_subscription_json() -> None:
         client_secret="test3",
     )
     assert subscription.to_json() == {
-        "kind": "gcp_account_information",
+        "kind": "azure_subscription_information",
         "azure_subscription_id": "test",
         "tenant_id": "test1",
         "client_id": "test2",
