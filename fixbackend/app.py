@@ -59,6 +59,20 @@ log = logging.getLogger(__name__)
 API_PREFIX = "/api"
 
 
+def dev_router(deps: FixDependencies) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/ui/{hash}", tags=["dev"])
+    async def custom_ui(hash: str) -> Response:
+        app_url = f"{deps.config.cdn_endpoint}/fix-test-ui-build/{hash}/index.html"
+        log.info(f"Loading dev app from CDN {app_url}")
+        response = await deps.http_client.get(app_url)
+        log.info("Loaded dev app from CDN")
+        return Response(content=response.content, media_type="text/html")
+
+    return router
+
+
 # noinspection PyUnresolvedReferences
 async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     google = google_client(cfg)
@@ -244,7 +258,6 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
-
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces")
@@ -258,10 +271,11 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router.include_router(roles_router(), prefix="/workspaces", tags=["roles"])
         api_router.include_router(analytics_router(deps))
         api_router.include_router(api_token_router(deps), prefix="/token", tags=["api_token"])
+        if cfg.environment == "dev":
+            api_router.include_router(dev_router(deps), prefix="/dev", tags=["dev"])
 
         app.include_router(api_router)
         app.mount("/static", StaticFiles(directory="static"), name="static")
-
         cookie = cookie_transport(cfg.session_ttl)
 
         @app.middleware("http")
