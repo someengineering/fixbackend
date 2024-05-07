@@ -24,7 +24,7 @@ from typing import Union, Optional, TypeVar
 
 from attr import frozen
 
-from fixbackend.ids import SubscriptionId, UserId, StripeSubscriptionId, StripeCustomerId
+from fixbackend.ids import SubscriptionId, UserId, StripeSubscriptionId, StripeCustomerId, WorkspaceId
 
 
 @frozen
@@ -42,6 +42,7 @@ class AwsMarketplaceSubscription:
 @frozen
 class StripeSubscription:
     id: SubscriptionId
+    workspace_id: Optional[WorkspaceId]
     customer_identifier: StripeCustomerId
     stripe_subscription_id: StripeSubscriptionId
     active: bool

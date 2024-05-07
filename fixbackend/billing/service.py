@@ -122,6 +122,9 @@ class BillingEntryService:
             match subscription:
                 case AwsMarketplaceSubscription():
                     payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+
+        async for subscription in self.subscription_repository.subscriptions(workspace_id=workspace.id, active=True):
+            match subscription:
                 case StripeSubscription():
                     payment_methods.append(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 
