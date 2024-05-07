@@ -94,12 +94,12 @@ def test_aws_account_info_json() -> None:
 def test_gcp_project_info_json() -> None:
     project = GcpProjectInformation(
         gcp_project_id=CloudAccountId("test"),
-        service_account_json={"test": "test"},
+        google_application_credentials={"test": "test"},
     )
     assert project.to_json() == {
         "kind": "gcp_account_information",
         "gcp_project_id": "test",
-        "service_account_json": {"test": "test"},
+        "google_application_credentials": {"test": "test"},
     }
 
 

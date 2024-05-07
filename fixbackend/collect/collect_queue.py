@@ -61,7 +61,7 @@ class AwsAccountInformation(AccountInformation):
 class GcpProjectInformation(AccountInformation):
     kind: ClassVar[str] = "gcp_account_information"
     gcp_project_id: CloudAccountId
-    service_account_json: Json  # GCP uses service account JSON to authenticate
+    google_application_credentials: Json  # GCP uses service account JSON to authenticate
 
 
 @define
