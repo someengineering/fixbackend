@@ -68,6 +68,22 @@ def dev_router(deps: FixDependencies) -> APIRouter:
         log.info(f"Loading dev app from CDN {app_url}")
         response = await deps.http_client.get(app_url)
         log.info("Loaded dev app from CDN")
+        nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
+        headers: dict[str, str] = {}
+        headers["fix-environment"] = deps.config.environment
+        headers["X-Content-Type-Options"] = "nosniff"
+        headers["X-Frame-Options"] = "DENY"
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        headers["Content-Security-Policy"] = (
+            "default-src 'self' https://cdn.fix.security;"
+            f" connect-src 'self' https://capture.trackjs.com https://*.google-analytics.com;"
+            f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
+            f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
+            " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com https://i.ytimg.com https://www.googletagmanager.com/;"
+            " frame-src 'self' https://cdn.fix.security https://docs.fix.security https://www.youtube-nocookie.com;"
+            " frame-ancestors 'none';"
+            " form-action 'self';"
+        )
         return Response(content=response.content, media_type="text/html")
 
     return router
