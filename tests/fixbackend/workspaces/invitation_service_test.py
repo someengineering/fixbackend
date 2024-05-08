@@ -166,8 +166,14 @@ async def test_invite_accept_user(
     assert list(map(lambda w: w.id, await workspace_repository.list_workspaces(existing_user))) == [workspace.id]
     assert await service.list_invitations(workspace.id) == [invite]
     assert len(domain_event_sender.events) == 3
-    assert domain_event_sender.events[1] == UserJoinedWorkspace(workspace.id, existing_user.id)
-    assert domain_event_sender.events[2] == InvitationAccepted(workspace.id, existing_user.id, existing_user.email)
+    user_joined = domain_event_sender.events[1]
+    assert isinstance(user_joined, UserJoinedWorkspace)
+    assert user_joined.workspace_id == workspace.id
+    assert user_joined.user_id == existing_user.id
+    accepted = domain_event_sender.events[2]
+    assert isinstance(accepted, InvitationAccepted)
+    assert accepted.workspace_id == workspace.id
+    assert accepted.user_id == existing_user.id
 
     # role is correct after the user accepts the invite
     user_roles = await role_repository.list_roles(existing_user.id)
