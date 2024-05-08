@@ -73,7 +73,6 @@ class WorkspaceRead(BaseModel):
     created_at: datetime = Field(description="The time at which the workspace was created")
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
     user_has_access: bool = Field(description="Whether the user has access to the workspace")
-    user_roles: List[RoleRead] = Field(description="The roles the user has in the workspace")
     user_permissions: int = Field(description="The permissions the user has in the workspace")
 
     model_config = {
@@ -89,7 +88,6 @@ class WorkspaceRead(BaseModel):
                     "created_at": "2020-01-01T00:00:00Z",
                     "trial_end_days": 13,
                     "user_has_access": True,
-                    "user_roles": ["admin", "member"],
                     "user_permissions": "3",
                 }
             ]
@@ -108,7 +106,6 @@ class WorkspaceRead(BaseModel):
             created_at=model.created_at,
             trial_end_days=model.trial_end_days(),
             user_has_access=model.paid_tier_access(user_id),
-            user_roles=RoleRead.from_role(user_roles.role_names) if user_roles else [],
             user_permissions=user_roles.permissions() if user_roles else 0,
         )
 
