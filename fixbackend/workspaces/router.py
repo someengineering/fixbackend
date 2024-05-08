@@ -59,9 +59,13 @@ def workspaces_router() -> APIRouter:
         can_assign_subscriptions: bool = False,
     ) -> List[WorkspaceRead]:
         """List all workspaces."""
-        orgs = await workspace_repository.list_workspaces(user)
+        workspaces = await workspace_repository.list_workspaces(user)
+        result = []
+        user_roles_dict = {role.workspace_id: role.role_names for role in user.roles}
+        for ws in workspaces:
+            result.append(WorkspaceRead.from_model(ws, user.id, user_roles_dict.get(ws.id, Roles(0))))
 
-        return [WorkspaceRead.from_model(org, user.id) for org in orgs]
+        return result
 
     @router.get("/{workspace_id}")
     async def get_workspace(
@@ -78,7 +82,11 @@ def workspaces_router() -> APIRouter:
         if user.id not in org.all_users():
             raise HTTPException(status_code=403, detail="You are not a member of this workspace")
 
-        return WorkspaceRead.from_model(org, user.id)
+        roles = next(
+            map(lambda role: role.role_names, filter(lambda role: role.workspace_id == org.id, user.roles)), Roles(0)
+        )
+
+        return WorkspaceRead.from_model(org, user.id, roles)
 
     @router.get("/{workspace_id}/settings")
     async def get_workspace_settings(
@@ -108,6 +116,7 @@ def workspaces_router() -> APIRouter:
         organization: WorkspaceCreate,
         user: AuthenticatedUser,
         workspace_repository: WorkspaceRepositoryDependency,
+        user_repository: UserRepositoryDependency,
     ) -> WorkspaceRead:
         """Create a workspace."""
         try:
@@ -117,7 +126,16 @@ def workspaces_router() -> APIRouter:
         except IntegrityError:
             raise HTTPException(status_code=409, detail="Organization with this slug already exists")
 
-        return WorkspaceRead.from_model(org, user.id)
+        updated_user = await user_repository.get(user.id)
+        if updated_user is None:
+            raise ValueError("User not found, this should never happer, go fix this bug")
+
+        roles = next(
+            map(lambda role: role.role_names, filter(lambda role: role.workspace_id == org.id, updated_user.roles)),
+            Roles(0),
+        )
+
+        return WorkspaceRead.from_model(org, user.id, roles)
 
     @router.get("/{workspace_id}/invites/")
     async def list_invites(
