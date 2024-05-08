@@ -206,6 +206,8 @@ async def test_scheduled_updates(
         assert email_sender.call_args[0].to == user.email
         assert "monthly" in email_sender.call_args[0].subject
         assert 'Workspace: "free_corp"' in email_sender.call_args[0].text
+        # counting pixel is included
+        assert "/api/analytics/email_opened/pixel" in email_sender.call_args[0].html  # type: ignore
         # doing it again does not send another email
         sent = await scheduled_email_sender._send_scheduled_status_update(first_of_month)
         assert sent == 0
@@ -217,6 +219,8 @@ async def test_scheduled_updates(
         assert email_sender.call_args[0].to == user.email
         assert "weekly" in email_sender.call_args[0].subject
         assert 'Workspace: "big_corp"' in email_sender.call_args[0].text
+        # counting pixel is included
+        assert "/api/analytics/email_opened/pixel" in email_sender.call_args[0].html  # type: ignore
         # doing it again does not send another email
         sent = await scheduled_email_sender._send_scheduled_status_update(friday)
         assert sent == 0
