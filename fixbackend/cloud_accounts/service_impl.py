@@ -28,7 +28,7 @@ from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Backoff, DefaultBackoff, Json, MessageContext, RedisStreamListener
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.service import Service
-from fixcloudutils.util import utc
+from fixcloudutils.util import utc, uuid_str
 from httpx import AsyncClient
 from redis.asyncio import Redis
 
@@ -381,7 +381,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     if first_workspace_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(
-                            AEFirstWorkspaceCollectFinished(user_id, event.tenant_id)
+                            AEFirstWorkspaceCollectFinished(uuid_str(), utc(), user_id, event.tenant_id)
                         )
                         # inform workspace users about the first successful collect
                         await self.notification_service.send_message_to_workspace(
@@ -389,7 +389,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         )
                     if first_account_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
-                        await self.analytics_event_sender.send(AEFirstAccountCollectFinished(user_id, event.tenant_id))
+                        await self.analytics_event_sender.send(
+                            AEFirstAccountCollectFinished(uuid_str(), utc(), user_id, event.tenant_id)
+                        )
 
                 case TenantAccountsCollectFailed.kind:
                     event = TenantAccountsCollected.from_json(message)

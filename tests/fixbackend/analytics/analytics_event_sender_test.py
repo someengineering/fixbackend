@@ -14,6 +14,7 @@
 import json
 from typing import List, Tuple
 
+from fixcloudutils.util import uuid_str, utc
 from httpx import AsyncClient, Request, Response, MockTransport
 from pytest import fixture
 
@@ -45,7 +46,8 @@ def google_analytics_event_sender(
 
 async def test_send_events(google_analytics_event_sender: Tuple[GoogleAnalyticsEventSender, List[Request]]) -> None:
     sender, request_list = google_analytics_event_sender
-    await sender.send(AEAccountDegraded(user_id, workspace_id, "aws", "some_error"))
+    degraded = AEAccountDegraded(uuid_str(), utc(), user_id, workspace_id, "aws", "some_error")
+    await sender.send(degraded)
     await sender.send_events()
     assert len(request_list) == 1
     assert json.loads(request_list[0].content) == {
@@ -53,7 +55,13 @@ async def test_send_events(google_analytics_event_sender: Tuple[GoogleAnalyticsE
         "events": [
             {
                 "name": "fix_account_degraded",
-                "params": {"error": "some_error", "cloud": "aws", "workspace_id": str(workspace_id)},
+                "params": {
+                    "error": "some_error",
+                    "cloud": "aws",
+                    "workspace_id": str(workspace_id),
+                    "id": degraded.id,
+                    "created_at": degraded.created_at.isoformat(),
+                },
             }
         ],
     }
