@@ -22,6 +22,8 @@ from fixbackend.collect.collect_queue import (
     RedisCollectQueue,
     JobAlreadyEnqueued,
     AwsAccountInformation,
+    GcpProjectInformation,
+    AzureSubscriptionInformation,
 )
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, AwsARN, ExternalId, CloudAccountName
@@ -72,7 +74,7 @@ async def test_redis_collect_queue(
     assert_json(pickle.loads(await arq_redis.get("arq:job:test")))
 
 
-async def test_aws_account_info_json() -> None:
+def test_aws_account_info_json() -> None:
     external_id = ExternalId(uuid4())
     aws_account_info = AwsAccountInformation(
         aws_account_id=CloudAccountId("123456789012"),
@@ -86,4 +88,32 @@ async def test_aws_account_info_json() -> None:
         "aws_account_name": "test",
         "aws_role_arn": "arn:aws:iam::123456789012:role/test",
         "external_id": str(external_id),
+    }
+
+
+def test_gcp_project_info_json() -> None:
+    project = GcpProjectInformation(
+        gcp_project_id=CloudAccountId("test"),
+        google_application_credentials={"test": "test"},
+    )
+    assert project.to_json() == {
+        "kind": "gcp_project_information",
+        "gcp_project_id": "test",
+        "google_application_credentials": {"test": "test"},
+    }
+
+
+def test_azure_subscription_json() -> None:
+    subscription = AzureSubscriptionInformation(
+        azure_subscription_id=CloudAccountId("test"),
+        tenant_id="test1",
+        client_id="test2",
+        client_secret="test3",
+    )
+    assert subscription.to_json() == {
+        "kind": "azure_subscription_information",
+        "azure_subscription_id": "test",
+        "tenant_id": "test1",
+        "client_id": "test2",
+        "client_secret": "test3",
     }

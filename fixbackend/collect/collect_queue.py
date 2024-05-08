@@ -57,6 +57,22 @@ class AwsAccountInformation(AccountInformation):
     external_id: ExternalId
 
 
+@define
+class GcpProjectInformation(AccountInformation):
+    kind: ClassVar[str] = "gcp_project_information"
+    gcp_project_id: CloudAccountId
+    google_application_credentials: Json  # GCP uses service account JSON to authenticate
+
+
+@define
+class AzureSubscriptionInformation(AccountInformation):
+    kind: ClassVar[str] = "azure_subscription_information"
+    azure_subscription_id: CloudAccountId
+    tenant_id: str  # ID of the service principal's tenant. Also called its "directory" ID.
+    client_id: str  # The service principal's client ID
+    client_secret: str  # One of the service principal's client secrets
+
+
 class CollectQueue(ABC):
     @abstractmethod
     async def enqueue(
