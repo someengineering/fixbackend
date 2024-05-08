@@ -202,6 +202,7 @@ class PostHogEventSender(AnalyticsEventSender):
                     )
                 # if the event has a workspace_id, use it to define the group
                 groups = {"workspace_id": str(ws)} if (ws := getattr(event, "workspace_id", None)) else None
+                log.info(f"Send analytics event to posthog: {event.kind} user={event.user_id}, id={event.id}")
                 self.client.capture(  # type: ignore
                     distinct_id=str(event.user_id),
                     event=event.kind,
