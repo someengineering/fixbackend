@@ -579,14 +579,10 @@ async def test_handle_account_discovered_success(
     # happy case, boto3 can assume role
     await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
 
-    message = {
-        "cloud_account_id": str(account.id),
-        "aws_account_id": account_id,
-    }
-
     assert pubsub_publisher.last_message is not None
     assert pubsub_publisher.last_message[0] == "aws_account_discovered"
-    assert pubsub_publisher.last_message[1] == message
+    assert pubsub_publisher.last_message[1]["cloud_account_id"] == str(account.id)
+    assert pubsub_publisher.last_message[1]["aws_account_id"] == account_id
     assert pubsub_publisher.last_message[2] == f"tenant-events::{workspace.id}"
 
     assert len(domain_sender.events) == 2

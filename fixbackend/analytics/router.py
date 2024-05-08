@@ -15,6 +15,7 @@ import logging
 from base64 import b64decode
 
 from fastapi import APIRouter, Response
+from fixcloudutils.util import utc, uuid_str
 
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import AEEmailOpened
@@ -34,7 +35,7 @@ def analytics_router(dependencies: FixDependencies) -> APIRouter:
     async def email_opened(user: UserId, email: str) -> Response:
         log.info(f"Email opened by {user} for email {email}")
         sender = dependencies.service(ServiceNames.analytics_event_sender, AnalyticsEventSender)  # type: ignore
-        await sender.send(AEEmailOpened(user_id=user, email=email))
+        await sender.send(AEEmailOpened(id=uuid_str(), created_at=utc(), user_id=user, email=email))
         return Response(content=b64decode(pxl_base64), media_type="image/png")
 
     return router

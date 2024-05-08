@@ -281,19 +281,19 @@ async def test_receive_collect_done_message(
     assert mr_2.duration == 18
 
     assert len(domain_event_sender.events) == current_events_length + 1
-    assert domain_event_sender.events[-1] == TenantAccountsCollected(
-        workspace.id,
-        {
-            cloud_account_id: CloudAccountCollectInfo(
-                mr_1.account_id,
-                mr_1.nr_of_resources_collected + mr_2.nr_of_resources_collected,
-                mr_1.duration,
-                now,
-                TaskId(mr_1.task_id),
-            )
-        },
-        None,
-    )
+    collected = domain_event_sender.events[-1]
+    assert isinstance(collected, TenantAccountsCollected)
+    assert collected.tenant_id == workspace.id
+    assert collected.next_run is None
+    assert collected.cloud_accounts == {
+        cloud_account_id: CloudAccountCollectInfo(
+            mr_1.account_id,
+            mr_1.nr_of_resources_collected + mr_2.nr_of_resources_collected,
+            mr_1.duration,
+            now,
+            TaskId(mr_1.task_id),
+        )
+    }
 
 
 @pytest.mark.asyncio

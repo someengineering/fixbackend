@@ -26,8 +26,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import ClassVar, Dict, Optional, TypeVar, Type, List, Literal
 
-from attrs import frozen
+from attr import frozen, field
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc, uuid_str
 
 from fixbackend.domain_events.converter import converter
 from fixbackend.ids import (
@@ -48,8 +49,11 @@ from fixbackend.ids import (
 T = TypeVar("T")
 
 
+@frozen(kw_only=True)
 class Event(ABC):
     kind: ClassVar[str]
+    id: str = field(factory=uuid_str)
+    created_at: datetime = field(factory=utc)
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore

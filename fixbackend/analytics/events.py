@@ -22,6 +22,7 @@
 
 
 from abc import ABC
+from datetime import datetime
 from typing import ClassVar, TypeVar
 
 from attrs import frozen
@@ -36,6 +37,10 @@ T = TypeVar("T")
 @frozen
 class AnalyticsEvent(ABC):
     kind: ClassVar[str]
+    # The id of the event.
+    id: str
+    # The time the event was created.
+    created_at: datetime
     # The user that triggered the event. This id will NOT be sent to Google Analytics.
     user_id: UserId
 
