@@ -28,7 +28,7 @@ from fixbackend.workspaces.models import Workspace, WorkspaceInvitation
 log = logging.getLogger(__name__)
 
 
-class JsonRoleName(StrEnum):
+class RoleRead(StrEnum):
     member = "member"
     admin = "admin"
     owner = "owner"
@@ -36,29 +36,29 @@ class JsonRoleName(StrEnum):
 
     def to_role(self) -> Roles:
         match self:
-            case JsonRoleName.member:
+            case RoleRead.member:
                 return Roles.workspace_member
-            case JsonRoleName.admin:
+            case RoleRead.admin:
                 return Roles.workspace_admin
-            case JsonRoleName.owner:
+            case RoleRead.owner:
                 return Roles.workspace_owner
-            case JsonRoleName.billing_admin:
+            case RoleRead.billing_admin:
                 return Roles.workspace_billing_admin
             case _:
                 log.warn(f"Unknown role: {self}")
                 return Roles.workspace_member
 
     @staticmethod
-    def from_role(roles: Roles) -> List["JsonRoleName"]:
+    def from_role(roles: Roles) -> List["RoleRead"]:
         result = []
         if Roles.workspace_member in roles:
-            result.append(JsonRoleName.member)
+            result.append(RoleRead.member)
         if Roles.workspace_admin in roles:
-            result.append(JsonRoleName.admin)
+            result.append(RoleRead.admin)
         if Roles.workspace_owner in roles:
-            result.append(JsonRoleName.owner)
+            result.append(RoleRead.owner)
         if Roles.workspace_billing_admin in roles:
-            result.append(JsonRoleName.billing_admin)
+            result.append(RoleRead.billing_admin)
 
         return result
 
@@ -73,7 +73,7 @@ class WorkspaceRead(BaseModel):
     created_at: datetime = Field(description="The time at which the workspace was created")
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
     user_has_access: bool = Field(description="Whether the user has access to the workspace")
-    user_roles: List[JsonRoleName] = Field(description="The roles the user has in the workspace")
+    user_roles: List[RoleRead] = Field(description="The roles the user has in the workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -106,7 +106,7 @@ class WorkspaceRead(BaseModel):
             created_at=model.created_at,
             trial_end_days=model.trial_end_days(),
             user_has_access=model.paid_tier_access(user_id),
-            user_roles=JsonRoleName.from_role(user_roles),
+            user_roles=RoleRead.from_role(user_roles),
         )
 
 
@@ -212,7 +212,7 @@ class ExternalIdRead(BaseModel):
 class UserInvite(BaseModel):
     name: str = Field(description="The name of the user")
     email: EmailStr = Field(description="The email of the user")
-    roles: List[JsonRoleName] = Field(description="The role of the user")
+    roles: List[RoleRead] = Field(description="The role of the user")
 
     model_config = {
         "json_schema_extra": {
@@ -235,12 +235,12 @@ UserSource = Union[FixUserSource]
 
 
 class WorkspaceRoleListRead(BaseModel):
-    roles: List[JsonRoleName] = Field(description="The roles available in the workspace")
+    roles: List[RoleRead] = Field(description="The roles available in the workspace")
 
     @staticmethod
     def from_model(role_names: Roles) -> "WorkspaceRoleListRead":
 
-        return WorkspaceRoleListRead(roles=JsonRoleName.from_role(role_names))
+        return WorkspaceRoleListRead(roles=RoleRead.from_role(role_names))
 
     model_config = {
         "json_schema_extra": {
