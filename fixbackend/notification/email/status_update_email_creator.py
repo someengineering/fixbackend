@@ -13,12 +13,13 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 from datetime import timedelta, datetime
-from typing import Optional, Tuple, Set, Dict, cast
+from typing import Optional, Tuple, Set, Dict, cast, Any, Callable
 
 import plotly.graph_objects as go
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.util import utc_str, value_in_path_get, value_in_path
 
+from fixbackend.auth.models import User
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.schemas import Scatters
@@ -109,9 +110,9 @@ class StatusUpdateEmailCreator:
         self.db_access = db_access
         self.process_pool = process_pool
 
-    async def create_messages(
+    async def _create_messages_dict(
         self, workspace: Workspace, now: datetime, duration: timedelta
-    ) -> Tuple[str, str, str, Dict[str, bytes]]:
+    ) -> Tuple[Dict[str, Any], Dict[str, bytes]]:
         dba = await self.db_access.get_database_access(workspace.id)
         assert dba is not None, f"No database access for workspace: {workspace.id}"
         duration_name = "month" if duration.days > 27 else "week"
@@ -215,7 +216,18 @@ class StatusUpdateEmailCreator:
             databases_progress=databases_progress,
             databases_bytes_progress=databases_bytes_progress,
         )
-        subject = render("status-update.subject", **args).strip()
-        html = render("status-update.html", **args)
-        txt = render("status-update.txt", **args)
-        return subject, html, txt, images
+        return args, images
+
+    async def create_messages_fn(
+        self, workspace: Workspace, now: datetime, duration: timedelta
+    ) -> Callable[[User], Tuple[str, str, str, Dict[str, bytes]]]:
+        args, images = await self._create_messages_dict(workspace, now, duration)
+
+        def for_user(user: User) -> Tuple[str, str, str, Dict[str, bytes]]:
+            user_args = args | dict(user_id=user.id)
+            subject = render("status-update.subject", **user_args).strip()
+            html = render("status-update.html", **user_args)
+            txt = render("status-update.txt", **user_args)
+            return subject, html, txt, images
+
+        return for_user
