@@ -21,26 +21,26 @@ from attrs import frozen
 
 # do not change the int
 class WorkspacePermissions(IntFlag):
-    create = 2**0
-    read = 2**1
-    update = 2**2
-    delete = 2**3
-    invite_to = 2**4
-    remove_from = 2**5
-    read_settings = 2**6
-    update_settings = 2**7
-    update_cloud_accounts = 2**8
-    read_billing = 2**9
-    update_billing = 2**10
-    read_roles = 2**11
-    update_roles = 2**12
+    create = 1 << 0
+    read = 1 << 1
+    update = 1 << 2
+    delete = 1 << 3
+    invite_to = 1 << 4
+    remove_from = 1 << 5
+    read_settings = 1 << 6
+    update_settings = 1 << 7
+    update_cloud_accounts = 1 << 8
+    read_billing = 1 << 9
+    update_billing = 1 << 10
+    read_roles = 1 << 11
+    update_roles = 1 << 12
 
 
 class Roles(IntFlag):
-    workspace_member = 2**0
-    workspace_admin = 2**1
-    workspace_owner = 2**2
-    workspace_billing_admin = 2**3
+    workspace_member = 1 << 0
+    workspace_admin = 1 << 1
+    workspace_owner = 1 << 2
+    workspace_billing_admin = 1 << 3
 
 
 # todo: remove giving members all permissions after FE supports permissions feature.

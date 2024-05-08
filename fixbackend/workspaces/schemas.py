@@ -74,6 +74,7 @@ class WorkspaceRead(BaseModel):
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
     user_has_access: bool = Field(description="Whether the user has access to the workspace")
     user_roles: List[RoleRead] = Field(description="The roles the user has in the workspace")
+    user_permissions: int = Field(description="The permissions the user has in the workspace")
 
     model_config = {
         "json_schema_extra": {
@@ -89,13 +90,14 @@ class WorkspaceRead(BaseModel):
                     "trial_end_days": 13,
                     "user_has_access": True,
                     "user_roles": ["admin", "member"],
+                    "user_permissions": "3",
                 }
             ]
         }
     }
 
     @classmethod
-    def from_model(cls, model: Workspace, user_id: UserId, user_roles: Roles) -> "WorkspaceRead":
+    def from_model(cls, model: Workspace, user_id: UserId, user_roles: Optional[UserRole]) -> "WorkspaceRead":
         return WorkspaceRead(
             id=model.id,
             slug=model.slug,
@@ -106,7 +108,8 @@ class WorkspaceRead(BaseModel):
             created_at=model.created_at,
             trial_end_days=model.trial_end_days(),
             user_has_access=model.paid_tier_access(user_id),
-            user_roles=RoleRead.from_role(user_roles),
+            user_roles=RoleRead.from_role(user_roles.role_names) if user_roles else [],
+            user_permissions=user_roles.permissions() if user_roles else 0,
         )
 
 
