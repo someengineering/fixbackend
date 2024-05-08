@@ -86,13 +86,12 @@ class ScheduledEmailSender(Service):
         await self._send_scheduled_emails()
 
     async def _send_scheduled_status_update(self, now: datetime) -> int:
-        unique_id = f'update-{now.strftime("%y%m%d")}'  # valid for the whole day
         counter = 0
-        users_already_marked: Set[UUID] = set()
 
-        async def send_emails(duration: timedelta, org_filter: ColumnExpressionArgument[bool]) -> None:
+        async def send_emails(kind: str, duration: timedelta, org_filter: ColumnExpressionArgument[bool]) -> None:
             nonlocal counter
-            nonlocal users_already_marked
+            unique_id = f'update-{kind}-{now.strftime("%y%m%d")}'  # valid for the whole day
+            users_already_marked: Set[UUID] = set()
             statement = (
                 (select(Organization, User))
                 .join(OrganizationMembers, Organization.id == OrganizationMembers.organization_id)
@@ -154,12 +153,12 @@ class ScheduledEmailSender(Service):
                 await session.commit()
 
         if now.weekday() == 4 and 9 <= now.hour <= 12:  # Fridays between 9 and 12
-            await send_emails(timedelta(days=7), Organization.tier != ProductTier.Free)
+            await send_emails("week", timedelta(days=7), Organization.tier != ProductTier.Free)
 
         if now.day == 1 and 9 <= now.hour <= 12:  # 1st of the month between 9 and 12
             yesterday = now - timedelta(days=1)
             _, days_of_last_month = calendar.monthrange(yesterday.year, yesterday.month)
-            await send_emails(timedelta(days=days_of_last_month), Organization.tier == ProductTier.Free)
+            await send_emails("month", timedelta(days=days_of_last_month), Organization.tier == ProductTier.Free)
 
         return counter
 
