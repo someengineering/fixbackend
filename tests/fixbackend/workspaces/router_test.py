@@ -51,6 +51,7 @@ async def test_list_organizations(client: AsyncClient, workspace: Workspace) -> 
     response = await client.get("/api/workspaces/")
     assert response.json()[0] is not None
     assert response.json()[0].get("id") == str(workspace.id)
+    assert response.json()[0].get("user_roles") == ["owner"]
 
 
 @pytest.mark.asyncio
