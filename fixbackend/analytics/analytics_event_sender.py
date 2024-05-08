@@ -26,7 +26,7 @@ from async_lru import alru_cache
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
-from fixcloudutils.util import uuid_str, utc
+from fixcloudutils.util import uuid_str
 from httpx import AsyncClient
 from posthog.client import Client
 from prometheus_client import Counter
@@ -188,8 +188,8 @@ class PostHogEventSender(AnalyticsEventSender):
                     self.client.identify(  # type: ignore
                         distinct_id=str(event.user_id),
                         properties={"email": event.email},
-                        timestamp=utc(),
-                        uuid=uuid_str(),
+                        timestamp=event.created_at,
+                        uuid=event.id,
                     )
                 # when a workspace is created, identify it as a group
                 if isinstance(event, AEWorkspaceCreated):
@@ -197,18 +197,19 @@ class PostHogEventSender(AnalyticsEventSender):
                         group_type="workspace_id",
                         group_key=str(event.workspace_id),
                         properties={"name": event.name, "slug": event.slug},
-                        timestamp=utc(),
-                        uuid=uuid_str(),
+                        timestamp=event.created_at,
+                        uuid=event.id,
                     )
                 # if the event has a workspace_id, use it to define the group
                 groups = {"workspace_id": str(ws)} if (ws := getattr(event, "workspace_id", None)) else None
+                log.info(f"Send analytics event to posthog: {event.kind} user={event.user_id}, id={event.id}")
                 self.client.capture(  # type: ignore
                     distinct_id=str(event.user_id),
                     event=event.kind,
                     properties=event.to_json(),
-                    timestamp=utc(),
+                    timestamp=event.created_at,
                     groups=groups,
-                    uuid=uuid_str(),
+                    uuid=event.id,
                 )
             self.queue.clear()
 

@@ -83,46 +83,54 @@ class DomainEventToAnalyticsEventHandler:
 
     async def handle(self, event: Event) -> None:
         match event:
-            case UserRegistered() as event:
-                await self.sender.send(AEUserRegistered(event.user_id, event.tenant_id, event.email))
-            case AwsAccountDiscovered() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountDiscovered(user_id, event.tenant_id, "aws"))
-            case AwsAccountConfigured() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountConfigured(user_id, event.tenant_id, "aws"))
-            case AwsAccountDeleted() as event:
-                await self.sender.send(AEAccountDeleted(event.user_id, event.tenant_id, "aws"))
-            case AwsAccountDegraded() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountDegraded(user_id, event.tenant_id, "aws", event.error))
-            case CloudAccountNameChanged() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEAccountNameChanged(user_id, event.tenant_id, event.cloud))
-            case WorkspaceCreated() as event:
-                await self.sender.send(AEWorkspaceCreated(event.user_id, event.workspace_id, event.name, event.slug))
-            case InvitationAccepted() as event:
-                user_id = event.user_id or await self.sender.user_id_from_workspace(event.workspace_id)
-                await self.sender.send(AEInvitationAccepted(user_id, event.workspace_id))
-            case UserJoinedWorkspace() as event:
-                await self.sender.send(AEUserJoinedWorkspace(event.user_id, event.workspace_id))
-            case ProductTierChanged() as event:
-                await self.sender.send(AEProductTierChanged(event.user_id, event.workspace_id, event.product_tier))
-            case SubscriptionCreated() as event:
-                if ws_id := event.workspace_id:
-                    await self.sender.send(AESubscriptionCreated(event.user_id, ws_id, "aws_marketplace"))
-            case UserLoggedIn() as event:
-                await self.sender.send(AEUserLoggedIn(event.user_id))
-            case FailingBenchmarkChecksAlertSend() as event:
-                user_id = await self.sender.user_id_from_workspace(event.workspace_id)
+            case UserRegistered() as e:
+                await self.sender.send(AEUserRegistered(e.id, e.created_at, e.user_id, e.tenant_id, e.email))
+            case AwsAccountDiscovered() as e:
+                user_id = await self.sender.user_id_from_workspace(e.tenant_id)
+                await self.sender.send(AEAccountDiscovered(e.id, e.created_at, user_id, e.tenant_id, "aws"))
+            case AwsAccountConfigured() as e:
+                user_id = await self.sender.user_id_from_workspace(e.tenant_id)
+                await self.sender.send(AEAccountConfigured(e.id, e.created_at, user_id, e.tenant_id, "aws"))
+            case AwsAccountDeleted() as e:
+                await self.sender.send(AEAccountDeleted(e.id, e.created_at, e.user_id, e.tenant_id, "aws"))
+            case AwsAccountDegraded() as e:
+                user_id = await self.sender.user_id_from_workspace(e.tenant_id)
+                await self.sender.send(AEAccountDegraded(e.id, e.created_at, user_id, e.tenant_id, "aws", e.error))
+            case CloudAccountNameChanged() as e:
+                user_id = await self.sender.user_id_from_workspace(e.tenant_id)
+                await self.sender.send(AEAccountNameChanged(e.id, e.created_at, user_id, e.tenant_id, e.cloud))
+            case WorkspaceCreated() as e:
+                await self.sender.send(
+                    AEWorkspaceCreated(e.id, e.created_at, e.user_id, e.workspace_id, e.name, e.slug)
+                )
+            case InvitationAccepted() as e:
+                user_id = e.user_id or await self.sender.user_id_from_workspace(e.workspace_id)
+                await self.sender.send(AEInvitationAccepted(e.id, e.created_at, user_id, e.workspace_id))
+            case UserJoinedWorkspace() as e:
+                await self.sender.send(AEUserJoinedWorkspace(e.id, e.created_at, e.user_id, e.workspace_id))
+            case ProductTierChanged() as e:
+                await self.sender.send(
+                    AEProductTierChanged(e.id, e.created_at, e.user_id, e.workspace_id, e.product_tier)
+                )
+            case SubscriptionCreated() as e:
+                if ws_id := e.workspace_id:
+                    await self.sender.send(
+                        AESubscriptionCreated(e.id, e.created_at, e.user_id, ws_id, "aws_marketplace")
+                    )
+            case UserLoggedIn() as e:
+                await self.sender.send(AEUserLoggedIn(e.id, e.created_at, e.user_id))
+            case FailingBenchmarkChecksAlertSend() as e:
+                user_id = await self.sender.user_id_from_workspace(e.workspace_id)
                 await self.sender.send(
                     AEFailingBenchmarkChecksAlertSend(
-                        user_id, event.workspace_id, event.benchmark, event.failed_checks_count_total
+                        e.id, e.created_at, user_id, e.workspace_id, e.benchmark, e.failed_checks_count_total
                     )
                 )
-            case BillingEntryCreated() as event:
-                user_id = await self.sender.user_id_from_workspace(event.tenant_id)
-                await self.sender.send(AEBillingEntryCreated(user_id, event.tenant_id, event.product_tier, event.usage))
+            case BillingEntryCreated() as e:
+                user_id = await self.sender.user_id_from_workspace(e.tenant_id)
+                await self.sender.send(
+                    AEBillingEntryCreated(e.id, e.created_at, user_id, e.tenant_id, e.product_tier, e.usage)
+                )
             case _:
                 log.info(f"Do not know how to handle event: {event}. Ignore.")
 

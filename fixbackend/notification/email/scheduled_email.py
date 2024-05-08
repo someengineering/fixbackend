@@ -14,7 +14,7 @@
 import calendar
 import logging
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, Set, Callable
 from uuid import UUID
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -25,6 +25,7 @@ from sqlalchemy import String, Integer, select, Index, and_, or_, func, text, Se
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.auth.models.orm import User
+from fixbackend.auth.models import User as UserModel
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
 from fixbackend.ids import WorkspaceId, ProductTier
@@ -87,9 +88,11 @@ class ScheduledEmailSender(Service):
     async def _send_scheduled_status_update(self, now: datetime) -> int:
         unique_id = f'update-{now.strftime("%y%m%d")}'  # valid for the whole day
         counter = 0
+        users_already_marked: Set[UUID] = set()
 
         async def send_emails(duration: timedelta, org_filter: ColumnExpressionArgument[bool]) -> None:
             nonlocal counter
+            nonlocal users_already_marked
             statement = (
                 (select(Organization, User))
                 .join(OrganizationMembers, Organization.id == OrganizationMembers.organization_id)
@@ -117,28 +120,33 @@ class ScheduledEmailSender(Service):
             )
             async with self.session_maker() as session:
                 last_workspace: Optional[Workspace] = None
-                content_to_send: Optional[Tuple[str, str, str, Dict[str, bytes]]] = None
-                for org, user in (await session.execute(statement)).unique().all():
+                send_fn: Optional[Callable[[UserModel], Tuple[str, str, str, Dict[str, bytes]]]] = None
+                for org, orm_user in (await session.execute(statement)).unique().all():
+                    user = orm_user.to_model()
                     workspace = org.to_model()
                     try:
                         if last_workspace != workspace:
-                            content_to_send = await self.status_update_creator.create_messages(workspace, now, duration)
-                        if content_to_send:
-                            subject, html, txt, images = content_to_send
-                            await self.email_sender.send_email(
-                                to=user.email,
-                                subject=subject,
-                                text=txt,
-                                html=html,
-                                unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
-                                images=images,
-                            )
-                            log.info(
-                                f"Sent status update email={user.email}, workspace={workspace.id}, "
-                                f"tier={workspace.product_tier}, subject: {subject}"
-                            )
+                            send_fn = await self.status_update_creator.create_messages_fn(workspace, now, duration)
+                        assert send_fn is not None, "Send function not set for workspace"
+                        subject, html, txt, images = send_fn(user)
+                        await self.email_sender.send_email(
+                            to=user.email,
+                            subject=subject,
+                            text=txt,
+                            html=html,
+                            unsubscribe=UserNotificationSettingsEntity.weekly_report.name,
+                            images=images,
+                        )
+                        log.info(
+                            f"Sent status update email={user.email}, workspace={workspace.id}, "
+                            f"tier={workspace.product_tier}, subject: {subject}"
+                        )
+                        # Only add the user once for this update.
+                        # If the user is in multiple workspaces, they will get multiple emails.
+                        if user.id not in users_already_marked:
                             session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
-                            counter += 1
+                            users_already_marked.add(user.id)
+                        counter += 1
                     except NoSuchGraph:
                         pass  # ignore workspaces without graphs
                     except Exception:
