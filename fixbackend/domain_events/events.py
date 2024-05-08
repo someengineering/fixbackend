@@ -52,8 +52,8 @@ T = TypeVar("T")
 @frozen(kw_only=True)
 class Event(ABC):
     kind: ClassVar[str]
-    id: Optional[str] = field(factory=uuid_str)
-    created_at: Optional[datetime] = field(factory=utc)
+    id: str = field(factory=uuid_str)
+    created_at: datetime = field(factory=utc)
 
     def to_json(self) -> Json:
         return converter.unstructure(self)  # type: ignore
