@@ -462,6 +462,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     # check if we need to delete accounts
                     new_account_limit = ProductTierSettings[ptc_evt.product_tier].account_limit or math.inf
                     old_account_limit = ProductTierSettings[ptc_evt.previous_tier].account_limit or math.inf
+                    workspace = await self.workspace_repository.get_workspace(ptc_evt.workspace_id)
+                    if workspace is None:
+                        log.error(f"Workspace {ptc_evt.workspace_id} not found, can't delete cloud accounts")
+                        return None
+                    user_id = ptc_evt.user_id or workspace.owner_id
                     if new_account_limit < old_account_limit:
                         # we should not have infinity here
                         new_account_limit = round(new_account_limit)
@@ -473,7 +478,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         async with asyncio.TaskGroup() as tg:
                             for cloud_account in to_delete:
                                 tg.create_task(
-                                    self.delete_cloud_account(ptc_evt.user_id, cloud_account.id, ptc_evt.workspace_id)
+                                    self.delete_cloud_account(user_id, cloud_account.id, ptc_evt.workspace_id)
                                 )
 
                 case SubscriptionCancelled.kind:

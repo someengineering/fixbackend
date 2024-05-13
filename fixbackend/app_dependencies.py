@@ -208,7 +208,15 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.stripe_service,
-        create_stripe_service(cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher),
+        create_stripe_service(
+            cfg,
+            user_repo,
+            subscription_repo,
+            workspace_repo,
+            session_maker,
+            domain_event_publisher,
+            billing_entry_service,
+        ),
     )
     cloud_accounts_redis_publisher = RedisPubSubPublisher(
         redis=readwrite_redis,
@@ -481,7 +489,15 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
     )
     stripe = deps.add(
         SN.stripe_service,
-        create_stripe_service(cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher),
+        create_stripe_service(
+            cfg,
+            user_repo,
+            subscription_repo,
+            workspace_repo,
+            session_maker,
+            domain_event_publisher,
+            billing_entry_service,
+        ),
     )
     deps.add(
         SN.billing_job,

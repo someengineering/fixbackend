@@ -26,6 +26,8 @@ from fastapi import APIRouter, Form, Cookie, Response, Request, Depends
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import OptionalAuthenticatedUser, AuthenticatedUser
+from fixbackend.billing.schemas import ProductTierRead
+from fixbackend.ids import ProductTier
 from fixbackend.permissions.models import workspace_billing_admin_permissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandlerDependency
@@ -81,11 +83,16 @@ def subscription_router() -> APIRouter:
         workspace: UserWorkspaceDependency,
         stripe_service: StripeServiceDependency,
         request: Request,
+        product_tier: Optional[ProductTierRead] = None,
         _: bool = Depends(WorkspacePermissionChecker(workspace_billing_admin_permissions)),
     ) -> Response:
         return_url = request.url_for(BackFromStripe, workspace_id=workspace.id)
-        print(str(return_url))
-        url = await stripe_service.redirect_to_stripe(workspace, str(return_url))
+
+        desired_product_tier: Optional[ProductTier] = None
+        if product_tier is not None:
+            desired_product_tier = product_tier.to_tier()
+
+        url = await stripe_service.redirect_to_stripe(workspace, str(return_url), desired_product_tier)
         return RedirectResponse(url)
 
     @router.get("/workspaces/{workspace_id}/subscriptions/stripe/back", include_in_schema=False, name=BackFromStripe)

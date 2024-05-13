@@ -953,6 +953,7 @@ def stripe_service(
     async_session_maker: AsyncSessionMaker,
     domain_event_sender: InMemoryDomainEventPublisher,
     stripe_client: StripeDummyClient,
+    billing_entry_service: BillingEntryService,
 ) -> StripeServiceImpl:
     return StripeServiceImpl(
         stripe_client,
@@ -963,6 +964,7 @@ def stripe_service(
         workspace_repository,
         async_session_maker,
         domain_event_sender,
+        billing_entry_service,
     )
 
 

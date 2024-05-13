@@ -30,7 +30,6 @@ from fastapi import Depends
 from fixcloudutils.util import utc
 from prometheus_client import Counter
 
-from fixbackend.auth.models import User
 from fixbackend.billing.models import (
     PaymentMethod,
     PaymentMethods,
@@ -91,7 +90,7 @@ class BillingEntryService:
         ]
         return billing_entries
 
-    async def get_payment_methods(self, workspace: Workspace, user_id: UserId) -> WorkspacePaymentMethods:
+    async def get_payment_methods(self, workspace: Workspace, user_id: Optional[UserId]) -> WorkspacePaymentMethods:
         """List all awailable payment methods available for the workspace"""
         current: PaymentMethod = PaymentMethods.NoPaymentMethod()
 
@@ -122,6 +121,8 @@ class BillingEntryService:
             match subscription:
                 case AwsMarketplaceSubscription():
                     payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+
+                # todo: this will never execute because stripe subscriptions do not have a user_id.
                 case StripeSubscription():
                     payment_methods.append(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 
@@ -129,13 +130,13 @@ class BillingEntryService:
 
     async def update_billing(
         self,
-        user: User,
+        user_id: Optional[UserId],
         workspace: Workspace,
         new_product_tier: Optional[ProductTier] = None,
         new_payment_method: Optional[PaymentMethod] = None,
     ) -> Workspace:
         current_tier = workspace.product_tier
-        workspace_payment_methods = await self.get_payment_methods(workspace, user.id)
+        workspace_payment_methods = await self.get_payment_methods(workspace, user_id)
 
         def payment_method_available() -> bool:
             new_payment_method_provided = (
@@ -180,7 +181,7 @@ class BillingEntryService:
             )
             event = ProductTierChanged(
                 workspace.id,
-                user.id,
+                user_id or workspace.owner_id,
                 product_tier,
                 product_tier.paid,
                 product_tier > current_tier,

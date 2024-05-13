@@ -77,7 +77,7 @@ class BillingEntryServiceMock(BillingEntryService):
     async def list_billing_info(self, workspace_id: WorkspaceId) -> List[BillingEntry]:
         return [billing_entry]
 
-    async def get_payment_methods(self, workspace: Workspace, user_id: UserId) -> WorkspacePaymentMethods:
+    async def get_payment_methods(self, workspace: Workspace, user_id: Optional[UserId]) -> WorkspacePaymentMethods:
         return WorkspacePaymentMethods(
             current=PaymentMethods.AwsSubscription(sub_id),
             available=[PaymentMethods.AwsSubscription(sub_id), PaymentMethods.NoPaymentMethod()],
@@ -85,7 +85,7 @@ class BillingEntryServiceMock(BillingEntryService):
 
     async def update_billing(
         self,
-        user: User,
+        user_id: Optional[UserId],
         workspace: Workspace,
         tier: ProductTier | None = None,
         payment_method: PaymentMethod | None = None,
@@ -131,7 +131,11 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
 
     @override
     async def update_subscription(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+        self,
+        workspace_id: WorkspaceId,
+        subscription_id: Optional[SubscriptionId],
+        *,
+        session: AsyncSession | None = None,
     ) -> Workspace:
         return evolve(workspace, subscription_id=subscription_id)
 

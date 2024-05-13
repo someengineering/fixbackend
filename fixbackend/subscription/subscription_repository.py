@@ -318,7 +318,12 @@ class SubscriptionRepository:
             await session.commit()
             return result.rowcount  # noqa
 
-    async def create(self, subscription: SubscriptionMethodType) -> SubscriptionMethodType:
+    async def create(
+        self,
+        subscription: SubscriptionMethodType,
+        *,
+        session: Optional[AsyncSession] = None,
+    ) -> SubscriptionMethodType:
         async with self.session_maker() as session:
             session.add(SubscriptionEntity.from_model(subscription))
             await session.commit()
@@ -355,6 +360,7 @@ class StripeCustomerEntity(CreatedUpdatedMixin, Base):
     __tablename__ = "stripe_customers"
     workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, primary_key=True)
     customer_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    desired_product_tier: Mapped[Optional[ProductTier]] = mapped_column(String(64), nullable=True, default=None)
 
 
 class StripeCustomerRepository:
@@ -377,9 +383,31 @@ class StripeCustomerRepository:
             else:
                 return None
 
-    async def create(self, workspace_id: WorkspaceId, customer_id: StripeCustomerId) -> None:
+    async def get_product_tier(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> Optional[ProductTier]:
+        async def do_tx(session: AsyncSession) -> Optional[ProductTier]:
+            stmt = select(StripeCustomerEntity.desired_product_tier).where(
+                StripeCustomerEntity.workspace_id == workspace_id
+            )
+            if result := (await session.execute(stmt)).scalar_one_or_none():
+                return ProductTier.from_str(result)
+            else:
+                return None
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
+
+    async def create(
+        self, workspace_id: WorkspaceId, customer_id: StripeCustomerId, desired_product_tier: Optional[ProductTier]
+    ) -> None:
         async with self.session_maker() as session:
-            entity = StripeCustomerEntity(workspace_id=workspace_id, customer_id=customer_id)
+            entity = StripeCustomerEntity(
+                workspace_id=workspace_id, customer_id=customer_id, desired_product_tier=desired_product_tier
+            )
             session.add(entity)
             await session.commit()
 

@@ -87,7 +87,9 @@ def billing_info_router(config: Config) -> APIRouter:
                 return None
             return billing.product_tier.to_tier()
 
-        ws = await billing_info_service.update_billing(user, workspace, product_tier(billing), payment_method(billing))
+        ws = await billing_info_service.update_billing(
+            user.id, workspace, product_tier(billing), payment_method(billing)
+        )
         payment_methods = await billing_info_service.get_payment_methods(workspace, user.id)
 
         return WorkspaceBillingSettingsRead.from_model(ws, payment_methods)
