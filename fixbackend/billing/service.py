@@ -122,7 +122,10 @@ class BillingEntryService:
                 case AwsMarketplaceSubscription():
                     payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
 
-                # todo: this will never execute because stripe subscriptions do not have a user_id.
+        async for subscription in self.subscription_repository.subscriptions(
+            stripe_workspace_id=workspace.id, active=True
+        ):
+            match subscription:
                 case StripeSubscription():
                     payment_methods.append(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 

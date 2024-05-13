@@ -121,7 +121,9 @@ async def test_report_usage(stripe_service: StripeServiceImpl, workspace: Worksp
 
     # create subscription and billing entry: expect one usage to be reported
     subscription = await stripe_service.subscription_repository.create(
-        StripeSubscription(SubscriptionId(uid()), stripe_customer_id, stripe_subscription_id, True, None, None)
+        StripeSubscription(
+            SubscriptionId(uid()), workspace.id, stripe_customer_id, stripe_subscription_id, True, None, None
+        )
     )
     await stripe_service.subscription_repository.add_billing_entry(
         subscription.id, workspace.id, ProductTier.Enterprise, 23, utc(), utc(), utc() + timedelta(days=1)

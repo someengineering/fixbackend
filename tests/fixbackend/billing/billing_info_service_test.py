@@ -69,12 +69,18 @@ async def test_list_payment_methods(
         case _:
             assert False, "Expected no payment method available"
     assert len(available_methods.available) == 2
-    assert available_methods.available[0] == PaymentMethods.NoPaymentMethod()
-    match available_methods.available[1]:
-        case PaymentMethods.AwsSubscription(subscription_id):
-            assert subscription_id == aws_marketplace_subscription.id
-        case _:
-            assert False, "Expected subscription to be available payment method"
+    assert available_methods.available == [
+        PaymentMethods.NoPaymentMethod(),
+        PaymentMethods.AwsSubscription(aws_marketplace_subscription.id),
+    ]
+
+    # also works by querying via workspace only
+    available_methods = await billing_entry_service.get_payment_methods(workspace, None)
+    assert len(available_methods.available) == 2
+    assert available_methods.available == [
+        PaymentMethods.NoPaymentMethod(),
+        PaymentMethods.AwsSubscription(aws_marketplace_subscription.id),
+    ]
 
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 

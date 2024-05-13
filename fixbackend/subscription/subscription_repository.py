@@ -64,6 +64,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
     aws_product_code: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     stripe_customer_identifier: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
+    stripe_workspace_id: Mapped[Optional[WorkspaceId]] = mapped_column(GUID, nullable=True, index=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
     next_charge_timestamp: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, default=None)
@@ -72,6 +73,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
         if self.stripe_subscription_id and self.stripe_customer_identifier:
             return StripeSubscription(
                 id=self.id,
+                workspace_id=self.stripe_workspace_id,
                 customer_identifier=StripeCustomerId(self.stripe_customer_identifier),
                 stripe_subscription_id=StripeSubscriptionId(self.stripe_subscription_id),
                 active=self.active,
@@ -109,6 +111,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
             return SubscriptionEntity(
                 id=subscription.id,
                 user_id=None,
+                stripe_workspace_id=subscription.workspace_id,
                 stripe_customer_identifier=subscription.customer_identifier,
                 stripe_subscription_id=subscription.stripe_subscription_id,
                 active=subscription.active,
@@ -202,6 +205,7 @@ class SubscriptionRepository:
         session: Optional[AsyncSession] = None,
         is_aws_marketplace_subscription: Optional[bool] = None,
         is_stripe_subscription: Optional[bool] = None,
+        stripe_workspace_id: Optional[WorkspaceId] = None,
     ) -> AsyncIterator[SubscriptionMethod]:
         query = select(SubscriptionEntity)
         if user_id:
@@ -224,6 +228,8 @@ class SubscriptionRepository:
         if (is_stripe := is_stripe_subscription) is not None:
             stripe_sub = SubscriptionEntity.stripe_subscription_id
             query = query.where(stripe_sub.isnot(None) if is_stripe else stripe_sub.is_(None))
+        if stripe_workspace_id:
+            query = query.where(SubscriptionEntity.stripe_workspace_id == stripe_workspace_id)
 
         if session:
             async for (subscription,) in await session.stream(query):

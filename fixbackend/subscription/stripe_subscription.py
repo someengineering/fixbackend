@@ -332,6 +332,7 @@ class StripeServiceImpl(StripeService):
                 subscription = await self.subscription_repository.create(
                     StripeSubscription(
                         id=SubscriptionId(uid()),
+                        workspace_id=workspace_id,
                         customer_identifier=customer_id,
                         stripe_subscription_id=stripe_subscription,
                         active=True,
