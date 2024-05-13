@@ -61,9 +61,9 @@ def workspaces_router() -> APIRouter:
         """List all workspaces."""
         workspaces = await workspace_repository.list_workspaces(user)
         result = []
-        user_roles_dict = {role.workspace_id: role.role_names for role in user.roles}
+        user_roles_dict = {role.workspace_id: role for role in user.roles}
         for ws in workspaces:
-            result.append(WorkspaceRead.from_model(ws, user.id, user_roles_dict.get(ws.id, Roles(0))))
+            result.append(WorkspaceRead.from_model(ws, user.id, user_roles_dict.get(ws.id)))
 
         return result
 
@@ -82,9 +82,7 @@ def workspaces_router() -> APIRouter:
         if user.id not in org.all_users():
             raise HTTPException(status_code=403, detail="You are not a member of this workspace")
 
-        roles = next(
-            map(lambda role: role.role_names, filter(lambda role: role.workspace_id == org.id, user.roles)), Roles(0)
-        )
+        roles = next(filter(lambda role: role.workspace_id == org.id, user.roles), None)
 
         return WorkspaceRead.from_model(org, user.id, roles)
 
@@ -131,8 +129,8 @@ def workspaces_router() -> APIRouter:
             raise ValueError("User not found, this should never happer, go fix this bug")
 
         roles = next(
-            map(lambda role: role.role_names, filter(lambda role: role.workspace_id == org.id, updated_user.roles)),
-            Roles(0),
+            filter(lambda role: role.workspace_id == org.id, updated_user.roles),
+            None,
         )
 
         return WorkspaceRead.from_model(org, user.id, roles)

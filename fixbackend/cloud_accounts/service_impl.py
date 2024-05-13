@@ -45,6 +45,7 @@ from fixbackend.cloud_accounts.models import (
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
 from fixbackend.config import Config, Free, ProductTierSettings
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
@@ -130,6 +131,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         *,
         workspace_repository: WorkspaceRepository,
         cloud_account_repository: CloudAccountRepository,
+        next_run_repository: NextRunRepository,
         pubsub_publisher: RedisPubSubPublisher,
         domain_event_publisher: DomainEventPublisher,
         readwrite_redis: Redis,
@@ -144,6 +146,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     ) -> None:
         self.workspace_repository = workspace_repository
         self.cloud_account_repository = cloud_account_repository
+        self.next_run_repository = next_run_repository
         self.pubsub_publisher = pubsub_publisher
         self.domain_events = domain_event_publisher
         self.notification_service = notification_service
@@ -454,8 +457,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
                 case ProductTierChanged.kind:
                     ptc_evt = ProductTierChanged.from_json(message)
+                    # update next tenant run
+                    await self.next_run_repository.update_next_run_for(ptc_evt.workspace_id, ptc_evt.product_tier)
+                    # check if we need to delete accounts
                     new_account_limit = ProductTierSettings[ptc_evt.product_tier].account_limit or math.inf
                     old_account_limit = ProductTierSettings[ptc_evt.previous_tier].account_limit or math.inf
+                    workspace = await self.workspace_repository.get_workspace(ptc_evt.workspace_id)
+                    if workspace is None:
+                        log.error(f"Workspace {ptc_evt.workspace_id} not found, can't delete cloud accounts")
+                        return None
+                    user_id = ptc_evt.user_id or workspace.owner_id
                     if new_account_limit < old_account_limit:
                         # we should not have infinity here
                         new_account_limit = round(new_account_limit)
@@ -467,7 +478,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         async with asyncio.TaskGroup() as tg:
                             for cloud_account in to_delete:
                                 tg.create_task(
-                                    self.delete_cloud_account(ptc_evt.user_id, cloud_account.id, ptc_evt.workspace_id)
+                                    self.delete_cloud_account(user_id, cloud_account.id, ptc_evt.workspace_id)
                                 )
 
                 case SubscriptionCancelled.kind:

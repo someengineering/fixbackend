@@ -36,6 +36,7 @@ from stripe import Webhook
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.billing.models import BillingEntry
+from fixbackend.billing.service import BillingEntryService
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import SubscriptionCreated, SubscriptionCancelled
@@ -92,28 +93,28 @@ class StripeClient:  # pragma: no cover
 
     async def create_usage_record(
         self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
-    ) -> int:
+    ) -> Dict[str, int]:
         # price ids reflect the product tier, price for seat is called "Seat"
         quantity = {tier: nr_of_accounts, "Seat": nr_of_seats}
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
         used = {price_ids_by_product_id[name]: value for name, value in quantity.items() if value > 0}
         subscription = await stripe.Subscription.retrieve_async(subscription_id)
         now = int(time.time())
-        result = []
+        result = {}
         # We will create multiple usage records: one for each price item
         # Reasoning: the usage has "set" mechanics - the latest reported usage overrides a previously defined one.
         # By reporting all usages of all prices, the complete state is updated.
         for item in subscription["items"]["data"]:
             plan_id = item["plan"]["id"]
-            usage_record = await run_async(
+            await run_async(
                 stripe.UsageRecord.create,
                 subscription_item=item["id"],
                 quantity=used.get(plan_id, 0),
                 timestamp=now,
                 action="set",
             )
-            result.append(usage_record)
-        return len(result)
+            result[plan_id] = used.get(plan_id, 0)
+        return result
 
     async def refund(self, payment_intent_id: str) -> stripe.Refund:
         return await stripe.Refund.create_async(payment_intent=payment_intent_id)
@@ -154,7 +155,9 @@ class StripeClient:  # pragma: no cover
 
 
 class StripeService(Service):
-    async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
+    async def redirect_to_stripe(
+        self, workspace: Workspace, return_url: str, desired_product_tier: Optional[ProductTier]
+    ) -> str:
         raise NotImplementedError("No payment service configured.")
 
     async def handle_event(self, event: str, signature: str) -> None:
@@ -179,6 +182,7 @@ class StripeServiceImpl(StripeService):
         workspace_repo: WorkspaceRepository,
         session_maker: AsyncSessionMaker,
         domain_event_publisher: DomainEventPublisher,
+        billing_entry_service: BillingEntryService,
     ) -> None:
         self.client = client
         self.webhook_key = webhook_key
@@ -188,9 +192,19 @@ class StripeServiceImpl(StripeService):
         self.workspace_repository = workspace_repo
         self.domain_event_publisher = domain_event_publisher
         self.stripe_customer_repo = StripeCustomerRepository(session_maker)
+        self.session_maker = session_maker
+        self.billing_entry_service = billing_entry_service
 
-    async def redirect_to_stripe(self, workspace: Workspace, return_url: str) -> str:
+    async def redirect_to_stripe(
+        self,
+        workspace: Workspace,
+        return_url: str,
+        desired_product_tier: Optional[ProductTier],
+    ) -> str:
         customer_id = await self._get_stripe_customer_id(workspace)
+        if desired_product_tier:
+            await self.stripe_customer_repo.set_product_tier(workspace.id, desired_product_tier)
+
         subscription = await self._get_stripe_subscription_id(customer_id)
         if subscription is None:
             # No subscription yet: let the user create a one-time payment as activation.
@@ -231,10 +245,12 @@ class StripeServiceImpl(StripeService):
     async def report_unreported_usages(self, raise_exception: bool = False) -> int:
         async def send(be: BillingEntry, subscription: StripeSubscription) -> None:
             try:
-                await self.client.create_usage_record(
+                result = await self.client.create_usage_record(
                     subscription.stripe_subscription_id, be.tier, be.nr_of_accounts_charged, nr_of_seats=0
                 )
                 await self.subscription_repository.mark_billing_entry_reported(entry.id)
+                info = ", ".join(f"{k}={v}" for k, v in result.items())
+                log.info(f"Reported usage to stripe for workspace {be.workspace_id}: {info} ({be.id})")
             except Exception:
                 log.error(f"Could not report usage for billing entry {be.id}", exc_info=True)
                 if raise_exception:
@@ -312,19 +328,32 @@ class StripeServiceImpl(StripeService):
             # create a subscription for customer using given payment method for defined billing period
             stripe_subscription = await self.client.create_subscription(customer_id, pm_id, self.billing_period)
             # the subscription has been created on the stripe side
-            subscription = await self.subscription_repository.create(
-                StripeSubscription(
-                    id=SubscriptionId(uid()),
-                    workspace_id=workspace_id,
-                    customer_identifier=customer_id,
-                    stripe_subscription_id=stripe_subscription,
-                    active=True,
-                    last_charge_timestamp=utc(),
-                    next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
+            async with self.session_maker() as session:
+                subscription = await self.subscription_repository.create(
+                    StripeSubscription(
+                        id=SubscriptionId(uid()),
+                        workspace_id=workspace_id,
+                        customer_identifier=customer_id,
+                        stripe_subscription_id=stripe_subscription,
+                        active=True,
+                        last_charge_timestamp=utc(),
+                        next_charge_timestamp=start_of_next_period(period=self.billing_period, hour=9),
+                    ),
+                    session=session,
                 )
-            )
-            # mark this subscription as the active one for the workspace
-            workspace = await self.workspace_repository.update_subscription(workspace_id, subscription.id)
+                # mark this subscription as the active one for the workspace
+                workspace = await self.workspace_repository.update_subscription(
+                    workspace_id, subscription.id, session=session
+                )
+                # update the product tier of the customer
+                product_tier = await self.stripe_customer_repo.get_product_tier(workspace_id, session=session)
+
+            if product_tier:
+                # idempotent, can be done without a session
+                await self.billing_entry_service.update_billing(
+                    user_id=None, workspace=workspace, new_product_tier=product_tier
+                )
+
             # publish a subscription event
             event = SubscriptionCreated(workspace_id, workspace.owner_id, subscription.id, "stripe")
             await self.domain_event_publisher.publish(event)
@@ -375,6 +404,7 @@ def create_stripe_service(
     workspace_repository: WorkspaceRepository,
     session_maker: AsyncSessionMaker,
     domain_event_publisher: DomainEventPublisher,
+    billing_entry_service: BillingEntryService,
 ) -> StripeService:
     if (api_key := config.stripe_api_key) and (ws_key := config.stripe_webhook_key):
         log.info("Stripe Service configured")
@@ -388,6 +418,7 @@ def create_stripe_service(
             workspace_repository,
             session_maker,
             domain_event_publisher,
+            billing_entry_service,
         )
     else:
         log.info("No Stripe Service configured")

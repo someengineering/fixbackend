@@ -14,7 +14,7 @@ from fastapi_users_db_sqlalchemy.generics import GUID
 
 # revision identifiers, used by Alembic.
 revision: str = "cd7a04e7394c"
-down_revision: Union[str, None] = "855bc1b7b7d1"
+down_revision: Union[str, None] = "57828ccdb2d9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -13,13 +13,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from datetime import datetime, timezone
+from typing import Dict
 
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.util import utc
-from pytest import approx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,15 +44,11 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
-    ProductTier,
     TaskId,
     UserCloudAccountName,
 )
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.subscription.models import AwsMarketplaceSubscription
-from fixbackend.config import ProductTierSettings
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 
 
@@ -338,8 +333,6 @@ async def test_receive_collect_done_message_zero_collected_accounts(
     assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
 
     # no event is emitted in case of no collected accounts
-    for evt in domain_event_sender.events:
-        print(evt)
     assert len(domain_event_sender.events) == current_events_length
 
 
@@ -413,36 +406,3 @@ async def test_receive_collect_error_message(
 
     # failure event is emitted in case of failure
     assert len(domain_event_sender.events) == current_events_length + 1
-
-
-@pytest.mark.asyncio
-async def test_compute_next_run(
-    dispatcher: DispatcherService,
-    workspace: Workspace,
-    workspace_repository: WorkspaceRepository,
-    aws_marketplace_subscription: AwsMarketplaceSubscription,
-) -> None:
-
-    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
-
-    for product_tier in ProductTier:
-
-        workspace = await workspace_repository.update_product_tier(workspace.id, product_tier)
-
-        settings = ProductTierSettings[workspace.product_tier]
-
-        delta = settings.scan_interval
-
-        async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
-            assert (await dispatcher.compute_next_run(workspace.id, last_run)).timestamp() == approx(
-                expected.timestamp(), abs=2
-            )
-
-        now = utc()
-        await assert_next_is(None, now + delta)
-        await assert_next_is(now, now + delta)
-        await assert_next_is(now + timedelta(seconds=10), now + delta + timedelta(seconds=10))
-        await assert_next_is(now - timedelta(seconds=10), now + delta - timedelta(seconds=10))
-        await assert_next_is(now + 3 * delta, now + 4 * delta)
-        await assert_next_is(now - 3 * delta, now + delta)
-        await assert_next_is(now - 123 * delta, now + delta)

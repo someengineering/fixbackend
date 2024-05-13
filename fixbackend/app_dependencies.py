@@ -137,7 +137,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
     )
     cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
-    deps.add(SN.next_run_repo, NextRunRepository(session_maker))
+    next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
     metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
     deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
     graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
@@ -208,7 +208,15 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.stripe_service,
-        create_stripe_service(cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher),
+        create_stripe_service(
+            cfg,
+            user_repo,
+            subscription_repo,
+            workspace_repo,
+            session_maker,
+            domain_event_publisher,
+            billing_entry_service,
+        ),
     )
     cloud_accounts_redis_publisher = RedisPubSubPublisher(
         redis=readwrite_redis,
@@ -247,6 +255,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         CloudAccountServiceImpl(
             workspace_repository=workspace_repo,
             cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+            next_run_repository=next_run_repo,
             pubsub_publisher=cloud_accounts_redis_publisher,
             domain_event_publisher=domain_event_publisher,
             readwrite_redis=readwrite_redis,
@@ -387,6 +396,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
         CloudAccountServiceImpl(
             workspace_repository=workspace_repo,
             cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+            next_run_repository=next_run_repo,
             pubsub_publisher=cloud_accounts_redis_publisher,
             domain_event_publisher=domain_event_publisher,
             readwrite_redis=readwrite_redis,
@@ -479,7 +489,15 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
     )
     stripe = deps.add(
         SN.stripe_service,
-        create_stripe_service(cfg, user_repo, subscription_repo, workspace_repo, session_maker, domain_event_publisher),
+        create_stripe_service(
+            cfg,
+            user_repo,
+            subscription_repo,
+            workspace_repo,
+            session_maker,
+            domain_event_publisher,
+            billing_entry_service,
+        ),
     )
     deps.add(
         SN.billing_job,

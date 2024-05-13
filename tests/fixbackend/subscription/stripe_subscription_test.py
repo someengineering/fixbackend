@@ -22,6 +22,7 @@ from fixbackend.subscription.models import StripeSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from tests.fixbackend.conftest import (
     stripe_customer_id,
     stripe_payment_intent_id,
@@ -48,11 +49,11 @@ def event(kind: str, data: Dict[str, Any]) -> stripe.Event:
 async def test_redirect_to_stripe(stripe_service: StripeServiceImpl, workspace: Workspace) -> None:
     # new customers need to enter payment data
     assert await stripe_service.stripe_customer_repo.get(workspace.id) is None
-    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", None)
     assert redirect.endswith("checkout")
     assert await stripe_service.stripe_customer_repo.get(workspace.id) is not None
     # the same customer should be redirected to the same checkout
-    redirect2 = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect2 = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", None)
     assert redirect == redirect2
     # send event that the customer bough a subscription
     await stripe_service.handle_verified_event(
@@ -61,8 +62,37 @@ async def test_redirect_to_stripe(stripe_service: StripeServiceImpl, workspace: 
         )
     )
     # now the customer is redirected to the billing portal
-    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return")
+    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", None)
     assert redirect.endswith("billing")
+
+
+async def test_redirect_to_stripe_with_product_tier(
+    stripe_service: StripeServiceImpl, workspace: Workspace, workspace_repository: WorkspaceRepositoryImpl
+) -> None:
+    # new customers need to enter payment data
+    assert await stripe_service.stripe_customer_repo.get(workspace.id) is None
+    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", ProductTier.Business)
+    assert redirect.endswith("checkout")
+    assert await stripe_service.stripe_customer_repo.get(workspace.id) is not None
+    # we stored the desired product tier in the stripe customer table
+    assert await stripe_service.stripe_customer_repo.get_product_tier(workspace_id=workspace.id) == ProductTier.Business
+    # the same customer should be redirected to the same checkout
+    redirect2 = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", ProductTier.Business)
+    assert redirect == redirect2
+    # send event that the customer bough a subscription
+    await stripe_service.handle_verified_event(
+        event(
+            "checkout.session.completed", {"customer": stripe_customer_id, "payment_intent": stripe_payment_intent_id}
+        )
+    )
+    # now the customer is redirected to the billing portal
+    redirect = await stripe_service.redirect_to_stripe(workspace, "https://localhost/return", None)
+    assert redirect.endswith("billing")
+
+    # workspace product tier is updated after the subscription is created
+    updated_workspace = await workspace_repository.get_workspace(workspace.id)
+    assert updated_workspace
+    assert updated_workspace.product_tier == ProductTier.Business
 
 
 async def test_refund(stripe_service: StripeServiceImpl, stripe_client: StripeDummyClient) -> None:

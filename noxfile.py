@@ -46,5 +46,4 @@ def mypy(session: Session) -> None:
     args = session.posargs or [] + opts + locations
     session.run_always("poetry", "install", "--quiet", external=True)
     session.install("mypy", ".")
-    print(args)
     session.run("mypy", *args)

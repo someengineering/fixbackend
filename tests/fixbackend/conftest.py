@@ -902,8 +902,8 @@ class StripeDummyClient(StripeClient):
 
     async def create_usage_record(
         self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
-    ) -> int:
-        return 4
+    ) -> Dict[str, int]:
+        return {}
 
     async def refund(self, payment_intent_id: str) -> stripe.Refund:
         self.requests.append(dict(call="refund", payment_intent_id=payment_intent_id))
@@ -953,6 +953,7 @@ def stripe_service(
     async_session_maker: AsyncSessionMaker,
     domain_event_sender: InMemoryDomainEventPublisher,
     stripe_client: StripeDummyClient,
+    billing_entry_service: BillingEntryService,
 ) -> StripeServiceImpl:
     return StripeServiceImpl(
         stripe_client,
@@ -963,6 +964,7 @@ def stripe_service(
         workspace_repository,
         async_session_maker,
         domain_event_sender,
+        billing_entry_service,
     )
 
 

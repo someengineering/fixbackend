@@ -95,7 +95,11 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def update_subscription(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+        self,
+        workspace_id: WorkspaceId,
+        subscription_id: Optional[SubscriptionId],
+        *,
+        session: Optional[AsyncSession] = None,
     ) -> Workspace:
         """Assign a subscription to a workspace."""
         raise NotImplementedError
@@ -230,9 +234,14 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             return [org.to_model() for org in orgs]
 
     async def update_subscription(
-        self, workspace_id: WorkspaceId, subscription_id: Optional[SubscriptionId]
+        self,
+        workspace_id: WorkspaceId,
+        subscription_id: Optional[SubscriptionId],
+        *,
+        session: Optional[AsyncSession] = None,
     ) -> Workspace:
-        async with self.session_maker() as session:
+
+        async def do_tx(session: AsyncSession) -> Workspace:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
             workspace = results.unique().scalar_one_or_none()
@@ -242,6 +251,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
             await session.refresh(workspace)
             return workspace.to_model()
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
 
     async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId, role: Roles) -> None:
         async with self.session_maker() as session:
