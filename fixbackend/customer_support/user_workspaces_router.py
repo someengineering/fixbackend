@@ -70,26 +70,21 @@ def user_workspaces_router(dependencies: FixDependencies, templates: Jinja2Templ
         user_id_query = request.query_params.get("query")
         user = None
         workspaces: Sequence[Workspace] = []
-        user_id: Optional[UserId] = None
         if user_id_query:
             try:
                 user_id = UserId(uuid.UUID(user_id_query))
                 user = await user_repo.get(user_id)
-                print("user", user)
             except ValueError:
                 pass
 
         if user:
             workspaces = await workspace_repo.list_workspaces(user)
-            user_id = user.id
 
         context: Dict[str, Any] = {
             "request": request,
             "user": user,
             "workspaces": workspaces,
         }
-        print(context)
-
         return templates.TemplateResponse(request=request, name="user_workspaces/table.html", context=context)
 
     @router.get("/user_workspaces/search", response_class=HTMLResponse, name="user_workspaces_search")

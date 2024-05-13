@@ -333,8 +333,6 @@ async def test_receive_collect_done_message_zero_collected_accounts(
     assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
 
     # no event is emitted in case of no collected accounts
-    for evt in domain_event_sender.events:
-        print(evt)
     assert len(domain_event_sender.events) == current_events_length
 
 
