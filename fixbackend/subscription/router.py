@@ -84,7 +84,6 @@ def subscription_router() -> APIRouter:
         _: bool = Depends(WorkspacePermissionChecker(workspace_billing_admin_permissions)),
     ) -> Response:
         return_url = request.url_for(BackFromStripe, workspace_id=workspace.id)
-        print(str(return_url))
         url = await stripe_service.redirect_to_stripe(workspace, str(return_url))
         return RedirectResponse(url)
 
