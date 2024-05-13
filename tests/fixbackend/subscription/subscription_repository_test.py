@@ -35,11 +35,13 @@ from fixbackend.subscription.subscription_repository import (
 async def test_crud_entry(subscription_repository: SubscriptionRepository, session: AsyncSession) -> None:
     id = SubscriptionId(uuid4())
     user_id = UserId(uuid4())
+    workspace_id = WorkspaceId(uuid4())
     cid = "some-customer-id"
     now = datetime(2021, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
+        workspace_id=workspace_id,
         customer_identifier=cid,
         customer_aws_account_id="123",
         product_code="123",
@@ -76,6 +78,7 @@ async def test_update_workspace_id(subscription_repository: SubscriptionReposito
     entity = AwsMarketplaceSubscription(
         id=id,
         user_id=user_id,
+        workspace_id=workspace_id,
         customer_identifier=cid,
         customer_aws_account_id="123",
         product_code="123",

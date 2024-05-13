@@ -84,6 +84,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
             return AwsMarketplaceSubscription(
                 id=self.id,
                 user_id=self.user_id,
+                workspace_id=self.workspace_id,
                 customer_identifier=self.aws_customer_identifier,
                 customer_aws_account_id=self.aws_customer_account_id,
                 product_code=self.aws_product_code,
@@ -100,7 +101,7 @@ class SubscriptionEntity(CreatedUpdatedMixin, Base):
             return SubscriptionEntity(
                 id=subscription.id,
                 user_id=subscription.user_id,
-                workspace_id=None,
+                workspace_id=subscription.workspace_id,
                 aws_customer_identifier=subscription.customer_identifier,
                 aws_customer_account_id=subscription.customer_aws_account_id,
                 aws_product_code=subscription.product_code,

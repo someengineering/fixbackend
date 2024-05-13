@@ -369,6 +369,7 @@ async def aws_marketplace_subscription(
         AwsMarketplaceSubscription(
             id=SubscriptionId(uid()),
             user_id=user.id,
+            workspace_id=None,
             customer_identifier="123",
             customer_aws_account_id="123456789",
             product_code="foo",

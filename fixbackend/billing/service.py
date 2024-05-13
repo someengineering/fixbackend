@@ -23,7 +23,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Annotated, List
+from typing import Annotated, List, Set
 from typing import Optional
 
 from fastapi import Depends
@@ -94,9 +94,9 @@ class BillingEntryService:
         """List all awailable payment methods available for the workspace"""
         current: PaymentMethod = PaymentMethods.NoPaymentMethod()
 
-        payment_methods: List[PaymentMethod] = []
+        payment_methods: Set[PaymentMethod] = set()
         if workspace.product_tier == ProductTier.Free or workspace.product_tier == ProductTier.Trial:
-            payment_methods.append(PaymentMethods.NoPaymentMethod())
+            payment_methods.add(PaymentMethods.NoPaymentMethod())
 
         async def get_current_subscription() -> Optional[SubscriptionMethod]:
             if workspace.subscription_id is None:
@@ -120,14 +120,18 @@ class BillingEntryService:
         async for subscription in self.subscription_repository.subscriptions(user_id=user_id, active=True):
             match subscription:
                 case AwsMarketplaceSubscription():
-                    payment_methods.append(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+                    payment_methods.add(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
+                case StripeSubscription():
+                    payment_methods.add(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 
         async for subscription in self.subscription_repository.subscriptions(workspace_id=workspace.id, active=True):
             match subscription:
+                case AwsMarketplaceSubscription():
+                    payment_methods.add(PaymentMethods.AwsSubscription(subscription_id=subscription.id))
                 case StripeSubscription():
-                    payment_methods.append(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
+                    payment_methods.add(PaymentMethods.StripeSubscription(subscription_id=subscription.id))
 
-        return WorkspacePaymentMethods(current=current, available=payment_methods)
+        return WorkspacePaymentMethods(current=current, available=list(payment_methods))
 
     async def update_billing(
         self,

@@ -127,6 +127,7 @@ class AwsMarketplaceHandler(Service):
             subscription = AwsMarketplaceSubscription(
                 id=SubscriptionId(uuid4()),
                 user_id=user.id,
+                workspace_id=workspace.id if workspace else None,
                 customer_identifier=customer_identifier,
                 customer_aws_account_id=customer_aws_account_id,
                 product_code=product_code,

@@ -31,6 +31,7 @@ from fixbackend.ids import SubscriptionId, UserId, StripeSubscriptionId, StripeC
 class AwsMarketplaceSubscription:
     id: SubscriptionId
     user_id: Optional[UserId]
+    workspace_id: Optional[WorkspaceId]
     customer_identifier: str
     customer_aws_account_id: str
     product_code: str
