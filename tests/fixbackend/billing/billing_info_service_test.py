@@ -103,31 +103,33 @@ async def test_update_billing(
     assert workspace.product_tier == ProductTier.Trial
     # update to higher tier is possible if there is a payment method
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
-    workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
+    workspace = await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Plus)
     assert workspace.product_tier == ProductTier.Plus
 
     # removing the payment method on non-free tier is not possible
     with pytest.raises(NotAllowed):
-        await billing_entry_service.update_billing(user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod())
+        await billing_entry_service.update_billing(
+            user.id, workspace, new_payment_method=PaymentMethods.NoPaymentMethod()
+        )
 
     # downgrading to free is possible
-    workspace = await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Free)
+    workspace = await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Free)
     assert workspace.product_tier == ProductTier.Free
 
     # we can remove the payment method if we're on free tier
     workspace = await billing_entry_service.update_billing(
-        user, workspace, new_payment_method=PaymentMethods.NoPaymentMethod()
+        user.id, workspace, new_payment_method=PaymentMethods.NoPaymentMethod()
     )
     payment_methods = await billing_entry_service.get_payment_methods(workspace, user.id)
     assert payment_methods.current == PaymentMethods.NoPaymentMethod()
 
     # upgrading to paid tier is not possible without payment method
     with pytest.raises(NotAllowed):
-        await billing_entry_service.update_billing(user, workspace, new_product_tier=ProductTier.Plus)
+        await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Plus)
 
     # but if we add the payment then we can upgrade to a paid plan
     workspace = await billing_entry_service.update_billing(
-        user,
+        user.id,
         workspace,
         new_payment_method=PaymentMethods.AwsSubscription(aws_marketplace_subscription.id),
         new_product_tier=ProductTier.Business,
