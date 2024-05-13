@@ -201,7 +201,10 @@ class StripeServiceImpl(StripeService):
         return_url: str,
         desired_product_tier: Optional[ProductTier],
     ) -> str:
-        customer_id = await self._get_stripe_customer_id(workspace, desired_product_tier)
+        customer_id = await self._get_stripe_customer_id(workspace)
+        if desired_product_tier:
+            await self.stripe_customer_repo.set_product_tier(workspace.id, desired_product_tier)
+
         subscription = await self._get_stripe_subscription_id(customer_id)
         if subscription is None:
             # No subscription yet: let the user create a one-time payment as activation.
@@ -369,15 +372,13 @@ class StripeServiceImpl(StripeService):
         if update:
             await self.client.update_customer(cid, **update)  # type: ignore
 
-    async def _get_stripe_customer_id(
-        self, workspace: Workspace, desired_product_tier: Optional[ProductTier]
-    ) -> StripeCustomerId:
+    async def _get_stripe_customer_id(self, workspace: Workspace) -> StripeCustomerId:
         customer_id = await self.stripe_customer_repo.get(workspace.id)
         if customer_id is None:
             owner = await self.user_repo.get(workspace.owner_id)
             assert owner is not None, f"Workspace {workspace.id} does not have an owner?"
             customer_id = await self.client.create_customer(workspace.id, email=owner.email)
-            await self.stripe_customer_repo.create(workspace.id, customer_id, desired_product_tier)
+            await self.stripe_customer_repo.create(workspace.id, customer_id)
         return customer_id
 
     async def _get_stripe_subscription_id(self, customer_id: str) -> Optional[str]:

@@ -401,13 +401,18 @@ class StripeCustomerRepository:
             async with self.session_maker() as session:
                 return await do_tx(session)
 
-    async def create(
-        self, workspace_id: WorkspaceId, customer_id: StripeCustomerId, desired_product_tier: Optional[ProductTier]
-    ) -> None:
+    async def set_product_tier(self, workspace_id: WorkspaceId, product_tier: ProductTier) -> None:
         async with self.session_maker() as session:
-            entity = StripeCustomerEntity(
-                workspace_id=workspace_id, customer_id=customer_id, desired_product_tier=desired_product_tier
+            await session.execute(
+                update(StripeCustomerEntity)
+                .where(StripeCustomerEntity.workspace_id == workspace_id)
+                .values(desired_product_tier=product_tier.value)
             )
+            await session.commit()
+
+    async def create(self, workspace_id: WorkspaceId, customer_id: StripeCustomerId) -> None:
+        async with self.session_maker() as session:
+            entity = StripeCustomerEntity(workspace_id=workspace_id, customer_id=customer_id)
             session.add(entity)
             await session.commit()
 
