@@ -13,13 +13,16 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import timedelta
+from datetime import timedelta, datetime
+from typing import Optional
 
 import pytest
 from fixcloudutils.util import utc
+from pytest import approx
 
+from fixbackend.config import ProductTierSettings
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import WorkspaceId, ProductTier
 
 
 @pytest.mark.asyncio
@@ -40,3 +43,24 @@ async def test_create(next_run_repository: NextRunRepository) -> None:
     # delete the entry
     await next_run_repository.delete(cid)
     assert [entry async for entry in next_run_repository.older_than(now + timedelta(days=365))] == []
+
+
+@pytest.mark.asyncio
+async def test_compute_next_run(next_run_repository: NextRunRepository) -> None:
+
+    for product_tier in ProductTier:
+        settings = ProductTierSettings[product_tier]
+        delta = settings.scan_interval
+
+        async def assert_next_is(last_run: Optional[datetime], expected: datetime) -> None:
+            nr = next_run_repository.next_run_for(product_tier, last_run)
+            assert nr.timestamp() == approx(expected.timestamp(), abs=2)
+
+        now = utc()
+        await assert_next_is(None, now + delta)
+        await assert_next_is(now, now + delta)
+        await assert_next_is(now + timedelta(seconds=10), now + delta + timedelta(seconds=10))
+        await assert_next_is(now - timedelta(seconds=10), now + delta - timedelta(seconds=10))
+        await assert_next_is(now + 3 * delta, now + 4 * delta)
+        await assert_next_is(now - 3 * delta, now + delta)
+        await assert_next_is(now - 123 * delta, now + delta)

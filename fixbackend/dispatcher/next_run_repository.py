@@ -15,11 +15,13 @@ from datetime import datetime
 from typing import AsyncIterator, Tuple, Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
+from fixcloudutils.util import utc
 from sqlalchemy import select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fixbackend.base_model import Base
-from fixbackend.ids import WorkspaceId
+from fixbackend.config import ProductTierSettings
+from fixbackend.ids import WorkspaceId, ProductTier
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
 
@@ -48,6 +50,26 @@ class NextRunRepository:
                 return run.at
             else:
                 return None
+
+    def next_run_for(self, product_tier: ProductTier, last_run: Optional[datetime] = None) -> datetime:
+        now = utc()
+        settings = ProductTierSettings[product_tier]
+        delta = settings.scan_interval
+        initial_time = last_run or now
+        diff = now - initial_time
+        if diff.total_seconds() > 0:  # if the last run is in the past, make sure the next run is in the future
+            periods = (diff // delta) + 1
+            result = initial_time + (delta * periods)
+        else:  # next run is already in the future. compute offset.
+            result = initial_time + delta
+        return result
+
+    async def update_next_run_for(
+        self, tenant: WorkspaceId, product_tier: ProductTier, last_run: Optional[datetime] = None
+    ) -> datetime:
+        result = self.next_run_for(product_tier, last_run)
+        await self.update_next_run_at(tenant, result)
+        return result
 
     async def update_next_run_at(self, workspace_id: WorkspaceId, next_run: datetime) -> None:
         async with self.session_maker() as session:

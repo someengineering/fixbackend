@@ -39,14 +39,12 @@ from fixbackend.domain_events.events import (
     WorkspaceCreated,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
+from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskId, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
-from fixbackend.config import ProductTierSettings
-
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
@@ -379,7 +377,8 @@ class DispatcherService(Service):
         workspace_id = event.workspace_id
         set_workspace_id(workspace_id)
         # store an entry in the next_run table
-        next_run_at = await self.compute_next_run(workspace_id)
+        product_tier = await self.workspace_repository.get_product_tier(workspace_id)
+        next_run_at = self.next_run_repo.next_run_for(product_tier)
         await self.next_run_repo.create(workspace_id, next_run_at)
 
     async def process_aws_account_configured(self, event: AwsAccountConfigured) -> None:
@@ -396,21 +395,6 @@ class DispatcherService(Service):
             log.error(
                 f"Received cloud account {cloud_account_id} configured message, but it does not exist in the database"
             )
-
-    async def compute_next_run(self, tenant: WorkspaceId, last_run: Optional[datetime] = None) -> datetime:
-        now = utc()
-        product_tier = await self.workspace_repository.get_product_tier(tenant)
-        settings = ProductTierSettings[product_tier]
-        delta = settings.scan_interval
-        initial_time = last_run or now
-        diff = now - initial_time
-        if diff.total_seconds() > 0:  # if the last run is in the past, make sure the next run is in the future
-            periods = (diff // delta) + 1
-            result = initial_time + (delta * periods)
-        else:  # next run is already in the future. compute offset.
-            result = initial_time + delta
-        log.info(f"Next run for tenant: {tenant} is {result}")
-        return result
 
     async def trigger_collect(
         self,
@@ -463,12 +447,13 @@ class DispatcherService(Service):
         async for workspace_id, at in self.next_run_repo.older_than(now):
             set_workspace_id(workspace_id)
             accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, ready_for_collection=True)
+            product_tier = await self.workspace_repository.get_product_tier(workspace_id)
             log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
             for account in accounts:
                 await self.trigger_collect(account)
-            next_run_at = await self.compute_next_run(workspace_id, at)
+
+            next_run_at = await self.next_run_repo.update_next_run_for(workspace_id, product_tier, last_run=at)
             log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")
-            await self.next_run_repo.update_next_run_at(workspace_id, next_run_at)
 
         failed_accounts = await self.cloud_account_repo.list_non_hourly_failed_scans_accounts(now)
         for account in failed_accounts:

@@ -92,28 +92,28 @@ class StripeClient:  # pragma: no cover
 
     async def create_usage_record(
         self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
-    ) -> int:
+    ) -> Dict[str, int]:
         # price ids reflect the product tier, price for seat is called "Seat"
         quantity = {tier: nr_of_accounts, "Seat": nr_of_seats}
         price_ids_by_product_id = await self.get_price_ids_by_product_id()
         used = {price_ids_by_product_id[name]: value for name, value in quantity.items() if value > 0}
         subscription = await stripe.Subscription.retrieve_async(subscription_id)
         now = int(time.time())
-        result = []
+        result = {}
         # We will create multiple usage records: one for each price item
         # Reasoning: the usage has "set" mechanics - the latest reported usage overrides a previously defined one.
         # By reporting all usages of all prices, the complete state is updated.
         for item in subscription["items"]["data"]:
             plan_id = item["plan"]["id"]
-            usage_record = await run_async(
+            await run_async(
                 stripe.UsageRecord.create,
                 subscription_item=item["id"],
                 quantity=used.get(plan_id, 0),
                 timestamp=now,
                 action="set",
             )
-            result.append(usage_record)
-        return len(result)
+            result[plan_id] = used.get(plan_id, 0)
+        return result
 
     async def refund(self, payment_intent_id: str) -> stripe.Refund:
         return await stripe.Refund.create_async(payment_intent=payment_intent_id)
@@ -231,10 +231,12 @@ class StripeServiceImpl(StripeService):
     async def report_unreported_usages(self, raise_exception: bool = False) -> int:
         async def send(be: BillingEntry, subscription: StripeSubscription) -> None:
             try:
-                await self.client.create_usage_record(
+                result = await self.client.create_usage_record(
                     subscription.stripe_subscription_id, be.tier, be.nr_of_accounts_charged, nr_of_seats=0
                 )
                 await self.subscription_repository.mark_billing_entry_reported(entry.id)
+                info = ", ".join(f"{k}={v}" for k, v in result.items())
+                log.info(f"Reported usage to stripe for workspace {be.workspace_id}: {info} ({be.id})")
             except Exception:
                 log.error(f"Could not report usage for billing entry {be.id}", exc_info=True)
                 if raise_exception:

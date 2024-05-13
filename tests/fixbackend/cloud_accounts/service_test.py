@@ -26,6 +26,7 @@ from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 from redis.asyncio import Redis
 
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.models import Workspace
@@ -37,7 +38,7 @@ from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, Cloud
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.subscription.models import AwsMarketplaceSubscription
-from fixbackend.config import Config
+from fixbackend.config import Config, ProductTierSettings
 from fixbackend.domain_events.events import (
     AwsAccountConfigured,
     AwsAccountDegraded,
@@ -157,6 +158,7 @@ def service(
     pubsub_publisher: RedisPubSubPublisherMock,
     domain_sender: DomainEventSenderMock,
     account_setup_helper: AwsAccountSetupHelperMock,
+    next_run_repository: NextRunRepository,
     arq_redis: Redis,
     default_config: Config,
     boto_session: boto3.Session,
@@ -167,6 +169,7 @@ def service(
     return CloudAccountServiceImpl(
         workspace_repository=workspace_repository,
         cloud_account_repository=cloud_account_repository,
+        next_run_repository=next_run_repository,
         pubsub_publisher=pubsub_publisher,
         domain_event_publisher=domain_sender,
         readwrite_redis=arq_redis,
@@ -1058,10 +1061,15 @@ async def test_move_to_degraded(
 
 @pytest.mark.asyncio
 async def test_handle_events(
-    service: CloudAccountServiceImpl, workspace: Workspace, user: User, workspace_repository: WorkspaceRepository
+    service: CloudAccountServiceImpl,
+    workspace: Workspace,
+    user: User,
+    workspace_repository: WorkspaceRepository,
+    next_run_repository: NextRunRepository,
 ) -> None:
     subscription_id = SubscriptionId(uid())
     await workspace_repository.update_subscription(workspace.id, subscription_id)
+    await next_run_repository.create(workspace.id, utc())
 
     for event in [
         AwsAccountDiscovered(
@@ -1107,3 +1115,8 @@ async def test_handle_events(
         SubscriptionCancelled(subscription_id=subscription_id, method="aws_marketplace"),
     ]:
         await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
+        if isinstance(event, ProductTierChanged):
+            interval = ProductTierSettings[event.product_tier].scan_interval
+            at = await next_run_repository.get(workspace.id)
+            assert at is not None
+            assert (now + interval) < at < (now + 2 * interval)
