@@ -902,8 +902,8 @@ class StripeDummyClient(StripeClient):
 
     async def create_usage_record(
         self, subscription_id: str, tier: ProductTier, nr_of_accounts: int, nr_of_seats: int
-    ) -> int:
-        return 4
+    ) -> Dict[str, int]:
+        return {}
 
     async def refund(self, payment_intent_id: str) -> stripe.Refund:
         self.requests.append(dict(call="refund", payment_intent_id=payment_intent_id))
