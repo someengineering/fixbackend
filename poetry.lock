@@ -684,6 +684,20 @@ files = [
 ]
 
 [[package]]
+name = "disposable-email-domains"
+version = "0.0.103"
+description = "A set of disposable email domains"
+optional = false
+python-versions = "*"
+files = [
+    {file = "disposable_email_domains-0.0.103-py2.py3-none-any.whl", hash = "sha256:57efb913f35a7198818fa0080f0ab8b52c2b5a29414a596be86c4a8b30fa6d33"},
+    {file = "disposable_email_domains-0.0.103.tar.gz", hash = "sha256:c368f03998cc7edaf125873304f4b16a5cd8576b9ae8987ad883fd743fd156cc"},
+]
+
+[package.extras]
+dev = ["check-manifest"]
+
+[[package]]
 name = "dnspython"
 version = "2.6.1"
 description = "DNS toolkit"
@@ -3187,4 +3201,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4.0"
-content-hash = "07e9a81722da13b41400057782f0acc927e85f8a963f596f9fc3a7ba9c618569"
+content-hash = "90f24ba7a15314ae6c0cfc809cdff0a1d9817c1771072c6d6780dae0aa1d578e"
