@@ -47,7 +47,9 @@ class Roles(IntFlag):
 all_read_permissions = WorkspacePermissions.read | WorkspacePermissions.read_settings | WorkspacePermissions.read_roles
 workspace_member_permissions = WorkspacePermissions.read | WorkspacePermissions.create | all_read_permissions
 
-workspace_billing_admin_permissions = WorkspacePermissions.read_billing | WorkspacePermissions.update_billing
+workspace_billing_admin_permissions = (
+    workspace_member_permissions | WorkspacePermissions.read_billing | WorkspacePermissions.update_billing
+)
 workspace_admin_permissions = (
     workspace_member_permissions
     | workspace_billing_admin_permissions
