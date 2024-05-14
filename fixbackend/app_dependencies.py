@@ -61,7 +61,7 @@ from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.jwt import JwtServiceImpl
+from fixbackend.fix_jwt import JwtServiceImpl
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender

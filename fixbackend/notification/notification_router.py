@@ -27,7 +27,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email
-from fixbackend.jwt import JwtServiceImpl
+from fixbackend.fix_jwt import JwtServiceImpl
 from fixbackend.logging_context import set_workspace_id, set_context
 from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting

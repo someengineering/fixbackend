@@ -95,7 +95,7 @@ from fixbackend.ids import (
 )
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.jwt import JwtService
+from fixbackend.fix_jwt import JwtService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
