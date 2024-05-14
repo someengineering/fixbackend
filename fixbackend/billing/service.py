@@ -51,7 +51,9 @@ from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
-AccountsCharged = Counter("billing_accounts_charged", "Accounts charged by security tier", ["product_tier"])
+AccountsCharged = Counter(
+    "billing_accounts_charged", "Accounts charged by security tier", ["product_tier", "payment_method"]
+)
 
 
 def compute_billing_period_factor(
@@ -257,7 +259,16 @@ class BillingEntryService:
                     return None
 
                 log.info(f"{kind}: subscription {subscription.id} collected {usage} times: {summaries}")
-                AccountsCharged.labels(product_tier=product_tier.value).inc(usage)
+                payment_method = "unknown"
+                match subscription:
+                    case AwsMarketplaceSubscription():
+                        payment_method = "aws_marketplace"
+                    case StripeSubscription():
+                        payment_method = "stripe"
+                    case _:
+                        log.error(f"Unknown subscription type: {subscription}")
+
+                AccountsCharged.labels(product_tier=product_tier.value, payment_method=payment_method).inc(usage)
                 billing_entry = await self.subscription_repository.add_billing_entry(
                     subscription.id,
                     workspace.id,
