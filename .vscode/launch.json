@@ -6,12 +6,12 @@
     "configurations": [
         {
             "name": "Python: FastAPI",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
-            "module": "uvicorn",
+            "program": "fixbackend",
             "args": [
-                "fixbackend.app:setup_fast_api",
-                "--reload",
+                "--environment",
+                "dev",
             ],
             "pythonArgs": [
                 "-Xfrozen_modules=off"
@@ -21,13 +21,13 @@
             "env": {
                 "PYDEVD_DISABLE_FILE_VALIDATION": "1",
                 "LOCAL_DEV_ENV": "true",
-                "MODE": "support",
-            }
+                // "MODE": "support",
+            },
         },
         {
             "name": "Debug Unit Test",
-            "type": "python",
-            "request": "test",
+            "type": "debugpy",
+            "request": "launch",
             "justMyCode": false,
         },
     ]

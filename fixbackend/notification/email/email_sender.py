@@ -29,7 +29,7 @@ from urllib.parse import urlencode
 
 import boto3
 from fixbackend.config import Config
-from fixbackend.jwt import JwtService
+from fixbackend.fix_jwt import JwtService
 
 
 class EmailSender(ABC):

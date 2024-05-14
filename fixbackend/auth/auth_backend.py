@@ -21,7 +21,7 @@ from fastapi_users.authentication.strategy.base import Strategy, StrategyDestroy
 from fastapi_users.manager import BaseUserManager
 from fixcloudutils.util import utc
 
-from fixbackend import jwt
+from fixbackend import fix_jwt
 from fixbackend.auth.models import User
 from fixbackend.auth.transport import CookieTransport
 from fixbackend.certificates.cert_store import CertificateStore
@@ -45,14 +45,14 @@ class FixJWTStrategy(Strategy[User, UserId]):
 
     async def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
         public_keys = await self.certstore.public_keys()
-        return jwt.decode_token(token, self.token_audience, public_keys)
+        return fix_jwt.decode_token(token, self.token_audience, public_keys)
 
     async def read_token(self, token: Optional[str], user_manager: BaseUserManager[User, UserId]) -> Optional[User]:
         if token is None:
             return None
 
         public_keys = await self.certstore.public_keys()
-        data = jwt.decode_token(token, self.token_audience, public_keys)
+        data = fix_jwt.decode_token(token, self.token_audience, public_keys)
         if data is None:
             return None
 
@@ -82,7 +82,7 @@ class FixJWTStrategy(Strategy[User, UserId]):
             payload["exp"] = expire
 
         private_key = await self.certstore.private_key()
-        return jwt.encode_token(payload, self.token_audience, private_key)
+        return fix_jwt.encode_token(payload, self.token_audience, private_key)
 
     async def destroy_token(self, token: str, user: User) -> None:
         raise StrategyDestroyNotSupportedError("A JWT can't be invalidated: it's valid until it expires.")
