@@ -17,6 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi_users.authentication import AuthenticationBackend, Strategy
+from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException
 from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.google import GoogleOAuth2
@@ -38,6 +39,8 @@ from fixbackend.auth.schemas import (
 from fixbackend.auth.user_manager import UserManagerDependency, UserManager, get_user_manager
 from fixbackend.config import Config
 from fixbackend.ids import UserId
+from fastapi_users import schemas
+from disposable_email_domains import blocklist
 
 log = getLogger(__name__)
 
@@ -211,10 +214,30 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
 
         return await auth_backend.logout(strategy, user, token)
 
-    router.include_router(
-        fastapi_users.get_register_router(user_schema=UserRead, user_create_schema=UserCreate),
-        tags=["auth"],
-    )
+    @router.post("/register", status_code=status.HTTP_201_CREATED, name="register:register")
+    async def register(request: Request, user_create: UserCreate, user_manager: UserManagerDependency) -> UserRead:
+        try:
+            if user_create.email.split("@")[-1] in blocklist:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Disposable email domains are not allowed",
+                )
+            created_user = await user_manager.create(user_create, safe=True, request=request)
+        except UserAlreadyExists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS,
+            )
+        except InvalidPasswordException as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": ErrorCode.REGISTER_INVALID_PASSWORD,
+                    "reason": e.reason,
+                },
+            )
+
+        return schemas.model_validate(UserRead, created_user)
 
     router.include_router(
         fastapi_users.get_reset_password_router(),
