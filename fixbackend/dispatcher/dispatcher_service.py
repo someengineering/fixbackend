@@ -171,7 +171,7 @@ class CollectAccountProgress:
         self,
         job_id: str,
         duration: int,
-        task_id: TaskId,
+        task_id: Optional[TaskId],
         error: str,
     ) -> None:
         workspace_id = await self.workspace_id_from_job_id(job_id)
@@ -305,7 +305,7 @@ class DispatcherService(Service):
 
         async def handle_error(error: str) -> None:
             task_id = message["task_id"]
-            duration = message["duration"]
+            duration = message.get("duration") or 0
             await self.collect_progress.mark_job_as_failed(job_id, duration, task_id, error)
             log.warning(f"Collect job finished with an error: error={error} job_id={job_id}")
 
