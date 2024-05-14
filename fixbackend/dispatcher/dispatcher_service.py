@@ -304,7 +304,7 @@ class DispatcherService(Service):
         job_id = message["job_id"]
 
         async def handle_error(error: str) -> None:
-            task_id = message["task_id"]
+            task_id = message.get("task_id")
             duration = message.get("duration") or 0
             await self.collect_progress.mark_job_as_failed(job_id, duration, task_id, error)
             log.warning(f"Collect job finished with an error: error={error} job_id={job_id}")
