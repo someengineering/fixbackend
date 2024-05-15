@@ -2524,6 +2524,10 @@ html:has(.drawer-toggle:checked) {
   z-index: 1;
 }
 
+.m-8 {
+  margin: 2rem;
+}
+
 .mb-2 {
   margin-bottom: 0.5rem;
 }
@@ -2546,6 +2550,10 @@ html:has(.drawer-toggle:checked) {
 
 .mt-24 {
   margin-top: 6rem;
+}
+
+.mr-4 {
+  margin-right: 1rem;
 }
 
 .block {
