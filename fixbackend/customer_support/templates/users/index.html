@@ -2,70 +2,84 @@
 
 
 {% block content %}
-<main class="flex-1 overflow-y-auto md:pt-4 pt-4 px-6 bg-base-200">
-    <div class="overflow-x-auto">
-        <table class="table table-auto w-full">
-            <!-- head -->
-            <thead>
-                <tr>
-                    <th>
-                        <input type="search" placeholder="id" name="id" class="input input-bordered"
-                            hx-get="{{ url_for('users:index') }}" hx-trigger="change changed, keyup changed delay:300ms"
-                            hx-select="tbody" hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
-                    </th>
-                    <th>
-                        <input type="search" id="id_input" name="email" placeholder="foo@bar.com"
-                            class="input input-bordered w-full max-w-xs" hx-get="{{ url_for('users:index') }}"
-                            hx-trigger="change changed, keyup changed delay:300ms" hx-select="tbody"
-                            hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
-                    </th>
-                    <th>Verified</th>
-                    <th>Active</th>
-                    <th>Workspace Roles</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                <tr class="hover:bg-base-100 hover:rounded-lg cursor-pointer"
-                    hx-get="{{ url_for('users:get_user', user_id=user.id)}}" hx-push-url="true" hx-target="closest main"
-                    hx-swap="outerHTML">
-                    <td>{{ user.id }}</td>
-                    <td>{{ user.email }}</td>
-                    <td>
-                        {% if user.is_verified %}
-                        <span class=" badge">Verified</span>
-                        {% else %}
-                        <span class="badge badge-neutral">Not Verified</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if user.is_active %}
-                        <span class="badge">Active</span>
-                        {% else %}
-                        <span class="badge badge-neutral">Deleted</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div class="flex flex-wrap gap-2">
-                            {% for role in user.roles %}
-                            <div class="card bg-base-100 shadow-lg">
-                                <div class="card-body p-2">
-                                    <h1>{{ role.workspace_id }}</h1>
-                                    <div class="flex flex-wrap gap-2">
-                                        {% for role_name in role.role_names %}
-                                        <span class=" badge badge-secondary">{{ role_name.name }}</span>
-                                        {% endfor %}
+<div class="flex flex-col h-full">
+    <main class="flex-1 overflow-y-auto md:pt-4 pt-4 px-6 bg-base-200 pb-4 rounded-b-lg">
+        <div class="overflow-x-auto">
+            <table class="table table-auto w-full">
+                <!-- head -->
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="search" placeholder="id" name="id" class="input input-bordered"
+                                hx-get="{{ url_for('users:index') }}"
+                                hx-trigger="change changed, keyup changed delay:300ms" hx-select="tbody"
+                                hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
+                        </th>
+                        <th>
+                            <input type="search" id="id_input" name="email" placeholder="foo@bar.com"
+                                class="input input-bordered w-full max-w-xs" hx-get="{{ url_for('users:index') }}"
+                                hx-trigger="change changed, keyup changed delay:300ms" hx-select="tbody"
+                                hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
+                        </th>
+                        <th>Verified</th>
+                        <th>Active</th>
+                        <th>Workspace Roles</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="hover:bg-base-100 hover:rounded-lg cursor-pointer"
+                        hx-get="{{ url_for('users:get_user', user_id=user.id)}}" hx-push-url="true"
+                        hx-target="closest main" hx-swap="outerHTML">
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.is_verified %}
+                            <span class=" badge">Verified</span>
+                            {% else %}
+                            <span class="badge badge-neutral">Not Verified</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge">Active</span>
+                            {% else %}
+                            <span class="badge badge-neutral">Deleted</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="flex flex-wrap gap-2">
+                                {% for role in user.roles %}
+                                <div class="card bg-base-100 shadow-lg">
+                                    <div class="card-body p-2">
+                                        <h1>{{ role.workspace_id }}</h1>
+                                        <div class="flex flex-wrap gap-2">
+                                            {% for role_name in role.role_names %}
+                                            <span class=" badge badge-secondary">{{ role_name.name }}</span>
+                                            {% endfor %}
 
+                                        </div>
                                     </div>
                                 </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+    {% if total %}
+    <div class="join mt-4 bottom-0 left-0">
+        {% for page in range(1, total + 1) %}
+        {% if page == current_page %}
+        <a href="{{url_for('users:index')}}?page={{ page }}" class="join-item btn btn-active">{{ page }}</a>
+        {% else %}
+        <a href="{{url_for('users:index')}}?page={{ page }}" class="join-item btn">{{ page }}</a>
+        {% endif %}
+        {% endfor %}
     </div>
-</main>
+    {% endif %}
+</div>
 {% endblock %}
