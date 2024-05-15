@@ -202,6 +202,8 @@ def workspaces_router() -> APIRouter:
         user = await user_repository.get(user_id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
+        if user_id == workspace.owner_id:
+            raise HTTPException(status_code=403, detail="Cannot remove the owner of the workspace")
         await workspace_repository.remove_from_workspace(workspace_id=workspace.id, user_id=user.id)
 
     @router.delete("/{workspace_id}/invites/{invite_id}")
