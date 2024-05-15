@@ -31,10 +31,9 @@
                 verification email</button>
             {% endif %}
             {% if user.is_active %}
-            <button class="btn btn-warning" hx-confirm="Are you sure?" hx-delete="#">Delete
+            <button class="btn btn-warning" hx-confirm="Are you sure?"
+                hx-delete="{{ url_for('users:delete_user', user_id=user.id) }}">Delete
                 user</button>
-            {% else %}
-            <button class="btn" hx-confirm="Are you sure?" hx-post="#">Restore user</button>
             {% endif %}
 
         </div>

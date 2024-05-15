@@ -93,22 +93,20 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         return templates.TemplateResponse(request=request, name="users/user.html", headers=headers, context=context)
 
-    @router.get("/{user_id}/", response_class=HTMLResponse, name="users:delete_user")
+    @router.delete("/{user_id}", response_class=HTMLResponse, name="users:delete_user")
     async def delete_user(request: Request, user_id: UserId) -> Response:
         user = await user_repo.get(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        user = await user_manager.update(UserUpdate(is_active=False), user, safe=True)
+        user = await user_manager.update(UserUpdate(is_active=False), user, safe=False)
 
-        context: Dict[str, Any] = {"request": request, "user": user}
+        headers = {
+            "Vary": "HX-Refresh",
+            "HX-Refresh": "true",
+        }
 
-        if request.headers.get("HX-Request"):
-            context["partial"] = True
-
-        headers = {"Vary": "HX-Request"}
-
-        return templates.TemplateResponse(request=request, name="users/user.html", headers=headers, context=context)
+        return Response(status_code=202, headers=headers)
 
     @router.get("/{user_id}/workspaces_table", response_class=HTMLResponse, name="users:workspaces_table")
     async def workspaces_table(request: Request, user_id: UserId) -> Response:
