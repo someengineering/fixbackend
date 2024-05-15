@@ -20,16 +20,20 @@ Excellent progress! Keep up the good work.
 Resources
 
 Compute
-  Virtual Machines: {{ instances_progress[0] }} ({{ instances_progress[1] }})
-  Cores: {{ cores_progress[0] }} ({{ cores_progress[1] }})
+  Virtual Machines: {{ instances_progress[0] | readable_number }} ({{ instances_progress[1] | readable_number(with_sign=true) }})
+  Cores: {{ cores_progress[0] | readable_number }} ({{ cores_progress[1] | readable_number(with_sign=true) }})
   Memory: {{ memory_progress[0] | readable_bytes }} ({{ memory_progress[1] | readable_bytes(with_sign=true) }})
 
 Storage
-  Volumes: {{ volumes_progress[0] }} ({{ volumes_progress[1] | with_sign }})
+  Volumes: {{ volumes_progress[0] | readable_number }} ({{ volumes_progress[1] | readable_number(with_sign=true) }})
   Size {{ volume_bytes_progress[0] | readable_bytes }} ({{ volume_bytes_progress[1] | readable_bytes(with_sign=true) }})
 
+Buckets
+  Objects: {{ buckets_objects_progress[0] | readable_number }} ({{ buckets_objects_progress[1] | readable_number(with_sign=true) }})
+  Size: {{ buckets_size_bytes_progress[0] | readable_bytes }} ({{ buckets_size_bytes_progress[1] | readable_bytes(with_sign=true) }})
+
 Databases
-  Instances {{ databases_progress[0] }} ({{ databases_progress[1] | with_sign }})
+  Instances {{ databases_progress[0] | readable_number }} ({{ databases_progress[1] | readable_number(with_sign=true) }})
   Size {{ databases_bytes_progress[0] | readable_bytes }} ({{ databases_bytes_progress[1] | readable_bytes(with_sign=true) }})
 
 

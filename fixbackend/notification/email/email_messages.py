@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Dict
 
 from attrs import frozen
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -25,27 +25,38 @@ from fixbackend.workspaces.models import Workspace
 
 TemplatesPath = Path(__file__).parent / "templates"
 _readable_numbers = {0: "zero", 1: "one", 2: "two", 3: "three"}
-_bytes_power = {5: "PB", 4: "TB", 3: "GB", 2: "MB", 1: "KB", 0: "B"}
+_bytes_power: Dict[int, Optional[str]] = {5: "PB", 4: "TB", 3: "GB", 2: "MB", 1: "KB", 0: "B"}
+_decimal_power: Dict[int, Optional[str]] = {5: "P", 4: "T", 3: "G", 2: "M", 1: "K", 0: None}
 
 
-def _readable_number(number: int) -> str:
-    return _readable_numbers.get(number, str(number))
+def _readable_number(number: int, *, with_sign: Optional[bool] = None) -> str:
+    if num := _readable_numbers.get(number):
+        return num
+    return _readable_unit(1000, _decimal_power, None, number, with_sign)
 
 
-def _with_sign(number: int) -> str:
-    return str(number) if number < 0 else ("±0" if number == 0 else f"+{number}")
+def _readable_unit(
+    base: int,
+    base_power: Dict[int, Optional[str]],
+    base_unit: Optional[str],
+    number: int,
+    with_sign: Optional[bool] = None,
+) -> str:
+    bu = f" {base_unit}" if base_unit else ""
+    sign = "-" if number < 0 else ("+" if with_sign and number > 0 else "")
+    number = abs(number)
+    if number < base:
+        return f"{sign}{number}{bu}"
+    for power, unit in base_power.items():
+        pot = base**power
+        if number >= pot:
+            pu = f" {unit}" if unit else ""
+            return f"{sign}{number // pot}{pu}"
+    return f"{sign}{number}{bu}"
 
 
 def _readable_bytes(number: int, *, with_sign: Optional[bool] = None) -> str:
-    sign = "-" if number < 0 else ("+" if with_sign and number > 0 else "")
-    number = abs(number)
-    if number < 1024:
-        return f"{sign}{number} B"
-    for power, unit in _bytes_power.items():
-        pot = 1024**power
-        if number >= pot:
-            return f"{sign}{number // pot} {unit}"
-    return f"{sign}{number} B"
+    return _readable_unit(1024, _bytes_power, "B", number, with_sign)
 
 
 def _pluralize(word: str, count: int) -> str:
@@ -59,7 +70,6 @@ def get_env() -> Environment:
     env.filters["pluralize"] = _pluralize
     env.filters["readable_number"] = _readable_number
     env.filters["readable_bytes"] = _readable_bytes
-    env.filters["with_sign"] = _with_sign
     return env
 
 
