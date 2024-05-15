@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Annotated, Any, Dict, Sequence
+from typing import Annotated, Any, Dict, Optional, Sequence
 import uuid
 from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
@@ -57,11 +57,17 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
 
     @router.get("", response_class=HTMLResponse, name="users:index")
-    async def index(request: Request) -> Response:
-        query = request.query_params.get("query")
+    async def index(request: Request, id: Optional[str] = None, email: Optional[str] = None) -> Response:
         users: Sequence[User] = []
-        if query:
-            users = await user_repo.search(query)
+        if id:
+            try:
+                user = await user_repo.get(UserId(uuid.UUID(id)))
+            except ValueError:
+                user = None
+            if user:
+                users = [user]
+        elif email:
+            users = await user_repo.search(email)
         else:
             users = await user_repo.list(25, 0)
 

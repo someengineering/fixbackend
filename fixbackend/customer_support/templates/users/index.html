@@ -9,10 +9,15 @@
             <thead>
                 <tr>
                     <th>
-                        <input type="text" placeholder="id" class="input input-bordered" />
+                        <input type="search" placeholder="id" name="id" class="input input-bordered"
+                            hx-get="{{ url_for('users:index') }}" hx-trigger="change changed, keyup changed delay:300ms"
+                            hx-select="tbody" hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
                     </th>
                     <th>
-                        <input type="text" placeholder="email" class="input input-bordered" />
+                        <input type="search" id="id_input" name="email" placeholder="foo@bar.com"
+                            class="input input-bordered w-full max-w-xs" hx-get="{{ url_for('users:index') }}"
+                            hx-trigger="change changed, keyup changed delay:300ms" hx-select="tbody"
+                            hx-target="next tbody" hx-push-url="true" hx-swap="outerHTML" />
                     </th>
                     <th>Verified</th>
                     <th>Active</th>
@@ -37,7 +42,7 @@
                         {% if user.is_active %}
                         <span class="badge">Active</span>
                         {% else %}
-                        <span class="badge badge-neutral">Suspended</span>
+                        <span class="badge badge-neutral">Deleted</span>
                         {% endif %}
                     </td>
                     <td>
