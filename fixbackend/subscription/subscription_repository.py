@@ -357,6 +357,7 @@ class SubscriptionRepository:
                 select(BillingEntity, SubscriptionEntity)
                 .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
                 .where(BillingEntity.workspace_id == workspace_id)  # noqa
+                .order_by(BillingEntity.created_at.desc())
             )
             async for billing_entity, subscription_entity in await session.stream(query):
                 yield billing_entity.to_model(), subscription_entity.to_model()
