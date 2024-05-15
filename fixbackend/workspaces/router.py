@@ -15,9 +15,11 @@
 from functools import reduce
 from typing import Annotated, List, Union
 
+from disposable_email_domains import blocklist
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
+from starlette import status
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.permissions.models import WorkspacePermissions, Roles
@@ -180,6 +182,14 @@ def workspaces_router() -> APIRouter:
 
         role = reduce(lambda acc, role_name: role_name.to_role() | acc, user_invite.roles, Roles.workspace_member)
 
+        # make sure the email does not belong to a disposable domain
+        if user.email.lower().split("@")[-1] in blocklist:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Disposable email domains are not allowed",
+            )
+
+        # create invitation
         invite, _ = await invitation_service.invite_user(
             workspace_id=workspace.id,
             inviter=user,
