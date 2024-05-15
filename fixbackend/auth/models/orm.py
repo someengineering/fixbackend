@@ -82,6 +82,7 @@ class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
             otp_secret=self.otp_secret,
             is_mfa_active=self.is_mfa_active,
             roles=[role.to_model() for role in self.roles],
+            created_at=self.created_at,
         )
 
     @staticmethod

@@ -68,7 +68,9 @@ def roles_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
         if request.headers.get("HX-Request"):
             context["partial"] = True
 
-        return templates.TemplateResponse(request=request, name="roles/index.html", context=context)
+        headers = {"Vary": "HX-Request"}
+
+        return templates.TemplateResponse(request=request, name="roles/index.html", headers=headers, context=context)
 
     @router.get("/roles/table", response_class=HTMLResponse)
     async def roles_table(request: Request) -> Response:

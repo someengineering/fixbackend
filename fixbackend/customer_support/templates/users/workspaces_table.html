@@ -1,0 +1,51 @@
+<div class="overflow-x-auto">
+    <table id="workspaces-table" class="table" hx-trigger="tableRefresh from:body"
+        hx-get="{{ url_for('users:workspaces_table', user_id=user.id)}}" hx-swap="outerHTML"
+        hx-target="closest .overflow-x-auto">
+        <thead>
+            <tr>
+                <th>Workspace</th>
+                <th>Product Tier</th>
+                <th>Roles</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in workspace_rows %}
+            <tr>
+                <td>
+                    <div class="flex flex-col">
+                        <p>
+                            {{ row.workspace.name }}
+                        </p>
+                        <p>
+                            ({{ row.workspace.id }})
+                        </p>
+                </td>
+                <td>{{ row.workspace.product_tier }} </td>
+                <td>
+                    <div class="flex items-start gap-2 flex-col">
+                        {% for name, enabled in row.roles.items() %}
+                        {% if enabled %}
+                        <span class="badge badge-secondary">{{ name }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    {% if row.workspace.owner_id == user.id %}
+                    <div class="tooltip" data-tip="Can't remove the workspace owner">
+                        <button class="btn btn-error" disabled="disabled">Remove</button>
+                    </div>
+                    {% else %}
+                    <button class="btn btn-error">Remove</button>
+                    {% endif %}
+                    <button class="btn btn-warning"
+                        hx-get="{{ url_for('users:workspace_roles_modal', user_id=user.id, workspace_id=row.workspace.id) }}"
+                        hx-target="body" hx-swap="afterbegin">Edit roles</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

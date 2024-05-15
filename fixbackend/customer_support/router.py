@@ -22,6 +22,7 @@ from fastapi.routing import APIRoute
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import User
 from fixbackend.customer_support.roles_router import roles_router
+from fixbackend.customer_support.users_router import users_router
 from fixbackend.customer_support.user_workspaces_router import user_workspaces_router
 from fixbackend.customer_support.login_router import auth_router
 from fixbackend.dependencies import FixDependencies
@@ -78,6 +79,7 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
 
     protected_router.include_router(user_workspaces_router(dependencies, templates))
     protected_router.include_router(roles_router(dependencies, templates))
+    protected_router.include_router(users_router(dependencies, templates), prefix="/users")
 
     root.include_router(protected_router)
 

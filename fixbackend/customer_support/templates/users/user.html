@@ -1,0 +1,48 @@
+{% if not partial %}
+{% extends "navbar.html" %}
+{% endif %}
+
+
+{% block content %}
+
+<div class="flex flex-col mt-8 gap-4">
+    {% if not user.is_active %}
+    <div role="alert" class="alert alert-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+
+        <span>User deleted and has no access to Fix. Account, owned workspaces and resources will be cleaned up
+            soon.</span>
+    </div>
+    {% endif %}
+    <h1 class="text-2xl mb-4">{{ user.email}}</h1>
+    <div class="flex flex-col w-full gap-4">
+        <p>User id: {{user.id}}</p>
+        <p>Created at: {{user.created_at}}</p>
+        <div class="flex gap-4">
+            <button class="btn" hx-get="{{ url_for('users:add_to_workspace_modal', user_id=user.id)}}" hx-target="body"
+                hx-swap="afterbegin">Add to
+                workspace</button>
+            {% if not user.is_verified %}
+            <button class="btn btn-neutral mt-4"
+                hx-post="{{ url_for('users:resend_verification_email', user_id=user.id)}}" hx-swap="outerHTML">Resend
+                verification email</button>
+            {% endif %}
+            {% if user.is_active %}
+            <button class="btn btn-warning" hx-confirm="Are you sure?" hx-delete="#">Delete
+                user</button>
+            {% else %}
+            <button class="btn" hx-confirm="Are you sure?" hx-post="#">Restore user</button>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<div class="divider"></div>
+
+{% include "users/workspaces_table.html" %}
+
+{% endblock %}

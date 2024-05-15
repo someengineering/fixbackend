@@ -63,7 +63,11 @@ def user_workspaces_router(dependencies: FixDependencies, templates: Jinja2Templ
         if request.headers.get("HX-Request"):
             context["partial"] = True
 
-        return templates.TemplateResponse(request=request, name="user_workspaces/index.html", context=context)
+        headers = {"Vary": "HX-Request"}
+
+        return templates.TemplateResponse(
+            request=request, name="user_workspaces/index.html", headers=headers, context=context
+        )
 
     @router.get("/user_workspaces/table", response_class=HTMLResponse, name="user_workspaces_table")
     async def workspaces_table(request: Request) -> Response:
