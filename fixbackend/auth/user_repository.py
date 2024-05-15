@@ -20,7 +20,7 @@ from fastapi_users.db.base import BaseUserDatabase
 from fastapi_users.password import PasswordHelperProtocol
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import select, delete
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import OAuthAccount, User, orm
@@ -67,6 +67,11 @@ class UserRepository(BaseUserDatabase[User, UserId]):
             )
             users = result.scalars().unique().all()
             return [user.to_model() for user in users]
+
+    async def count(self) -> int:
+        async with self.session_maker() as session:
+            result = await session.execute(select(func.count(orm.User.id)).distinct())  # type: ignore
+            return result.scalar_one_or_none() or 0
 
     async def search(self, query: str) -> Sequence[User]:
         async with self.session_maker() as session:

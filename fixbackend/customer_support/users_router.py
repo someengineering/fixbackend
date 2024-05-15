@@ -57,8 +57,11 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
 
     @router.get("", response_class=HTMLResponse, name="users:index")
-    async def index(request: Request, id: Optional[str] = None, email: Optional[str] = None) -> Response:
+    async def index(
+        request: Request, id: Optional[str] = None, email: Optional[str] = None, page: Optional[int] = 1
+    ) -> Response:
         users: Sequence[User] = []
+        total_pages = None
         if id:
             try:
                 user = await user_repo.get(UserId(uuid.UUID(id)))
@@ -69,9 +72,15 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
         elif email:
             users = await user_repo.search(email)
         else:
-            users = await user_repo.list(25, 0)
+            enties_per_page = 10
+            offset = 0
+            if page:
+                offset = (page - 1) * enties_per_page
+            users = await user_repo.list(enties_per_page, offset)
+            count = await user_repo.count()
+            total_pages = count // enties_per_page
 
-        context: Dict[str, Any] = {"request": request, "users": users}
+        context: Dict[str, Any] = {"request": request, "users": users, "current_page": page, "total": total_pages}
 
         return templates.TemplateResponse(request=request, name="users/index.html", context=context)
 
