@@ -71,7 +71,7 @@ def subscription_router() -> APIRouter:
                 response = RedirectResponse(f"/subscription/choose-workspace?subscription_id={subscription.id}")
                 return response
             # load the app and show a message
-            response = RedirectResponse("/?message=aws-marketplace-subscribed")
+            response = RedirectResponse("/workspace-settings/billing-receipts?message=aws-marketplace-subscribed")
             response.set_cookie(MarketplaceTokenCookie, expires=0, secure=True, httponly=True)  # delete the cookie
             return response
         else:  # something went wrong
