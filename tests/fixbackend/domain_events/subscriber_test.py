@@ -13,19 +13,20 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from collections import defaultdict
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, Dict, Awaitable, Callable
 from uuid import uuid4
 
 import pytest
-from fixcloudutils.redis.event_stream import RedisStreamPublisher
+from fixcloudutils.redis.event_stream import RedisStreamPublisher, Backoff
 from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import UserRegistered, AwsAccountConfigured
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.domain_events.subscriber import DomainEventSubscriber, HandlerDescriptor
 from fixbackend.ids import UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
 
 
@@ -88,3 +89,31 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
     assert account_configured_event == aws_event
 
     await subscriber.stop()
+
+
+async def test_handler() -> None:
+    counter: Dict[int, int] = defaultdict(int)
+
+    def fail_times(num: int) -> Callable[[UserRegistered], Awaitable[None]]:
+        count = num
+
+        async def handle_event(event: UserRegistered) -> None:
+            nonlocal count
+            counter[num] += 1
+            count -= 1
+            if count > 0:
+                raise Exception("foo")
+            return None
+
+        return handle_event
+
+    fast_backoff = Backoff(0, 1, 5)
+    handler = HandlerDescriptor.create(UserRegistered)
+    handler = handler.with_callback(fail_times(1), "handler1", fast_backoff)
+    handler = handler.with_callback(fail_times(2), "handler2", fast_backoff)
+    handler = handler.with_callback(fail_times(3), "handler3", fast_backoff)
+    handler = handler.with_callback(fail_times(4), "handler4", fast_backoff)
+    await handler.call(UserRegistered(user_id=UserId(uuid4()), email="foo", tenant_id=WorkspaceId(uuid4())))
+    assert len(counter) == 4
+    for k, v in counter.items():
+        assert k == v  # expect that the handler k is attempted k times

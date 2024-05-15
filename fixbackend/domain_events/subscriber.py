@@ -11,22 +11,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
-from datetime import datetime, timedelta
+import asyncio
+from collections import defaultdict
+from datetime import timedelta
+from functools import partial
 from logging import getLogger
-from typing import Any, Awaitable, Callable, Dict, Generic, Tuple, Type, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Generic, Tuple, Type, TypeVar, Optional
 
 from attrs import frozen
-from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener
+from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener, Backoff, NoBackoff, DefaultBackoff
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
+from fixcloudutils.util import utc
 from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import Event
-import asyncio
 
 Kind = str
 
@@ -40,6 +41,13 @@ log = getLogger(__name__)
 class Callback(Generic[Evt]):
     callback: Callable[[Evt], Awaitable[None]]
     name: str
+    backoff: Backoff
+
+    async def call(self, event: Evt) -> None:
+        before = utc()
+        await self.backoff.with_backoff(partial(self.callback, event))
+        elapsed = utc() - before
+        log.debug(f"{self.name} processed domain event {event} in {elapsed}")
 
 
 @frozen
@@ -47,8 +55,21 @@ class HandlerDescriptor(Generic[Evt]):
     callbacks: Tuple[Callback[Evt], ...]
     event_cls: Type[Evt]
 
-    def with_callback(self, callback: Callable[[Evt], Awaitable[None]], name: str) -> "HandlerDescriptor[Evt]":
-        return HandlerDescriptor(callbacks=self.callbacks + (Callback(callback, name),), event_cls=self.event_cls)
+    async def call(self, event: Evt) -> None:
+        async with asyncio.TaskGroup() as g:
+            for callback in self.callbacks:
+                g.create_task(callback.call(event))
+
+    def with_callback(
+        self, callback: Callable[[Evt], Awaitable[None]], name: str, backoff: Backoff
+    ) -> "HandlerDescriptor[Evt]":
+        return HandlerDescriptor(
+            callbacks=self.callbacks + (Callback(callback, name, backoff),), event_cls=self.event_cls
+        )
+
+    @staticmethod
+    def create(event_cls: Type[Evt]) -> "HandlerDescriptor[Evt]":
+        return HandlerDescriptor(callbacks=(), event_cls=event_cls)
 
 
 T = TypeVar("T")
@@ -65,6 +86,7 @@ class DomainEventSubscriber(Service):
             listener=config.instance_id,
             message_processor=self.process_domain_event,
             consider_failed_after=timedelta(minutes=5),
+            backoff=defaultdict(lambda: NoBackoff),  # no backoff for the whole message but for each handler
         )
 
     async def start(self) -> None:
@@ -75,20 +97,16 @@ class DomainEventSubscriber(Service):
         log.info("Stopping domain event subscriber")
         await self.listener.stop()
 
-    def subscribe(self, event_cls: Type[Evt], handler: Callable[[Evt], Awaitable[None]], name: str) -> None:
-        default_descriptor = HandlerDescriptor(event_cls=event_cls, callbacks=())
-        existing = self.subscribers.get(event_cls.kind, default_descriptor)
-        new_descriptor = existing.with_callback(handler, name)
-        self.subscribers[event_cls.kind] = new_descriptor
+    def subscribe(
+        self,
+        event_cls: Type[Evt],
+        handler: Callable[[Evt], Awaitable[None]],
+        name: str,
+        backoff: Optional[Backoff] = None,
+    ) -> None:
+        existing = self.subscribers.get(event_cls.kind, HandlerDescriptor.create(event_cls))
+        self.subscribers[event_cls.kind] = existing.with_callback(handler, name, backoff or DefaultBackoff)
         log.info(f"Added domain event handler {name} for {event_cls.kind}")
-
-    async def timed(self, callback: Callback[Evt], event: Evt) -> None:
-        before = datetime.utcnow()
-        await callback.callback(event)
-        after = datetime.utcnow()
-        elapsed = after - before
-
-        log.debug(f"{callback.name} processed domain event {event} in {elapsed}")
 
     async def process_domain_event(self, message: Json, context: MessageContext) -> None:
         handler = self.subscribers.get(context.kind)
@@ -96,6 +114,4 @@ class DomainEventSubscriber(Service):
             return
         event = handler.event_cls.from_json(message)
         log.info(f"Processing domain event {event}")
-        async with asyncio.TaskGroup() as g:
-            for callback in handler.callbacks:
-                g.create_task(self.timed(callback, event))
+        await handler.call(event)

@@ -28,6 +28,7 @@ from fixbackend.auth.models.orm import User
 from fixbackend.auth.models import User as UserModel
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
+from fixbackend.config import Config
 from fixbackend.ids import WorkspaceId, ProductTier
 from fixbackend.inventory.inventory_client import NoSuchGraph
 from fixbackend.notification.email import email_messages
@@ -64,10 +65,12 @@ class ScheduledEmailSentEntity(Base):
 class ScheduledEmailSender(Service):
     def __init__(
         self,
+        config: Config,
         email_sender: EmailSender,
         session_maker: AsyncSessionMaker,
         status_update_creator: StatusUpdateEmailCreator,
     ) -> None:
+        self.config = config
         self.email_sender = email_sender
         self.session_maker = session_maker
         self.status_update_creator = status_update_creator
@@ -88,7 +91,7 @@ class ScheduledEmailSender(Service):
     async def _send_scheduled_status_update(self, now: datetime) -> int:
         counter = 0
 
-        async def send_emails(kind: str, duration: timedelta, org_filter: ColumnExpressionArgument[bool]) -> None:
+        async def send_emails(kind: str, duration: timedelta, email_filter: ColumnExpressionArgument[bool]) -> None:
             nonlocal counter
             unique_id = f'update-{kind}-{now.strftime("%y%m%d")}'  # valid for the whole day
             users_already_marked: Set[UUID] = set()
@@ -106,7 +109,7 @@ class ScheduledEmailSender(Service):
                 )
                 .where(
                     and_(
-                        org_filter,
+                        email_filter,
                         Organization.created_at < (now - duration),  # org is older than min age
                         ScheduledEmailSentEntity.id.is_(None),  # user has not received this email yet
                         or_(
@@ -152,12 +155,16 @@ class ScheduledEmailSender(Service):
                         log.exception(f"Failed to send status update email for workspace {workspace.id}", exc_info=True)
                 await session.commit()
 
-        if now.weekday() == 4 and 9 <= now.hour <= 12:  # Fridays between 9 and 12
+        # Create a status update email for all support users for testing
+        if now.weekday() == 4 and 7 <= now.hour <= 8:  # Every Friday
+            await send_emails("test", timedelta(days=7), User.email.in_(self.config.customer_support_users))  # type: ignore # noqa
+
+        if now.weekday() == 6 and 9 <= now.hour <= 12:  # Every Sunday
             await send_emails("week", timedelta(days=7), Organization.tier != ProductTier.Free)
 
-        if now.day == 1 and 9 <= now.hour <= 12:  # 1st of the month between 9 and 12
-            yesterday = now - timedelta(days=1)
-            _, days_of_last_month = calendar.monthrange(yesterday.year, yesterday.month)
+        if now.weekday() == 6 and now.day <= 7 and 9 <= now.hour <= 12:  # 1st sunday of the month
+            ten_days_ago = now - timedelta(days=10)
+            _, days_of_last_month = calendar.monthrange(ten_days_ago.year, ten_days_ago.month)
             await send_emails("month", timedelta(days=days_of_last_month), Organization.tier == ProductTier.Free)
 
         return counter

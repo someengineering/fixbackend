@@ -56,13 +56,13 @@
     <tr class="purchase_item">
       <td rowspan="3" style="vertical-align: top;">Compute</td>
       <td class="td-bottom-line">Virtual Machines</td>
-      <td class="td-bottom-line">{{ instances_progress[0] }}</td>
-      <td class="td-bottom-line">{{ instances_progress[1] }}</td>
+      <td class="td-bottom-line">{{ instances_progress[0] | readable_number }}</td>
+      <td class="td-bottom-line">{{ instances_progress[1] | readable_number(with_sign=true) }}</td>
     </tr>
     <tr class="purchase_item">
       <td class="td-bottom-line">Cores</td>
-      <td class="td-bottom-line">{{ cores_progress[0] }}</td>
-      <td class="td-bottom-line">{{ cores_progress[1] }}</td>
+      <td class="td-bottom-line">{{ cores_progress[0] | readable_number }}</td>
+      <td class="td-bottom-line">{{ cores_progress[1] | readable_number(with_sign=true) }}</td>
     </tr>
     <tr class="purchase_item">
       <td class="td-bottom-line">Memory</td>
@@ -76,8 +76,8 @@
     <tr class="purchase_item">
       <td rowspan="2" style="vertical-align: top;">Storage</td>
       <td class="td-bottom-line">Volumes</td>
-      <td class="td-bottom-line">{{ volumes_progress[0] }}</td>
-      <td class="td-bottom-line">{{ volumes_progress[1] | with_sign }}</td>
+      <td class="td-bottom-line">{{ volumes_progress[0] | readable_number}}</td>
+      <td class="td-bottom-line">{{ volumes_progress[1] | readable_number(with_sign=true) }}</td>
     </tr>
     <tr class="purchase_item">
       <td class="td-bottom-line">Size</td>
@@ -87,12 +87,27 @@
     <tr>
       <td colspan="4">&nbsp;</td>
     </tr>
+    <!-- Buckets Section -->
+    <tr class="purchase_item">
+      <td rowspan="2" style="vertical-align: top;">Buckets</td>
+      <td class="td-bottom-line">Objects</td>
+      <td class="td-bottom-line">{{ buckets_objects_progress[0] | readable_number }}</td>
+      <td class="td-bottom-line">{{ buckets_objects_progress[1] | readable_number(with_sign=true) }}</td>
+    </tr>
+    <tr class="purchase_item">
+      <td class="td-bottom-line">Size</td>
+      <td class="td-bottom-line">{{ buckets_size_bytes_progress[0] | readable_bytes }}</td>
+      <td class="td-bottom-line">{{ buckets_size_bytes_progress[1] | readable_bytes(with_sign=true) }}</td>
+    </tr>
+    <tr>
+      <td colspan="4">&nbsp;</td>
+    </tr>
     <!-- Databases Section -->
     <tr class="purchase_item">
       <td rowspan="2" style="vertical-align: top;">Databases</td>
       <td class="td-bottom-line">Instances</td>
-      <td class="td-bottom-line">{{ databases_progress[0] }}</td>
-      <td class="td-bottom-line">{{ databases_progress[1] | with_sign }}</td>
+      <td class="td-bottom-line">{{ databases_progress[0] | readable_number }}</td>
+      <td class="td-bottom-line">{{ databases_progress[1] | readable_number(with_sign=true) }}</td>
     </tr>
     <tr class="purchase_item">
       <td class="td-bottom-line">Size</td>

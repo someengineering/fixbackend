@@ -428,6 +428,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     deps.add(
         SN.scheduled_email_sender,
         ScheduledEmailSender(
+            cfg,
             notification_service.email_sender,
             session_maker,
             StatusUpdateEmailCreator(inventory_service, graph_db_access, deps.async_process_pool),

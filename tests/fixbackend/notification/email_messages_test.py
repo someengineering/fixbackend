@@ -21,6 +21,10 @@ def test_readable_number() -> None:
     assert get_env().from_string("{{ 3|readable_number }}").render() == "three"
     assert get_env().from_string("{{ 4|readable_number }}").render() == "4"
     assert get_env().from_string("{{ -3|readable_number }}").render() == "-3"
+    assert get_env().from_string("{{ 1000|readable_number }}").render() == "1 K"
+    assert get_env().from_string("{{ 1000000|readable_number }}").render() == "1 M"
+    assert get_env().from_string("{{ 1000000|readable_number(with_sign=true) }}").render() == "+1 M"
+    assert get_env().from_string("{{ -1000000|readable_number }}").render() == "-1 M"
 
 
 def test_pluralize() -> None:
