@@ -28,6 +28,7 @@ from sqlalchemy import text
 
 from fixbackend.auth.models import User
 from fixbackend.auth.models.orm import User as OrmUser
+from fixbackend.config import Config
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import UserId, ProductTier
 from fixbackend.inventory.inventory_client import InventoryClient
@@ -48,6 +49,7 @@ from tests.fixbackend.inventory.inventory_client_test import mocked_inventory_cl
 
 @pytest.fixture
 async def scheduled_email_sender(
+    default_config: Config,
     email_sender: InMemoryEmailSender,
     async_session_maker: AsyncSessionMaker,
     inventory_service: InventoryService,
@@ -57,6 +59,7 @@ async def scheduled_email_sender(
 ) -> ScheduledEmailSender:
 
     return ScheduledEmailSender(
+        default_config,
         email_sender,
         async_session_maker,
         StatusUpdateEmailCreator(inventory_service, graph_database_access_manager, async_process_pool),
@@ -172,9 +175,9 @@ async def test_scheduled_updates(
     user: User,
 ) -> None:
 
-    first_of_month = datetime(2024, 4, 1, hour=10, tzinfo=timezone.utc)  # wednesday
+    first_sunday_of_month = datetime(2024, 4, 7, hour=10, tzinfo=timezone.utc)  # wednesday
     middle_of_the_month = datetime(2024, 4, 24, tzinfo=timezone.utc)  # wednesday
-    friday = datetime(2024, 4, 26, hour=10, tzinfo=timezone.utc)  # wednesday
+    sunday = datetime(2024, 4, 28, hour=10, tzinfo=timezone.utc)  # wednesday
 
     async with async_session_maker() as session:
 
@@ -199,28 +202,32 @@ async def test_scheduled_updates(
         sent = await scheduled_email_sender._send_scheduled_status_update(middle_of_the_month)
         assert sent == 0  # no email is sent, since not a Friday and no start of month
 
-        # first_of_month: only free_corp receives an email
+        # first sunday of the month: big_corp and free_corp receive an email
         await clear()
-        sent = await scheduled_email_sender._send_scheduled_status_update(first_of_month)
-        assert sent == 1
+        sent = await scheduled_email_sender._send_scheduled_status_update(first_sunday_of_month)
+        assert sent == 2
+        # email to big_corp
         assert email_sender.call_args[0].to == user.email
-        assert "monthly" in email_sender.call_args[0].subject
-        assert 'Workspace: "free_corp"' in email_sender.call_args[0].text
-        # counting pixel is included
+        assert "weekly" in email_sender.call_args[0].subject
+        assert 'Workspace: "big_corp"' in email_sender.call_args[0].text
         assert "/api/analytics/email_opened/pixel" in email_sender.call_args[0].html  # type: ignore
+        # email to free_corp
+        assert email_sender.call_args[1].to == user.email
+        assert "monthly" in email_sender.call_args[1].subject
+        assert 'Workspace: "free_corp"' in email_sender.call_args[1].text
+        assert "/api/analytics/email_opened/pixel" in email_sender.call_args[1].html  # type: ignore
         # doing it again does not send another email
-        sent = await scheduled_email_sender._send_scheduled_status_update(first_of_month)
+        sent = await scheduled_email_sender._send_scheduled_status_update(first_sunday_of_month)
         assert sent == 0
 
-        # friday in enterprise tier
+        # every other sunday: only big_corp will receive a status update
         await clear()
-        sent = await scheduled_email_sender._send_scheduled_status_update(friday)
+        sent = await scheduled_email_sender._send_scheduled_status_update(sunday)
         assert sent == 1
         assert email_sender.call_args[0].to == user.email
         assert "weekly" in email_sender.call_args[0].subject
         assert 'Workspace: "big_corp"' in email_sender.call_args[0].text
-        # counting pixel is included
         assert "/api/analytics/email_opened/pixel" in email_sender.call_args[0].html  # type: ignore
         # doing it again does not send another email
-        sent = await scheduled_email_sender._send_scheduled_status_update(friday)
+        sent = await scheduled_email_sender._send_scheduled_status_update(sunday)
         assert sent == 0
