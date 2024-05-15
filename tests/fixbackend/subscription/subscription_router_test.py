@@ -29,6 +29,7 @@ from fixbackend.db import get_async_session
 from fixbackend.ids import SubscriptionId, UserId, WorkspaceId
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler, get_marketplace_handler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixcloudutils.util import utc
 
 user_id = UserId(uuid.uuid4())
 
@@ -43,6 +44,7 @@ user = User(
     otp_secret=None,
     oauth_accounts=[],
     roles=[],
+    created_at=utc(),
 )
 
 subscription = SimpleNamespace(

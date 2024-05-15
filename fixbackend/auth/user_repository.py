@@ -60,6 +60,14 @@ class UserRepository(BaseUserDatabase[User, UserId]):
             user = await db.get_by_email(email)
             return user.to_model() if user else None
 
+    async def list(self, limit: int, offset: int) -> Sequence[User]:
+        async with self.session_maker() as session:
+            result = await session.execute(
+                select(orm.User).limit(limit).offset(offset).order_by(orm.User.created_at.desc())
+            )
+            users = result.scalars().unique().all()
+            return [user.to_model() for user in users]
+
     async def search(self, query: str) -> Sequence[User]:
         async with self.session_maker() as session:
 

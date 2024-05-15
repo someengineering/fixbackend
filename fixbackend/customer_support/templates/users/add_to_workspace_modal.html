@@ -6,7 +6,7 @@
         </form>
         <h3 class="font-bold text-lg">Add {{ user.email }} to a new workspace</h3>
         <form class="justify-evenly mt-4 form-control"
-            hx-post="{{ url_for('add_to_workspace_submit', user_id=user.id) }}" hx-swap="outerHTML">
+            hx-post="{{ url_for('users:add_to_workspace', user_id=user.id) }}" hx-swap="outerHTML">
             <input type="text" placeholder="workspace id" name="workspace_id"
                 class="input input-bordered w-full max-w-xs" />
 

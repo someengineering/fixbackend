@@ -1,0 +1,66 @@
+{% extends "navbar.html" %}
+
+
+{% block content %}
+<main class="flex-1 overflow-y-auto md:pt-4 pt-4 px-6 bg-base-200">
+    <div class="overflow-x-auto">
+        <table class="table table-auto w-full">
+            <!-- head -->
+            <thead>
+                <tr>
+                    <th>
+                        <input type="text" placeholder="id" class="input input-bordered" />
+                    </th>
+                    <th>
+                        <input type="text" placeholder="email" class="input input-bordered" />
+                    </th>
+                    <th>Verified</th>
+                    <th>Active</th>
+                    <th>Workspace Roles</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="hover:bg-base-100 hover:rounded-lg cursor-pointer"
+                    hx-get="{{ url_for('users:get_user', user_id=user.id)}}" hx-push-url="true" hx-target="closest main"
+                    hx-swap="outerHTML">
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        {% if user.is_verified %}
+                        <span class=" badge">Verified</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Not Verified</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_active %}
+                        <span class="badge">Active</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Suspended</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="flex flex-wrap gap-2">
+                            {% for role in user.roles %}
+                            <div class="card bg-base-100 shadow-lg">
+                                <div class="card-body p-2">
+                                    <h1>{{ role.workspace_id }}</h1>
+                                    <div class="flex flex-wrap gap-2">
+                                        {% for role_name in role.role_names %}
+                                        <span class=" badge badge-secondary">{{ role_name.name }}</span>
+                                        {% endfor %}
+
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}

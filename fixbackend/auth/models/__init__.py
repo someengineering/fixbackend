@@ -46,6 +46,7 @@ class User(UserOAuthProtocol[UserId, OAuthAccount]):
     otp_secret: Optional[str]
     oauth_accounts: List[OAuthAccount]
     roles: List[UserRole]
+    created_at: datetime
 
 
 @frozen

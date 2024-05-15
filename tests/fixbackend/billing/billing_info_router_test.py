@@ -52,6 +52,7 @@ user = User(
     otp_secret=None,
     oauth_accounts=[],
     roles=[UserRole(user_id, workspace_id, Roles.workspace_billing_admin)],
+    created_at=utc(),
 )
 
 now = utc().replace(microsecond=0)
