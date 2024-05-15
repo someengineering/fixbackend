@@ -184,6 +184,8 @@ class StatusUpdateEmailCreator:
             volume_bytes_progress,
             databases_progress,
             databases_bytes_progress,
+            buckets_objects_progress,
+            buckets_size_bytes_progress,
         ) = await asyncio.gather(
             resources_per_account_timeline(),
             overall_score(),
@@ -195,6 +197,8 @@ class StatusUpdateEmailCreator:
             progress("volume_bytes", 0, group=set(), aggregation="sum"),
             progress("databases_total", 0, group=set(), aggregation="sum"),
             progress("databases_bytes", 0, group=set(), aggregation="sum"),
+            progress("buckets_objects_total", 0, group=set(), aggregation="sum"),
+            progress("buckets_size_bytes", 0, group=set(), aggregation="sum"),
         )
         images: Dict[str, bytes] = {
             "account_timeline.png": cast(bytes, account_timeline_image),
@@ -215,6 +219,8 @@ class StatusUpdateEmailCreator:
             volume_bytes_progress=volume_bytes_progress,
             databases_progress=databases_progress,
             databases_bytes_progress=databases_bytes_progress,
+            buckets_objects_progress=buckets_objects_progress,
+            buckets_size_bytes_progress=buckets_size_bytes_progress,
         )
         return args, images
 
