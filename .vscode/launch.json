@@ -12,8 +12,6 @@
             "args": [
                 "--environment",
                 "dev",
-                "--customer-support-users",
-                "nikita@some.engineering"
             ],
             "pythonArgs": [
                 "-Xfrozen_modules=off"
@@ -23,7 +21,6 @@
             "env": {
                 "PYDEVD_DISABLE_FILE_VALIDATION": "1",
                 "LOCAL_DEV_ENV": "true",
-                "MODE": "support",
             },
         },
         {
