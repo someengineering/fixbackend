@@ -41,19 +41,21 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% for role in user.roles %}
-                        <div class="card bg-base-100 shadow-lg">
-                            <div class="card-body p-2">
-                                <h1>{{ role.workspace_id }}</h1>
-                                <div class="flex flex-wrap gap-2">
-                                    {% for role_name in role.role_names %}
-                                    <span class=" badge badge-secondary">{{ role_name.name }}</span>
-                                    {% endfor %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for role in user.roles %}
+                            <div class="card bg-base-100 shadow-lg">
+                                <div class="card-body p-2">
+                                    <h1>{{ role.workspace_id }}</h1>
+                                    <div class="flex flex-wrap gap-2">
+                                        {% for role_name in role.role_names %}
+                                        <span class=" badge badge-secondary">{{ role_name.name }}</span>
+                                        {% endfor %}
 
+                                    </div>
                                 </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </td>
                 </tr>
                 {% endfor %}
