@@ -91,7 +91,7 @@ async def test_create_billing_entry(
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
-    assert billing.nr_of_accounts_charged == 2
+    assert billing.nr_of_accounts_charged == 25
     assert billing.reported is False
     assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
@@ -102,7 +102,7 @@ async def test_create_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 25}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 0
@@ -148,7 +148,7 @@ async def test_create_daily_billing_entry(
     assert billing is not None
     assert billing.period_start == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert billing.period_end == datetime(2020, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
-    assert billing.nr_of_accounts_charged == 2
+    assert billing.nr_of_accounts_charged == 25
     assert billing.reported is False
     assert billing.tier == ProductTier.Enterprise
     # report all unreported billing entries to AWS
@@ -159,7 +159,7 @@ async def test_create_daily_billing_entry(
     boto_requests[0][1]["UsageRecords"][0].pop("Timestamp")
     assert boto_requests[0][1] == {
         "ProductCode": "foo",
-        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 2}],
+        "UsageRecords": [{"CustomerIdentifier": "123", "Dimension": "EnterpriseAccount", "Quantity": 25}],
     }
     # make sure there is no unreported billing entry anymore
     assert len([i async for i in subscription_repository.unreported_aws_billing_entries()]) == 0
