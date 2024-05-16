@@ -13,7 +13,7 @@
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
 
-        <span>User deleted and has no access to Fix. Account, owned workspaces and resources will be cleaned up
+        <span>User deactivated and has no access to Fix. Account, owned workspaces and resources will be cleaned up
             soon.</span>
     </div>
     {% endif %}
@@ -32,7 +32,9 @@
             {% endif %}
             {% if user.is_active %}
             <button class="btn btn-warning" hx-confirm="Are you sure?"
-                hx-delete="{{ url_for('users:delete_user', user_id=user.id) }}">Delete
+                hx-delete="{{ url_for('users:deactivate_user', user_id=user.id) }}">Deactivate user</button>
+            {% else %}
+            <button class="btn btn-success" hx-post="{{ url_for('users:restore_user', user_id=user.id) }}">Restore
                 user</button>
             {% endif %}
 
