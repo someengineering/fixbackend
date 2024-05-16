@@ -57,6 +57,7 @@ from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import utc
 from httpx import AsyncClient, MockTransport, Request, Response
 from redis.asyncio import Redis
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
@@ -80,6 +81,7 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import Event
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.fix_jwt import JwtService
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import (
@@ -95,7 +97,6 @@ from fixbackend.ids import (
 )
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.fix_jwt import JwtService
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
@@ -243,10 +244,12 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     """
     Creates a new database for a test and runs the migrations.
     """
+    no_db_drop = os.environ.get("NO_DB_DROP", "False").lower() == "true"
     # make sure the db exists and it is clean
-    if database_exists(SYNC_DATABASE_URL):
+    if database_exists(SYNC_DATABASE_URL) and not no_db_drop:
         drop_database(SYNC_DATABASE_URL)
-    create_database(SYNC_DATABASE_URL)
+    if not database_exists(SYNC_DATABASE_URL):
+        create_database(SYNC_DATABASE_URL)
 
     while not database_exists(SYNC_DATABASE_URL):
         await asyncio.sleep(0.1)
@@ -259,13 +262,19 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     await asyncio.to_thread(alembic_upgrade, alembic_config, "head")  # noqa
     await asyncio.to_thread(alembic_check, alembic_config)  # noqa
 
+    if no_db_drop:
+        async with engine.connect() as conn:
+            for table in ["key_value_json"]:
+                await conn.execute(text(f"TRUNCATE TABLE {table}"))
+
     yield engine
 
     await engine.dispose()
-    try:
-        drop_database(SYNC_DATABASE_URL)
-    except Exception:
-        pass
+    if not no_db_drop:
+        try:
+            drop_database(SYNC_DATABASE_URL)
+        except Exception:
+            pass
 
 
 @pytest.fixture
