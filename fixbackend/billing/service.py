@@ -36,6 +36,7 @@ from fixbackend.billing.models import (
     WorkspacePaymentMethods,
     BillingEntry,
 )
+from fixbackend.config import ProductTierSettings
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import BillingEntryCreated
 from fixbackend.domain_events.events import ProductTierChanged
@@ -247,8 +248,9 @@ class BillingEntryService:
                 tiers = [summary.product_tier for summary in summaries]
                 # highest recorded tier
                 product_tier = max(tiers, default=ProductTier.Free)
+                accounts_included = ProductTierSettings[product_tier].accounts_included
                 # We only count the number of accounts, no matter how many runs we had
-                usage = int(len(summaries) * month_factor)
+                usage = max(int(len(summaries) * month_factor), accounts_included)
                 on_payment_free_tier = product_tier.paid is False
                 if on_payment_free_tier or usage == 0:
                     log.info(f"{kind}: subscription {subscription.id} has no usage")
@@ -259,16 +261,7 @@ class BillingEntryService:
                     return None
 
                 log.info(f"{kind}: subscription {subscription.id} collected {usage} times: {summaries}")
-                payment_method = "unknown"
-                match subscription:
-                    case AwsMarketplaceSubscription():
-                        payment_method = "aws_marketplace"
-                    case StripeSubscription():
-                        payment_method = "stripe"
-                    case _:
-                        log.error(f"Unknown subscription type: {subscription}")
-
-                AccountsCharged.labels(product_tier=product_tier.value, payment_method=payment_method).inc(usage)
+                AccountsCharged.labels(product_tier=product_tier.value, payment_method=subscription.kind).inc(usage)
                 billing_entry = await self.subscription_repository.add_billing_entry(
                     subscription.id,
                     workspace.id,

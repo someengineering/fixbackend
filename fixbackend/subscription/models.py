@@ -20,7 +20,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
-from typing import Union, Optional, TypeVar
+from typing import Union, Optional, TypeVar, ClassVar
 
 from attr import frozen
 
@@ -29,6 +29,7 @@ from fixbackend.ids import SubscriptionId, UserId, StripeSubscriptionId, StripeC
 
 @frozen
 class AwsMarketplaceSubscription:
+    kind: ClassVar[str] = "aws_marketplace"
     id: SubscriptionId
     user_id: Optional[UserId]
     customer_identifier: str
@@ -41,6 +42,7 @@ class AwsMarketplaceSubscription:
 
 @frozen
 class StripeSubscription:
+    kind: ClassVar[str] = "stripe"
     id: SubscriptionId
     workspace_id: Optional[WorkspaceId]
     customer_identifier: StripeCustomerId
