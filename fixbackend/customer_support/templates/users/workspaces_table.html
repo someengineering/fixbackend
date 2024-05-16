@@ -6,6 +6,7 @@
             <tr>
                 <th>Workspace</th>
                 <th>Product Tier</th>
+                <th>Cloud Accounts</th>
                 <th>Roles</th>
                 <th>Actions</th>
             </tr>
@@ -23,6 +24,7 @@
                         </p>
                 </td>
                 <td>{{ row.workspace.product_tier }} </td>
+                <td>{{ row.cloud_accounts }}</td>
                 <td>
                     <div class="flex items-start gap-2 flex-col">
                         {% for name, enabled in row.roles.items() %}

@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 from typing import Annotated, Any, Dict, Optional, Sequence
 import uuid
 from fastapi import APIRouter, Form, HTTPException, Request, Response
@@ -20,6 +21,7 @@ from fixbackend.auth.models import User
 from fixbackend.auth.schemas import UserUpdate
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
+from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fastapi.templating import Jinja2Templates
 from fixbackend.permissions.role_repository import RoleRepositoryImpl
@@ -36,15 +38,16 @@ from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 class WorkspaceTableRow:
     workspace: Workspace
     roles: Dict[str, bool]
+    cloud_accounts: int
 
     @staticmethod
-    def from_user_role(workspace: Workspace, user_role: Roles) -> "WorkspaceTableRow":
+    def from_user_role(workspace: Workspace, user_role: Roles, cloud_accounts: int) -> "WorkspaceTableRow":
         roles = {role: False for role in Roles}
         for role in Roles:
             if role & user_role:  # check if the role is in the user_role
                 roles[role] = True
         html_roles = {role.name: value for role, value in roles.items() if role.name}
-        return WorkspaceTableRow(workspace=workspace, roles=html_roles)
+        return WorkspaceTableRow(workspace=workspace, roles=html_roles, cloud_accounts=cloud_accounts)
 
 
 def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> APIRouter:
@@ -55,6 +58,7 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
     workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
     user_manager = dependencies.service(ServiceNames.user_manager, UserManager)
     role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
+    cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
 
     @router.get("", response_class=HTMLResponse, name="users:index")
     async def index(
@@ -94,8 +98,20 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         roles_dict = {role.workspace_id: role.role_names for role in user.roles}
 
+        cloud_accounts_count: Dict[WorkspaceId, int] = {}
+
+        async def update_count(workspace: Workspace) -> None:
+            count = await cloud_accont_repo.count_by_workspace_id(workspace.id)
+            cloud_accounts_count[workspace.id] = count
+
+        async with asyncio.TaskGroup() as tg:
+            for workspace in workspaces:
+                tg.create_task(update_count(workspace))
+
         workspace_rows = [
-            WorkspaceTableRow.from_user_role(workspace, roles_dict.get(workspace.id, Roles(0)))
+            WorkspaceTableRow.from_user_role(
+                workspace, roles_dict.get(workspace.id, Roles(0)), cloud_accounts_count.get(workspace.id, 0)
+            )
             for workspace in workspaces
         ]
 
@@ -133,8 +149,20 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         roles_dict = {role.workspace_id: role.role_names for role in user.roles}
 
+        cloud_accounts_count: Dict[WorkspaceId, int] = {}
+
+        async def update_count(workspace: Workspace) -> None:
+            count = await cloud_accont_repo.count_by_workspace_id(workspace.id)
+            cloud_accounts_count[workspace.id] = count
+
+        async with asyncio.TaskGroup() as tg:
+            for workspace in workspaces:
+                tg.create_task(update_count(workspace))
+
         workspace_rows = [
-            WorkspaceTableRow.from_user_role(workspace, roles_dict.get(workspace.id, Roles(0)))
+            WorkspaceTableRow.from_user_role(
+                workspace, roles_dict.get(workspace.id, Roles(0)), cloud_accounts_count.get(workspace.id, 0)
+            )
             for workspace in workspaces
         ]
 
@@ -203,7 +231,7 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         roles = next(iter([role.role_names for role in user.roles if role.workspace_id == workspace_id]), Roles(0))
 
-        role = WorkspaceTableRow.from_user_role(workspace, roles)
+        role = WorkspaceTableRow.from_user_role(workspace, roles, 0)
 
         return templates.TemplateResponse(
             request=request,
@@ -232,7 +260,7 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         updated_user_role = await role_repo.add_roles(user_id, workspace_id, new_roles, replace_existing=True)
 
-        role_row = WorkspaceTableRow.from_user_role(workspace, updated_user_role.role_names)
+        role_row = WorkspaceTableRow.from_user_role(workspace, updated_user_role.role_names, 0)
 
         headers = {"HX-Trigger": "tableRefresh", "Vary": "HX-Trigger"}
 
