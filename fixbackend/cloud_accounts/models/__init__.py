@@ -22,7 +22,7 @@ from fixbackend.ids import (
     CloudAccountId,
     ExternalId,
     FixCloudAccountId,
-    GcpServiceAccountJsonId,
+    GcpServiceAccountKeyId,
     WorkspaceId,
     AwsRoleName,
     CloudAccountName,
@@ -51,8 +51,8 @@ class GcpCloudAccess(CloudAccess):
 
 
 @frozen
-class GcpServiceAccountJson:
-    id: GcpServiceAccountJsonId
+class GcpServiceAccountKey:
+    id: GcpServiceAccountKeyId
     tenant_id: WorkspaceId
     value: str
     can_access_sa: Optional[bool]

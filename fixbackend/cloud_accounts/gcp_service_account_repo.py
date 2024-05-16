@@ -20,26 +20,26 @@ from sqlalchemy import Boolean, ForeignKey, Text, select
 
 from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.cloud_accounts.models import (
-    GcpServiceAccountJson,
+    GcpServiceAccountKey,
 )
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import WorkspaceId, GcpServiceAccountJsonId
+from fixbackend.ids import WorkspaceId, GcpServiceAccountKeyId
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
 
-class ServiceAccountJsonEntity(Base, CreatedUpdatedMixin):
-    __tablename__ = "gcp_service_account_json"
+class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
+    __tablename__ = "gcp_service_account_key"
 
-    id: Mapped[GcpServiceAccountJsonId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    id: Mapped[GcpServiceAccountKeyId] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[WorkspaceId] = mapped_column(
         GUID, ForeignKey("organization.id"), nullable=False, index=True, unique=True
     )
     value: Mapped[str] = mapped_column(Text, nullable=False)
     can_access_sa: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
-    def to_model(self) -> GcpServiceAccountJson:
-        return GcpServiceAccountJson(
+    def to_model(self) -> GcpServiceAccountKey:
+        return GcpServiceAccountKey(
             id=self.id,
             tenant_id=self.tenant_id,
             value=self.value,
@@ -58,38 +58,38 @@ class GcpServiceAccountJsonRepository:
         self,
         tenant_id: WorkspaceId,
         value: str,
-    ) -> GcpServiceAccountJson:
+    ) -> GcpServiceAccountKey:
         async with self._session_maker() as session:
-            entity = ServiceAccountJsonEntity(tenant_id=tenant_id, value=value)
+            entity = GcpServiceAccountKeyEntity(tenant_id=tenant_id, value=value)
             session.add(entity)
             await session.commit()
             await session.refresh(entity)
             return entity.to_model()
 
-    async def get(self, id: GcpServiceAccountJsonId) -> Optional[GcpServiceAccountJson]:
+    async def get(self, key_id: GcpServiceAccountKeyId) -> Optional[GcpServiceAccountKey]:
         async with self._session_maker() as session:
-            query = select(ServiceAccountJsonEntity).filter(ServiceAccountJsonEntity.id == id)
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.id == key_id)
             result = await session.execute(query)
             entity = result.scalars().first()
             if entity is None:
                 return None
             return entity.to_model()
 
-    async def update_status(self, id: GcpServiceAccountJsonId, can_access_sa: bool) -> GcpServiceAccountJson:
+    async def update_status(self, key_id: GcpServiceAccountKeyId, can_access_sa: bool) -> GcpServiceAccountKey:
         async with self._session_maker() as session:
-            query = select(ServiceAccountJsonEntity).filter(ServiceAccountJsonEntity.id == id)
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.id == key_id)
             result = await session.execute(query)
             entity = result.scalars().first()
             if entity is None:
-                raise ResourceNotFound(f"Service account json with id {id} not found")
+                raise ResourceNotFound(f"Service account json with id {key_id} not found")
             entity.can_access_sa = can_access_sa
             await session.commit()
             await session.refresh(entity)
             return entity.to_model()
 
-    async def delete(self, id: GcpServiceAccountJsonId) -> None:
+    async def delete(self, key_id: GcpServiceAccountKeyId) -> None:
         async with self._session_maker() as session:
-            query = select(ServiceAccountJsonEntity).filter(ServiceAccountJsonEntity.id == id)
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.id == key_id)
             result = await session.execute(query)
             entity = result.scalars().first()
             if entity is None:

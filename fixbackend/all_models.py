@@ -32,4 +32,4 @@ from fixbackend.notification.user_notification_repo import UserNotificationSetti
 from fixbackend.permissions.role_repository import UserRoleAssignmentEntity  # noqa
 from fixbackend.notification.email.scheduled_email import ScheduledEmailEntity, ScheduledEmailSentEntity  # noqa
 from fixbackend.notification.email.one_time_email import OneTimeEmailEntity  # noqa
-from fixbackend.cloud_accounts.gcp_service_account_repo import ServiceAccountJsonEntity  # noqa
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyEntity  # noqa
