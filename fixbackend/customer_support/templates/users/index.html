@@ -30,7 +30,7 @@
                     {% for user in users %}
                     <tr class="hover:bg-base-100 hover:rounded-lg cursor-pointer"
                         hx-get="{{ url_for('users:get_user', user_id=user.id)}}" hx-push-url="true"
-                        hx-target="closest main" hx-swap="outerHTML">
+                        hx-target="#content">
                         <td>{{ user.id }}</td>
                         <td>{{ user.email }}</td>
                         <td>
@@ -71,7 +71,7 @@
         </div>
     </main>
     {% if total %}
-    <div class="join mt-4 bottom-0 left-0">
+    <div class="join mt-4 bottom-0 left-0 mb-8">
         {% for page in range(1, total + 1) %}
         {% if page == current_page %}
         <a href="{{url_for('users:index')}}?page={{ page }}" class="join-item btn btn-active">{{ page }}</a>
