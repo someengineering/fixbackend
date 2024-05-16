@@ -25,6 +25,7 @@ Email = NewType("Email", str)
 OneTimeEmailId = NewType("OneTimeEmailId", UUID)
 StripeCustomerId = NewType("StripeCustomerId", str)
 StripeSubscriptionId = NewType("StripeSubscriptionId", str)
+GcpServiceAccountKeyId = NewType("GcpServiceAccountKeyId", UUID)
 
 
 class NotificationProvider(StrEnum):

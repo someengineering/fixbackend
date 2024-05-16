@@ -22,6 +22,7 @@ from fixbackend.ids import (
     CloudAccountId,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     WorkspaceId,
     AwsRoleName,
     CloudAccountName,
@@ -47,6 +48,16 @@ class AwsCloudAccess(CloudAccess):
 @frozen
 class GcpCloudAccess(CloudAccess):
     cloud: ClassVar[CloudName] = CloudNames.GCP
+
+
+@frozen
+class GcpServiceAccountKey:
+    id: GcpServiceAccountKeyId
+    tenant_id: WorkspaceId
+    value: str
+    can_access_sa: Optional[bool]
+    created_at: datetime
+    updated_at: datetime
 
 
 @frozen
