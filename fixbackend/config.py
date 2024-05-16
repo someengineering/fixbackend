@@ -20,8 +20,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Sequence, List, Tuple
 
+import cattrs
 from attr import frozen
 from fastapi import Depends
+from fixcloudutils.types import Json
 from pydantic_settings import BaseSettings
 
 from fixbackend.ids import ProductTier, BillingPeriod
@@ -224,6 +226,11 @@ class ProductTierSetting:
     seats_max: Optional[int]
     scan_interval: timedelta
     account_limit: Optional[int]
+    accounts_included: int
+    price_per_account_cents: int
+
+    def to_json(self) -> Json:
+        return cattrs.unstructure(self)  # type: ignore
 
 
 Free = ProductTierSetting(
@@ -232,6 +239,8 @@ Free = ProductTierSetting(
     seats_max=1,
     scan_interval=timedelta(days=30),
     account_limit=1,
+    accounts_included=0,
+    price_per_account_cents=0,
 )
 Trial = ProductTierSetting(
     retention_period=timedelta(days=183),
@@ -239,6 +248,8 @@ Trial = ProductTierSetting(
     seats_max=None,
     scan_interval=timedelta(hours=1),
     account_limit=None,
+    accounts_included=0,
+    price_per_account_cents=0,
 )
 ProductTierSettings = defaultdict(
     lambda: Free,
@@ -251,6 +262,8 @@ ProductTierSettings = defaultdict(
             seats_max=20,
             scan_interval=timedelta(days=1),
             account_limit=None,
+            accounts_included=3,
+            price_per_account_cents=3000,
         ),
         ProductTier.Business: ProductTierSetting(
             retention_period=timedelta(days=183),
@@ -258,6 +271,8 @@ ProductTierSettings = defaultdict(
             seats_max=50,
             scan_interval=timedelta(hours=1),
             account_limit=None,
+            accounts_included=10,
+            price_per_account_cents=4000,
         ),
         ProductTier.Enterprise: ProductTierSetting(
             retention_period=timedelta(days=549),
@@ -265,6 +280,8 @@ ProductTierSettings = defaultdict(
             seats_max=None,
             scan_interval=timedelta(hours=1),
             account_limit=None,
+            accounts_included=25,
+            price_per_account_cents=5000,
         ),
     },
 )

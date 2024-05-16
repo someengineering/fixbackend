@@ -62,7 +62,7 @@ API_PREFIX = "/api"
 def dev_router(deps: FixDependencies) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/ui/{hash}", tags=["dev"])
+    @router.get("/ui/{hash}", tags=["dev"], include_in_schema=False)
     async def custom_ui(hash: str) -> Response:
         app_url = f"{deps.config.cdn_endpoint}/fix-test-ui-build/{hash}/index.html"
         log.info(f"Loading dev app from CDN {app_url}")
@@ -148,7 +148,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
                 return await call_next(request)
 
     app.add_middleware(RealIpMiddleware)  # type: ignore
-    app.add_middleware(GZipMiddleware, compresslevel=4)
+    app.add_middleware(GZipMiddleware, compresslevel=4)  # noqa
 
     workspaces_prefix = f"{API_PREFIX}/workspaces"
 

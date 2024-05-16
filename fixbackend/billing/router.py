@@ -16,11 +16,9 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Response, status
+from fixcloudutils.types import Json
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.config import Config
-from fixbackend.permissions.models import WorkspacePermissions
-from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.billing import schemas
 from fixbackend.billing.models import PaymentMethod, PaymentMethods
 from fixbackend.billing.schemas import (
@@ -29,8 +27,11 @@ from fixbackend.billing.schemas import (
     WorkspaceBillingSettingsUpdate,
 )
 from fixbackend.billing.service import BillingEntryServiceDependency
+from fixbackend.config import Config, ProductTierSettings
 from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import ProductTier, SubscriptionId, WorkspaceId
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.subscription.subscription_repository import SubscriptionRepositoryDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 from fixbackend.workspaces.repository import WorkspaceRepositoryDependency
@@ -108,13 +109,15 @@ def billing_info_router(config: Config) -> APIRouter:
         await workspace_repository.update_subscription(workspace.id, subscription_id)
 
     @router.get("/{workspace_id}/aws_marketplace_product")
-    async def redirect_to_aws_marketplace_product(
-        workspace_id: WorkspaceId,
-    ) -> Response:
+    async def redirect_to_aws_marketplace_product(workspace_id: WorkspaceId) -> Response:
         response = Response(
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": config.aws_marketplace_url},
         )
         return response
+
+    @router.get("/{workspace_id}/product_tiers")
+    async def get_product_tiers(workspace_id: WorkspaceId) -> Json:
+        return {name: tier.to_json() for name, tier in ProductTierSettings.items()}
 
     return router
