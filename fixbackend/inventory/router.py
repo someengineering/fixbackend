@@ -293,11 +293,6 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
-    # deprecated, needs to be removed
-    @router.post("/node/{node_id}", tags=["deprecated"])
-    async def node(graph_db: CurrentGraphDbDependency, node_id: NodeId = Path()) -> Json:
-        return await get_node(graph_db, node_id)
-
     @router.get("/node/{node_id}/history", tags=["search"])
     async def get_node_history(
         request: Request,
