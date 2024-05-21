@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from turtle import up
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
@@ -20,10 +21,27 @@ from sqlalchemy import func, select
 from sqlalchemy.orm.exc import StaleDataError
 from fixcloudutils.util import utc
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountState, CloudAccountStates, orm
+from fixbackend.cloud_accounts.models import (
+    AwsCloudAccess,
+    CloudAccess,
+    CloudAccount,
+    CloudAccountState,
+    CloudAccountStates,
+    GcpCloudAccess,
+    orm,
+)
 from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import AwsRoleName, ExternalId, FixCloudAccountId, WorkspaceId
+from fixbackend.ids import (
+    AwsRoleName,
+    CloudAccountId,
+    CloudName,
+    CloudNames,
+    ExternalId,
+    FixCloudAccountId,
+    GcpServiceAccountKeyId,
+    WorkspaceId,
+)
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
 
@@ -35,6 +53,10 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_account_id(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> Optional[CloudAccount]:
         raise NotImplementedError
 
     @abstractmethod
@@ -79,29 +101,40 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     ) -> None:
         role_name: Optional[AwsRoleName] = None
         external_id: Optional[ExternalId] = None
+        gcp_service_key_id: Optional[GcpServiceAccountKeyId] = None
         enabled = False
         scan = False
         error: Optional[str] = None
         state: Optional[str] = None
+
+        def update_cloud_access_fields(cloud_access: CloudAccess) -> None:
+            nonlocal role_name, external_id, gcp_service_key_id
+
+            match cloud_access:
+                case AwsCloudAccess():
+                    role_name = cloud_access.role_name
+                    external_id = cloud_access.external_id
+
+                case GcpCloudAccess():
+                    gcp_service_key_id = cloud_access.service_account_key_id
+
         match account_state:
             case CloudAccountStates.Detected():
                 state = CloudAccountStates.Detected.state_name
 
-            case CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), ex_enabled):
-                role_name = role_name
-                external_id = external_id
+            case CloudAccountStates.Discovered(access, ex_enabled):
+                update_cloud_access_fields(access)
                 state = CloudAccountStates.Discovered.state_name
                 enabled = ex_enabled
 
-            case CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), ex_enabled, ex_scan):
-                external_id = external_id
-                enabled = ex_enabled
+            case CloudAccountStates.Configured(access, ex_enabled, ex_scan):
+                update_cloud_access_fields(access)
                 scan = ex_scan
+                enabled = ex_enabled
                 state = CloudAccountStates.Configured.state_name
 
-            case CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), error):
-                external_id = external_id
-                role_name = role_name
+            case CloudAccountStates.Degraded(access, error):
+                update_cloud_access_fields(access)
                 error = error
                 state = CloudAccountStates.Degraded.state_name
 
@@ -115,6 +148,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
         orm_cloud_account.aws_external_id = external_id
         orm_cloud_account.aws_role_name = role_name
+        orm_cloud_account.gcp_service_account_key_id = gcp_service_key_id
         orm_cloud_account.state = state
         orm_cloud_account.error = error
         orm_cloud_account.enabled = enabled
@@ -123,7 +157,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         """Create a cloud account."""
         async with self.session_maker() as session:
-            if cloud_account.cloud != "aws":
+            if cloud_account.cloud not in [CloudNames.AWS, CloudNames.GCP]:
                 raise ValueError(f"Unknown cloud {cloud_account.cloud}")
 
             orm_cloud_account = orm.CloudAccount(
@@ -152,6 +186,18 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         """Get a single cloud account by id."""
         async with self.session_maker() as session:
             cloud_account = await session.get(orm.CloudAccount, id)
+            return cloud_account.to_model() if cloud_account else None
+
+    async def get_by_account_id(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> Optional[CloudAccount]:
+        """Get a single cloud account by account id."""
+        async with self.session_maker() as session:
+            statement = (
+                select(orm.CloudAccount)
+                .where(orm.CloudAccount.tenant_id == workspace_id)
+                .where(orm.CloudAccount.account_id == account_id)
+            )
+            results = await session.execute(statement)
+            cloud_account = results.scalars().first()
             return cloud_account.to_model() if cloud_account else None
 
     async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:

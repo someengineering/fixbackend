@@ -48,6 +48,7 @@ class AwsCloudAccess(CloudAccess):
 @frozen
 class GcpCloudAccess(CloudAccess):
     cloud: ClassVar[CloudName] = CloudNames.GCP
+    service_account_key_id: GcpServiceAccountKeyId
 
 
 @frozen

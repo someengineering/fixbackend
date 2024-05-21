@@ -25,6 +25,7 @@ from datetime import datetime
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
 from fixbackend.ids import (
+    GcpServiceAccountKeyId,
     WorkspaceId,
     FixCloudAccountId,
     ExternalId,
@@ -47,6 +48,7 @@ class CloudAccount(Base):
     account_id: Mapped[CloudAccountId] = mapped_column(String(length=64), nullable=False)
     aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
     aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=2048), nullable=True)
+    gcp_service_account_key_id: Mapped[Optional[GcpServiceAccountKeyId]] = mapped_column(GUID, nullable=True)
     privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)
     user_account_name: Mapped[Optional[UserCloudAccountName]] = mapped_column(String(length=256), nullable=True)
     api_account_name: Mapped[Optional[CloudAccountName]] = mapped_column(String(length=256), nullable=True)
@@ -79,6 +81,12 @@ class CloudAccount(Base):
                     return models.AwsCloudAccess(
                         external_id=self.aws_external_id,
                         role_name=self.aws_role_name,
+                    )
+                case CloudNames.GCP:
+                    if self.gcp_service_account_key_id is None:
+                        raise ValueError("GCP service account key id is not set")
+                    return models.GcpCloudAccess(
+                        service_account_key_id=self.gcp_service_account_key_id,
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
