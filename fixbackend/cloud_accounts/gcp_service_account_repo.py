@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import List, Optional
 import uuid
 from fixbackend.base_model import CreatedUpdatedMixin, Base
 
@@ -26,6 +26,8 @@ from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import WorkspaceId, GcpServiceAccountKeyId
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
+
+from datetime import datetime
 
 
 class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
@@ -49,7 +51,7 @@ class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
         )
 
 
-class GcpServiceAccountJsonRepository:
+class GcpServiceAccountKeyRepository:
 
     def __init__(self, session_maker: AsyncSessionMaker):
         self._session_maker = session_maker
@@ -74,6 +76,18 @@ class GcpServiceAccountJsonRepository:
             if entity is None:
                 return None
             return entity.to_model()
+
+    async def list_created_after(self, time: datetime) -> List[GcpServiceAccountKey]:
+        async with self._session_maker() as session:
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at > time)
+            result = await session.execute(query)
+            return [entity.to_model() for entity in result.scalars()]
+
+    async def list_created_before(self, time: datetime) -> List[GcpServiceAccountKey]:
+        async with self._session_maker() as session:
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at < time)
+            result = await session.execute(query)
+            return [entity.to_model() for entity in result.scalars()]
 
     async def update_status(self, key_id: GcpServiceAccountKeyId, can_access_sa: bool) -> GcpServiceAccountKey:
         async with self._session_maker() as session:
