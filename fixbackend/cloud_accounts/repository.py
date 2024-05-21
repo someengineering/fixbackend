@@ -13,7 +13,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from turtle import up
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
@@ -35,7 +34,6 @@ from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountId,
-    CloudName,
     CloudNames,
     ExternalId,
     FixCloudAccountId,
