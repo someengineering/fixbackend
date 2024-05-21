@@ -35,10 +35,10 @@ def test_pluralize() -> None:
 
 
 def test_readable_bytes() -> None:
-    assert get_env().from_string("{{ 1024|readable_bytes }}").render() == "1 KB"
-    assert get_env().from_string("{{ 4348576|readable_bytes }}").render() == "4 MB"
-    assert get_env().from_string("{{ -4348576|readable_bytes }}").render() == "-4 MB"
-    assert get_env().from_string("{{ 3214348576|readable_bytes }}").render() == "2 GB"
-    assert get_env().from_string("{{ 233214348576|readable_bytes }}").render() == "217 GB"
-    assert get_env().from_string("{{ 233214348576|readable_bytes(with_sign=true) }}").render() == "+217 GB"
-    assert get_env().from_string("{{ -233214348576|readable_bytes(with_sign=true) }}").render() == "-217 GB"
+    assert get_env().from_string("{{ 1024|readable_bytes }}").render() == "1 KiB"
+    assert get_env().from_string("{{ 4348576|readable_bytes }}").render() == "4 MiB"
+    assert get_env().from_string("{{ -4348576|readable_bytes }}").render() == "-4 MiB"
+    assert get_env().from_string("{{ 3214348576|readable_bytes }}").render() == "2 GiB"
+    assert get_env().from_string("{{ 233214348576|readable_bytes }}").render() == "217 GiB"
+    assert get_env().from_string("{{ 233214348576|readable_bytes(with_sign=true) }}").render() == "+217 GiB"
+    assert get_env().from_string("{{ -233214348576|readable_bytes(with_sign=true) }}").render() == "-217 GiB"

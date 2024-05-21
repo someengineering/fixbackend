@@ -25,7 +25,7 @@ from fixbackend.workspaces.models import Workspace
 
 TemplatesPath = Path(__file__).parent / "templates"
 _readable_numbers = {0: "zero", 1: "one", 2: "two", 3: "three"}
-_bytes_power: Dict[int, Optional[str]] = {5: "PB", 4: "TB", 3: "GB", 2: "MB", 1: "KB", 0: "B"}
+_bytes_power: Dict[int, Optional[str]] = {5: "PiB", 4: "TiB", 3: "GiB", 2: "MiB", 1: "KiB", 0: "B"}
 _decimal_power: Dict[int, Optional[str]] = {5: "P", 4: "T", 3: "G", 2: "M", 1: "K", 0: None}
 
 
