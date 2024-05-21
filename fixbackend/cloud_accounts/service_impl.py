@@ -41,6 +41,7 @@ from fixbackend.cloud_accounts.models import (
     CloudAccount,
     CloudAccountState,
     CloudAccountStates,
+    GcpCloudAccess,
 )
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service import CloudAccountService, WrongExternalId
@@ -70,6 +71,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     UserCloudAccountName,
     UserId,
     WorkspaceId,
@@ -636,6 +638,21 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             log.info(f"Account {account.id} was changed concurrently, skipping: {e}")
             return ConcurrentUpdate()
 
+    async def _should_be_enabled(self, workspace: Workspace) -> bool:
+        should_be_enabled = True
+
+        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+            existing_accounts = await self.cloud_account_repository.count_by_workspace_id(
+                workspace.id, non_deleted=True
+            )
+            if existing_accounts >= limit:
+                should_be_enabled = False
+
+        if workspace.payment_on_hold_since:
+            should_be_enabled = False
+
+        return should_be_enabled
+
     async def create_aws_account(
         self,
         *,
@@ -657,27 +674,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         if not compare_digest(str(workspace.external_id), str(external_id)):
             raise WrongExternalId("External ids does not match")
 
-        should_be_enabled = True
+        should_be_enabled = await self._should_be_enabled(workspace)
 
-        if limit := ProductTierSettings[workspace.product_tier].account_limit:
-            existing_accounts = await self.cloud_account_repository.count_by_workspace_id(
-                workspace.id, non_deleted=True
-            )
-            if existing_accounts >= limit:
-                should_be_enabled = False
-
-        if workspace.payment_on_hold_since:
-            should_be_enabled = False
-
-        async def account_already_exists(workspace_id: WorkspaceId, account_id: str) -> Optional[CloudAccount]:
-            accounts = await self.cloud_account_repository.list_by_workspace_id(workspace_id)
-            maybe_account = next(
-                iter([account for account in accounts if account.account_id == account_id]),
-                None,
-            )
-            return maybe_account
-
-        if existing := await account_already_exists(workspace_id, account_id):
+        if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
             log.info(f"Account already exists in state: {existing.state.state_name}")
             new_name = account_name or existing.account_name
             new_created_at = utc() if existing.state == CloudAccountStates.Deleted() else existing.created_at
@@ -764,6 +763,59 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
         )
         log.info("AwsAccountDiscovered published")
+        return result
+
+    async def create_gcp_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        key_id: GcpServiceAccountKeyId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+        """Create a GCP cloud account."""
+        set_workspace_id(workspace_id)
+        set_cloud_account_id(account_id)
+
+        log.info("create_aws_account called")
+
+        workspace = await self.workspace_repository.get_workspace(workspace_id)
+        if workspace is None:
+            raise ResourceNotFound("Organization does not exist")
+
+        if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
+            log.info("GCP account already exists")
+            return existing
+
+        should_be_enabled = await self._should_be_enabled(workspace)
+
+        created_at = utc()
+        account = CloudAccount(
+            id=FixCloudAccountId(uuid.uuid4()),
+            account_id=account_id,
+            workspace_id=workspace_id,
+            cloud=CloudNames.GCP,
+            state=CloudAccountStates.Configured(
+                access=GcpCloudAccess(key_id), enabled=should_be_enabled, scan=should_be_enabled
+            ),
+            account_alias=None,
+            account_name=account_name,
+            user_account_name=None,
+            privileged=False,
+            next_scan=None,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            last_scan_started_at=None,
+            created_at=created_at,
+            updated_at=created_at,
+            state_updated_at=created_at,
+            cf_stack_version=0,
+            failed_scan_count=0,
+        )
+
+        result = await self.cloud_account_repository.create(account)
+        log.info(f"GCP cloud Account {account_id} created")
+
         return result
 
     async def delete_cloud_account(

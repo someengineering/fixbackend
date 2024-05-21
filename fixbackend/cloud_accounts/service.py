@@ -23,6 +23,7 @@ from fixbackend.ids import (
     CloudAccountName,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     UserCloudAccountName,
     UserId,
     WorkspaceId,
@@ -45,6 +46,18 @@ class CloudAccountService(ABC):
         account_name: Optional[CloudAccountName],
     ) -> CloudAccount:
         """Create a cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create_gcp_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        key_id: GcpServiceAccountKeyId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+        """Create a GCP cloud account."""
         raise NotImplementedError
 
     @abstractmethod

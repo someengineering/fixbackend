@@ -34,7 +34,7 @@ from fixbackend.workspaces.models import Workspace
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.subscription.models import AwsMarketplaceSubscription
@@ -63,6 +63,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     ProductTier,
     TaskId,
     UserCloudAccountName,
@@ -1120,3 +1121,67 @@ async def test_handle_events(
             at = await next_run_repository.get(workspace.id)
             assert at is not None
             assert (now + interval) < at < (now + 2 * interval)
+
+
+@pytest.mark.asyncio
+async def test_create_gcp_account(
+    cloud_account_repository: CloudAccountRepository,
+    domain_sender: DomainEventSenderMock,
+    service: CloudAccountServiceImpl,
+    workspace: Workspace,
+    workspace_repository: WorkspaceRepository,
+    aws_marketplace_subscription: AwsMarketplaceSubscription,
+) -> None:
+    key_id = GcpServiceAccountKeyId(uuid.uuid4())
+    # happy case
+    acc = await service.create_gcp_account(
+        workspace_id=workspace.id,
+        account_id=account_id,
+        account_name=account_name,
+        key_id=key_id,
+    )
+    assert await cloud_account_repository.count_by_workspace_id(workspace.id) == 1
+    account = await cloud_account_repository.get(acc.id)
+    assert account is not None
+    assert account.workspace_id == workspace.id
+    assert account.account_id == account_id
+    assert account.account_name == account_name
+    state = account.state
+    assert isinstance(state, CloudAccountStates.Configured)
+    assert state.enabled is True
+    assert state.scan is True
+    access = state.access
+    assert isinstance(access, GcpCloudAccess)
+    assert access.service_account_key_id == key_id
+
+    assert len(domain_sender.events) == 0
+
+    # reaching the account limit of the free tier, expext a Discovered account with enabled=False
+    previous_tier = workspace.product_tier
+    await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
+    await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
+    new_account = await service.create_gcp_account(
+        workspace_id=workspace.id,
+        account_id=CloudAccountId("new_one"),
+        account_name=CloudAccountName("new_account_name"),
+        key_id=key_id,
+    )
+    assert new_account is not None
+    state = new_account.state
+    assert isinstance(state, CloudAccountStates.Configured)
+    assert state.enabled is False
+    assert state.scan is False
+    # cleanup
+    await cloud_account_repository.delete(new_account.id)
+    await workspace_repository.update_product_tier(workspace.id, previous_tier)
+
+    # account already exists, return existing account
+    domain_sender.events = []
+    idempotent_account = await service.create_aws_account(
+        workspace_id=workspace.id,
+        account_id=account_id,
+        role_name=None,
+        external_id=workspace.external_id,
+        account_name=account_name,
+    )
+    assert idempotent_account == acc
