@@ -45,6 +45,7 @@ from fixbackend.ids import (
     CloudNames,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     UserCloudAccountName,
     UserId,
     WorkspaceId,
@@ -93,6 +94,17 @@ class InMemoryCloudAccountService(CloudAccountService):
         self.accounts[account.id] = account
         return account
 
+    async def create_gcp_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        key_id: GcpServiceAccountKeyId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+        """Create a GCP cloud account."""
+        raise NotImplementedError
+
     async def delete_cloud_account(
         self, user_id: UserId, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId
     ) -> None:
@@ -100,6 +112,14 @@ class InMemoryCloudAccountService(CloudAccountService):
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         return self.accounts[cloud_account_id]
+
+    async def get_cloud_account_by_account_id(
+        self, account_id: CloudAccountId, workspace_id: WorkspaceId
+    ) -> Optional[CloudAccount]:
+        for account in self.accounts.values():
+            if account.account_id == account_id:
+                return account
+        return None
 
     async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
         return [acc for acc in self.accounts.values() if acc.workspace_id == workspace_id]
