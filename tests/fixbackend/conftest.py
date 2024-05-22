@@ -756,6 +756,11 @@ async def aws_marketplace_handler(
 
 
 @pytest.fixture
+def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpServiceAccountKeyRepository:
+    return GcpServiceAccountKeyRepository(async_session_maker)
+
+
+@pytest.fixture
 async def dispatcher(
     arq_redis: ArqRedis,
     cloud_account_repository: CloudAccountRepository,
@@ -766,6 +771,7 @@ async def dispatcher(
     domain_event_sender: DomainEventPublisher,
     domain_event_subscriber: DomainEventSubscriber,
     workspace_repository: WorkspaceRepository,
+    gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
     redis: Redis,
 ) -> DispatcherService:
     return DispatcherService(
@@ -779,6 +785,7 @@ async def dispatcher(
         redis,
         domain_event_subscriber,
         workspace_repository,
+        gcp_service_account_key_repo,
     )
 
 
@@ -824,11 +831,6 @@ def api_token_service(
     return ApiTokenService(
         async_session_maker, jwt_strategy, user_repository, password_helper, workspace_repository, async_process_pool
     )
-
-
-@pytest.fixture
-def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpServiceAccountKeyRepository:
-    return GcpServiceAccountKeyRepository(async_session_maker)
 
 
 @pytest.fixture

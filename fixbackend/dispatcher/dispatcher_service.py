@@ -13,6 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import json
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -25,9 +26,15 @@ from fixcloudutils.service import Service
 from fixcloudutils.util import parse_utc_str, utc
 from redis.asyncio import Redis
 
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInformation, CollectQueue
+from fixbackend.collect.collect_queue import (
+    AccountInformation,
+    AwsAccountInformation,
+    CollectQueue,
+    GcpProjectInformation,
+)
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionFailure, CollectionSuccess
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
@@ -209,8 +216,10 @@ class DispatcherService(Service):
         temp_store_redis: Redis,
         domain_event_subscriber: DomainEventSubscriber,
         workspace_repository: WorkspaceRepository,
+        gcp_serivice_account_key_repo: GcpServiceAccountKeyRepository,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
+        self.gcp_service_account_key_repo = gcp_serivice_account_key_repo
         self.next_run_repo = next_run_repo
         self.metering_repo = metering_repo
         self.collect_queue = collect_queue
@@ -409,7 +418,7 @@ class DispatcherService(Service):
             log.info(f"Collect for tenant: {account.workspace_id} and account: {account.id} is already in progress.")
             return
 
-        def account_information() -> Optional[AccountInformation]:
+        async def account_information() -> Optional[AccountInformation]:
             match account.state:
                 case CloudAccountStates.Configured(access, _) | CloudAccountStates.Degraded(access, _):
                     match access:
@@ -420,6 +429,15 @@ class DispatcherService(Service):
                                 aws_role_arn=AwsARN(f"arn:aws:iam::{account.account_id}:role/{role_name}"),
                                 external_id=external_id,
                             )
+                        case GcpCloudAccess(service_account_key_id):
+                            service_account_key = await self.gcp_service_account_key_repo.get(service_account_key_id)
+                            if service_account_key is None:
+                                log.error("Service account key not found")
+                                return None
+                            return GcpProjectInformation(
+                                gcp_project_id=account.account_id,
+                                google_application_credentials=json.loads(service_account_key.value),
+                            )
                         case _:
                             log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")
                             return None
@@ -427,7 +445,7 @@ class DispatcherService(Service):
                     log.error(f"Account {account.id} is not in configured state. Ignore it.")
                     return None
 
-        if (ai := account_information()) and (
+        if (ai := await account_information()) and (
             db := await self.access_manager.get_database_access(account.workspace_id)
         ):
             job_id = uuid.uuid4()
