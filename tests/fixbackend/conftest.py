@@ -72,6 +72,7 @@ from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
 from fixbackend.db import get_async_session, get_async_session_maker
@@ -826,6 +827,11 @@ def api_token_service(
 
 
 @pytest.fixture
+def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpServiceAccountKeyRepository:
+    return GcpServiceAccountKeyRepository(async_session_maker)
+
+
+@pytest.fixture
 async def fix_deps(
     default_config: Config,
     db_engine: AsyncEngine,
@@ -840,6 +846,7 @@ async def fix_deps(
     api_token_service: ApiTokenService,
     password_helper: InsecureFastPasswordHelper,
     jwt_strategy: FixJWTStrategy,
+    gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -860,6 +867,7 @@ async def fix_deps(
             ServiceNames.api_token_service: api_token_service,
             ServiceNames.password_helper: password_helper,
             ServiceNames.jwt_strategy: jwt_strategy,
+            ServiceNames.gcp_service_account_repo: gcp_service_account_key_repo,
         }
     )
 

@@ -56,12 +56,24 @@ class GcpServiceAccountKeyRepository:
     def __init__(self, session_maker: AsyncSessionMaker):
         self._session_maker = session_maker
 
-    async def create(
+    async def upsert(
         self,
         tenant_id: WorkspaceId,
         value: str,
     ) -> GcpServiceAccountKey:
         async with self._session_maker() as session:
+
+            # update existing
+            statement = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.tenant_id == tenant_id)
+            result = await session.execute(statement)
+            existing = result.scalars().first()
+            if existing is not None:
+                existing.value = value
+                await session.commit()
+                await session.refresh(existing)
+                return existing.to_model()
+
+            # create new
             entity = GcpServiceAccountKeyEntity(tenant_id=tenant_id, value=value)
             session.add(entity)
             await session.commit()
@@ -76,6 +88,12 @@ class GcpServiceAccountKeyRepository:
             if entity is None:
                 return None
             return entity.to_model()
+
+    async def list_by_tenant(self, tenant_id: WorkspaceId) -> List[GcpServiceAccountKey]:
+        async with self._session_maker() as session:
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.tenant_id == tenant_id)
+            result = await session.execute(query)
+            return [entity.to_model() for entity in result.scalars().unique()]
 
     async def list_created_after(self, time: datetime) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:

@@ -22,7 +22,7 @@ import json
 from fixbackend.cloud_accounts.models import GcpServiceAccountKey
 from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.ids import GcpServiceAccountKeyId, WorkspaceId
-from gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.util import utc
@@ -33,16 +33,28 @@ class GcpServiceAccountService(Service):
     def __init__(
         self,
         service_account_key_repo: GcpServiceAccountKeyRepository,
-        cloud_account_repo: CloudAccountService,
+        cloud_account_service: CloudAccountService,
+        dispatching: bool = False,
     ) -> None:
+        self.dispatching = dispatching
         self.service_account_key_repo = service_account_key_repo
-        self.cloud_account_repo = cloud_account_repo
+        self.cloud_account_service = cloud_account_service
         self.new_account_pinger = Periodic(
             "new_service_account_pinger", self._ping_new_service_account_keys, timedelta(minutes=1)
         )
         self.regular_account_healthcheck = Periodic(
             "service_account_healthcheck", self._service_account_healthcheck, timedelta(hours=1)
         )
+
+    async def start(self) -> Any:
+        if self.dispatching:
+            await self.new_account_pinger.start()
+            await self.regular_account_healthcheck.start()
+
+    async def stop(self) -> None:
+        if self.dispatching:
+            await self.new_account_pinger.stop()
+            await self.regular_account_healthcheck.stop()
 
     async def list_projects(self, service_account_key: str) -> List[Dict[str, Any]]:
 
@@ -74,7 +86,7 @@ class GcpServiceAccountService(Service):
         self, projects: List[Dict[str, Any]], tenant_id: WorkspaceId, key_id: GcpServiceAccountKeyId
     ) -> None:
         for project in projects:
-            await self.cloud_account_repo.create_gcp_account(
+            await self.cloud_account_service.create_gcp_account(
                 workspace_id=tenant_id, account_id=project["projectId"], account_name=project.get("name"), key_id=key_id
             )
 

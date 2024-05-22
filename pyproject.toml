@@ -37,6 +37,7 @@ google-auth = "^2.29.0"
 google-api-python-client = "^2.129.0"
 
 
+python-multipart = "0.0.7"
 [tool.poetry.group.dev.dependencies]
 ipykernel = ">=6.25.1"
 mypy = ">=1.5.1"
