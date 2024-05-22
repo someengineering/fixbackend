@@ -31,7 +31,7 @@ from fixbackend.collect.collect_queue import AccountInformation, AwsAccountInfor
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionFailure, CollectionSuccess
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
-    AwsAccountConfigured,
+    CloudAccountConfigured,
     CloudAccountCollectInfo,
     Event,
     TenantAccountsCollectFailed,
@@ -230,7 +230,7 @@ class DispatcherService(Service):
         self.collect_progress = CollectAccountProgress(temp_store_redis)
 
         domain_event_subscriber.subscribe(WorkspaceCreated, self.process_workspace_created, "dispatcher")
-        domain_event_subscriber.subscribe(AwsAccountConfigured, self.process_aws_account_configured, "dispatcher")
+        domain_event_subscriber.subscribe(CloudAccountConfigured, self.process_aws_account_configured, "dispatcher")
 
     async def start(self) -> Any:
         await self.collect_result_listener.start()
@@ -381,10 +381,10 @@ class DispatcherService(Service):
         next_run_at = self.next_run_repo.next_run_for(product_tier)
         await self.next_run_repo.create(workspace_id, next_run_at)
 
-    async def process_aws_account_configured(self, event: AwsAccountConfigured) -> None:
+    async def process_aws_account_configured(self, event: CloudAccountConfigured) -> None:
         set_fix_cloud_account_id(event.cloud_account_id)
         set_workspace_id(event.tenant_id)
-        set_cloud_account_id(event.aws_account_id)
+        set_cloud_account_id(event.account_id)
         cloud_account_id = event.cloud_account_id
         if account := await self.cloud_account_repo.get(cloud_account_id):
             # The first time we collect this account with this role.

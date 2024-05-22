@@ -40,7 +40,7 @@ from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.config import Config, ProductTierSettings
 from fixbackend.domain_events.events import (
-    AwsAccountConfigured,
+    CloudAccountConfigured,
     AwsAccountDegraded,
     AwsAccountDiscovered,
     CloudAccountCollectInfo,
@@ -51,7 +51,7 @@ from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     ProductTierChanged,
     SubscriptionCancelled,
-    AwsAccountDeleted,
+    CloudAccountDeleted,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound
@@ -591,9 +591,10 @@ async def test_handle_account_discovered_success(
 
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
-    assert isinstance(event, AwsAccountConfigured)
+    assert isinstance(event, CloudAccountConfigured)
+    assert event.cloud == CloudNames.AWS
     assert event.cloud_account_id == account.id
-    assert event.aws_account_id == account_id
+    assert event.account_id == account_id
     assert event.tenant_id == account.workspace_id
 
 
@@ -653,9 +654,10 @@ async def test_handle_account_discovered_assume_role_failure(
     await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
-    assert isinstance(event, AwsAccountConfigured)
+    assert isinstance(event, CloudAccountConfigured)
+    assert event.cloud == CloudNames.AWS
     assert event.cloud_account_id == account.id
-    assert event.aws_account_id == account_id
+    assert event.account_id == account_id
     assert event.tenant_id == account.workspace_id
 
     after_configured = await service.get_cloud_account(account.id, workspace.id)
@@ -698,7 +700,7 @@ async def test_handle_account_discovered_list_accounts_success(
     await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 3
     assert isinstance(domain_sender.events[1], CloudAccountNameChanged)
-    assert isinstance(domain_sender.events[2], AwsAccountConfigured)
+    assert isinstance(domain_sender.events[2], CloudAccountConfigured)
 
     after_discovered = await service.get_cloud_account(account.id, workspace.id)
 
@@ -743,7 +745,7 @@ async def test_handle_account_discovered_list_aliases_success(
     await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
     assert len(domain_sender.events) == 2
     event = domain_sender.events[1]
-    assert isinstance(event, AwsAccountConfigured)
+    assert isinstance(event, CloudAccountConfigured)
 
     after_discovered = await service.get_cloud_account(account.id, workspace.id)
 
@@ -1078,9 +1080,10 @@ async def test_handle_events(
             aws_account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
         ),
-        AwsAccountConfigured(
+        CloudAccountConfigured(
+            cloud=CloudNames.AWS,
             cloud_account_id=FixCloudAccountId(uuid.uuid4()),
-            aws_account_id=CloudAccountId("foobar"),
+            account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
         ),
         AwsAccountDegraded(
@@ -1091,9 +1094,10 @@ async def test_handle_events(
             error="test",
             reason=DegradationReason.stack_deleted,
         ),
-        AwsAccountDeleted(
+        CloudAccountDeleted(
+            cloud=CloudNames.AWS,
             cloud_account_id=FixCloudAccountId(uuid.uuid4()),
-            aws_account_id=CloudAccountId("foobar"),
+            account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
             user_id=user.id,
         ),
@@ -1154,7 +1158,13 @@ async def test_create_gcp_account(
     assert isinstance(access, GcpCloudAccess)
     assert access.service_account_key_id == key_id
 
-    assert len(domain_sender.events) == 0
+    assert len(domain_sender.events) == 1
+    event = domain_sender.events[0]
+    assert isinstance(event, CloudAccountConfigured)
+    assert event.cloud == CloudNames.GCP
+    assert event.cloud_account_id == acc.id
+    assert event.account_id == account_id
+    assert event.tenant_id == acc.workspace_id
 
     # reaching the account limit of the free tier, expext a Discovered account with enabled=False
     previous_tier = workspace.product_tier
@@ -1185,3 +1195,4 @@ async def test_create_gcp_account(
         account_name=account_name,
     )
     assert idempotent_account == acc
+    assert len(domain_sender.events) == 0
