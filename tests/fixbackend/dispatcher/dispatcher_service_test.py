@@ -30,7 +30,7 @@ from fixbackend.dispatcher.collect_progress import AccountCollectProgress
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
 from fixbackend.domain_events.events import (
-    AwsAccountConfigured,
+    CloudAccountConfigured,
     CloudAccountCollectInfo,
     TenantAccountsCollected,
     WorkspaceCreated,
@@ -141,7 +141,7 @@ async def test_receive_aws_account_configured(
 
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_aws_account_configured(
-        AwsAccountConfigured(cloud_account_id, workspace.id, aws_account_id),
+        CloudAccountConfigured(CloudNames.AWS, cloud_account_id, workspace.id, aws_account_id),
     )
 
     # check that no new entry was created in the next_run table
@@ -164,7 +164,7 @@ async def test_receive_aws_account_configured(
     # concurrent event does not create a new entry in the work queue
     # signal to the dispatcher that the cloud account was discovered
     await dispatcher.process_aws_account_configured(
-        AwsAccountConfigured(cloud_account_id, workspace.id, aws_account_id),
+        CloudAccountConfigured(CloudNames.AWS, cloud_account_id, workspace.id, aws_account_id),
     )
     assert len(await arq_redis.keys()) == 2
     assert len(await redis.keys()) == 3

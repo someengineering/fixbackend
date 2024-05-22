@@ -49,9 +49,9 @@ from fixbackend.config import Config, Free, ProductTierSettings
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
-    AwsAccountConfigured,
+    CloudAccountConfigured,
     AwsAccountDegraded,
-    AwsAccountDeleted,
+    CloudAccountDeleted,
     AwsAccountDiscovered,
     DegradationReason,
     SubscriptionCancelled,
@@ -335,8 +335,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             e: Union[
                 AwsAccountDegraded,
                 AwsAccountDiscovered,
-                AwsAccountDeleted,
-                AwsAccountConfigured,
+                CloudAccountDeleted,
+                CloudAccountConfigured,
                 TenantAccountsCollected,
             ]
         ) -> None:
@@ -436,12 +436,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     await self.process_discovered_event(discovered_event)
                     await send_pub_sub_message(discovered_event)
 
-                case AwsAccountConfigured.kind:
-                    configured_event = AwsAccountConfigured.from_json(message)
+                case CloudAccountConfigured.kind:
+                    configured_event = CloudAccountConfigured.from_json(message)
                     await send_pub_sub_message(configured_event)
 
-                case AwsAccountDeleted.kind:
-                    deleted_event = AwsAccountDeleted.from_json(message)
+                case CloudAccountDeleted.kind:
+                    deleted_event = CloudAccountDeleted.from_json(message)
                     await send_pub_sub_message(deleted_event)
 
                 case AwsAccountDegraded.kind:
@@ -627,10 +627,11 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             updated_account = await self.cloud_account_repository.update(account.id, update_to_configured)
             log.info(f"Account {account.id} configured")
             await self.domain_events.publish(
-                AwsAccountConfigured(
+                CloudAccountConfigured(
+                    cloud=CloudNames.AWS,
                     cloud_account_id=account.id,
                     tenant_id=account.workspace_id,
-                    aws_account_id=account.account_id,
+                    account_id=account.account_id,
                 )
             )
             return updated_account
@@ -816,6 +817,15 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         result = await self.cloud_account_repository.create(account)
         log.info(f"GCP cloud Account {account_id} created")
 
+        await self.domain_events.publish(
+            CloudAccountConfigured(
+                cloud=CloudNames.GCP,
+                cloud_account_id=result.id,
+                tenant_id=workspace_id,
+                account_id=account_id,
+            )
+        )
+
         return result
 
     async def delete_cloud_account(
@@ -839,7 +849,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 last_scan_started_at=None,
             ),
         )
-        await self.domain_events.publish(AwsAccountDeleted(user_id, cloud_account_id, workspace_id, account.account_id))
+        await self.domain_events.publish(
+            CloudAccountDeleted(account.cloud, user_id, cloud_account_id, workspace_id, account.account_id)
+        )
 
     async def get_cloud_account(self, cloud_account_id: FixCloudAccountId, workspace_id: WorkspaceId) -> CloudAccount:
         account = await self.cloud_account_repository.get(cloud_account_id)

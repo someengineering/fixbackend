@@ -116,7 +116,7 @@ class InventoryClient(Service):
             if response.status_code == 401:
                 raise GraphDatabaseForbidden(401, response.text)
             elif response.status_code == 400 and "[HTTP 401][ERR 11]" in response.text:
-                raise GraphDatabaseNotAvailable(503, response.text)
+                raise GraphDatabaseNotAvailable(404, response.text)
             elif response.status_code == 404 and "NoSuchGraph" in response.text:
                 raise NoSuchGraph(404, response.text)
             else:

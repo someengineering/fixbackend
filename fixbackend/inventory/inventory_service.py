@@ -53,7 +53,7 @@ from redis.asyncio import Redis
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.config import ProductTierSettings, Trial
 from fixbackend.domain_events.events import (
-    AwsAccountDeleted,
+    CloudAccountDeleted,
     TenantAccountsCollected,
     CloudAccountNameChanged,
     WorkspaceCreated,
@@ -64,7 +64,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudNames, WorkspaceId
+from fixbackend.ids import WorkspaceId
 from fixbackend.ids import NodeId
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
@@ -145,7 +145,7 @@ class InventoryService(Service):
         self.update_name_again_after = timedelta(hours=1)
         self.start_workers = start_workers
         if sub := domain_event_subscriber:
-            sub.subscribe(AwsAccountDeleted, self._process_account_deleted, Inventory)
+            sub.subscribe(CloudAccountDeleted, self._process_account_deleted, Inventory)
             sub.subscribe(TenantAccountsCollected, self._process_tenant_collected, Inventory)
             sub.subscribe(CloudAccountNameChanged, self._process_account_name_changed, Inventory)
             sub.subscribe(WorkspaceCreated, self._process_workspace_created, Inventory)
@@ -165,14 +165,14 @@ class InventoryService(Service):
             await self.worker.stop()
             await self.cache.stop()
 
-    async def _process_account_deleted(self, event: AwsAccountDeleted) -> None:
+    async def _process_account_deleted(self, event: CloudAccountDeleted) -> None:
         set_workspace_id(event.tenant_id)
-        set_cloud_account_id(event.aws_account_id)
+        set_cloud_account_id(event.account_id)
         set_fix_cloud_account_id(event.cloud_account_id)
         access = await self.db_access_manager.get_database_access(event.tenant_id)
         if access:
             log.info(f"Aws Account deleted. Remove from inventory: {event}.")
-            await self.client.delete_account(access, cloud=CloudNames.AWS, account_id=event.aws_account_id)
+            await self.client.delete_account(access, cloud=event.cloud, account_id=event.account_id)
 
     async def _process_tenant_collected(self, event: TenantAccountsCollected) -> None:
         log.info(f"Tenant: {event.tenant_id} was collected - invalidate caches.")
