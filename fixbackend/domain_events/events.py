@@ -94,26 +94,28 @@ class AwsAccountDiscovered(Event):
 
 
 @frozen
-class AwsAccountConfigured(Event):
+class CloudAccountConfigured(Event):
     """
     This event is emitted when AWS account is ready to be collected.
     """
 
-    kind: ClassVar[str] = "aws_account_configured"
+    kind: ClassVar[str] = "cloud_account_configured"
 
+    cloud: CloudName
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: CloudAccountId
+    account_id: CloudAccountId
 
 
 @frozen
-class AwsAccountDeleted(Event):
-    kind: ClassVar[str] = "aws_account_deleted"
+class CloudAccountDeleted(Event):
+    kind: ClassVar[str] = "cloud_account_deleted"
 
+    cloud: CloudName
     user_id: UserId
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: CloudAccountId
+    account_id: CloudAccountId
 
 
 class DegradationReason(StrEnum):

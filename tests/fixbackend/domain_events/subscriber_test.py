@@ -24,10 +24,10 @@ from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.events import UserRegistered, AwsAccountConfigured
+from fixbackend.domain_events.events import UserRegistered, CloudAccountConfigured
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber, HandlerDescriptor
-from fixbackend.ids import UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
+from fixbackend.ids import CloudNames, UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
 
 
 @pytest.mark.asyncio
@@ -43,16 +43,17 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
     )
 
     event = UserRegistered(user_id=UserId(uuid4()), email="foo", tenant_id=WorkspaceId(uuid4()))
-    aws_event = AwsAccountConfigured(
+    aws_event = CloudAccountConfigured(
+        CloudNames.AWS,
         cloud_account_id=FixCloudAccountId(uuid4()),
         tenant_id=WorkspaceId(uuid4()),
-        aws_account_id=CloudAccountId("123456"),
+        account_id=CloudAccountId("123456"),
     )
 
     received_event: Optional[UserRegistered] = None
     received_event2: Optional[UserRegistered] = None
     handler2_failed = False
-    account_configured_event: Optional[AwsAccountConfigured] = None
+    account_configured_event: Optional[CloudAccountConfigured] = None
 
     async def handler(event: UserRegistered) -> None:
         nonlocal received_event
@@ -66,13 +67,13 @@ async def test_subscribe(redis: Redis, default_config: Config) -> None:
             raise Exception("foo")
         received_event2 = event
 
-    async def handler3(event: AwsAccountConfigured) -> None:
+    async def handler3(event: CloudAccountConfigured) -> None:
         nonlocal account_configured_event
         account_configured_event = event
 
     subscriber.subscribe(UserRegistered, handler, "handler1")
     subscriber.subscribe(UserRegistered, handler2, "handler2")
-    subscriber.subscribe(AwsAccountConfigured, handler3, "handler3")
+    subscriber.subscribe(CloudAccountConfigured, handler3, "handler3")
     await subscriber.start()
 
     await publisher.publish(event)
