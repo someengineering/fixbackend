@@ -33,7 +33,11 @@ from httpx import AsyncClient
 from redis.asyncio import Redis
 
 from fixbackend.analytics import AnalyticsEventSender
-from fixbackend.analytics.events import AEFirstAccountCollectFinished, AEFirstWorkspaceCollectFinished
+from fixbackend.analytics.events import (
+    AEFirstAccountCollectFinished,
+    AEFirstWorkspaceCollectFinished,
+    AEWorkspaceCollectFinished,
+)
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
@@ -383,10 +387,10 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             )
 
                     await send_pub_sub_message(event)
+                    user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                     if first_workspace_collect:
-                        user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(
-                            AEFirstWorkspaceCollectFinished(uuid_str(), utc(), user_id, event.tenant_id)
+                            AEFirstWorkspaceCollectFinished(uuid_str(), context.sent_at, user_id, event.tenant_id)
                         )
                         # inform workspace users about the first successful collect
                         await self.notification_service.send_message_to_workspace(
@@ -395,8 +399,18 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     if first_account_collect:
                         user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                         await self.analytics_event_sender.send(
-                            AEFirstAccountCollectFinished(uuid_str(), utc(), user_id, event.tenant_id)
+                            AEFirstAccountCollectFinished(uuid_str(), context.sent_at, user_id, event.tenant_id)
                         )
+                    await self.analytics_event_sender.send(
+                        AEWorkspaceCollectFinished(
+                            context.id,
+                            context.sent_at,
+                            user_id,
+                            event.tenant_id,
+                            len(event.cloud_accounts),
+                            sum(a.scanned_resources for a in event.cloud_accounts.values()),
+                        )
+                    )
 
                 case TenantAccountsCollectFailed.kind:
                     event = TenantAccountsCollected.from_json(message)
