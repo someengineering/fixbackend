@@ -83,6 +83,8 @@ class CollectAccountProgress:
     ) -> None:
         if isinstance(account_information, AwsAccountInformation):
             account_id = account_information.aws_account_id
+        elif isinstance(account_information, GcpProjectInformation):
+            account_id = account_information.gcp_project_id
         else:
             raise NotImplementedError("Unsupported account information type")
         value = AccountCollectProgress(
