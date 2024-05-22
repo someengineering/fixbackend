@@ -13,13 +13,16 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import timedelta
+import json
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, Response, status
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
@@ -29,6 +32,7 @@ from fixbackend.cloud_accounts.schemas import (
     AwsCloudFormationLambdaCallbackParameters,
     CloudAccountList,
     CloudAccountRead,
+    GcpServiceAccountKeyRead,
     LastScanInfo,
     ScannedAccount,
 )
@@ -40,8 +44,12 @@ from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 log = logging.getLogger(__name__)
 
 
-def cloud_accounts_router() -> APIRouter:
+def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
+
+    gcp_service_account_repo = dependencies.service(
+        ServiceNames.gcp_service_account_repo, GcpServiceAccountKeyRepository
+    )
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def get_cloud_account(
@@ -159,6 +167,35 @@ def cloud_accounts_router() -> APIRouter:
             ],
             next_scan=accounts[0].next_scan,
         )
+
+    @router.put("/{workspace_id}/cloud_accounts/gcp/key")
+    async def add_gcp_service_account_key(
+        workspace: UserWorkspaceDependency,
+        service_account_key: Annotated[
+            bytes, File(description="GCP's service_account.json file", max_length=64 * 1024)
+        ],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
+    ) -> Response:
+
+        try:
+            string_key = service_account_key.decode("utf-8")
+            json.loads(service_account_key)
+        except Exception as e:
+            log.error(f"Error decoding GCP service account key: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_json")
+
+        await gcp_service_account_repo.upsert(workspace.id, string_key)
+
+        return Response(status_code=201)
+
+    @router.get("/{workspace_id}/cloud_accounts/gcp/key")
+    async def get_gcp_service_account_keys(
+        workspace: UserWorkspaceDependency,
+    ) -> GcpServiceAccountKeyRead:
+        key = await gcp_service_account_repo.get_by_tenant(workspace.id)
+        if key is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_key_found")
+        return GcpServiceAccountKeyRead.from_model(key)
 
     return router
 

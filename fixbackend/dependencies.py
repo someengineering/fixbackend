@@ -75,6 +75,8 @@ class ServiceNames:
     user_manager = "user_manager"
     auth_email_sender = "auth_email_sender"
     api_token_service = "api_token_service"
+    gcp_service_account_repo = "gcp_service_account_repo"
+    gcp_service_account_service = "gcp_service_account_service"
 
 
 class FixDependencies(Dependencies):

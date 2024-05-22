@@ -13,13 +13,14 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import tempfile
 import uuid
 from datetime import datetime, timedelta
 from typing import AsyncIterator, Dict, List, Optional
 
 import pytest
 from attrs import evolve
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fixcloudutils.util import utc
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,10 +50,8 @@ from fixbackend.ids import (
     UserCloudAccountName,
     UserId,
     WorkspaceId,
-    ProductTier,
 )
 from fixbackend.permissions.models import Roles, UserRole
-from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
 
@@ -163,18 +162,18 @@ class InMemoryCloudAccountService(CloudAccountService):
 
 cloud_account_service = InMemoryCloudAccountService()
 
-workspace_id = WorkspaceId(uuid.uuid4())
+# workspace_id = WorkspaceId(uuid.uuid4())
 external_id = ExternalId(uuid.uuid4())
-workspace = Workspace(workspace_id, "foo", "foo", external_id, UserId(uid()), [], ProductTier.Free, utc(), utc())
+# workspace = Workspace(workspace_id, "foo", "foo", external_id, UserId(uid()), [], ProductTier.Free, utc(), utc())
 role_name = AwsRoleName("FooBarRole")
 account_id = CloudAccountId("123456789012")
 
 
 @pytest.fixture
 async def client(
-    session: AsyncSession, default_config: Config, user: User, fast_api: FastAPI
+    session: AsyncSession, default_config: Config, user: User, fast_api: FastAPI, workspace: Workspace
 ) -> AsyncIterator[AsyncClient]:  # noqa: F811
-    admin_user = evolve(user, roles=[UserRole(user.id, workspace_id, Roles.workspace_admin)])
+    admin_user = evolve(user, roles=[UserRole(user.id, workspace.id, Roles.workspace_admin)])
     fast_api.dependency_overrides[get_async_session] = lambda: session
     fast_api.dependency_overrides[get_config] = lambda: default_config
     fast_api.dependency_overrides[get_cloud_account_service] = lambda: cloud_account_service
@@ -186,19 +185,19 @@ async def client(
 
 
 @pytest.mark.asyncio
-async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
+async def test_aws_cloudformation_callback(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     payload = {
         "account_id": account_id,
         "external_id": str(external_id),
         "role_name": role_name,
-        "workspace_id": str(workspace_id),
+        "workspace_id": str(workspace.id),
         "fix_stack_version": 1708513196,
     }
     response = await client.post("/api/cloud/callbacks/aws/cf", json=payload)
     assert response.status_code == 200
     saved_account = list(cloud_account_service.accounts.values())[0]
-    assert saved_account.workspace_id == workspace_id
+    assert saved_account.workspace_id == workspace.id
     assert saved_account.account_id == account_id
     assert saved_account.cloud == "aws"
     assert saved_account.account_name is None
@@ -215,14 +214,14 @@ async def test_aws_cloudformation_callback(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_cloud_account(client: AsyncClient) -> None:
+async def test_delete_cloud_account(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
         cloud=CloudNames.AWS,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         state=CloudAccountStates.Detected(),
         account_name=CloudAccountName("foo"),
         account_alias=None,
@@ -238,13 +237,13 @@ async def test_delete_cloud_account(client: AsyncClient) -> None:
         cf_stack_version=0,
         failed_scan_count=0,
     )
-    response = await client.delete(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
+    response = await client.delete(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
     assert len(cloud_account_service.accounts) == 0
 
 
 @pytest.mark.asyncio
-async def test_last_scan(client: AsyncClient) -> None:
+async def test_last_scan(client: AsyncClient, workspace: Workspace) -> None:
     next_scan = datetime.utcnow()
     started_at = datetime.utcnow()
 
@@ -254,7 +253,7 @@ async def test_last_scan(client: AsyncClient) -> None:
         id=cloud_account_id,
         account_id=CloudAccountId("123456789012"),
         cloud=CloudNames.AWS,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         state=CloudAccountStates.Detected(),
         account_name=CloudAccountName("foo"),
         account_alias=None,
@@ -271,10 +270,10 @@ async def test_last_scan(client: AsyncClient) -> None:
         failed_scan_count=0,
     )
 
-    response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts/last_scan")
+    response = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/last_scan")
     assert response.status_code == 200
     data = response.json()
-    assert data["workspace_id"] == str(workspace_id)
+    assert data["workspace_id"] == str(workspace.id)
     assert len(data["accounts"]) == 1
     assert data["accounts"][0]["account_id"] == "123456789012"
     assert data["accounts"][0]["duration"] == 10
@@ -284,7 +283,7 @@ async def test_last_scan(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_cloud_account(client: AsyncClient) -> None:
+async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     next_scan = datetime.utcnow()
@@ -292,7 +291,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
         account_id=account_id,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
         account_name=CloudAccountName("foo"),
@@ -310,7 +309,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
         failed_scan_count=0,
     )
 
-    response = await client.get(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}")
+    response = await client.get(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == str(cloud_account_id)
@@ -331,7 +330,7 @@ async def test_get_cloud_account(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_cloud_accounts(client: AsyncClient) -> None:
+async def test_list_cloud_accounts(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
 
     def add_account(created_at: datetime, state: CloudAccountState) -> CloudAccount:
@@ -340,7 +339,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         account = CloudAccount(
             id=cloud_account_id,
             account_id=account_id,
-            workspace_id=workspace_id,
+            workspace_id=workspace.id,
             cloud=CloudNames.AWS,
             state=state,
             account_name=CloudAccountName("foo"),
@@ -383,7 +382,7 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
         utc() - timedelta(minutes=3), CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), "foo")
     )
 
-    response = await client.get(f"/api/workspaces/{workspace_id}/cloud_accounts")
+    response = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts")
     assert response.status_code == 200
     data = response.json()
 
@@ -406,13 +405,13 @@ async def test_list_cloud_accounts(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_cloud_account(client: AsyncClient) -> None:
+async def test_update_cloud_account(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         account_id=account_id,
         cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
@@ -434,7 +433,7 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     payload: Dict[str, Optional[str]] = {
         "name": "bar",
     }
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}", json=payload)
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == str(cloud_account_id)
@@ -448,20 +447,20 @@ async def test_update_cloud_account(client: AsyncClient) -> None:
     payload = {
         "name": None,
     }
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}", json=payload)
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["user_account_name"] is None
 
 
 @pytest.mark.asyncio
-async def test_enable_disable_account(client: AsyncClient) -> None:
+async def test_enable_disable_account(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     next_scan = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         account_id=account_id,
         cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
@@ -480,7 +479,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
         failed_scan_count=0,
     )
 
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/disable")
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/disable")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == str(cloud_account_id)
@@ -492,7 +491,7 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
     assert data["resources"] == 100
     assert data["next_scan"] == next_scan.isoformat()
 
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/enable")
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/enable")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == str(cloud_account_id)
@@ -506,12 +505,12 @@ async def test_enable_disable_account(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_enable_disable_account_scan(client: AsyncClient) -> None:
+async def test_enable_disable_account_scan(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
         id=cloud_account_id,
-        workspace_id=workspace_id,
+        workspace_id=workspace.id,
         account_id=account_id,
         cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
@@ -530,12 +529,69 @@ async def test_enable_disable_account_scan(client: AsyncClient) -> None:
         failed_scan_count=0,
     )
 
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/disable")
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/scan/disable")
     assert response.status_code == 200
     data = response.json()
     assert data["scan"] is False
 
-    response = await client.patch(f"/api/workspaces/{workspace_id}/cloud_account/{cloud_account_id}/scan/enable")
+    response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/scan/enable")
     assert response.status_code == 200
     data = response.json()
     assert data["scan"] is True
+
+
+@pytest.mark.asyncio
+async def test_add_gcp_service_account_key(client: AsyncClient, workspace: Workspace) -> None:
+
+    with tempfile.TemporaryFile() as f:
+
+        f.write(b"""{"valid": "json"}""")
+        files = {"service_account_key": ("service_account.json", f, "text/plain")}
+
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
+        assert response.status_code == 201
+
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
+        assert key_list.status_code == 200
+        key = key_list.json()
+        assert key["id"] is not None
+        assert key["tenant_id"] == str(workspace.id)
+        assert key["created_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_add_invalid_gcp_service_account_key(client: AsyncClient, workspace: Workspace) -> None:
+
+    with tempfile.TemporaryFile() as f:
+
+        f.write(b"""this is invalid json""")
+        files = {"service_account_key": ("service_account.json", f, "text/plain")}
+
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
+        assert key_list.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_chonky_boi(client: AsyncClient, workspace: Workspace) -> None:
+
+    with tempfile.TemporaryFile() as f:
+
+        f.write(b"""[""")
+
+        for _ in range(256 * 1024):
+            f.write(b"""["payload incoming"],""")
+
+        f.write(b"""["last one"]]""")
+
+        f.flush()
+
+        files = {"service_account_key": ("service_account.json", f, "text/plain")}
+
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
+        assert key_list.status_code == 404
