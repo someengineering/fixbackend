@@ -110,8 +110,6 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         return Response(content=rendered, media_type="text/html", status_code=200)
 
-        # return templates.TemplateResponse(request=request, name="users/index.html", context=context)
-
     @router.get("/{user_id}", response_class=HTMLResponse, name="users:get_user")
     async def get_user(request: Request, user_id: UserId) -> Response:
         user = await user_repo.get(user_id)
