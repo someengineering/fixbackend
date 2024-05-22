@@ -420,6 +420,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             analytics_event_sender=analytics_event_sender,
         ),
     )
+    gcp_account_repo = deps.add(
+        SN.gcp_service_account_repo,
+        GcpServiceAccountKeyRepository(session_maker),
+    )
     deps.add(
         SN.dispatching,
         DispatcherService(
@@ -433,6 +437,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             temp_store_redis,
             domain_event_subscriber,
             workspace_repo,
+            gcp_account_repo,
         ),
     )
     deps.add(
@@ -443,10 +448,6 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             session_maker,
             StatusUpdateEmailCreator(inventory_service, graph_db_access, deps.async_process_pool),
         ),
-    )
-    gcp_account_repo = deps.add(
-        SN.gcp_service_account_repo,
-        GcpServiceAccountKeyRepository(session_maker),
     )
     deps.add(
         SN.gcp_service_account_service,
