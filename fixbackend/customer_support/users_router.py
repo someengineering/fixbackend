@@ -66,6 +66,7 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
     ) -> Response:
         users: Sequence[User] = []
         total_pages = None
+        paging = True
         if id:
             try:
                 user = await user_repo.get(UserId(uuid.UUID(id)))
@@ -73,10 +74,13 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
                 user = None
             if user:
                 users = [user]
+            paging = False
         elif email:
             users = await user_repo.search(email)
+            paging = False
         else:
-            enties_per_page = 10
+            paging = True
+            enties_per_page = 25
             offset = 0
             if page:
                 offset = (page - 1) * enties_per_page
@@ -84,9 +88,27 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
             count = await user_repo.count()
             total_pages = count // enties_per_page
 
-        context: Dict[str, Any] = {"request": request, "users": users, "current_page": page, "total": total_pages}
+        context: Dict[str, Any] = {
+            "request": request,
+            "users": users,
+            "current_page": page,
+            "total": total_pages,
+            "paging": paging,
+        }
 
-        return templates.TemplateResponse(request=request, name="users/index.html", context=context)
+        template = templates.get_template("users/index.html")
+        rendered = template.render(context)
+
+        if paging:
+            paging_template = templates.get_template("users/index_pagination.html")
+            rendered_paging = paging_template.render(context)
+            paging_oob = """<div id="pagination" hx-swap-oob="true">""" + rendered_paging + """</div>"""
+            rendered = rendered + paging_oob
+        else:
+            disable_paging = """<div id="pagination" hx-swap-oob="true"></div>"""
+            rendered = rendered + disable_paging
+
+        return Response(content=rendered, media_type="text/html", status_code=200)
 
     @router.get("/{user_id}", response_class=HTMLResponse, name="users:get_user")
     async def get_user(request: Request, user_id: UserId) -> Response:
