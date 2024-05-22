@@ -52,7 +52,6 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.permissions.models import Roles, UserRole
-from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
 
@@ -549,14 +548,12 @@ async def test_add_gcp_service_account_key(client: AsyncClient, workspace: Works
         f.write(b"""{"valid": "json"}""")
         files = {"service_account_key": ("service_account.json", f, "text/plain")}
 
-        response = await client.post(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys", files=files)
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
         assert response.status_code == 201
 
-        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys")
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
         assert key_list.status_code == 200
-        keys = key_list.json()
-        assert len(keys) == 1
-        key = keys[0]
+        key = key_list.json()
         assert key["id"] is not None
         assert key["tenant_id"] == str(workspace.id)
         assert key["created_at"] is not None
@@ -570,13 +567,11 @@ async def test_add_invalid_gcp_service_account_key(client: AsyncClient, workspac
         f.write(b"""this is invalid json""")
         files = {"service_account_key": ("service_account.json", f, "text/plain")}
 
-        response = await client.post(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys", files=files)
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys")
-        assert key_list.status_code == 200
-        keys = key_list.json()
-        assert len(keys) == 0
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
+        assert key_list.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -586,7 +581,7 @@ async def test_chonky_boi(client: AsyncClient, workspace: Workspace) -> None:
 
         f.write(b"""[""")
 
-        for i in range(256 * 1024):
+        for _ in range(256 * 1024):
             f.write(b"""["payload incoming"],""")
 
         f.write(b"""["last one"]]""")
@@ -595,10 +590,8 @@ async def test_chonky_boi(client: AsyncClient, workspace: Workspace) -> None:
 
         files = {"service_account_key": ("service_account.json", f, "text/plain")}
 
-        response = await client.post(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys", files=files)
+        response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key", files=files)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/keys")
-        assert key_list.status_code == 200
-        keys = key_list.json()
-        assert len(keys) == 0
+        key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
+        assert key_list.status_code == 404

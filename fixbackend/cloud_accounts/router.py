@@ -168,13 +168,13 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
             next_scan=accounts[0].next_scan,
         )
 
-    @router.post("/{workspace_id}/cloud_accounts/gcp/keys")
+    @router.put("/{workspace_id}/cloud_accounts/gcp/key")
     async def add_gcp_service_account_key(
         workspace: UserWorkspaceDependency,
         service_account_key: Annotated[
             bytes, File(description="GCP's service_account.json file", max_length=64 * 1024)
         ],
-        # _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
     ) -> Response:
 
         try:
@@ -188,12 +188,14 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 
         return Response(status_code=201)
 
-    @router.get("/{workspace_id}/cloud_accounts/gcp/keys")
-    async def list_gcp_service_account_keys(
+    @router.get("/{workspace_id}/cloud_accounts/gcp/key")
+    async def get_gcp_service_account_keys(
         workspace: UserWorkspaceDependency,
-    ) -> list[GcpServiceAccountKeyRead]:
-        keys = await gcp_service_account_repo.list_by_tenant(workspace.id)
-        return [GcpServiceAccountKeyRead.from_model(key) for key in keys]
+    ) -> GcpServiceAccountKeyRead:
+        key = await gcp_service_account_repo.get_by_tenant(workspace.id)
+        if key is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_key_found")
+        return GcpServiceAccountKeyRead.from_model(key)
 
     return router
 

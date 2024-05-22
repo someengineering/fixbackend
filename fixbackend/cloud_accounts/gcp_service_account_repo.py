@@ -69,9 +69,9 @@ class GcpServiceAccountKeyRepository:
             existing = result.scalars().first()
             if existing is not None:
                 existing.value = value
+                model = existing.to_model()
                 await session.commit()
-                await session.refresh(existing)
-                return existing.to_model()
+                return model
 
             # create new
             entity = GcpServiceAccountKeyEntity(tenant_id=tenant_id, value=value)
@@ -89,11 +89,15 @@ class GcpServiceAccountKeyRepository:
                 return None
             return entity.to_model()
 
-    async def list_by_tenant(self, tenant_id: WorkspaceId) -> List[GcpServiceAccountKey]:
+    async def get_by_tenant(self, tenant_id: WorkspaceId) -> Optional[GcpServiceAccountKey]:
         async with self._session_maker() as session:
             query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.tenant_id == tenant_id)
             result = await session.execute(query)
-            return [entity.to_model() for entity in result.scalars().unique()]
+            entity = result.scalars().first()
+            if entity is None:
+                return None
+
+            return entity.to_model()
 
     async def list_created_after(self, time: datetime) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:

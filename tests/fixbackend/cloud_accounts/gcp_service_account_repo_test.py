@@ -48,7 +48,7 @@ async def test_store_gcp_service_account(
     assert await gcp_repo.list_created_before(utc() - timedelta(minutes=5)) == []
     assert await gcp_repo.list_created_before(utc() + timedelta(minutes=5)) == [same_acc]
 
-    assert await gcp_repo.list_by_tenant(workspace.id) == [same_acc]
+    assert await gcp_repo.get_by_tenant(workspace.id) == same_acc
 
     await gcp_repo.update_status(gcp_service_account.id, can_access_sa=True)
     updated_acc = await gcp_repo.get(gcp_service_account.id)
