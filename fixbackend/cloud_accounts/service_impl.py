@@ -54,9 +54,9 @@ from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
     CloudAccountConfigured,
-    AwsAccountDegraded,
+    CloudAccountDegraded,
     CloudAccountDeleted,
-    AwsAccountDiscovered,
+    CloudAccountDiscovered,
     DegradationReason,
     SubscriptionCancelled,
     ProductTierChanged,
@@ -158,7 +158,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.notification_service = notification_service
         self.analytics_event_sender = analytics_event_sender
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
-        backoff_config[AwsAccountDiscovered.kind] = Backoff(
+        backoff_config[CloudAccountDiscovered.kind] = Backoff(
             base_delay=5,
             maximum_delay=10,
             retries=8,
@@ -337,8 +337,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         async def send_pub_sub_message(
             e: Union[
-                AwsAccountDegraded,
-                AwsAccountDiscovered,
+                CloudAccountDegraded,
+                CloudAccountDiscovered,
                 CloudAccountDeleted,
                 CloudAccountConfigured,
                 TenantAccountsCollected,
@@ -442,9 +442,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                                 updated.id, "Too many consecutive failed scans", DegradationReason.other
                             )
 
-                case AwsAccountDiscovered.kind:
-                    discovered_event = AwsAccountDiscovered.from_json(message)
-                    set_cloud_account_id(discovered_event.aws_account_id)
+                case CloudAccountDiscovered.kind:
+                    discovered_event = CloudAccountDiscovered.from_json(message)
+                    set_cloud_account_id(discovered_event.account_id)
                     set_fix_cloud_account_id(discovered_event.cloud_account_id)
                     set_workspace_id(discovered_event.tenant_id)
                     await self.process_discovered_event(discovered_event)
@@ -458,14 +458,14 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     deleted_event = CloudAccountDeleted.from_json(message)
                     await send_pub_sub_message(deleted_event)
 
-                case AwsAccountDegraded.kind:
-                    degraded_event = AwsAccountDegraded.from_json(message)
+                case CloudAccountDegraded.kind:
+                    degraded_event = CloudAccountDegraded.from_json(message)
                     await self.notification_service.send_message_to_workspace(
                         workspace_id=degraded_event.tenant_id,
                         message=email.AccountDegraded(
-                            cloud_account_id=degraded_event.aws_account_id,
+                            cloud_account_id=degraded_event.account_id,
                             tenant_id=degraded_event.tenant_id,
-                            account_name=degraded_event.aws_account_name,
+                            account_name=degraded_event.account_name,
                             cf_stack_deleted=degraded_event.reason == DegradationReason.stack_deleted,
                         ),
                     )
@@ -512,7 +512,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case _:  # pragma: no cover
                     pass  # ignore other domain events
 
-    async def process_discovered_event(self, discovered: AwsAccountDiscovered) -> None:
+    async def process_discovered_event(self, discovered: CloudAccountDiscovered) -> None:
         account = await self.cloud_account_repository.get(discovered.cloud_account_id)
         if account is None:
             log.warning(f"Account {discovered.cloud_account_id} not found, cannot setup account")
@@ -775,7 +775,9 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             return result
 
         await self.domain_events.publish(
-            AwsAccountDiscovered(cloud_account_id=result.id, tenant_id=workspace_id, aws_account_id=account_id)
+            CloudAccountDiscovered(
+                cloud=CloudNames.AWS, cloud_account_id=result.id, tenant_id=workspace_id, account_id=account_id
+            )
         )
         log.info("AwsAccountDiscovered published")
         return result
@@ -1006,11 +1008,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
         account = await self.cloud_account_repository.update(account_id, set_degraded)
         await self.domain_events.publish(
-            AwsAccountDegraded(
+            CloudAccountDegraded(
+                cloud=CloudNames.AWS,
                 cloud_account_id=account.id,
                 tenant_id=account.workspace_id,
-                aws_account_id=account.account_id,
-                aws_account_name=account.final_name(),
+                account_id=account.account_id,
+                account_name=account.final_name(),
                 error=error,
                 reason=reason,
             )
