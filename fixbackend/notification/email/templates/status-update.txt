@@ -28,10 +28,6 @@ Storage
   Volumes: {{ volumes_progress[0] | readable_number }} ({{ volumes_progress[1] | readable_number(with_sign=true) }})
   Size {{ volume_bytes_progress[0] | readable_bytes }} ({{ volume_bytes_progress[1] | readable_bytes(with_sign=true) }})
 
-Buckets
-  Objects: {{ buckets_objects_progress[0] | readable_number }} ({{ buckets_objects_progress[1] | readable_number(with_sign=true) }})
-  Size: {{ buckets_size_bytes_progress[0] | readable_bytes }} ({{ buckets_size_bytes_progress[1] | readable_bytes(with_sign=true) }})
-
 Databases
   Instances {{ databases_progress[0] | readable_number }} ({{ databases_progress[1] | readable_number(with_sign=true) }})
   Size {{ databases_bytes_progress[0] | readable_bytes }} ({{ databases_bytes_progress[1] | readable_bytes(with_sign=true) }})
