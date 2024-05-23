@@ -303,3 +303,12 @@ class BillingEntryCreated(Event):
     subscription_id: SubscriptionId
     product_tier: str
     usage: int
+
+
+@frozen
+class AlertNotificationSetupUpdated(Event):
+    kind: ClassVar[str] = "alert_notification_setup_updated"
+
+    tenant_id: WorkspaceId
+    user_id: UserId
+    provider: NotificationProvider

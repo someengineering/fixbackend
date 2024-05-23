@@ -38,6 +38,7 @@ from fixbackend.analytics.events import (
     AEFailingBenchmarkChecksAlertSend,
     AEAccountNameChanged,
     AEBillingEntryCreated,
+    AEAlertNotificationSetupUpdated,
 )
 from fixbackend.config import Config
 from fixbackend.domain_events.events import (
@@ -56,6 +57,7 @@ from fixbackend.domain_events.events import (
     UserLoggedIn,
     FailingBenchmarkChecksAlertSend,
     BillingEntryCreated,
+    AlertNotificationSetupUpdated,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -80,6 +82,7 @@ class DomainEventToAnalyticsEventHandler:
         domain_event_subscriber.subscribe(UserLoggedIn, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(FailingBenchmarkChecksAlertSend, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(BillingEntryCreated, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(AlertNotificationSetupUpdated, self.handle, "domain_event_to_analytics")
 
     async def handle(self, event: Event) -> None:
         match event:
@@ -130,6 +133,10 @@ class DomainEventToAnalyticsEventHandler:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(
                     AEBillingEntryCreated(e.id, e.created_at, user_id, e.tenant_id, e.product_tier, e.usage)
+                )
+            case AlertNotificationSetupUpdated() as e:
+                await self.sender.send(
+                    AEAlertNotificationSetupUpdated(e.id, e.created_at, e.user_id, e.tenant_id, e.provider)
                 )
             case _:
                 log.info(f"Do not know how to handle event: {event}. Ignore.")

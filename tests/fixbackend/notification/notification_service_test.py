@@ -21,6 +21,7 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
 
+from fixbackend.auth.models import User
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
 from fixbackend.graph_db.models import GraphDatabaseAccess
@@ -53,6 +54,7 @@ from tests.fixbackend.conftest import (
     json_response,
     nd_json_response,
     RedisPubSubPublisherMock,
+    InMemoryDomainEventPublisher,
 )
 from tests.fixbackend.inventory.inventory_service_test import mocked_answers  # noqa: F401
 
@@ -155,8 +157,10 @@ async def test_send_alert(
     notification_service: NotificationService,
     graph_db_access: GraphDatabaseAccess,
     mocked_answers: RequestHandlerMock,  # noqa: F811
+    domain_event_sender: InMemoryDomainEventPublisher,
     example_check: Json,
     redis_publisher_mock: RedisPubSubPublisherMock,
+    user: User,
 ) -> None:
     async def request_handler(request: Request) -> Response:
         if request.url == "https://discord.com/webhook_example":
@@ -187,11 +191,15 @@ async def test_send_alert(
             raise Exception(f"Unexpected request: {request.url}")
 
     # setup
+    domain_event_sender.events.clear()
     ws_id = graph_db_access.workspace_id
     mocked_answers.insert(0, request_handler)
     await notification_service.update_notification_provider_config(
-        ws_id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
+        ws_id, user.id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
     )
+    # ensure domain event
+    assert len(domain_event_sender.events) == 1
+    assert domain_event_sender.events[0].kind == "alert_notification_setup_updated"
     setting = AlertingSetting(severity="high", channels=[NP.discord])
     aws_cis_2_0 = BenchmarkName("aws_cis_2_0")
     await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={aws_cis_2_0: setting}))
@@ -223,6 +231,9 @@ async def test_send_alert(
     assert resource.id == "r1"
     assert resource.kind == "aws_s3_bucket"
     assert resource.name == "my_bucket"
+    # ensure domain event
+    assert len(domain_event_sender.events) == 2
+    assert domain_event_sender.events[1].kind == "failing_benchmark_checks_alert_send"
 
     # send alert
     await notification_service._send_alert(message, MessageContext("1", kind, "test", utc(), utc()))
@@ -264,11 +275,12 @@ async def test_send_test_alert(
     graph_db_access: GraphDatabaseAccess,
     success_handler_mock: RequestHandlerMock,
     inventory_requests: List[Request],
+    user: User,
 ) -> None:
     # setup
     ws_id = graph_db_access.workspace_id
     await notification_service.update_notification_provider_config(
-        ws_id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
+        ws_id, user.id, NP.discord, "test", {"webhook_url": "https://discord.com/webhook_example"}
     )
     # test alert
     await notification_service.send_test_alert(ws_id, NP.discord)
