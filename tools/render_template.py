@@ -14,14 +14,23 @@
 import os
 import sys
 import subprocess
+import yaml
 from pathlib import Path
 from time import sleep
 
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_messages import TemplatesPath
 
+
+if len(sys.argv) < 2:
+    print("Error: No template argument provided.")
+    sys.exit(1)
+
+
 template = sys.argv[1]
-additional_context = dict(user_id="test")
+template_base_name = Path(template).stem
+script_dir = Path(__file__).parent
+context_dir = script_dir / "contexts"
 last_mod_time = None
 
 
@@ -35,6 +44,17 @@ def file_has_changed(filepath: Path):
     return False
 
 
+def load_context_from_yaml(template_name: str) -> dict:
+    yaml_file = context_dir / f"{template_name}.yaml"
+    if yaml_file.exists():
+        with open(yaml_file, "r") as file:
+            return yaml.safe_load(file)
+    else:
+        print(f"Warning: No YAML context file found for template '{template_name}'.")
+        return {}
+
+
+additional_context = load_context_from_yaml(template_base_name)
 path = TemplatesPath / template
 rendered_path = Path(f"~/{template}").expanduser().absolute()
 while True:
