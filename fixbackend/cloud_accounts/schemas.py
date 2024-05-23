@@ -17,7 +17,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates
+from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates, GcpServiceAccountKey
 from fixbackend.ids import (
     AwsRoleName,
     CloudAccountAlias,
@@ -25,6 +25,7 @@ from fixbackend.ids import (
     CloudAccountName,
     ExternalId,
     FixCloudAccountId,
+    GcpServiceAccountKeyId,
     UserCloudAccountName,
     WorkspaceId,
 )
@@ -136,3 +137,19 @@ class LastScanInfo(BaseModel):
     @staticmethod
     def empty(workspace_id: WorkspaceId) -> "LastScanInfo":
         return LastScanInfo(workspace_id=workspace_id, accounts=[], next_scan=None)
+
+
+class GcpServiceAccountKeyRead(BaseModel):
+    id: GcpServiceAccountKeyId
+    tenant_id: WorkspaceId
+    can_access_sa: Optional[bool]
+    created_at: datetime
+
+    @staticmethod
+    def from_model(model: GcpServiceAccountKey) -> "GcpServiceAccountKeyRead":
+        return GcpServiceAccountKeyRead(
+            id=model.id,
+            tenant_id=model.tenant_id,
+            can_access_sa=model.can_access_sa,
+            created_at=model.created_at,
+        )

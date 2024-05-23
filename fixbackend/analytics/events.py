@@ -29,7 +29,7 @@ from attrs import frozen
 from fixcloudutils.types import Json
 
 from fixbackend.domain_events.converter import converter
-from fixbackend.ids import WorkspaceId, UserId
+from fixbackend.ids import WorkspaceId, UserId, NotificationProvider
 
 T = TypeVar("T")
 
@@ -170,3 +170,11 @@ class AEBillingEntryCreated(AnalyticsEvent):
 class AEEmailOpened(AnalyticsEvent):
     kind: ClassVar[str] = "fix_email_opened"
     email: str
+
+
+@frozen
+class AEAlertNotificationSetupUpdated(AnalyticsEvent):
+    kind: ClassVar[str] = "alerting_integration_updated"
+
+    workspace_id: WorkspaceId
+    provider: NotificationProvider

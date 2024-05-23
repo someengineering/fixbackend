@@ -46,6 +46,8 @@ from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -250,7 +252,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
     deps.add(SN.schedule_trial_end_reminder_consumer, ScheduleTrialEndReminder(domain_event_subscriber, one_time_email))
-    deps.add(
+    cloud_account_service = deps.add(
         SN.cloud_account_service,
         CloudAccountServiceImpl(
             workspace_repository=workspace_repo,
@@ -291,6 +293,14 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         ApiTokenService(
             session_maker, jwt_strategy, user_repo, password_helper, workspace_repo, deps.async_process_pool
         ),
+    )
+    gcp_account_repo = deps.add(
+        SN.gcp_service_account_repo,
+        GcpServiceAccountKeyRepository(session_maker),
+    )
+    deps.add(
+        SN.gcp_service_account_service,
+        GcpServiceAccountService(gcp_account_repo, cloud_account_service),
     )
     return deps
 
@@ -391,7 +401,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     analytics_event_sender = deps.add(
         SN.analytics_event_sender, analytics(cfg, http_client, domain_event_subscriber, workspace_repo)
     )
-    deps.add(
+    cloud_account_service = deps.add(
         SN.cloud_account_service,
         CloudAccountServiceImpl(
             workspace_repository=workspace_repo,
@@ -410,6 +420,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             analytics_event_sender=analytics_event_sender,
         ),
     )
+    gcp_account_repo = deps.add(
+        SN.gcp_service_account_repo,
+        GcpServiceAccountKeyRepository(session_maker),
+    )
     deps.add(
         SN.dispatching,
         DispatcherService(
@@ -423,6 +437,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             temp_store_redis,
             domain_event_subscriber,
             workspace_repo,
+            gcp_account_repo,
         ),
     )
     deps.add(
@@ -433,6 +448,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             session_maker,
             StatusUpdateEmailCreator(inventory_service, graph_db_access, deps.async_process_pool),
         ),
+    )
+    deps.add(
+        SN.gcp_service_account_service,
+        GcpServiceAccountService(gcp_account_repo, cloud_account_service, dispatching=True),
     )
     return deps
 

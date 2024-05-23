@@ -31,7 +31,7 @@ from httpx import Request, Response
 
 from fixbackend.auth.models import User
 from fixbackend.domain_events.events import (
-    AwsAccountDeleted,
+    CloudAccountDeleted,
     CloudAccountNameChanged,
     WorkspaceCreated,
     ProductTierChanged,
@@ -39,6 +39,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import (
     CloudAccountId,
+    CloudNames,
     FixCloudAccountId,
     NodeId,
     WorkspaceId,
@@ -330,8 +331,8 @@ async def test_account_deleted(
         raise ValueError(f"Unexpected request: {request.url}")
 
     request_handler_mock.append(inventory_call)
-    message = AwsAccountDeleted(
-        user.id, FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123")
+    message = CloudAccountDeleted(
+        CloudNames.AWS, user.id, FixCloudAccountId(uuid4()), graph_db_access.workspace_id, CloudAccountId("123")
     )
     await inventory_service._process_account_deleted(message)
     assert len(inventory_requests) == 2

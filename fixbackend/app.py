@@ -275,7 +275,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router = APIRouter(prefix=API_PREFIX)
         api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
-        api_router.include_router(cloud_accounts_router(), prefix="/workspaces", tags=["cloud_accounts"])
+        api_router.include_router(cloud_accounts_router(deps), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces")
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])

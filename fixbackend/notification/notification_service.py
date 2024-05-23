@@ -32,12 +32,13 @@ from fixbackend.domain_events.events import (
     TenantAccountsCollected,
     FailingBenchmarkChecksAlertSend,
     UserJoinedWorkspace,
+    AlertNotificationSetupUpdated,
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId
+from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId, UserId
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.fix_jwt import JwtService
@@ -176,8 +177,9 @@ class NotificationService(Service):
         await self.provider_config_repo.delete_messaging_config_for_workspace(workspace_id, provider)
 
     async def update_notification_provider_config(
-        self, workspace_id: WorkspaceId, provider: NotificationProvider, name: str, config: Json
+        self, workspace_id: WorkspaceId, user_id: UserId, provider: NotificationProvider, name: str, config: Json
     ) -> None:
+        await self.domain_event_sender.publish(AlertNotificationSetupUpdated(workspace_id, user_id, provider))
         await self.provider_config_repo.update_messaging_config_for_workspace(workspace_id, provider, name, config)
 
     async def alerting_for(self, workspace_id: WorkspaceId) -> Optional[WorkspaceAlert]:

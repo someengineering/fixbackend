@@ -38,13 +38,14 @@ from fixbackend.analytics.events import (
     AEFailingBenchmarkChecksAlertSend,
     AEAccountNameChanged,
     AEBillingEntryCreated,
+    AEAlertNotificationSetupUpdated,
 )
 from fixbackend.config import Config
 from fixbackend.domain_events.events import (
     UserRegistered,
     AwsAccountDiscovered,
-    AwsAccountConfigured,
-    AwsAccountDeleted,
+    CloudAccountConfigured,
+    CloudAccountDeleted,
     AwsAccountDegraded,
     CloudAccountNameChanged,
     WorkspaceCreated,
@@ -56,6 +57,7 @@ from fixbackend.domain_events.events import (
     UserLoggedIn,
     FailingBenchmarkChecksAlertSend,
     BillingEntryCreated,
+    AlertNotificationSetupUpdated,
 )
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -68,8 +70,8 @@ class DomainEventToAnalyticsEventHandler:
         self.sender = sender
         domain_event_subscriber.subscribe(UserRegistered, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(AwsAccountDiscovered, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsAccountConfigured, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsAccountDeleted, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(CloudAccountConfigured, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(CloudAccountDeleted, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(AwsAccountDegraded, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(CloudAccountNameChanged, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(WorkspaceCreated, self.handle, "domain_event_to_analytics")
@@ -80,6 +82,7 @@ class DomainEventToAnalyticsEventHandler:
         domain_event_subscriber.subscribe(UserLoggedIn, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(FailingBenchmarkChecksAlertSend, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(BillingEntryCreated, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(AlertNotificationSetupUpdated, self.handle, "domain_event_to_analytics")
 
     async def handle(self, event: Event) -> None:
         match event:
@@ -88,11 +91,11 @@ class DomainEventToAnalyticsEventHandler:
             case AwsAccountDiscovered() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(AEAccountDiscovered(e.id, e.created_at, user_id, e.tenant_id, "aws"))
-            case AwsAccountConfigured() as e:
+            case CloudAccountConfigured() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
-                await self.sender.send(AEAccountConfigured(e.id, e.created_at, user_id, e.tenant_id, "aws"))
-            case AwsAccountDeleted() as e:
-                await self.sender.send(AEAccountDeleted(e.id, e.created_at, e.user_id, e.tenant_id, "aws"))
+                await self.sender.send(AEAccountConfigured(e.id, e.created_at, user_id, e.tenant_id, e.cloud))
+            case CloudAccountDeleted() as e:
+                await self.sender.send(AEAccountDeleted(e.id, e.created_at, e.user_id, e.tenant_id, e.cloud))
             case AwsAccountDegraded() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(AEAccountDegraded(e.id, e.created_at, user_id, e.tenant_id, "aws", e.error))
@@ -130,6 +133,10 @@ class DomainEventToAnalyticsEventHandler:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(
                     AEBillingEntryCreated(e.id, e.created_at, user_id, e.tenant_id, e.product_tier, e.usage)
+                )
+            case AlertNotificationSetupUpdated() as e:
+                await self.sender.send(
+                    AEAlertNotificationSetupUpdated(e.id, e.created_at, e.user_id, e.tenant_id, e.provider)
                 )
             case _:
                 log.info(f"Do not know how to handle event: {event}. Ignore.")

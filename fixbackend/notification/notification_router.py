@@ -26,9 +26,9 @@ from starlette.responses import RedirectResponse, JSONResponse
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.errors import NotAllowed
-from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email
+from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email, UserId
 from fixbackend.fix_jwt import JwtServiceImpl
-from fixbackend.logging_context import set_workspace_id, set_context
+from fixbackend.logging_context import set_workspace_id, set_context, set_user_id
 from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
@@ -86,13 +86,11 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             log.info(f"OAuth callback: invalid state token: {state}, {ex}")
             return error_redirect
 
-        if not (workspace_id := decoded_state.get("workspace_id")):
-            log.info(f"OAuth callback: invalid workspace_id in state token: {decoded_state.get('workspace_id')}")
-            return error_redirect
-
-        workspace_id = WorkspaceId(workspace_id)
-
+        workspace_id = WorkspaceId(decoded_state["workspace_id"])
+        user_id = UserId(decoded_state["user_id"])
         set_workspace_id(workspace_id)
+        set_user_id(user_id)
+
         # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
             client_id=cfg.slack_oauth_client_id,
@@ -136,7 +134,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             channel=hook["channel"],
         )
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.slack, hook["channel"], config)
+        await ns.update_notification_provider_config(
+            workspace_id, user_id, NotificationProvider.slack, hook["channel"], config
+        )
         log.info("Slack webhook added successfully")
         return RedirectResponse(f"/workspace-settings?message=slack_added&outcome=success#{workspace_id}")
 
@@ -150,6 +150,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info(f"User {user.id} in workspace {workspace_id} wants to integrate slack notifications")
         data = {
+            "user_id": str(user.id),
             "workspace_id": str(workspace_id),
         }
         state = generate_state_token(data)
@@ -188,7 +189,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
             return error_response
 
         workspace_id = WorkspaceId(state_obj["workspace_id"])
+        user_id = UserId(state_obj["user_id"])
         set_workspace_id(workspace_id)
+        set_user_id(user_id)
 
         # with our client and secret, we authorize the request to get an access token
         data: Json = dict(
@@ -210,7 +213,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         config = dict(webhook_url=hook["url"])
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.discord, "alert", config)
+        await ns.update_notification_provider_config(
+            workspace_id, user_id, NotificationProvider.discord, "alert", config
+        )
 
         # redirect to the UI
         log.info("Discord webhook added successfully")
@@ -226,6 +231,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         set_context(workspace_id=workspace_id, user_id=user.id)
         log.info("Add discord notifications requested.")
         data = {
+            "user_id": str(user.id),
             "workspace_id": str(workspace_id),
         }
         state = generate_state_token(data)
@@ -253,7 +259,9 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         config = dict(integration_key=integration_key)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.pagerduty, name, config)
+        await ns.update_notification_provider_config(
+            workspace_id, user.id, NotificationProvider.pagerduty, name, config
+        )
         log.info("Pagerduty integration added successfully")
         return Response(status_code=204)
 
@@ -271,7 +279,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         config = dict(api_key=api_key)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.opsgenie, name, config)
+        await ns.update_notification_provider_config(workspace_id, user.id, NotificationProvider.opsgenie, name, config)
         log.info("Opsgenie integration added successfully")
         return Response(status_code=204)
 
@@ -289,7 +297,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         config = dict(webhook_url=webhook_url)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.teams, name, config)
+        await ns.update_notification_provider_config(workspace_id, user.id, NotificationProvider.teams, name, config)
         log.info("Pagerduty integration added successfully")
         return Response(status_code=204)
 
@@ -307,7 +315,7 @@ def notification_router(fix: FixDependencies) -> APIRouter:
         config = dict(email=email)
         # store token and webhook url
         ns = fix.service(ServiceNames.notification_service, NotificationService)
-        await ns.update_notification_provider_config(workspace_id, NotificationProvider.email, name, config)
+        await ns.update_notification_provider_config(workspace_id, user.id, NotificationProvider.email, name, config)
         log.info("Email integration added successfully")
         return Response(status_code=204)
 
