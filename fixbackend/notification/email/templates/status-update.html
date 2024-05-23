@@ -54,7 +54,7 @@
     <tbody>
     <!-- Compute Section -->
     <tr class="purchase_item">
-      <td rowspan="3" style="vertical-align: top;">Compute</td>
+      <td rowspan="3" style="vertical-align: top;"><a href="https://app.fix.security/inventory?q=aggregate(%2Fancestors.cloud.reported.name%20as%20cloud%2C%20%2Fancestors.account.reported.name%20as%20account%3A%20sum(1)%20as%20instances_total%2C%20sum(instance_cores)%20as%20cores%2C%20sum(instance_memory)%20as%20memory_gb)%3A%20is(instance)%20and%20instance_status%20%3D%20%22running%22#{{ workspace_id }}">Compute</a></td>
       <td class="td-bottom-line">Virtual Machines</td>
       <td class="td-bottom-line">{{ instances_progress[0] | readable_number }}</td>
       <td class="td-bottom-line">{{ instances_progress[1] | readable_number(with_sign=true) }}</td>
@@ -74,7 +74,7 @@
     </tr>
     <!-- Storage Section -->
     <tr class="purchase_item">
-      <td rowspan="2" style="vertical-align: top;">Storage</td>
+      <td rowspan="2" style="vertical-align: top;"><a href="https://app.fix.security/inventory?q=aggregate(%2Fancestors.cloud.reported.name%20as%20cloud%2C%20%2Fancestors.account.reported.name%20as%20account%3A%20sum(1)%20as%20volumes_total%2C%20sum(volume_size)%20as%20size_gb)%3A%20is(volume)#{{ workspace_id }}">Storage</a></td>
       <td class="td-bottom-line">Volumes</td>
       <td class="td-bottom-line">{{ volumes_progress[0] | readable_number}}</td>
       <td class="td-bottom-line">{{ volumes_progress[1] | readable_number(with_sign=true) }}</td>
@@ -87,9 +87,10 @@
     <tr>
       <td colspan="4">&nbsp;</td>
     </tr>
+    {#
     <!-- Buckets Section -->
     <tr class="purchase_item">
-      <td rowspan="2" style="vertical-align: top;">Buckets</td>
+      <td rowspan="2" style="vertical-align: top;"><a href="https://app.fix.security/inventory?q=aggregate(%2Fancestors.cloud.reported.name%20as%20cloud%2C%20%2Fancestors.account.reported.name%20as%20account%3A%20sum(1)%20as%20buckets_total%2C%20sum(%2Fusage.bucket_size_bytes.avg%20%2F%201024%20%20%2F%201024%20%20%2F%201024)%20as%20size_gb)%3A%20is(bucket)#{{ workspace_id }}">Buckets</a></td>
       <td class="td-bottom-line">Objects</td>
       <td class="td-bottom-line">{{ buckets_objects_progress[0] | readable_number }}</td>
       <td class="td-bottom-line">{{ buckets_objects_progress[1] | readable_number(with_sign=true) }}</td>
@@ -99,12 +100,13 @@
       <td class="td-bottom-line">{{ buckets_size_bytes_progress[0] | readable_bytes }}</td>
       <td class="td-bottom-line">{{ buckets_size_bytes_progress[1] | readable_bytes(with_sign=true) }}</td>
     </tr>
+    #}
     <tr>
       <td colspan="4">&nbsp;</td>
     </tr>
     <!-- Databases Section -->
     <tr class="purchase_item">
-      <td rowspan="2" style="vertical-align: top;">Databases</td>
+      <td rowspan="2" style="vertical-align: top;"><a href="https://app.fix.security/inventory?q=aggregate(%2Fancestors.cloud.reported.name%20as%20cloud%2C%20%2Fancestors.account.reported.name%20as%20account%2C%20db_type%20as%20type%2C%20instance_type%20as%20instance_type%3A%20sum(1)%20as%20databases_total%2C%20sum(volume_size)%20as%20volume_size_gb)%3A%20is(database)#{{ workspace_id }}">Databases</a></td>
       <td class="td-bottom-line">Instances</td>
       <td class="td-bottom-line">{{ databases_progress[0] | readable_number }}</td>
       <td class="td-bottom-line">{{ databases_progress[1] | readable_number(with_sign=true) }}</td>
