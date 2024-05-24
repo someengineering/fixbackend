@@ -15,13 +15,14 @@
             {% for row in workspace_rows %}
             <tr>
                 <td>
-                    <div class="flex flex-col">
+                    <a href="{{ url_for('workspace:get', workspace_id=row.workspace.id) }}" class="link link-primary">
                         <p>
                             {{ row.workspace.name }}
                         </p>
                         <p>
                             ({{ row.workspace.id }})
                         </p>
+                    </a>
                 </td>
                 <td>{{ row.workspace.product_tier }} </td>
                 <td>{{ row.cloud_accounts }}</td>
