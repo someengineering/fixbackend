@@ -648,6 +648,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
             domain_event_subscriber,
             workspace_repo,
             gcp_account_repo,
+            active=False,
         ),
     )
 

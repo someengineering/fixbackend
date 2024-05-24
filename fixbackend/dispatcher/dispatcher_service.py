@@ -219,7 +219,9 @@ class DispatcherService(Service):
         domain_event_subscriber: DomainEventSubscriber,
         workspace_repository: WorkspaceRepository,
         gcp_serivice_account_key_repo: GcpServiceAccountKeyRepository,
+        active: bool = True,
     ) -> None:
+        self.active = active
         self.cloud_account_repo = cloud_account_repo
         self.gcp_service_account_key_repo = gcp_serivice_account_key_repo
         self.next_run_repo = next_run_repo
@@ -244,12 +246,14 @@ class DispatcherService(Service):
         domain_event_subscriber.subscribe(CloudAccountConfigured, self.process_aws_account_configured, "dispatcher")
 
     async def start(self) -> Any:
-        await self.collect_result_listener.start()
-        await self.periodic.start()
+        if self.active:
+            await self.collect_result_listener.start()
+            await self.periodic.start()
 
     async def stop(self) -> None:
-        await self.periodic.stop()
-        await self.collect_result_listener.stop()
+        if self.active:
+            await self.periodic.stop()
+            await self.collect_result_listener.stop()
 
     async def process_collect_done_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
