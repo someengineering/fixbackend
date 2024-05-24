@@ -64,7 +64,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import TaskId, WorkspaceId
 from fixbackend.ids import NodeId
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
@@ -716,3 +716,9 @@ class InventoryService(Service):
             result = {k["fqn"]: k for k in root_list}
             self.__cached_aggregate_roots = result
             return result
+
+    def logs(
+        self, db: GraphDatabaseAccess, task_id: TaskId
+    ) -> AsyncContextManager[AsyncIteratorWithContext[JsonElement]]:
+        cmd = f"workflows log {task_id} | dump"
+        return self.client.execute_single(db, cmd)

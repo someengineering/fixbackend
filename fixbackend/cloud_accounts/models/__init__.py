@@ -23,6 +23,7 @@ from fixbackend.ids import (
     ExternalId,
     FixCloudAccountId,
     GcpServiceAccountKeyId,
+    TaskId,
     WorkspaceId,
     AwsRoleName,
     CloudAccountName,
@@ -160,6 +161,7 @@ class CloudAccount:
     state_updated_at: datetime
     cf_stack_version: Optional[int]
     failed_scan_count: int
+    last_task_id: Optional[TaskId]
 
     def aws_access(self) -> Optional[AwsCloudAccess]:
         if isinstance(access := self.state.cloud_access(), AwsCloudAccess):

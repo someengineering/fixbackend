@@ -235,6 +235,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 stored_account.state_updated_at = cloud_account.state_updated_at
                 stored_account.cf_stack_version = cloud_account.cf_stack_version
                 stored_account.failed_scan_count = cloud_account.failed_scan_count
+                stored_account.last_task_id = cloud_account.last_task_id
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
                 await session.commit()

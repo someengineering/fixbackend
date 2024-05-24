@@ -849,6 +849,7 @@ async def fix_deps(
     password_helper: InsecureFastPasswordHelper,
     jwt_strategy: FixJWTStrategy,
     gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
+    inventory_service: InventoryService,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -870,6 +871,7 @@ async def fix_deps(
             ServiceNames.password_helper: password_helper,
             ServiceNames.jwt_strategy: jwt_strategy,
             ServiceNames.gcp_service_account_repo: gcp_service_account_key_repo,
+            ServiceNames.inventory: inventory_service,
         }
     )
 
