@@ -15,14 +15,16 @@
 from datetime import timedelta
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, AsyncIterator
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, status
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.router import CurrentGraphDbDependency
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
@@ -38,6 +40,7 @@ from fixbackend.cloud_accounts.schemas import (
 )
 from fixbackend.ids import FixCloudAccountId
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
+from fixbackend.streaming_response import StreamOnSuccessResponse, streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 
@@ -50,6 +53,9 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     gcp_service_account_repo = dependencies.service(
         ServiceNames.gcp_service_account_repo, GcpServiceAccountKeyRepository
     )
+
+    def inventory() -> InventoryService:
+        return dependencies.service(ServiceNames.inventory, InventoryService)
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}")
     async def get_cloud_account(
@@ -196,6 +202,31 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         if key is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_key_found")
         return GcpServiceAccountKeyRead.from_model(key)
+
+    @router.get("/{workspace_id}/cloud_account/{cloud_account_id}/logs", tags=["report"])
+    async def logs(
+        workspace: UserWorkspaceDependency,
+        cloud_account_id: FixCloudAccountId,
+        service: CloudAccountServiceDependency,
+        graph_db: CurrentGraphDbDependency,
+        request: Request,
+    ) -> StreamOnSuccessResponse:
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        cloud_account = await service.get_cloud_account(cloud_account_id, workspace.id)
+        if cloud_account is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="cloud_account_not_found")
+
+        task_id = cloud_account.last_task_id
+        if task_id is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_task_id")
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().logs(graph_db, task_id) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     return router
 

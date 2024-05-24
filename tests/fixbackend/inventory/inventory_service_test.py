@@ -42,6 +42,7 @@ from fixbackend.ids import (
     CloudNames,
     FixCloudAccountId,
     NodeId,
+    TaskId,
     WorkspaceId,
     UserCloudAccountName,
     CloudName,
@@ -75,6 +76,14 @@ neighborhood: List[Json] = [
     {"type": "edge", "from": "some_node_id", "to": "successor_id"},
 ]
 
+task_id = TaskId("d3c5c12d-c934-4cac-9c34-037f5cb7af4f")
+
+logs_json = [
+    "foo",
+    "bar",
+    "baz",
+]
+
 
 @pytest.fixture
 def mocked_answers(
@@ -104,6 +113,8 @@ def mocked_answers(
             )
         elif request.url.path == "/cli/execute" and content == "report benchmark load benchmark_name | dump":
             return nd_json_response(benchmark_json)
+        elif request.url.path == "/cli/execute" and content == f"workflows log {task_id} | dump":
+            return nd_json_response(logs_json)
         elif request.url.path == "/cli/execute" and "<-[0:2]->" in content:
             return nd_json_response(neighborhood)
         elif request.url.path == "/report/checks":
@@ -449,3 +460,10 @@ async def test_checks(
         checks = await inventory_service.checks(graph_db_access)
         assert len(checks) == 1
     assert len(inventory_requests) == 1  # only one request is made, 4 are served from cache
+
+
+@pytest.mark.asyncio
+async def test_logs_command(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
+    async with inventory_service.logs(db, TaskId(task_id)) as result:
+        response = [a async for a in result]
+        assert response == logs_json

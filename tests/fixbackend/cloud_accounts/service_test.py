@@ -456,6 +456,7 @@ async def test_store_last_run_info_on_error(
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
+    assert account.last_task_id
 
 
 @pytest.mark.asyncio
@@ -892,6 +893,7 @@ async def test_configure_account(
             state_updated_at=state_updated_at,
             cf_stack_version=0,
             failed_scan_count=0,
+            last_task_id=None,
         )
 
     # fresh account should be retried

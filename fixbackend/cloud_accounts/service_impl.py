@@ -359,12 +359,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     first_account_collect = any(account.last_scan_started_at is None for account in collected_accounts)
 
                     set_workspace_id(event.tenant_id)
-                    for account_id, account in event.cloud_accounts.items():
+                    for account_id, collect_info in event.cloud_accounts.items():
                         set_fix_cloud_account_id(account_id)
-                        set_cloud_account_id(account.account_id)
+                        set_cloud_account_id(collect_info.account_id)
 
                         def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if account.scanned_resources < 50:
+                            if collect_info.scanned_resources < 50:
                                 return acc.failed_scan_count + 1
                             else:
                                 return 0
@@ -373,11 +373,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             account_id,
                             lambda acc: evolve(
                                 acc,
-                                last_scan_duration_seconds=account.duration_seconds,
-                                last_scan_resources_scanned=account.scanned_resources,
-                                last_scan_started_at=account.started_at,
+                                last_scan_duration_seconds=collect_info.duration_seconds,
+                                last_scan_resources_scanned=collect_info.scanned_resources,
+                                last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
                                 failed_scan_count=compute_failed_scan_count(acc),
+                                last_task_id=collect_info.task_id,
                             ),
                         )
 
@@ -415,12 +416,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 case TenantAccountsCollectFailed.kind:
                     event = TenantAccountsCollected.from_json(message)
                     set_workspace_id(event.tenant_id)
-                    for account_id, account in event.cloud_accounts.items():
+                    for account_id, collect_info in event.cloud_accounts.items():
                         set_fix_cloud_account_id(account_id)
-                        set_cloud_account_id(account.account_id)
+                        set_cloud_account_id(collect_info.account_id)
 
                         def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if account.scanned_resources < 50:
+                            if collect_info.scanned_resources < 50:
                                 return acc.failed_scan_count + 1
                             else:
                                 return 0
@@ -429,11 +430,12 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                             account_id,
                             lambda acc: evolve(
                                 acc,
-                                last_scan_duration_seconds=account.duration_seconds,
-                                last_scan_resources_scanned=account.scanned_resources,
-                                last_scan_started_at=account.started_at,
+                                last_scan_duration_seconds=collect_info.duration_seconds,
+                                last_scan_resources_scanned=collect_info.scanned_resources,
+                                last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
                                 failed_scan_count=compute_failed_scan_count(acc),
+                                last_task_id=collect_info.task_id,
                             ),
                         )
 
@@ -764,6 +766,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 state_updated_at=created_at,
                 cf_stack_version=0,
                 failed_scan_count=0,
+                last_task_id=None,
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
@@ -826,6 +829,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             state_updated_at=created_at,
             cf_stack_version=0,
             failed_scan_count=0,
+            last_task_id=None,
         )
 
         result = await self.cloud_account_repository.create(account)
