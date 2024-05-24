@@ -10,6 +10,7 @@
                 <th>Cloud</th>
                 <th>Resources scanned</th>
                 <th>Collection Status</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -21,13 +22,12 @@
                 <td>{{ account.account_id }}</td>
                 <td>{{ account.final_name }}</td>
                 <td>{{ account.cloud }} </td>
-                <td>{{ row.cloud_accounts }}</td>
                 <td>{{ account.resources_scanned }}</td>
-                <td>Not collected</td>
+                <td></td>
                 <td>
                     <button class="btn btn-warning"
-                        hx-post="{{ url_for('workspace:trigger_single_account_collect', workspace_id=account.workspace_id, cloud_account_id=account.id) }}">Edit
-                        roles</button>
+                        hx-post="{{ url_for('workspace:trigger_single_account_collect', workspace_id=account.workspace_id, cloud_account_id=account.id) }}">Collect
+                        single account</button>
                 </td>
             </tr>
             {% endfor %}
