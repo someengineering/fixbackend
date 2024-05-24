@@ -331,7 +331,7 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
     assert data["last_scan_started_at"] == started_at.isoformat()
     assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
     assert data["cf_stack_version"] == 42
-    assert data['errors'] == 123
+    assert data["errors"] == 123
 
 
 @pytest.mark.asyncio
