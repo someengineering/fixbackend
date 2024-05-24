@@ -205,6 +205,7 @@ class StatusUpdateEmailCreator:
             "score.png": cast(bytes, score_image),
         }
         args = dict(
+            workspace_id=workspace.id,
             workspace_name=workspace.name,
             duration=duration_name,
             accounts=len(scatters.groups),  # type: ignore
