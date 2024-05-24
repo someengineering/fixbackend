@@ -626,30 +626,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(SN.jwt_strategy, FixJWTStrategy(cert_store, lifetime_seconds=cfg.session_ttl))
 
-    next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
-    metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
-    arq_redis = deps.add(SN.arq_redis, await create_pool(arq_settings))
-    collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
-    gcp_account_repo = deps.add(
-        SN.gcp_service_account_repo,
-        GcpServiceAccountKeyRepository(session_maker),
-    )
-    deps.add(
-        SN.dispatching,
-        DispatcherService(
-            readwrite_redis,
-            cloud_account_repo,
-            next_run_repo,
-            metering_repo,
-            collect_queue,
-            graph_db_access,
-            domain_event_publisher,
-            temp_store_redis,
-            domain_event_subscriber,
-            workspace_repo,
-            gcp_account_repo,
-        ),
-    )
+    deps.add(SN.next_run_repo, NextRunRepository(session_maker))
 
     return deps
 

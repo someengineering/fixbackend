@@ -22,7 +22,6 @@ from fixcloudutils.util import utc
 
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.dependencies import FixDependencies, ServiceNames
-from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
@@ -34,7 +33,6 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
 
     workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
     cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
-    dispatcher_service = dependencies.service(ServiceNames.dispatching, DispatcherService)
     next_run_repo = dependencies.service(ServiceNames.next_run_repo, NextRunRepository)
 
     @router.get("/{workspace_id}", response_class=HTMLResponse, name="workspace:get")
@@ -78,8 +76,6 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
         cloud_account = await cloud_accont_repo.get(cloud_account_id)
         if not cloud_account:
             raise HTTPException(status_code=404, detail="Cloud account not found")
-
-        await dispatcher_service.trigger_collect(cloud_account)
 
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
