@@ -12,29 +12,19 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from datetime import timedelta
-from typing import Annotated, Any, Dict, Optional, Sequence
-import uuid
-from fastapi import APIRouter, Form, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse
-from fixbackend.auth.models import User
-from fixbackend.auth.schemas import UserUpdate
-from fixbackend.auth.user_manager import UserManager
-from fixbackend.auth.user_repository import UserRepository
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.dependencies import FixDependencies, ServiceNames
-from fastapi.templating import Jinja2Templates
-from fixbackend.dispatcher.dispatcher_service import DispatcherService
-from fixbackend.dispatcher.next_run_repository import NextRunRepository
-from fixbackend.permissions.role_repository import RoleRepositoryImpl
-from fixbackend.workspaces.models import Workspace
+from typing import Any, Dict
 
-from fixbackend.ids import FixCloudAccountId, UserId, WorkspaceId
-from fixbackend.permissions.models import Roles
-from attrs import frozen
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from fixcloudutils.util import utc
 
+from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
+from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.dispatcher.dispatcher_service import DispatcherService
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
 
