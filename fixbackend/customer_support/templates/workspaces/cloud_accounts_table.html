@@ -1,7 +1,5 @@
 <div class="overflow-x-auto">
-    <table id="cloud-accounts-table" class="table" hx-trigger="tableRefresh from:body"
-        hx-get="{{ url_for('workspace:cloud_account_table', user_id=user.id)}}" hx-swap="outerHTML"
-        hx-target="closest .overflow-x-auto">
+    <table id="cloud-accounts-table" class="table">
         <thead>
             <tr>
                 <th>Fix Id</th>
