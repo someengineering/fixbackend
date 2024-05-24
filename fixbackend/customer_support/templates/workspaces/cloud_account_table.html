@@ -1,0 +1,36 @@
+<div class="overflow-x-auto">
+    <table id="cloud-accounts-table" class="table" hx-trigger="tableRefresh from:body"
+        hx-get="{{ url_for('workspace:cloud_account_table', user_id=user.id)}}" hx-swap="outerHTML"
+        hx-target="closest .overflow-x-auto">
+        <thead>
+            <tr>
+                <th>Fix Id</th>
+                <th>Account Id</th>
+                <th>Name</th>
+                <th>Cloud</th>
+                <th>Resources scanned</th>
+                <th>Collection Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for account in cloud_accounts %}
+            <tr>
+                <td>
+                    {{ account.id }}
+                </td>
+                <td>{{ account.account_id }}</td>
+                <td>{{ account.final_name }}</td>
+                <td>{{ account.cloud }} </td>
+                <td>{{ account.resources_scanned }}</td>
+                <td></td>
+                <td>
+                    <button class="btn btn-warning"
+                        hx-post="{{ url_for('workspace:trigger_single_account_collect', workspace_id=account.workspace_id, cloud_account_id=account.id) }}">Collect
+                        single account</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

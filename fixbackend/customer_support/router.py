@@ -21,6 +21,7 @@ from fastapi.routing import APIRoute
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.auth.models import User
+from fixbackend.customer_support.workspaces_router import workspaces_router
 from fixbackend.customer_support.users_router import users_router
 from fixbackend.customer_support.login_router import auth_router
 from fixbackend.dependencies import FixDependencies
@@ -76,6 +77,7 @@ def admin_console_router(dependencies: FixDependencies, google_client: GoogleOAu
         return RedirectResponse(url="/users", status_code=307)
 
     protected_router.include_router(users_router(dependencies, templates), prefix="/users")
+    protected_router.include_router(workspaces_router(dependencies, templates), prefix="/workspaces")
 
     root.include_router(protected_router)
 
