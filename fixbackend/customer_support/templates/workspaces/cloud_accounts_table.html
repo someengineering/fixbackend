@@ -18,9 +18,9 @@
                     {{ account.id }}
                 </td>
                 <td>{{ account.account_id }}</td>
-                <td>{{ account.final_name }}</td>
+                <td>{{ account.final_name() }}</td>
                 <td>{{ account.cloud }} </td>
-                <td>{{ account.resources_scanned }}</td>
+                <td>{{ account.last_scan_resources_scanned }}</td>
                 <td></td>
                 <td>
                     <button class="btn btn-warning"
