@@ -20,10 +20,10 @@ from fixcloudutils.util import utc
 from fixbackend.domain_events.events import (
     DegradationReason,
     UserRegistered,
-    AwsAccountDiscovered,
+    CloudAccountDiscovered,
     CloudAccountConfigured,
     CloudAccountDeleted,
-    AwsAccountDegraded,
+    CloudAccountDegraded,
     TenantAccountsCollected,
     CloudAccountCollectInfo,
     WorkspaceCreated,
@@ -41,8 +41,8 @@ task_id = TaskId("task_123")
 collect_info = CloudAccountCollectInfo(cloud_account_id, 123, 123, now, task_id)
 events = [
     UserRegistered(user_id=user_id, email="test@example.com", tenant_id=workspace_id),
-    AwsAccountDiscovered(
-        cloud_account_id=fix_cloud_account_id, tenant_id=workspace_id, aws_account_id=cloud_account_id
+    CloudAccountDiscovered(
+        cloud=CloudNames.AWS, cloud_account_id=fix_cloud_account_id, tenant_id=workspace_id, account_id=cloud_account_id
     ),
     CloudAccountConfigured(
         cloud=CloudNames.AWS,
@@ -57,11 +57,12 @@ events = [
         tenant_id=workspace_id,
         account_id=cloud_account_id,
     ),
-    AwsAccountDegraded(
+    CloudAccountDegraded(
+        cloud=CloudNames.AWS,
         cloud_account_id=fix_cloud_account_id,
         tenant_id=workspace_id,
-        aws_account_id=cloud_account_id,
-        aws_account_name="aws final name",
+        account_id=cloud_account_id,
+        account_name="aws final name",
         error="some error",
         reason=DegradationReason.other,
     ),
@@ -79,7 +80,7 @@ event_jsons: Dict[Type[Event], Json] = {
         "email": "test@example.com",
         "tenant_id": "35dfca88-3028-4990-9d30-a269228d0b01",
     },
-    AwsAccountDiscovered: {
+    CloudAccountDiscovered: {
         "cloud_account_id": "69dea3e9-bafe-4e80-9c9d-5a7e1b519767",
         "tenant_id": "35dfca88-3028-4990-9d30-a269228d0b01",
         "aws_account_id": "123",
@@ -96,7 +97,7 @@ event_jsons: Dict[Type[Event], Json] = {
         "tenant_id": "35dfca88-3028-4990-9d30-a269228d0b01",
         "account_id": "123",
     },
-    AwsAccountDegraded: {
+    CloudAccountDegraded: {
         "cloud_account_id": "69dea3e9-bafe-4e80-9c9d-5a7e1b519767",
         "tenant_id": "35dfca88-3028-4990-9d30-a269228d0b01",
         "aws_account_id": "123",

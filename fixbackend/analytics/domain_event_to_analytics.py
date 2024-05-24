@@ -43,10 +43,10 @@ from fixbackend.analytics.events import (
 from fixbackend.config import Config
 from fixbackend.domain_events.events import (
     UserRegistered,
-    AwsAccountDiscovered,
+    CloudAccountDiscovered,
     CloudAccountConfigured,
     CloudAccountDeleted,
-    AwsAccountDegraded,
+    CloudAccountDegraded,
     CloudAccountNameChanged,
     WorkspaceCreated,
     InvitationAccepted,
@@ -69,10 +69,10 @@ class DomainEventToAnalyticsEventHandler:
     def __init__(self, domain_event_subscriber: DomainEventSubscriber, sender: AnalyticsEventSender) -> None:
         self.sender = sender
         domain_event_subscriber.subscribe(UserRegistered, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsAccountDiscovered, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(CloudAccountDiscovered, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(CloudAccountConfigured, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(CloudAccountDeleted, self.handle, "domain_event_to_analytics")
-        domain_event_subscriber.subscribe(AwsAccountDegraded, self.handle, "domain_event_to_analytics")
+        domain_event_subscriber.subscribe(CloudAccountDegraded, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(CloudAccountNameChanged, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(WorkspaceCreated, self.handle, "domain_event_to_analytics")
         domain_event_subscriber.subscribe(InvitationAccepted, self.handle, "domain_event_to_analytics")
@@ -88,17 +88,17 @@ class DomainEventToAnalyticsEventHandler:
         match event:
             case UserRegistered() as e:
                 await self.sender.send(AEUserRegistered(e.id, e.created_at, e.user_id, e.tenant_id, e.email))
-            case AwsAccountDiscovered() as e:
+            case CloudAccountDiscovered() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
-                await self.sender.send(AEAccountDiscovered(e.id, e.created_at, user_id, e.tenant_id, "aws"))
+                await self.sender.send(AEAccountDiscovered(e.id, e.created_at, user_id, e.tenant_id, e.cloud))
             case CloudAccountConfigured() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(AEAccountConfigured(e.id, e.created_at, user_id, e.tenant_id, e.cloud))
             case CloudAccountDeleted() as e:
                 await self.sender.send(AEAccountDeleted(e.id, e.created_at, e.user_id, e.tenant_id, e.cloud))
-            case AwsAccountDegraded() as e:
+            case CloudAccountDegraded() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
-                await self.sender.send(AEAccountDegraded(e.id, e.created_at, user_id, e.tenant_id, "aws", e.error))
+                await self.sender.send(AEAccountDegraded(e.id, e.created_at, user_id, e.tenant_id, e.cloud, e.error))
             case CloudAccountNameChanged() as e:
                 user_id = await self.sender.user_id_from_workspace(e.tenant_id)
                 await self.sender.send(AEAccountNameChanged(e.id, e.created_at, user_id, e.tenant_id, e.cloud))

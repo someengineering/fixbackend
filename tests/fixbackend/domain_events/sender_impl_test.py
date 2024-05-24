@@ -17,10 +17,10 @@ from typing import Optional, Tuple
 import uuid
 import pytest
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
-from fixbackend.domain_events.events import AwsAccountDiscovered
+from fixbackend.domain_events.events import CloudAccountDiscovered
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.types import Json
-from fixbackend.ids import FixCloudAccountId, WorkspaceId, CloudAccountId
+from fixbackend.ids import CloudNames, FixCloudAccountId, WorkspaceId, CloudAccountId
 
 
 class RedisStreamPublisherMock(RedisStreamPublisher):
@@ -35,10 +35,11 @@ class RedisStreamPublisherMock(RedisStreamPublisher):
 async def test_publish_event() -> None:
     stream_publisher = RedisStreamPublisherMock()
     sender = DomainEventPublisherImpl(stream_publisher)
-    event = AwsAccountDiscovered(
+    event = CloudAccountDiscovered(
+        cloud=CloudNames.AWS,
         cloud_account_id=FixCloudAccountId(uuid.uuid4()),
         tenant_id=WorkspaceId(uuid.uuid4()),
-        aws_account_id=CloudAccountId("123456789012"),
+        account_id=CloudAccountId("123456789012"),
     )
     await sender.publish(event)
 
