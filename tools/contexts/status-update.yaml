@@ -1,0 +1,16 @@
+user_id: "test@example.com"
+workspace_id: "381cf723-65cb-469e-8d63-95d7c5249a8c"
+workspace_name: "Example Workspace"
+duration: "weekly"
+accounts: 5
+account_timeline_image: "timeline.png"
+score_progress: [85, 2]
+score_image: "score.png"
+instances_progress: [10, -2]
+cores_progress: [40, 5]
+memory_progress: [25600000000, 1024000000]
+volumes_progress: [8, 1]
+volume_bytes_progress: [204800000000, 10240000000]
+databases_progress: [3, 0]
+databases_bytes_progress: [102400000000, 2048000000]
+resource_changes: [2345, 321, 123]
