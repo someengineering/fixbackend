@@ -95,5 +95,6 @@ def batch(items: Iterable[AnyT], n: int = 50) -> Iterator[List[AnyT]]:
 
 
 def fassert(condition: Any, message: Any = "") -> None:
+    assert condition, message
     if not condition:
         raise AssertionError(message)
