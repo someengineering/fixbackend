@@ -30,7 +30,7 @@ from fixbackend.base_model import Base
 from fixbackend.cloud_accounts.models.orm import CloudAccount
 from fixbackend.config import Config
 from fixbackend.ids import WorkspaceId, ProductTier
-from fixbackend.inventory.inventory_client import NoSuchGraph
+from fixbackend.inventory.inventory_client import NoSuchGraph, GraphDatabaseNotAvailable
 from fixbackend.notification.email import email_messages
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
@@ -149,6 +149,8 @@ class ScheduledEmailSender(Service):
                             session.add(ScheduledEmailSentEntity(id=uid(), user_id=user.id, kind=unique_id, at=now))
                             users_already_marked.add(user.id)
                         counter += 1
+                    except GraphDatabaseNotAvailable:
+                        pass  # ignore workspaces without graphs
                     except NoSuchGraph:
                         pass  # ignore workspaces without graphs
                     except Exception:
