@@ -30,7 +30,7 @@ from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import SubscriptionMethod, AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeService
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
-from fixbackend.utils import kill_running_process, uid
+from fixbackend.utils import kill_running_process, uid, fassert
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
@@ -121,9 +121,10 @@ class BillingJob(Service):
             async for subscription in self.subscription_repository.subscriptions(
                 active=True, is_aws_marketplace_subscription=True, next_charge_timestamp_after=now
             ):
-                assert isinstance(
-                    subscription, AwsMarketplaceSubscription
-                ), f"Expected AwsMarketplaceSubscription, but got {subscription}"
+                fassert(
+                    isinstance(subscription, AwsMarketplaceSubscription),
+                    f"Expected AwsMarketplaceSubscription, but got {subscription}",
+                )
                 for workspace in await self.workspace_repository.list_workspaces_by_subscription_id(subscription.id):
                     # create a dummy billing entry with no usage
                     entry = BillingEntry(
@@ -144,7 +145,7 @@ class BillingJob(Service):
                 yield chunk
 
         async def report_usages(chunk: List[Tuple[AwsMarketplaceSubscription, BillingEntry]]) -> None:
-            assert 0 < len(chunk) <= 25, f"Chunk size must be between 1 and 25, but got {len(chunk)}"
+            fassert(0 < len(chunk) <= 25, f"Chunk size must be between 1 and 25, but got {len(chunk)}")
             product_code = chunk[0][0].product_code  # all subscriptions in a chunk have the same product code
             async with semaphore:
                 try:

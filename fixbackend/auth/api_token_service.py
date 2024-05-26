@@ -38,7 +38,7 @@ from fixbackend.errors import NotAllowed
 from fixbackend.ids import WorkspaceId
 from fixbackend.permissions.models import all_permissions
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import uid
+from fixbackend.utils import uid, fassert
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 
@@ -63,7 +63,7 @@ class ApiTokenService(Service):
     async def login(self, api_token: str) -> str:
         tkn = await self._get_user_token(api_token, update_last_used=True)
         user = await self.user_repo.get(tkn.user_id)
-        assert user, "User not found"
+        fassert(user, "User not found")
         permission = tkn.permission or all_permissions
         workspace = tkn.workspace_id
         permissions = {
@@ -81,7 +81,7 @@ class ApiTokenService(Service):
             token_hash = self.password_helper.hash(token)
             if workspace_id:
                 ids = {ws.id for ws in await self.workspace_repo.list_workspaces(user)}
-                assert workspace_id in ids, "User is not a member of the workspace"
+                fassert(workspace_id in ids, "User is not a member of the workspace")
             async with self.session_maker() as session:
                 now = utc()
                 entity = ApiTokenEntity(

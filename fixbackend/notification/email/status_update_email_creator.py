@@ -25,6 +25,8 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.schemas import Scatters
 from fixbackend.notification.email.email_messages import render
 from fixbackend.workspaces.models import Workspace
+from fixbackend.utils import fassert
+
 
 color_codes = [
     "#B7B8D3",  # Light Periwinkle
@@ -114,7 +116,7 @@ class StatusUpdateEmailCreator:
         self, workspace: Workspace, now: datetime, duration: timedelta
     ) -> Tuple[Dict[str, Any], Dict[str, bytes]]:
         dba = await self.db_access.get_database_access(workspace.id)
-        assert dba is not None, f"No database access for workspace: {workspace.id}"
+        fassert(dba is not None, f"No database access for workspace: {workspace.id}")
         duration_name = "month" if duration.days > 27 else "week"
         start = now - duration
 

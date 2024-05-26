@@ -51,6 +51,8 @@ from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
 from fixbackend.inventory.schemas import CompletePathRequest, HistoryChange
+from fixbackend.utils import fassert
+
 
 T = TypeVar("T")
 ContextHeaders = {"Total-Count", "Result-Count"}
@@ -124,7 +126,7 @@ class InventoryClient(Service):
         if expected_media_types is not None and not response.is_error:
             media_type, *params = response.headers.get("content-type", "").split(";")
             emt = {expected_media_types} if isinstance(expected_media_types, str) else expected_media_types
-            assert media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}"
+            fassert(media_type in emt, f"Expected content type {expected_media_types}, but got {media_type}")
 
     async def _request(
         self,

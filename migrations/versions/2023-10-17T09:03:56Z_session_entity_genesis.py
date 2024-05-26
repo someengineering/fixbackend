@@ -5,6 +5,7 @@ Revises: 9b482c179740
 Create Date: 2023-10-17 09:03:56.141766+00:00
 
 """
+
 from typing import Sequence, Union
 
 import fastapi_users_db_sqlalchemy

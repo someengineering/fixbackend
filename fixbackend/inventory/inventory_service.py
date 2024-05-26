@@ -64,8 +64,8 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import TaskId, WorkspaceId
-from fixbackend.ids import NodeId
+from fixbackend.ids import TaskId, WorkspaceId, NodeId
+from fixbackend.utils import fassert
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
     AsyncIteratorWithContext,
@@ -428,7 +428,7 @@ class InventoryService(Service):
                     ": sum(1) as count | dump",
                 ) as result:
                     async for elem in result:
-                        assert isinstance(elem, dict), f"Expected Json object but got {elem}"
+                        fassert(isinstance(elem, dict), f"Expected Json object but got {elem}")
                         severity = elem["group"]["severity"]
                         if severity is None:  # safeguard for history entries in old format
                             continue

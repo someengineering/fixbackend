@@ -37,7 +37,7 @@ from fixbackend.notification.email.status_update_email_creator import StatusUpda
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsEntity
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import uid
+from fixbackend.utils import uid, fassert
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.models.orm import Organization, OrganizationMembers
 
@@ -129,7 +129,7 @@ class ScheduledEmailSender(Service):
                     try:
                         if last_workspace != workspace:
                             send_fn = await self.status_update_creator.create_messages_fn(workspace, now, duration)
-                        assert send_fn is not None, "Send function not set for workspace"
+                        fassert(send_fn is not None, "Send function not set for workspace")
                         subject, html, txt, images = send_fn(user)
                         await self.email_sender.send_email(
                             to=user.email,

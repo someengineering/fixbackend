@@ -92,3 +92,8 @@ def batch(items: Iterable[AnyT], n: int = 50) -> Iterator[List[AnyT]]:
     it = iter(items)
     while chunk := list(islice(it, n)):
         yield chunk
+
+
+def fassert(condition: Any, message: Any = "") -> None:
+    if not condition:
+        raise AssertionError(message)

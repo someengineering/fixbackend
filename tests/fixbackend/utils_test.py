@@ -27,10 +27,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import pytest
 from datetime import datetime, timezone
 
 
-from fixbackend.utils import start_of_next_month, batch
+from fixbackend.utils import start_of_next_month, batch, fassert
 
 
 def test_start_of_next_month() -> None:
@@ -52,3 +53,21 @@ def test_batch() -> None:
     check_size(100, 1)
     check_size(1, 100)
     check_size(5, 20)
+
+
+def test_fassert():
+    fassert(1 == 1, "This should not fail")
+
+    with pytest.raises(AssertionError, match="This should fail"):
+        fassert(1 == 2, "This should fail")
+
+    fassert(2 > 1)
+
+    with pytest.raises(AssertionError):
+        fassert(1 > 2)
+
+    with pytest.raises(AssertionError, match="Condition is false"):
+        fassert(None, "Condition is false")
+
+    with pytest.raises(AssertionError, match="List is empty"):
+        fassert([], "List is empty")

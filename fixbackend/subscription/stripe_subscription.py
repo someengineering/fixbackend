@@ -52,7 +52,7 @@ from fixbackend.ids import (
 from fixbackend.subscription.models import StripeSubscription
 from fixbackend.subscription.subscription_repository import StripeCustomerRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
-from fixbackend.utils import start_of_next_period, uid
+from fixbackend.utils import start_of_next_period, uid, fassert
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -132,7 +132,7 @@ class StripeClient:  # pragma: no cover
 
     async def checkout_session(self, **params: Unpack[stripe.checkout.Session.CreateParams]) -> str:
         session = await stripe.checkout.Session.create_async(**params)
-        assert session.url is not None, "No session URL?"
+        fassert(session.url is not None, "No session URL?")
         return session.url
 
     async def billing_portal_session(self, **params: Unpack[stripe.billing_portal.Session.CreateParams]) -> str:
@@ -377,7 +377,7 @@ class StripeServiceImpl(StripeService):
         customer_id = await self.stripe_customer_repo.get(workspace.id)
         if customer_id is None:
             owner = await self.user_repo.get(workspace.owner_id)
-            assert owner is not None, f"Workspace {workspace.id} does not have an owner?"
+            fassert(owner is not None, f"Workspace {workspace.id} does not have an owner?")
             customer_id = await self.client.create_customer(workspace.id, email=owner.email)
             await self.stripe_customer_repo.create(workspace.id, customer_id)
         return customer_id

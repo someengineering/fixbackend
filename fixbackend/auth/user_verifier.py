@@ -20,6 +20,7 @@ from fastapi.datastructures import URL
 
 from fixbackend.auth.models import User
 from fixbackend.config import Config
+from fixbackend.utils import fassert
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.notification.email.email_messages import PasswordReset, VerifyEmail
 from fixbackend.notification.notification_service import NotificationService
@@ -51,7 +52,7 @@ class AuthEmailSender:
         log.info(f"Sent account verification email to {user.email}")
 
     async def send_password_reset(self, user: User, token: str, request: Optional[Request]) -> None:
-        assert request
+        fassert(request, "Request is required to send password reset email")
 
         redirect_url = request.query_params.get("redirectUrl", "/")
         reset_link = request.base_url

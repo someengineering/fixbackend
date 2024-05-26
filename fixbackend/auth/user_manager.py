@@ -39,6 +39,8 @@ from fixbackend.ids import UserId
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.utils import fassert
+
 
 # do not change this without regenerating MFA recovery codes in the db
 crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -251,7 +253,7 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def recreate_mfa(self, user: User) -> OTPConfig:
         log.info(f"Recreate MFA for user {user.email}")
-        assert not user.is_mfa_active, "User already has MFA enabled."
+        fassert(not user.is_mfa_active, "User already has MFA enabled.")
         user_secret = pyotp.random_base32()
         # create recovery codes
         recovery_codes, hashes = await self.compute_recovery_codes()
@@ -261,7 +263,7 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def enable_mfa(self, user: User, otp: str) -> bool:
         log.info(f"Enable MFA for user {user.email}")
-        assert not user.is_mfa_active, "User already has MFA enabled."
+        fassert(not user.is_mfa_active, "User already has MFA enabled.")
         if (secret := user.otp_secret) and not pyotp.TOTP(secret).verify(otp, valid_window=self.otp_valid_window):
             return False
         await self.user_repository.update(user, {"is_mfa_active": True})

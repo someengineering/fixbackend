@@ -84,7 +84,7 @@ from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_accou
 from fixbackend.notification.email import email_messages as email
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
-from fixbackend.utils import uid
+from fixbackend.utils import uid, fassert
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -265,8 +265,8 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                 external_id = ExternalId(uuid.UUID(resource_properties["ExternalId"]))
                 role_name = AwsRoleName(resource_properties["RoleName"])
                 stack_id = resource_properties["StackId"]
-                assert stack_id.startswith("arn:aws:cloudformation:")
-                assert stack_id.count(":") == 5
+                fassert(stack_id.startswith("arn:aws:cloudformation:"), "Invalid stack id")
+                fassert(stack_id.count(":") == 5, "Invalid stack id")
                 account_id = CloudAccountId(stack_id.split(":")[4])
             except Exception as e:  # pragma: no cover
                 log.warning(f"Received invalid CF stack create event: {msg}. Error: {e}")

@@ -32,6 +32,7 @@ from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandlerDependency
 from fixbackend.subscription.stripe_subscription import StripeServiceDependency
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from fixbackend.utils import fassert
 
 AddUrlName = "aws-marketplace-subscription-add"
 BackFromStripe = "back-from-stripe"
@@ -104,7 +105,7 @@ def subscription_router() -> APIRouter:
     @router.post("/subscriptions/stripe/events", include_in_schema=False)
     async def stripe_callback(request: Request, stripe_service: StripeServiceDependency) -> Response:
         signature = request.headers.get("Stripe-Signature")
-        assert signature is not None, "No Stripe-Signature header found"
+        fassert(signature is not None, "No Stripe-Signature header found")
         js_bytes = await request.body()
         try:
             await stripe_service.handle_event(js_bytes.decode("utf-8"), signature)

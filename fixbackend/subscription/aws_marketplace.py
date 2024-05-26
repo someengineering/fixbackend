@@ -48,7 +48,7 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import (
     SubscriptionRepository,
 )
-from fixbackend.utils import start_of_next_period
+from fixbackend.utils import start_of_next_period, fassert
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
@@ -183,7 +183,7 @@ class AwsMarketplaceHandler(Service):
 
     async def subscription_canceled(self, customer_id: str) -> None:
         async for subscription in self.subscription_repo.subscriptions(aws_customer_identifier=customer_id):
-            assert isinstance(subscription, AwsMarketplaceSubscription), "Subscription is not from AWS Marketplace"
+            fassert(isinstance(subscription, AwsMarketplaceSubscription), "Subscription is not from AWS Marketplace")
             await self.domain_event_sender.publish(SubscriptionCancelled(subscription.id, "aws_marketplace"))
             if billing := await self.billing_entry_service.create_billing_entry(subscription):
                 await self.report_usage(subscription.product_code, [(subscription, billing)])

@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPubl
 from cryptography.x509 import Certificate
 
 from fixbackend.config import Config
+from fixbackend.utils import fassert
 
 
 @frozen
@@ -94,8 +95,8 @@ class CertificateStore:
         self.signing_key_2_path = config.signing_key_2
 
     async def get_host_cert_key_pair(self) -> CertKeyPair:
-        assert self.host_cert_path is not None
-        assert self.host_key_path is not None
+        fassert(self.host_cert_path is not None, "Host cert path not set")
+        fassert(self.host_key_path is not None, "Host key path not set")
         return await load_cert_key_pair(self.host_cert_path, self.host_key_path)
 
     async def _get_signing_cert_key_pair(self) -> List[CertKeyPair]:
