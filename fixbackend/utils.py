@@ -34,7 +34,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from itertools import islice
-from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any, Iterator
+from typing import Optional, Callable, TypeVar, Iterable, Dict, List, Any, Iterator, TypeGuard
 from uuid import UUID
 
 from fixcloudutils.util import utc
@@ -94,7 +94,7 @@ def batch(items: Iterable[AnyT], n: int = 50) -> Iterator[List[AnyT]]:
         yield chunk
 
 
-def fassert(condition: Any, message: Any = "") -> None:
-    assert condition, message
+def fassert(condition: Any, message: Any = "") -> TypeGuard[bool]:
     if not condition:
         raise AssertionError(message)
+    return True
