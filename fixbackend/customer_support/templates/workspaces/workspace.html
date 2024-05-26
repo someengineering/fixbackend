@@ -1,0 +1,26 @@
+{% if not partial %}
+{% extends "navbar.html" %}
+{% endif %}
+
+
+{% block content %}
+
+<div class="flex flex-col gap-4 mt-8 mr-4">
+    <h1 class="text-2xl mb-4">{{ workspace.name}}</h1>
+    <div class="flex flex-col w-full gap-4">
+        <p>Workspace id: {{workspace.id}}</p>
+        <p>Created at: {{workspace.created_at}}</p>
+        <p id="next-run">Next run: {{next_run}} </p>
+        <div class="flex gap-4">
+            <button class="btn btn-neutral"
+                hx-delete="{{ url_for('workspace:reset_next_run', workspace_id=workspace.id) }}"
+                hx-target="#next-run">Reset next run</button>
+        </div>
+    </div>
+</div>
+
+<div class="divider"></div>
+
+{% include "workspaces/cloud_accounts_table.html" %}
+
+{% endblock %}

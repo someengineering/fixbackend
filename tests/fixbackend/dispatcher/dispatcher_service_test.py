@@ -90,6 +90,7 @@ async def test_receive_workspace_created(
             state_updated_at=utc(),
             cf_stack_version=0,
             failed_scan_count=0,
+            last_task_id=None,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -136,6 +137,7 @@ async def test_receive_aws_account_configured(
         state_updated_at=utc(),
         cf_stack_version=0,
         failed_scan_count=0,
+        last_task_id=None,
     )
     await cloud_account_repository.create(account)
 

@@ -76,6 +76,7 @@ class CloudAccountRead(BaseModel):
     last_scan_started_at: Optional[datetime] = Field(description="The time when the last scan started")
     last_scan_finished_at: Optional[datetime] = Field(description="The time when the last scan finished")
     cf_stack_version: Optional[int] = Field(description="The version of the corresponting CF stack")
+    errors: Optional[int] = Field(description="Number of errors during the last scan")
 
     @staticmethod
     def from_model(model: CloudAccount) -> "CloudAccountRead":
@@ -109,6 +110,7 @@ class CloudAccountRead(BaseModel):
             last_scan_started_at=model.last_scan_started_at,
             last_scan_finished_at=last_scan_finished,
             cf_stack_version=model.cf_stack_version,
+            errors=model.failed_scan_count,
         )
 
 

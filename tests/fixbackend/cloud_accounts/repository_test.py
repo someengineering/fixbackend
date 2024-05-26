@@ -96,6 +96,7 @@ async def test_create_aws_cloud_account(
             state_updated_at=utc().replace(microsecond=0),
             cf_stack_version=0,
             failed_scan_count=configured_count * 42,  # only the last one has failed scans
+            last_task_id=None,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -231,6 +232,7 @@ async def test_create_gcp_cloud_account(
         state_updated_at=utc().replace(microsecond=0),
         cf_stack_version=0,
         failed_scan_count=0,  # only the last one has failed scans
+        last_task_id=None,
     )
 
     # create

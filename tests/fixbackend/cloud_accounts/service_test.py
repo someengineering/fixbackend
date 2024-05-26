@@ -41,8 +41,8 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.config import Config, ProductTierSettings
 from fixbackend.domain_events.events import (
     CloudAccountConfigured,
-    AwsAccountDegraded,
-    AwsAccountDiscovered,
+    CloudAccountDegraded,
+    CloudAccountDiscovered,
     CloudAccountCollectInfo,
     CloudAccountNameChanged,
     DegradationReason,
@@ -219,9 +219,9 @@ async def test_create_aws_account(
 
     assert len(domain_sender.events) == 1
     event = domain_sender.events[0]
-    assert isinstance(event, AwsAccountDiscovered)
+    assert isinstance(event, CloudAccountDiscovered)
     assert event.cloud_account_id == acc.id
-    assert event.aws_account_id == account_id
+    assert event.account_id == account_id
     assert event.tenant_id == acc.workspace_id
 
     # reaching the account limit of the free tier, expext a Discovered account with enabled=False
@@ -456,6 +456,7 @@ async def test_store_last_run_info_on_error(
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
+    assert account.last_task_id
 
 
 @pytest.mark.asyncio
@@ -578,15 +579,15 @@ async def test_handle_account_discovered_success(
 
     assert len(domain_sender.events) == 1
     event = domain_sender.events[0]
-    assert isinstance(event, AwsAccountDiscovered)
+    assert isinstance(event, CloudAccountDiscovered)
 
     # happy case, boto3 can assume role
     await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
 
     assert pubsub_publisher.last_message is not None
-    assert pubsub_publisher.last_message[0] == "aws_account_discovered"
+    assert pubsub_publisher.last_message[0] == "cloud_account_discovered"
     assert pubsub_publisher.last_message[1]["cloud_account_id"] == str(account.id)
-    assert pubsub_publisher.last_message[1]["aws_account_id"] == account_id
+    assert pubsub_publisher.last_message[1]["account_id"] == account_id
     assert pubsub_publisher.last_message[2] == f"tenant-events::{workspace.id}"
 
     assert len(domain_sender.events) == 2
@@ -892,6 +893,7 @@ async def test_configure_account(
             state_updated_at=state_updated_at,
             cf_stack_version=0,
             failed_scan_count=0,
+            last_task_id=None,
         )
 
     # fresh account should be retried
@@ -945,11 +947,11 @@ async def test_configure_account(
 
     assert len(domain_sender.events) == 1
     event = domain_sender.events[0]
-    assert isinstance(event, AwsAccountDegraded)
+    assert isinstance(event, CloudAccountDegraded)
     assert event.cloud_account_id == account.id
-    assert event.aws_account_id == account_id
+    assert event.account_id == account_id
     assert event.tenant_id == account.workspace_id
-    assert event.aws_account_name == account.final_name()
+    assert event.account_name == account.final_name()
 
 
 @pytest.mark.asyncio
@@ -1054,12 +1056,12 @@ async def test_move_to_degraded(
 
     assert len(domain_sender.events) == 2
     published_event = domain_sender.events[1]
-    assert isinstance(published_event, AwsAccountDegraded)
+    assert isinstance(published_event, CloudAccountDegraded)
     assert published_event.cloud_account_id == account.id
-    assert published_event.aws_account_id == account_id
+    assert published_event.account_id == account_id
     assert published_event.tenant_id == account.workspace_id
     assert published_event.error == "Too many consecutive failed scans"
-    assert published_event.aws_account_name == account.final_name()
+    assert published_event.account_name == account.final_name()
 
 
 @pytest.mark.asyncio
@@ -1075,9 +1077,10 @@ async def test_handle_events(
     await next_run_repository.create(workspace.id, utc())
 
     for event in [
-        AwsAccountDiscovered(
+        CloudAccountDiscovered(
+            cloud=CloudNames.AWS,
             cloud_account_id=FixCloudAccountId(uuid.uuid4()),
-            aws_account_id=CloudAccountId("foobar"),
+            account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
         ),
         CloudAccountConfigured(
@@ -1086,11 +1089,12 @@ async def test_handle_events(
             account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
         ),
-        AwsAccountDegraded(
+        CloudAccountDegraded(
+            cloud=CloudNames.AWS,
             cloud_account_id=FixCloudAccountId(uuid.uuid4()),
-            aws_account_id=CloudAccountId("foobar"),
+            account_id=CloudAccountId("foobar"),
             tenant_id=workspace.id,
-            aws_account_name="test",
+            account_name="test",
             error="test",
             reason=DegradationReason.stack_deleted,
         ),

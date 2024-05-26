@@ -81,22 +81,23 @@ class UserLoggedIn(Event):
 
 
 @frozen
-class AwsAccountDiscovered(Event):
+class CloudAccountDiscovered(Event):
     """
-    This event is emitted when the cloud account callback is hit.
+    This event is emitted when a cloud account callback is hit.
     """
 
-    kind: ClassVar[str] = "aws_account_discovered"
+    kind: ClassVar[str] = "cloud_account_discovered"
 
+    cloud: CloudName
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: CloudAccountId
+    account_id: CloudAccountId
 
 
 @frozen
 class CloudAccountConfigured(Event):
     """
-    This event is emitted when AWS account is ready to be collected.
+    This event is emitted when a cloud account is ready to be collected.
     """
 
     kind: ClassVar[str] = "cloud_account_configured"
@@ -124,17 +125,18 @@ class DegradationReason(StrEnum):
 
 
 @frozen
-class AwsAccountDegraded(Event):
+class CloudAccountDegraded(Event):
     """
-    This event is emitted when AWS account is not collectable anymore.
+    This event is emitted when a cloud account is not collectable anymore.
     """
 
     kind: ClassVar[str] = "aws_account_degraded"
 
+    cloud: CloudName
     cloud_account_id: FixCloudAccountId
     tenant_id: WorkspaceId
-    aws_account_id: CloudAccountId
-    aws_account_name: Optional[str]
+    account_id: CloudAccountId
+    account_name: Optional[str]
     error: str
     reason: Optional[DegradationReason]
 

@@ -626,6 +626,8 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(SN.jwt_strategy, FixJWTStrategy(cert_store, lifetime_seconds=cfg.session_ttl))
 
+    deps.add(SN.next_run_repo, NextRunRepository(session_maker))
+
     return deps
 
 

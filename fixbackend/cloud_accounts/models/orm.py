@@ -26,6 +26,7 @@ from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
 from fixbackend.ids import (
     GcpServiceAccountKeyId,
+    TaskId,
     WorkspaceId,
     FixCloudAccountId,
     ExternalId,
@@ -68,6 +69,7 @@ class CloudAccount(Base):
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     scan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     failed_scan_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_task_id: Mapped[Optional[TaskId]] = mapped_column(String(length=64), nullable=True)
 
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
     __mapper_args__ = {"version_id_col": version_id}  # for optimistic locking
@@ -134,4 +136,5 @@ class CloudAccount(Base):
             state_updated_at=self.state_updated_at,
             cf_stack_version=self.cf_stack_version,
             failed_scan_count=self.failed_scan_count,
+            last_task_id=self.last_task_id,
         )
