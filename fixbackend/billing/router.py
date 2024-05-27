@@ -15,7 +15,7 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends
 from fixcloudutils.types import Json
 
 from fixbackend.auth.depedencies import AuthenticatedUser
@@ -107,14 +107,6 @@ def billing_info_router(config: Config) -> APIRouter:
             raise ResourceNotFound("Subscription not found")
 
         await workspace_repository.update_subscription(workspace.id, subscription_id)
-
-    @router.get("/{workspace_id}/aws_marketplace_product")
-    async def redirect_to_aws_marketplace_product(workspace_id: WorkspaceId) -> Response:
-        response = Response(
-            status_code=status.HTTP_303_SEE_OTHER,
-            headers={"Location": config.aws_marketplace_url},
-        )
-        return response
 
     @router.get("/{workspace_id}/product_tiers")
     async def get_product_tiers(workspace_id: WorkspaceId) -> Json:

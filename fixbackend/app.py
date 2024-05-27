@@ -280,7 +280,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
         api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
-        api_router.include_router(subscription_router(), tags=["billing"])
+        api_router.include_router(subscription_router(deps), tags=["billing"])
         api_router.include_router(billing_info_router(cfg), prefix="/workspaces", tags=["billing"])
         api_router.include_router(notification_router(deps), prefix="/workspaces", tags=["notification"])
         api_router.include_router(unsubscribe_router(deps), include_in_schema=False)

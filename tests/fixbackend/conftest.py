@@ -107,7 +107,7 @@ from fixbackend.permissions.role_repository import RoleRepository, RoleRepositor
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
-from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
@@ -744,6 +744,7 @@ async def aws_marketplace_handler(
     boto_session: BotoSession,
     domain_event_sender: DomainEventPublisher,
     billing_entry_service: BillingEntryService,
+    async_session_maker: AsyncSessionMaker,
 ) -> AwsMarketplaceHandler:
     return AwsMarketplaceHandler(
         subscription_repository,
@@ -752,6 +753,7 @@ async def aws_marketplace_handler(
         domain_event_sender,
         billing_entry_service,
         None,
+        AwsTierPreferenceRepository(async_session_maker),
     )
 
 
@@ -872,6 +874,7 @@ async def fix_deps(
             ServiceNames.jwt_strategy: jwt_strategy,
             ServiceNames.gcp_service_account_repo: gcp_service_account_key_repo,
             ServiceNames.inventory: inventory_service,
+            ServiceNames.aws_tier_preference_repo: AwsTierPreferenceRepository(async_session_maker),
         }
     )
 

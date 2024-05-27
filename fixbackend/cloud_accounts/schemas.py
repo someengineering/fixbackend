@@ -143,7 +143,7 @@ class LastScanInfo(BaseModel):
 
 class GcpServiceAccountKeyRead(BaseModel):
     id: GcpServiceAccountKeyId
-    tenant_id: WorkspaceId
+    workspace_id: WorkspaceId
     can_access_sa: Optional[bool]
     created_at: datetime
 
@@ -151,7 +151,7 @@ class GcpServiceAccountKeyRead(BaseModel):
     def from_model(model: GcpServiceAccountKey) -> "GcpServiceAccountKeyRead":
         return GcpServiceAccountKeyRead(
             id=model.id,
-            tenant_id=model.tenant_id,
+            workspace_id=model.tenant_id,
             can_access_sa=model.can_access_sa,
             created_at=model.created_at,
         )
