@@ -22,15 +22,18 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Form, Cookie, Response, Request, Depends
+from fastapi import APIRouter, Form, Cookie, Response, Request, Depends, status
 from starlette.responses import RedirectResponse, JSONResponse
 
 from fixbackend.auth.depedencies import OptionalAuthenticatedUser, AuthenticatedUser
 from fixbackend.billing.schemas import ProductTierRead
+from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.ids import WorkspaceId
 from fixbackend.permissions.models import workspace_billing_admin_permissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandlerDependency
 from fixbackend.subscription.stripe_subscription import StripeServiceDependency
+from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
 AddUrlName = "aws-marketplace-subscription-add"
@@ -39,8 +42,11 @@ MarketplaceTokenCookie = "fix-aws-marketplace-token"
 log = logging.getLogger(__name__)
 
 
-def subscription_router() -> APIRouter:
+def subscription_router(fix: FixDependencies) -> APIRouter:
     router = APIRouter()
+
+    config = fix.config
+    aws_tier_preference_repo = fix.service(ServiceNames.aws_tier_preference_repo, AwsTierPreferenceRepository)
 
     # Attention: Changing this route will break the AWS Marketplace integration!
     @router.post("/cloud/callbacks/aws/marketplace", include_in_schema=False)
@@ -76,6 +82,20 @@ def subscription_router() -> APIRouter:
             return response
         else:  # something went wrong
             raise ValueError("No AWS token found!")
+
+    @router.get("/workspaces/{workspace_id}/aws_marketplace_product")
+    async def redirect_to_aws_marketplace_product(
+        workspace_id: WorkspaceId, product_tier: Optional[ProductTierRead]
+    ) -> Response:
+
+        if product_tier:
+            await aws_tier_preference_repo.create(workspace_id, product_tier.to_tier())
+
+        response = Response(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": config.aws_marketplace_url},
+        )
+        return response
 
     @router.get("/workspaces/{workspace_id}/subscriptions/stripe", include_in_schema=False)
     async def redirect_to_stripe(

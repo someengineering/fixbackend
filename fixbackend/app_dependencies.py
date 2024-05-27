@@ -74,7 +74,7 @@ from fixbackend.permissions.role_repository import RoleRepositoryImpl
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.stripe_subscription import create_stripe_service
-from fixbackend.subscription.subscription_repository import SubscriptionRepository
+from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository, SubscriptionRepository
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
@@ -197,6 +197,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         SN.invitation_repository,
         InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
     )
+    aws_tier_preference_repo = deps.add(SN.aws_tier_preference_repo, AwsTierPreferenceRepository(session_maker))
     deps.add(
         SN.aws_marketplace_handler,
         AwsMarketplaceHandler(
@@ -206,6 +207,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
             domain_event_publisher,
             billing_entry_service,
             cfg.args.aws_marketplace_metering_sqs_url,
+            aws_tier_preference_repo,
         ),
     )
     deps.add(
@@ -496,6 +498,7 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
             subscription_repo, workspace_repo, metering_repo, domain_event_publisher, cfg.billing_period
         ),
     )
+    aws_tier_preference_repo = deps.add(SN.aws_tier_preference_repo, AwsTierPreferenceRepository(session_maker))
     aws_marketplace = deps.add(
         SN.aws_marketplace_handler,
         AwsMarketplaceHandler(
@@ -505,6 +508,7 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
             domain_event_publisher,
             billing_entry_service,
             cfg.args.aws_marketplace_metering_sqs_url,
+            aws_tier_preference_repo,
         ),
     )
     stripe = deps.add(

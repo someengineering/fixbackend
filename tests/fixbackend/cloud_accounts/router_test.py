@@ -564,7 +564,7 @@ async def test_add_gcp_service_account_key(client: AsyncClient, workspace: Works
         assert key_list.status_code == 200
         key = key_list.json()
         assert key["id"] is not None
-        assert key["tenant_id"] == str(workspace.id)
+        assert key["workspace_id"] == str(workspace.id)
         assert key["created_at"] is not None
 
 

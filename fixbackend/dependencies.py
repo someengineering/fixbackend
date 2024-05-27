@@ -77,6 +77,7 @@ class ServiceNames:
     api_token_service = "api_token_service"
     gcp_service_account_repo = "gcp_service_account_repo"
     gcp_service_account_service = "gcp_service_account_service"
+    aws_tier_preference_repo = "aws_tier_preference_repo"
 
 
 class FixDependencies(Dependencies):

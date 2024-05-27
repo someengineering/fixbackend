@@ -46,6 +46,7 @@ from fixbackend.ids import ProductTier, SubscriptionId
 from fixbackend.sqs import SQSRawListener
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import (
+    AwsTierPreferenceRepository,
     SubscriptionRepository,
 )
 from fixbackend.utils import start_of_next_period
@@ -70,6 +71,7 @@ class AwsMarketplaceHandler(Service):
         domain_event_sender: DomainEventPublisher,
         billing_entry_service: BillingEntryService,
         sqs_queue_url: Optional[str],
+        aws_tier_preference_repo: AwsTierPreferenceRepository,
     ) -> None:
         self.subscription_repo = subscription_repo
         self.workspace_repo = workspace_repo
@@ -88,6 +90,7 @@ class AwsMarketplaceHandler(Service):
         self.marketplace_client: Any = session.client("meteringmarketplace")
         self.domain_event_sender = domain_event_sender
         self.billing_entry_service = billing_entry_service
+        self.aws_tier_preference_repo = aws_tier_preference_repo
 
     async def start(self) -> None:
         if self.listener is not None:
@@ -140,6 +143,15 @@ class AwsMarketplaceHandler(Service):
             result = cast(AwsMarketplaceSubscription, await self.subscription_repo.create(subscription))
             if workspace and workspace.subscription_id is None:
                 await self.workspace_repo.update_subscription(workspace.id, result.id)
+
+                if preferred_tier := await self.aws_tier_preference_repo.get_product_tier(workspace.id):
+                    try:
+                        await self.billing_entry_service.update_billing(
+                            None, workspace, new_product_tier=preferred_tier
+                        )
+                    except Exception as error:
+                        log.warn(f"Could not update tier for workspace {workspace.id}", error)
+
                 workspace_assigned = True
             await self.domain_event_sender.publish(event)
             return result, workspace_assigned

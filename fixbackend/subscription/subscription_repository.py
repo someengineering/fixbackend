@@ -424,6 +424,46 @@ class StripeCustomerRepository:
             await session.commit()
 
 
+class AwsTierPreferenceEntity(CreatedUpdatedMixin, Base):
+    __tablename__ = "aws_tier_preferences"
+    workspace_id: Mapped[WorkspaceId] = mapped_column(GUID, nullable=False, primary_key=True)
+    desired_product_tier: Mapped[Optional[ProductTier]] = mapped_column(String(64), nullable=True, default=None)
+
+
+class AwsTierPreferenceRepository:
+    def __init__(self, session_maker: AsyncSessionMaker) -> None:
+        self.session_maker = session_maker
+
+    async def get_product_tier(
+        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
+    ) -> Optional[ProductTier]:
+        async def do_tx(session: AsyncSession) -> Optional[ProductTier]:
+            stmt = select(AwsTierPreferenceEntity.desired_product_tier).where(
+                AwsTierPreferenceEntity.workspace_id == workspace_id
+            )
+            if result := (await session.execute(stmt)).scalar_one_or_none():
+                return ProductTier.from_str(result)
+            else:
+                return None
+
+        if session:
+            return await do_tx(session)
+        else:
+            async with self.session_maker() as session:
+                return await do_tx(session)
+
+    async def create(self, workspace_id: WorkspaceId, product_tier: ProductTier) -> None:
+        async with self.session_maker() as session:
+            maybe_entity = await session.get(AwsTierPreferenceEntity, workspace_id)
+            if maybe_entity:
+                maybe_entity.desired_product_tier = product_tier
+            else:
+                entity = AwsTierPreferenceEntity(workspace_id=workspace_id, desired_product_tier=product_tier)
+                session.add(entity)
+
+            await session.commit()
+
+
 def get_subscription_repository(fix: FixDependency) -> SubscriptionRepository:
     return fix.service(ServiceNames.subscription_repo, SubscriptionRepository)
 
