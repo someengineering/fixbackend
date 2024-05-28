@@ -17,9 +17,15 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates, GcpServiceAccountKey
+from fixbackend.cloud_accounts.models import (
+    AzureSubscriptionCredentials,
+    CloudAccount,
+    CloudAccountStates,
+    GcpServiceAccountKey,
+)
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountAlias,
     CloudAccountId,
     CloudAccountName,
@@ -153,5 +159,30 @@ class GcpServiceAccountKeyRead(BaseModel):
             id=model.id,
             workspace_id=model.tenant_id,
             can_access_sa=model.can_access_sa,
+            created_at=model.created_at,
+        )
+
+
+class AzureSubscriptionCredentialsUpdate(BaseModel):
+    azure_subscription_id: CloudAccountId
+    azure_tenant_id: str
+    client_id: str
+    client_secret: str
+
+
+class AzureSubscriptionCredentialsRead(BaseModel):
+    id: AzureSubscriptionCredentialsId
+    workspace_id: WorkspaceId
+    azure_subscription_id: CloudAccountId
+    can_access_azure_account: Optional[bool]
+    created_at: datetime
+
+    @staticmethod
+    def from_model(model: AzureSubscriptionCredentials) -> "AzureSubscriptionCredentialsRead":
+        return AzureSubscriptionCredentialsRead(
+            id=model.id,
+            workspace_id=model.tenant_id,
+            azure_subscription_id=model.azure_subscription_id,
+            can_access_azure_account=model.can_access_azure_account,
             created_at=model.created_at,
         )

@@ -26,6 +26,7 @@ OneTimeEmailId = NewType("OneTimeEmailId", UUID)
 StripeCustomerId = NewType("StripeCustomerId", str)
 StripeSubscriptionId = NewType("StripeSubscriptionId", str)
 GcpServiceAccountKeyId = NewType("GcpServiceAccountKeyId", UUID)
+AzureSubscriptionCredentialsId = NewType("AzureSubscriptionCredentialsId", UUID)
 
 
 class NotificationProvider(StrEnum):
@@ -44,6 +45,7 @@ ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
 class CloudNames:
     AWS: CloudName = CloudName("aws")
     GCP: CloudName = CloudName("gcp")
+    Azure: CloudName = CloudName("azure")
 
 
 class ProductTier(StrEnum):
