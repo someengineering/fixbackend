@@ -22,7 +22,6 @@ from asyncio import AbstractEventLoop
 from contextlib import suppress
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from re import S
 from typing import (
     Any,
     AsyncIterator,
