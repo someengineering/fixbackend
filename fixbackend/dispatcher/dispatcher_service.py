@@ -26,12 +26,20 @@ from fixcloudutils.service import Service
 from fixcloudutils.util import parse_utc_str, utc
 from redis.asyncio import Redis
 
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
-from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
+from fixbackend.cloud_accounts.models import (
+    AwsCloudAccess,
+    AzureCloudAccess,
+    CloudAccount,
+    CloudAccountStates,
+    GcpCloudAccess,
+)
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.collect.collect_queue import (
     AccountInformation,
     AwsAccountInformation,
+    AzureSubscriptionInformation,
     CollectQueue,
     GcpProjectInformation,
 )
@@ -85,6 +93,8 @@ class CollectAccountProgress:
             account_id = account_information.aws_account_id
         elif isinstance(account_information, GcpProjectInformation):
             account_id = account_information.gcp_project_id
+        elif isinstance(account_information, AzureSubscriptionInformation):
+            account_id = account_information.azure_subscription_id
         else:
             raise NotImplementedError("Unsupported account information type")
         value = AccountCollectProgress(
@@ -219,9 +229,11 @@ class DispatcherService(Service):
         domain_event_subscriber: DomainEventSubscriber,
         workspace_repository: WorkspaceRepository,
         gcp_serivice_account_key_repo: GcpServiceAccountKeyRepository,
+        azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.gcp_service_account_key_repo = gcp_serivice_account_key_repo
+        self.azure_subscription_credentials_repo = azure_subscription_credentials_repo
         self.next_run_repo = next_run_repo
         self.metering_repo = metering_repo
         self.collect_queue = collect_queue
@@ -439,6 +451,17 @@ class DispatcherService(Service):
                             return GcpProjectInformation(
                                 gcp_project_id=account.account_id,
                                 google_application_credentials=json.loads(service_account_key.value),
+                            )
+                        case AzureCloudAccess(credential_id):
+                            azure_credential = await self.azure_subscription_credentials_repo.get(credential_id)
+                            if azure_credential is None:
+                                log.error("Azure credential not found")
+                                return None
+                            return AzureSubscriptionInformation(
+                                azure_subscription_id=account.account_id,
+                                tenant_id=azure_credential.azure_tenant_id,
+                                client_id=azure_credential.client_id,
+                                client_secret=azure_credential.client_secret,
                             )
                         case _:
                             log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")

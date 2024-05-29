@@ -604,3 +604,24 @@ async def test_chonky_boi(client: AsyncClient, workspace: Workspace) -> None:
 
         key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/gcp/key")
         assert key_list.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_azure_subscription_creds(client: AsyncClient, workspace: Workspace) -> None:
+
+    payload = {
+        "azure_subscription_id": "1234567890",
+        "azure_tenant_id": "1234567890",
+        "client_id": "1234567890",
+        "client_secret": "123",
+    }
+
+    response = await client.put(f"/api/workspaces/{workspace.id}/cloud_accounts/azure/credentials", json=payload)
+    assert response.status_code == 201
+
+    key_list = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/azure/credentials")
+    assert key_list.status_code == 200
+    key = key_list.json()
+    assert key["id"] is not None
+    assert key["workspace_id"] == str(workspace.id)
+    assert key["created_at"] is not None
