@@ -71,6 +71,7 @@ from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -763,6 +764,13 @@ def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpS
 
 
 @pytest.fixture
+def azure_subscription_credentials_repo(
+    async_session_maker: AsyncSessionMaker,
+) -> AzureSubscriptionCredentialsRepository:
+    return AzureSubscriptionCredentialsRepository(async_session_maker)
+
+
+@pytest.fixture
 async def dispatcher(
     arq_redis: ArqRedis,
     cloud_account_repository: CloudAccountRepository,
@@ -774,6 +782,7 @@ async def dispatcher(
     domain_event_subscriber: DomainEventSubscriber,
     workspace_repository: WorkspaceRepository,
     gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
+    azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     redis: Redis,
 ) -> DispatcherService:
     return DispatcherService(
@@ -788,6 +797,7 @@ async def dispatcher(
         domain_event_subscriber,
         workspace_repository,
         gcp_service_account_key_repo,
+        azure_subscription_credentials_repo,
     )
 
 
@@ -851,6 +861,7 @@ async def fix_deps(
     password_helper: InsecureFastPasswordHelper,
     jwt_strategy: FixJWTStrategy,
     gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
+    azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     inventory_service: InventoryService,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
@@ -875,6 +886,7 @@ async def fix_deps(
             ServiceNames.gcp_service_account_repo: gcp_service_account_key_repo,
             ServiceNames.inventory: inventory_service,
             ServiceNames.aws_tier_preference_repo: AwsTierPreferenceRepository(async_session_maker),
+            ServiceNames.azure_subscription_repo: azure_subscription_credentials_repo,
         }
     )
 

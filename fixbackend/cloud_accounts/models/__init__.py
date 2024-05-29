@@ -19,6 +19,7 @@ from abc import ABC
 from attrs import frozen
 
 from fixbackend.ids import (
+    AzureSubscriptionCredentialsId,
     CloudAccountId,
     ExternalId,
     FixCloudAccountId,
@@ -58,6 +59,25 @@ class GcpServiceAccountKey:
     tenant_id: WorkspaceId
     value: str
     can_access_sa: Optional[bool]
+    created_at: datetime
+    updated_at: datetime
+
+
+@frozen
+class AzureCloudAccess(CloudAccess):
+    cloud: ClassVar[CloudName] = CloudNames.Azure
+    subscription_credentials_id: AzureSubscriptionCredentialsId
+
+
+@frozen
+class AzureSubscriptionCredentials:
+    id: AzureSubscriptionCredentialsId
+    tenant_id: WorkspaceId
+    azure_subscription_id: CloudAccountId
+    azure_tenant_id: str
+    client_id: str
+    client_secret: str
+    can_access_azure_account: Optional[bool]
     created_at: datetime
     updated_at: datetime
 
