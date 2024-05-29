@@ -5,11 +5,12 @@
 
 <div class="f-fallback">
     <h1 style="margin-top: 0; color: #333333; font-size: 22px; font-weight: bold; text-align: left;" align="left">
-        Unable to access account {{ message.account_info() }}
+        Unable to access {{ message.cloud_name() }} account {{ message.account_info() }}
     </h1>
 
     <p style="font-size: 16px; line-height: 1.625; color: #333; margin: .4em 0 1.1875em;">
-        Fix was not able to collect latest resource information for account {{ message.account_info() }}. Please
+        Fix was not able to collect latest resource information for {{ message.cloud_name() }} account {{
+        message.account_info() }} in workspace {{ message.workspace_name }} ({{ message.tenant_id }}). Please
         ensure the account exists and that the necessary access permissions have been granted.
     </p>
     <p>

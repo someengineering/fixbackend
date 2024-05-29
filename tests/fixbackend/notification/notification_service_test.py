@@ -26,6 +26,7 @@ from fixbackend.auth.user_repository import UserRepository
 from fixbackend.domain_events.events import TenantAccountsCollected, CloudAccountCollectInfo
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import (
+    CloudNames,
     NotificationProvider as NP,
     WorkspaceId,
     TaskId,
@@ -296,18 +297,24 @@ async def test_send_degraded_message(
     email_sender: InMemoryEmailSender,
 ) -> None:
     message = AccountDegraded(
+        cloud=CloudNames.AWS,
         cloud_account_id=CloudAccountId("12345"),
         tenant_id=workspace.id,
+        workspace_name=workspace.name,
         account_name="Development",
         cf_stack_deleted=False,
     )
     await notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)
 
     assert len(email_sender.call_args) == 1
-    assert email_sender.call_args[0].subject == "Unable to access account Development (12345)"
-    assert "Unable to access account Development (12345)" in (email_sender.call_args[0].html or "")
-    assert "Fix was not able to collect latest resource information for account Development (12345)." in (
-        email_sender.call_args[0].html or ""
+    assert (
+        email_sender.call_args[0].subject
+        == f"Workspace {workspace.name}: unable to access AWS account Development (12345)"
+    )
+    assert "Unable to access AWS account Development (12345)" in (email_sender.call_args[0].html or "")
+    assert (
+        f"Fix was not able to collect latest resource information for AWS account Development (12345) in workspace {workspace.name} ({workspace.id})."  # noqa: E501
+        in (email_sender.call_args[0].html or "")
     )
     assert f'<a href="https://app.fix.security/workspace-settings/accounts#{workspace.id}' in (
         email_sender.call_args[0].html or ""
