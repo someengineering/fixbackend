@@ -12,12 +12,12 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
-from functools import partial
 import json
 import math
 import uuid
 from collections import defaultdict
 from datetime import timedelta
+from functools import partial
 from hmac import compare_digest
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Union
@@ -30,7 +30,6 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc, uuid_str
 from httpx import AsyncClient
-from redis.asyncio import Redis
 
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.analytics.events import (
@@ -84,6 +83,7 @@ from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_accou
 from fixbackend.notification.email import email_messages as email
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.sqs import SQSRawListener
+from fixbackend.types import Redis
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository

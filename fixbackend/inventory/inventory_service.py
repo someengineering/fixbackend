@@ -48,7 +48,6 @@ from fixcloudutils.redis.worker_queue import WorkDispatcher, WorkerInstance
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str
-from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.config import ProductTierSettings, Trial
@@ -64,8 +63,8 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import TaskId, WorkspaceId
 from fixbackend.ids import NodeId
+from fixbackend.ids import TaskId, WorkspaceId
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
     AsyncIteratorWithContext,
@@ -89,6 +88,7 @@ from fixbackend.inventory.schemas import (
     Scatters,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
+from fixbackend.types import Redis
 
 log = logging.getLogger(__name__)
 

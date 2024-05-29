@@ -14,9 +14,10 @@
 import pickle
 import uuid
 from typing import Any, Sequence, Mapping
+from uuid import uuid4
 
 import pytest
-from redis.asyncio import Redis
+from arq import ArqRedis
 
 from fixbackend.collect.collect_queue import (
     RedisCollectQueue,
@@ -27,7 +28,6 @@ from fixbackend.collect.collect_queue import (
 )
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, AwsARN, ExternalId, CloudAccountName
-from uuid import uuid4
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def graph_db_access() -> GraphDatabaseAccess:
 
 @pytest.mark.asyncio
 async def test_redis_collect_queue(
-    arq_redis: Redis, collect_queue: RedisCollectQueue, graph_db_access: GraphDatabaseAccess
+    arq_redis: ArqRedis, collect_queue: RedisCollectQueue, graph_db_access: GraphDatabaseAccess
 ) -> None:
     # assert no keys in redis
     assert set(await arq_redis.keys()) == set()
@@ -71,7 +71,7 @@ async def test_redis_collect_queue(
         else:
             raise TypeError(f"Unexpected type {type(obj)}")
 
-    assert_json(pickle.loads(await arq_redis.get("arq:job:test")))
+    assert_json(pickle.loads(await arq_redis.get("arq:job:test")))  # type: ignore
 
 
 def test_aws_account_info_json() -> None:

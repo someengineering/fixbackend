@@ -5,10 +5,10 @@ from fastapi import WebSocket, Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubListener
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
-from redis.asyncio import Redis
 
 from fixbackend.dependencies import FixDependency
 from fixbackend.ids import WorkspaceId
+from fixbackend.types import Redis
 
 
 class WebsocketEventHandler:

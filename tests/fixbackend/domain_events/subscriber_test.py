@@ -20,7 +20,6 @@ from uuid import uuid4
 
 import pytest
 from fixcloudutils.redis.event_stream import RedisStreamPublisher, Backoff
-from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
@@ -28,6 +27,7 @@ from fixbackend.domain_events.events import UserRegistered, CloudAccountConfigur
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber, HandlerDescriptor
 from fixbackend.ids import CloudNames, UserId, WorkspaceId, CloudAccountId, FixCloudAccountId
+from fixbackend.types import Redis
 
 
 @pytest.mark.asyncio

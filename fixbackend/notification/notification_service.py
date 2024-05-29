@@ -24,7 +24,6 @@ from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc, utc_str
 from httpx import AsyncClient
-from redis.asyncio import Redis
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
@@ -36,12 +35,12 @@ from fixbackend.domain_events.events import (
 )
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.fix_jwt import JwtService
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId, UserId
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
 from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
-from fixbackend.fix_jwt import JwtService
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage, UserJoinedWorkspaceMail
@@ -65,6 +64,7 @@ from fixbackend.notification.slack.slack_notification import SlackNotificationSe
 from fixbackend.notification.teams.teams_notification import TeamsNotificationSender
 from fixbackend.notification.workspace_alert_config_repo import WorkspaceAlertRepository
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.types import Redis
 from fixbackend.utils import md5
 from fixbackend.workspaces.repository import WorkspaceRepository
 

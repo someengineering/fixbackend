@@ -23,11 +23,11 @@ from fixcloudutils.redis.event_stream import MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc
-from redis.asyncio import Redis
 
 from fixbackend.config import Config
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import Event
+from fixbackend.types import Redis
 
 Kind = str
 
