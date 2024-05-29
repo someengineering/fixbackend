@@ -152,6 +152,7 @@ class GcpServiceAccountKeyRead(BaseModel):
     workspace_id: WorkspaceId
     can_access_sa: Optional[bool]
     created_at: datetime
+    error: Optional[str]
 
     @staticmethod
     def from_model(model: GcpServiceAccountKey) -> "GcpServiceAccountKeyRead":
@@ -160,6 +161,7 @@ class GcpServiceAccountKeyRead(BaseModel):
             workspace_id=model.tenant_id,
             can_access_sa=model.can_access_sa,
             created_at=model.created_at,
+            error=model.error,
         )
 
 

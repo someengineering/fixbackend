@@ -59,6 +59,7 @@ class GcpServiceAccountKey:
     tenant_id: WorkspaceId
     value: str
     can_access_sa: Optional[bool]
+    error: Optional[str]
     created_at: datetime
     updated_at: datetime
 
