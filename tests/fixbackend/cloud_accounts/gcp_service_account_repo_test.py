@@ -60,5 +60,13 @@ async def test_store_gcp_service_account(
     assert updated_acc.tenant_id == gcp_service_account.tenant_id
     assert updated_acc.value == gcp_service_account.value
 
+    # mark as unusable
+    await gcp_repo.update_status(gcp_service_account.id, can_access_sa=False)
+    assert await gcp_repo.list_created_before(utc() + timedelta(minutes=5)) == []
+    assert await gcp_repo.list_created_after(utc() - timedelta(minutes=5)) == []
+    marked = await gcp_repo.get(gcp_service_account.id)
+    assert marked
+    assert marked.can_access_sa is False
+
     await gcp_repo.delete(gcp_service_account.id)
     assert await gcp_repo.get(gcp_service_account.id) is None

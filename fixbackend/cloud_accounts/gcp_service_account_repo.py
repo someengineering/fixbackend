@@ -16,7 +16,7 @@ from typing import List, Optional
 import uuid
 from fixbackend.base_model import CreatedUpdatedMixin, Base
 
-from sqlalchemy import Boolean, ForeignKey, Text, select
+from sqlalchemy import Boolean, ForeignKey, Text, or_, select
 
 from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.cloud_accounts.models import (
@@ -101,13 +101,31 @@ class GcpServiceAccountKeyRepository:
 
     async def list_created_after(self, time: datetime) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:
-            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at > time)
+            query = (
+                select(GcpServiceAccountKeyEntity)
+                .filter(GcpServiceAccountKeyEntity.created_at > time)
+                .filter(
+                    or_(
+                        GcpServiceAccountKeyEntity.can_access_sa == True,  # noqa
+                        GcpServiceAccountKeyEntity.can_access_sa == None,  # noqa
+                    )
+                )
+            )
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
 
     async def list_created_before(self, time: datetime) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:
-            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at < time)
+            query = (
+                select(GcpServiceAccountKeyEntity)
+                .filter(GcpServiceAccountKeyEntity.created_at < time)
+                .filter(
+                    or_(
+                        GcpServiceAccountKeyEntity.can_access_sa == True,  # noqa
+                        GcpServiceAccountKeyEntity.can_access_sa == None,  # noqa
+                    )
+                )
+            )
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
 

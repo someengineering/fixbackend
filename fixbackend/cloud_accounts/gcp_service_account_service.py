@@ -26,6 +26,9 @@ from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccount
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.util import utc
+from logging import getLogger
+
+log = getLogger(__name__)
 
 
 class GcpServiceAccountService(Service):
@@ -91,7 +94,13 @@ class GcpServiceAccountService(Service):
             )
 
     async def _import_projects_from_service_account(self, key: GcpServiceAccountKey) -> None:
-        projects = await self.list_projects(key.value)
+        try:
+            projects = await self.list_projects(key.value)
+        except Exception as e:
+            log.info(f"Failed to list projects for service account key {key.id}, marking it as invalid: {e}")
+            await self.service_account_key_repo.update_status(key.id, can_access_sa=False)
+            return None
+
         await self.update_cloud_accounts(projects, key.tenant_id, key.id)
 
     async def _ping_new_service_account_keys(self) -> None:
