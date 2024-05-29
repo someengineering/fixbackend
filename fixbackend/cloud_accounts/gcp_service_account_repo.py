@@ -69,6 +69,7 @@ class GcpServiceAccountKeyRepository:
             existing = result.scalars().first()
             if existing is not None:
                 existing.value = value
+                existing.can_access_sa = None
                 model = existing.to_model()
                 await session.commit()
                 return model
