@@ -27,6 +27,8 @@ from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccount
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.util import utc
 from logging import getLogger
+from google.auth.exceptions import MalformedError
+from googleapiclient.errors import HttpError
 
 log = getLogger(__name__)
 
@@ -96,9 +98,17 @@ class GcpServiceAccountService(Service):
     async def _import_projects_from_service_account(self, key: GcpServiceAccountKey) -> None:
         try:
             projects = await self.list_projects(key.value)
+        except MalformedError as e:
+            log.info(f"Broken service account key {key.id}, marking it as invalid: {e}")
+            await self.service_account_key_repo.update_status(key.id, can_access_sa=False, error="Malformed JSON")
+            return None
+        except HttpError as e:
+            log.info(f"Failed to list projects for service account key {key.id}, marking it as invalid: {e}")
+            await self.service_account_key_repo.update_status(key.id, can_access_sa=False, error=str(e.reason))
+            return None
         except Exception as e:
             log.info(f"Failed to list projects for service account key {key.id}, marking it as invalid: {e}")
-            await self.service_account_key_repo.update_status(key.id, can_access_sa=False)
+            await self.service_account_key_repo.update_status(key.id, can_access_sa=False, error=str(e))
             return None
         await self.service_account_key_repo.update_status(key.id, can_access_sa=True)
         await self.update_cloud_accounts(projects, key.tenant_id, key.id)

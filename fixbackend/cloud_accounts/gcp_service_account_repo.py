@@ -28,6 +28,7 @@ from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
 from datetime import datetime
+from fixcloudutils.util import utc
 
 
 class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
@@ -39,6 +40,7 @@ class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
     )
     value: Mapped[str] = mapped_column(Text, nullable=False)
     can_access_sa: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def to_model(self) -> GcpServiceAccountKey:
         return GcpServiceAccountKey(
@@ -46,6 +48,7 @@ class GcpServiceAccountKeyEntity(Base, CreatedUpdatedMixin):
             tenant_id=self.tenant_id,
             value=self.value,
             can_access_sa=self.can_access_sa,
+            error=self.error,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
@@ -70,12 +73,14 @@ class GcpServiceAccountKeyRepository:
             if existing is not None:
                 existing.value = value
                 existing.can_access_sa = None
+                existing.created_at = utc()
+                existing.error = None
                 model = existing.to_model()
                 await session.commit()
                 return model
 
             # create new
-            entity = GcpServiceAccountKeyEntity(tenant_id=tenant_id, value=value)
+            entity = GcpServiceAccountKeyEntity(tenant_id=tenant_id, value=value, created_at=utc())
             session.add(entity)
             await session.commit()
             await session.refresh(entity)
@@ -126,7 +131,9 @@ class GcpServiceAccountKeyRepository:
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
 
-    async def update_status(self, key_id: GcpServiceAccountKeyId, can_access_sa: bool) -> GcpServiceAccountKey:
+    async def update_status(
+        self, key_id: GcpServiceAccountKeyId, can_access_sa: bool, error: Optional[str] = None
+    ) -> GcpServiceAccountKey:
         async with self._session_maker() as session:
             query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.id == key_id)
             result = await session.execute(query)
@@ -134,6 +141,7 @@ class GcpServiceAccountKeyRepository:
             if entity is None:
                 raise ResourceNotFound(f"Service account json with id {key_id} not found")
             entity.can_access_sa = can_access_sa
+            entity.error = error
             await session.commit()
             await session.refresh(entity)
             return entity.to_model()
