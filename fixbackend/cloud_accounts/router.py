@@ -23,6 +23,7 @@ from fixcloudutils.util import utc
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import CurrentGraphDbDependency
@@ -45,6 +46,8 @@ from fixbackend.ids import FixCloudAccountId
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
 from fixbackend.streaming_response import StreamOnSuccessResponse, streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from google.auth.exceptions import MalformedError
+from googleapiclient.errors import HttpError
 
 
 log = logging.getLogger(__name__)
@@ -55,6 +58,10 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 
     gcp_service_account_repo = dependencies.service(
         ServiceNames.gcp_service_account_repo, GcpServiceAccountKeyRepository
+    )
+
+    gcp_service_account_service = dependencies.service(
+        ServiceNames.gcp_service_account_service, GcpServiceAccountService
     )
 
     azure_subscription_repo = dependencies.service(
@@ -196,6 +203,15 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         except Exception as e:
             log.error(f"Error decoding GCP service account key: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_json")
+
+        try:
+            await gcp_service_account_service.list_projects(string_key)
+        except MalformedError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="malformed_json")
+        except HttpError as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e.reason))
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
         await gcp_service_account_repo.upsert(workspace.id, string_key)
 
