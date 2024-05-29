@@ -24,7 +24,6 @@ from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
 from fixcloudutils.util import parse_utc_str, utc
-from redis.asyncio import Redis
 
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
@@ -52,6 +51,7 @@ from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskI
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.types import Redis
 from fixbackend.workspaces.repository import WorkspaceRepository
 
 log = logging.getLogger(__name__)
@@ -92,11 +92,9 @@ class CollectAccountProgress:
         ).to_json_str()
         # store account_collect_progress
         async with self.redis.pipeline(transaction=True) as pipe:
-            await pipe.hset(
-                name=self._collect_progress_hash_key(workspace_id), key=str(cloud_account_id), value=value
-            )  # type: ignore
+            await pipe.hset(name=self._collect_progress_hash_key(workspace_id), key=str(cloud_account_id), value=value)
             # store job_id -> cloud_account_id mapping
-            await pipe.hset(name=self._jobs_hash_key(workspace_id), key=str(job_id), value=str(cloud_account_id))  # type: ignore
+            await pipe.hset(name=self._jobs_hash_key(workspace_id), key=str(job_id), value=str(cloud_account_id))
 
             # store job_id -> workspace_id mapping
             await pipe.set(name=self._jobs_to_workspace_key(str(job_id)), value=str(workspace_id))
@@ -120,7 +118,7 @@ class CollectAccountProgress:
         self, workspace_id: WorkspaceId, account_id: FixCloudAccountId
     ) -> Optional[AccountCollectProgress]:
         hash_key = self._collect_progress_hash_key(workspace_id)
-        account_progress_str: Optional[str] = await self.redis.hget(hash_key, str(account_id))  # type: ignore
+        account_progress_str: Optional[str] = await self.redis.hget(hash_key, str(account_id))
         if account_progress_str is None:
             return None
         return AccountCollectProgress.from_json_str(account_progress_str)
@@ -129,7 +127,7 @@ class CollectAccountProgress:
         self, workspace_id: WorkspaceId, job_id: str
     ) -> Optional[AccountCollectProgress]:
         hash_key = self._jobs_hash_key(workspace_id)
-        fix_cloud_account_id_str: Optional[str] = await self.redis.hget(hash_key, job_id)  # type: ignore
+        fix_cloud_account_id_str: Optional[str] = await self.redis.hget(hash_key, job_id)
         if fix_cloud_account_id_str is None:
             log.warning(f"Could not find cloud account id for job id {job_id}")
             return None
@@ -163,13 +161,11 @@ class CollectAccountProgress:
         collect_progress_done = collect_state[cloud_account_id].done(
             scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds, task_id=task_id
         )
-        await self.redis.hset(
-            hash_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str()
-        )  # type: ignore
+        await self.redis.hset(hash_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str())
         return collect_state | {cloud_account_id: collect_progress_done}
 
     async def workspace_id_from_job_id(self, job_id: str) -> Optional[WorkspaceId]:
-        workspace_id_str: Optional[str] = await self.redis.get(self._jobs_to_workspace_key(UUID(job_id)))  # type: ignore # noqa
+        workspace_id_str: Optional[str] = await self.redis.get(self._jobs_to_workspace_key(job_id))
         if workspace_id_str is None:
             logging.warning(f"Could not find workspace id for job id {job_id}")
             return None
@@ -195,11 +191,11 @@ class CollectAccountProgress:
             return
 
         failed = cloud_account_state.failed(error, duration, task_id)
-        await self.redis.hset(hash_key, key=str(failed.cloud_account_id), value=failed.to_json_str())  # type: ignore
+        await self.redis.hset(hash_key, key=str(failed.cloud_account_id), value=failed.to_json_str())
 
     async def delete_tenant_collect_state(self, workspace_id: WorkspaceId) -> None:
         await self.redis.delete(self._collect_progress_hash_key(workspace_id))
-        all_job_ids = await self.redis.hgetall(self._jobs_hash_key(workspace_id))  # type: ignore
+        all_job_ids = await self.redis.hgetall(self._jobs_hash_key(workspace_id))
         for job_id in all_job_ids.keys():
             await self.redis.delete(self._jobs_to_workspace_key(job_id))
         await self.redis.delete(self._jobs_hash_key(workspace_id))

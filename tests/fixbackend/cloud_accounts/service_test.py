@@ -24,12 +24,6 @@ from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.types import Json
 from fixcloudutils.util import utc
 from httpx import AsyncClient, Request, Response
-from redis.asyncio import Redis
-
-from fixbackend.dispatcher.next_run_repository import NextRunRepository
-from fixbackend.utils import uid
-from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.workspaces.models import Workspace
 
 from fixbackend.analytics import AnalyticsEventSender
 from fixbackend.auth.models import User
@@ -37,8 +31,8 @@ from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRole
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
-from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.config import Config, ProductTierSettings
+from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
     CloudAccountConfigured,
     CloudAccountDegraded,
@@ -72,8 +66,12 @@ from fixbackend.ids import (
 )
 from fixbackend.notification.email.email_messages import EmailMessage
 from fixbackend.notification.notification_service import NotificationService
+from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.types import Redis
+from fixbackend.utils import uid
+from fixbackend.workspaces.models import Workspace
+from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import RequestHandlerMock, RedisPubSubPublisherMock
-
 
 account_id = CloudAccountId("foobar")
 role_name = AwsRoleName("FooBarRole")

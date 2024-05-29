@@ -33,7 +33,6 @@ from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.redis.event_stream import RedisStreamPublisher
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from httpx import AsyncClient, Limits, Timeout
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from fixbackend.analytics.domain_event_to_analytics import analytics
@@ -60,10 +59,10 @@ from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.consumers import EmailOnSignupConsumer, ScheduleTrialEndReminder
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
+from fixbackend.fix_jwt import JwtServiceImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.fix_jwt import JwtServiceImpl
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
@@ -75,6 +74,7 @@ from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.stripe_subscription import create_stripe_service
 from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository, SubscriptionRepository
+from fixbackend.types import Redis
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
@@ -90,7 +90,7 @@ def create_redis(url: str, cfg: Config) -> Redis:
     kwargs["socket_keepalive"] = True
     if cfg.args.redis_password:
         kwargs["password"] = cfg.args.redis_password
-    return Redis.from_url(url, decode_responses=True, **kwargs)  # type: ignore
+    return Redis.from_url(url, decode_responses=True, **kwargs)
 
 
 async def base_dependencies(cfg: Config) -> FixDependencies:

@@ -19,13 +19,13 @@ from fastapi.params import Depends
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
 from fixcloudutils.service import Dependencies
 from httpx import AsyncClient
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from fixbackend.config import Config
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.types import Redis
 
 
 class ServiceNames:
@@ -131,7 +131,7 @@ class FixDependencies(Dependencies):
         if isinstance(engine := self.lookup.get(ServiceNames.async_engine), AsyncEngine):
             await engine.dispose()
         if isinstance(arq_redis := self.lookup.get(ServiceNames.arq_redis), ArqRedis):
-            await arq_redis.aclose()
+            await arq_redis.aclose()  # type: ignore
 
 
 # placeholder for dependencies, will be replaced during the app initialization

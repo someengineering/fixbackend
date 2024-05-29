@@ -19,7 +19,6 @@ from typing import Dict
 import pytest
 from fixcloudutils.redis.event_stream import MessageContext
 from fixcloudutils.util import utc
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fixbackend.auth.models import User
@@ -48,6 +47,7 @@ from fixbackend.ids import (
     UserCloudAccountName,
 )
 from fixbackend.metering.metering_repository import MeteringRepository
+from fixbackend.types import Redis
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher
 

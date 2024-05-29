@@ -56,7 +56,6 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import utc
 from httpx import AsyncClient, MockTransport, Request, Response
-from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
@@ -71,8 +70,8 @@ from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
-from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
+from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
 from fixbackend.db import get_async_session, get_async_session_maker
@@ -109,6 +108,7 @@ from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
 from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository, SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
+from fixbackend.types import Redis
 from fixbackend.utils import start_of_next_month, uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
 from fixbackend.workspaces.models import Workspace
@@ -764,7 +764,7 @@ def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpS
 
 @pytest.fixture
 async def dispatcher(
-    arq_redis: ArqRedis,
+    arq_redis: Redis,
     cloud_account_repository: CloudAccountRepository,
     next_run_repository: NextRunRepository,
     metering_repository: MeteringRepository,
