@@ -465,6 +465,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     await self.notification_service.send_message_to_workspace(
                         workspace_id=degraded_event.tenant_id,
                         message=email.AccountDegraded(
+                            cloud=degraded_event.cloud,
                             cloud_account_id=degraded_event.account_id,
                             tenant_id=degraded_event.tenant_id,
                             account_name=degraded_event.account_name,

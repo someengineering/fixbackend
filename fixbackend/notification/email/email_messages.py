@@ -19,7 +19,7 @@ from attrs import frozen
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fixbackend.auth.models import User
-from fixbackend.ids import CloudAccountId, WorkspaceId
+from fixbackend.ids import CloudAccountId, CloudName, CloudNames, WorkspaceId
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
 
@@ -191,10 +191,22 @@ View in Fix: https://app.fix.security"""  # noqa
 
 @frozen(kw_only=True)
 class AccountDegraded:
+    cloud: CloudName
     cloud_account_id: CloudAccountId
     account_name: Optional[str]
     tenant_id: WorkspaceId
     cf_stack_deleted: bool
+
+    def cloud_name(self) -> str:
+        match self.cloud:
+            case CloudNames.AWS:
+                return "AWS"
+            case CloudNames.GCP:
+                return "GCP"
+            case CloudNames.Azure:
+                return "Azure"
+            case _:
+                return ""
 
     def account_info(self) -> str:
         formatted = (
@@ -203,9 +215,9 @@ class AccountDegraded:
         return formatted
 
     def subject(self) -> str:
-        if self.cf_stack_deleted:
+        if self.cloud == CloudNames.AWS and self.cf_stack_deleted:
             return f"""CloudFormation Stack for account {self.account_info()} was deleted"""
-        return f"""Unable to access account {self.account_info()}"""
+        return f"""Unable to access {self.cloud_name()} account {self.account_info()}"""
 
     def text(self) -> str:
         if self.cf_stack_deleted:
@@ -213,7 +225,7 @@ class AccountDegraded:
                 f"""We noticed that you deleted the CloudFormation Stack for account {self.account_info()}."""
                 "The corresponding resources won't be collected."
             )
-        return f"""Fix was not able to collect latest resource information for account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
+        return f"""Fix was not able to collect latest resource information for {self.account_name} account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
 
 View in Fix: https://app.fix.security/workspace-settings/accounts#{self.tenant_id}"""  # noqa
 
