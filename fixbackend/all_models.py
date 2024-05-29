@@ -33,3 +33,4 @@ from fixbackend.permissions.role_repository import UserRoleAssignmentEntity  # n
 from fixbackend.notification.email.scheduled_email import ScheduledEmailEntity, ScheduledEmailSentEntity  # noqa
 from fixbackend.notification.email.one_time_email import OneTimeEmailEntity  # noqa
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyEntity  # noqa
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsEntity  # noqa

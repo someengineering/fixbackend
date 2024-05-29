@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.inventory.inventory_service import InventoryService
@@ -32,6 +33,8 @@ from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
     AwsCloudAccountUpdate,
     AwsCloudFormationLambdaCallbackParameters,
+    AzureSubscriptionCredentialsRead,
+    AzureSubscriptionCredentialsUpdate,
     CloudAccountList,
     CloudAccountRead,
     GcpServiceAccountKeyRead,
@@ -52,6 +55,10 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 
     gcp_service_account_repo = dependencies.service(
         ServiceNames.gcp_service_account_repo, GcpServiceAccountKeyRepository
+    )
+
+    azure_subscription_repo = dependencies.service(
+        ServiceNames.azure_subscription_repo, AzureSubscriptionCredentialsRepository
     )
 
     def inventory() -> InventoryService:
@@ -202,6 +209,32 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         if key is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_key_found")
         return GcpServiceAccountKeyRead.from_model(key)
+
+    @router.put("/{workspace_id}/cloud_accounts/azure/credentials")
+    async def add_azure_subscription_credentials(
+        workspace: UserWorkspaceDependency,
+        credentials: AzureSubscriptionCredentialsUpdate,
+        _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
+    ) -> Response:
+
+        await azure_subscription_repo.upsert(
+            workspace.id,
+            credentials.azure_subscription_id,
+            credentials.azure_tenant_id,
+            credentials.client_id,
+            credentials.client_secret,
+        )
+
+        return Response(status_code=201)
+
+    @router.get("/{workspace_id}/cloud_accounts/azure/credentials")
+    async def get_azure_credentials(
+        workspace: UserWorkspaceDependency,
+    ) -> AzureSubscriptionCredentialsRead:
+        creds = await azure_subscription_repo.get_by_tenant(workspace.id)
+        if creds is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
+        return AzureSubscriptionCredentialsRead.from_model(creds)
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}/logs", tags=["report"])
     async def logs(

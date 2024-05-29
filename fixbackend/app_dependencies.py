@@ -45,6 +45,7 @@ from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
@@ -301,6 +302,10 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         GcpServiceAccountKeyRepository(session_maker),
     )
     deps.add(
+        SN.azure_subscription_repo,
+        AzureSubscriptionCredentialsRepository(session_maker),
+    )
+    deps.add(
         SN.gcp_service_account_service,
         GcpServiceAccountService(gcp_account_repo, cloud_account_service),
     )
@@ -426,6 +431,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
         SN.gcp_service_account_repo,
         GcpServiceAccountKeyRepository(session_maker),
     )
+    azure_subscription_credentals_repo = deps.add(
+        SN.azure_subscription_repo,
+        AzureSubscriptionCredentialsRepository(session_maker),
+    )
     deps.add(
         SN.dispatching,
         DispatcherService(
@@ -440,6 +449,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             domain_event_subscriber,
             workspace_repo,
             gcp_account_repo,
+            azure_subscription_credentals_repo,
         ),
     )
     deps.add(
