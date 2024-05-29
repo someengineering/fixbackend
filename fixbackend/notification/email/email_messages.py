@@ -195,6 +195,7 @@ class AccountDegraded:
     cloud_account_id: CloudAccountId
     account_name: Optional[str]
     tenant_id: WorkspaceId
+    workspace_name: str
     cf_stack_deleted: bool
 
     def cloud_name(self) -> str:
@@ -216,16 +217,18 @@ class AccountDegraded:
 
     def subject(self) -> str:
         if self.cloud == CloudNames.AWS and self.cf_stack_deleted:
-            return f"""CloudFormation Stack for account {self.account_info()} was deleted"""
-        return f"""Unable to access {self.cloud_name()} account {self.account_info()}"""
+            return f"""Workspace {self.workspace_name}: CloudFormation Stack for account {self.account_info()} was deleted"""  # noqa
+        return (
+            f"""Workspace {self.workspace_name}: unable to access {self.cloud_name()} account {self.account_info()}"""
+        )
 
     def text(self) -> str:
         if self.cf_stack_deleted:
             return (
-                f"""We noticed that you deleted the CloudFormation Stack for account {self.account_info()}."""
+                f"""We noticed that you deleted the AWS CloudFormation Stack for account {self.account_info()} in workspace {self.workspace_name} ({self.tenant_id})."""  # noqa
                 "The corresponding resources won't be collected."
             )
-        return f"""Fix was not able to collect latest resource information for {self.account_name} account {self.account_info()}. Please ensure the account exists and that the necessary access permissions have been granted.
+        return f"""Fix was not able to collect latest resource information for {self.account_name} account {self.account_info()} in workspace {self.workspace_name} ({self.tenant_id}). Please ensure the account exists and that the necessary access permissions have been granted.
 
 View in Fix: https://app.fix.security/workspace-settings/accounts#{self.tenant_id}"""  # noqa
 

@@ -462,12 +462,17 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
 
                 case CloudAccountDegraded.kind:
                     degraded_event = CloudAccountDegraded.from_json(message)
+                    workspace = await self.workspace_repository.get_workspace(degraded_event.tenant_id)
+                    if workspace is None:
+                        log.error(f"Workspace {degraded_event.tenant_id} not found, can't send email")
+                        return None
                     await self.notification_service.send_message_to_workspace(
                         workspace_id=degraded_event.tenant_id,
                         message=email.AccountDegraded(
                             cloud=degraded_event.cloud,
                             cloud_account_id=degraded_event.account_id,
                             tenant_id=degraded_event.tenant_id,
+                            workspace_name=workspace.name,
                             account_name=degraded_event.account_name,
                             cf_stack_deleted=degraded_event.reason == DegradationReason.stack_deleted,
                         ),
