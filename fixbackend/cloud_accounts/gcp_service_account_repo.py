@@ -100,33 +100,29 @@ class GcpServiceAccountKeyRepository:
 
             return entity.to_model()
 
-    async def list_created_after(self, time: datetime) -> List[GcpServiceAccountKey]:
+    async def list_created_after(self, time: datetime, only_valid_keys: bool = True) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:
-            query = (
-                select(GcpServiceAccountKeyEntity)
-                .filter(GcpServiceAccountKeyEntity.created_at > time)
-                .filter(
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at > time)
+            if only_valid_keys:
+                query = query.filter(
                     or_(
                         GcpServiceAccountKeyEntity.can_access_sa == True,  # noqa
                         GcpServiceAccountKeyEntity.can_access_sa == None,  # noqa
                     )
                 )
-            )
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
 
-    async def list_created_before(self, time: datetime) -> List[GcpServiceAccountKey]:
+    async def list_created_before(self, time: datetime, only_valid_keys: bool = True) -> List[GcpServiceAccountKey]:
         async with self._session_maker() as session:
-            query = (
-                select(GcpServiceAccountKeyEntity)
-                .filter(GcpServiceAccountKeyEntity.created_at < time)
-                .filter(
+            query = select(GcpServiceAccountKeyEntity).filter(GcpServiceAccountKeyEntity.created_at < time)
+            if only_valid_keys:
+                query = query.filter(
                     or_(
                         GcpServiceAccountKeyEntity.can_access_sa == True,  # noqa
                         GcpServiceAccountKeyEntity.can_access_sa == None,  # noqa
                     )
                 )
-            )
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
 

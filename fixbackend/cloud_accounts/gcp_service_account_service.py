@@ -100,12 +100,12 @@ class GcpServiceAccountService(Service):
             log.info(f"Failed to list projects for service account key {key.id}, marking it as invalid: {e}")
             await self.service_account_key_repo.update_status(key.id, can_access_sa=False)
             return None
-
+        await self.service_account_key_repo.update_status(key.id, can_access_sa=True)
         await self.update_cloud_accounts(projects, key.tenant_id, key.id)
 
     async def _ping_new_service_account_keys(self) -> None:
         created_less_than_30_minutes_ago = await self.service_account_key_repo.list_created_after(
-            utc() - timedelta(minutes=30)
+            utc() - timedelta(minutes=30), only_valid_keys=False
         )
 
         async with asyncio.TaskGroup() as tg:
@@ -113,7 +113,9 @@ class GcpServiceAccountService(Service):
                 tg.create_task(self._import_projects_from_service_account(key))
 
     async def _service_account_healthcheck(self) -> None:
-        older_than_1_hour = await self.service_account_key_repo.list_created_before(utc() - timedelta(hours=1))
+        older_than_1_hour = await self.service_account_key_repo.list_created_before(
+            utc() - timedelta(hours=1), only_valid_keys=True
+        )
 
         async with asyncio.TaskGroup() as tg:
             for key in older_than_1_hour:
