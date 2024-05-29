@@ -70,7 +70,7 @@ from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
-from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
