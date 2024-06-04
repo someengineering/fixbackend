@@ -25,7 +25,6 @@ from sqlalchemy.exc import IntegrityError
 from typing import Optional, Tuple, List
 from uuid import UUID
 
-from fastapi_users.password import PasswordHelperProtocol
 from fixcloudutils.service import Service
 from passlib.pwd import genword
 from sqlalchemy import delete, select
@@ -40,6 +39,16 @@ from fixbackend.permissions.models import all_permissions
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
+from passlib.context import CryptContext
+
+
+# if you change this, tokens will be invalidated
+crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# so pickling works for multiprocessing
+def verify_and_update(plain_password: str, hashed_password: str) -> Tuple[bool, str]:
+    return crypt_context.verify_and_update(plain_password, hashed_password)  # type: ignore
 
 
 class ApiTokenService(Service):
@@ -49,14 +58,12 @@ class ApiTokenService(Service):
         session_maker: AsyncSessionMaker,
         jwt_strategy: FixJWTStrategy,
         user_repo: UserRepository,
-        password_helper: PasswordHelperProtocol,
         workspace_repo: WorkspaceRepository,
         process_pool: AsyncProcessPool,
     ) -> None:
         self.session_maker = session_maker
         self.jwt_strategy = jwt_strategy
         self.user_repo = user_repo
-        self.password_helper = password_helper
         self.workspace_repo = workspace_repo
         self.process_pool = process_pool
 
@@ -78,7 +85,7 @@ class ApiTokenService(Service):
     ) -> Tuple[ApiToken, str]:
         try:
             token_id, token = self._create_token()
-            token_hash = self.password_helper.hash(token)
+            token_hash = crypt_context.hash(token)
             if workspace_id:
                 ids = {ws.id for ws in await self.workspace_repo.list_workspaces(user)}
                 assert workspace_id in ids, "User is not a member of the workspace"
@@ -142,9 +149,7 @@ class ApiTokenService(Service):
                 .scalars()
                 .one_or_none()
             ):
-                verified, updated_password_hash = await self.process_pool.submit(
-                    self.password_helper.verify_and_update, api_token, row.hash
-                )
+                verified, updated_password_hash = await self.process_pool.submit(verify_and_update, api_token, row.hash)
                 if not verified:
                     raise NotAllowed("Invalid token")
                 # Update password hash to a more robust one if needed
