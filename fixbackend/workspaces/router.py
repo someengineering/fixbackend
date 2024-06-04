@@ -251,7 +251,8 @@ def workspaces_router() -> APIRouter:
                 message = "invitation-accepted"
                 workspace_id = invitation_result.workspace_id
 
-        url = request.base_url.replace_query_params(message=message, workspace_id=workspace_id)
+        url = str(request.base_url.replace_query_params(message=message))
+        url = url + f"#{workspace_id}"
         return RedirectResponse(url)
 
     @router.get("/{workspace_id}/cf_url")
