@@ -293,9 +293,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     jwt_strategy = deps.add(SN.jwt_strategy, FixJWTStrategy(cert_store, lifetime_seconds=cfg.session_ttl))
     deps.add(
         SN.api_token_service,
-        ApiTokenService(
-            session_maker, jwt_strategy, user_repo, password_helper, workspace_repo, deps.async_process_pool
-        ),
+        ApiTokenService(session_maker, jwt_strategy, user_repo, workspace_repo, deps.async_process_pool),
     )
     gcp_account_repo = deps.add(
         SN.gcp_service_account_repo,

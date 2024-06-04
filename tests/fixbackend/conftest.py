@@ -864,12 +864,9 @@ def api_token_service(
     workspace_repository: WorkspaceRepository,
     jwt_strategy: FixJWTStrategy,
     user_repository: UserRepository,
-    password_helper: InsecureFastPasswordHelper,
     async_process_pool: AsyncProcessPool,
 ) -> ApiTokenService:
-    return ApiTokenService(
-        async_session_maker, jwt_strategy, user_repository, password_helper, workspace_repository, async_process_pool
-    )
+    return ApiTokenService(async_session_maker, jwt_strategy, user_repository, workspace_repository, async_process_pool)
 
 
 @pytest.fixture
