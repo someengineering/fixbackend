@@ -22,6 +22,7 @@ from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
+from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.dependencies import FixDependencies, ServiceNames
@@ -67,6 +68,8 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     azure_subscription_repo = dependencies.service(
         ServiceNames.azure_subscription_repo, AzureSubscriptionCredentialsRepository
     )
+
+    azure_subscription_service = dependencies.service(ServiceNames.azure_subscription_service, AzureSubscriptionService)
 
     def inventory() -> InventoryService:
         return dependencies.service(ServiceNames.inventory, InventoryService)
@@ -232,6 +235,14 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         credentials: AzureSubscriptionCredentialsUpdate,
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update_cloud_accounts))],
     ) -> Response:
+
+        try:
+            await azure_subscription_service.list_subscriptions(
+                credentials.azure_tenant_id, credentials.client_id, credentials.client_secret
+            )
+        except Exception as e:
+            log.info(f"Error listing Azure subscriptions: {e}")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_credentials")
 
         await azure_subscription_repo.upsert(
             workspace.id,
