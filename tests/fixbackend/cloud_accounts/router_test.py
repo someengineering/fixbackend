@@ -40,6 +40,7 @@ from fixbackend.config import config as get_config
 from fixbackend.db import get_async_session
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountAlias,
     CloudAccountId,
     CloudAccountName,
@@ -159,6 +160,17 @@ class InMemoryCloudAccountService(CloudAccountService):
 
     async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
         return None
+
+    async def create_azure_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        subscription_credentials_id: AzureSubscriptionCredentialsId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+        """Create an Azure cloud account."""
+        raise NotImplementedError
 
 
 cloud_account_service = InMemoryCloudAccountService()

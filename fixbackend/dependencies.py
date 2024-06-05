@@ -79,6 +79,7 @@ class ServiceNames:
     gcp_service_account_service = "gcp_service_account_service"
     aws_tier_preference_repo = "aws_tier_preference_repo"
     azure_subscription_repo = "azure_subscription_repo"
+    azure_subscription_service = "azure_subscription_service"
 
 
 class FixDependencies(Dependencies):

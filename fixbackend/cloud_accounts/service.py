@@ -19,6 +19,7 @@ from typing import List, Optional
 from fixbackend.cloud_accounts.models import CloudAccount
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountId,
     CloudAccountName,
     ExternalId,
@@ -58,6 +59,18 @@ class CloudAccountService(ABC):
         account_name: Optional[CloudAccountName],
     ) -> CloudAccount:
         """Create a GCP cloud account."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create_azure_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        subscription_credentials_id: AzureSubscriptionCredentialsId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+        """Create an Azure cloud account."""
         raise NotImplementedError
 
     @abstractmethod

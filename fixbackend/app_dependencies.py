@@ -48,6 +48,7 @@ from fixbackend.cloud_accounts.account_setup import AwsAccountSetupHelper
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
+from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.collect.collect_queue import RedisCollectQueue
@@ -299,13 +300,17 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         SN.gcp_service_account_repo,
         GcpServiceAccountKeyRepository(session_maker),
     )
-    deps.add(
+    azure_subscription_repo = deps.add(
         SN.azure_subscription_repo,
         AzureSubscriptionCredentialsRepository(session_maker),
     )
     deps.add(
         SN.gcp_service_account_service,
         GcpServiceAccountService(gcp_account_repo, cloud_account_service),
+    )
+    deps.add(
+        SN.azure_subscription_service,
+        AzureSubscriptionService(azure_subscription_repo, cloud_account_service),
     )
     return deps
 
@@ -462,6 +467,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     deps.add(
         SN.gcp_service_account_service,
         GcpServiceAccountService(gcp_account_repo, cloud_account_service, dispatching=True),
+    )
+    deps.add(
+        SN.azure_subscription_service,
+        AzureSubscriptionService(azure_subscription_credentals_repo, cloud_account_service, dispatching=True),
     )
     return deps
 

@@ -71,6 +71,7 @@ from fixbackend.billing.billing_job import BillingJob
 from fixbackend.billing.service import BillingEntryService
 from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
+from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService, SubscriptionInfo
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
@@ -87,6 +88,7 @@ from fixbackend.fix_jwt import JwtService
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import (
+    AzureSubscriptionCredentialsId,
     GcpServiceAccountKeyId,
     SubscriptionId,
     WorkspaceId,
@@ -797,6 +799,36 @@ def azure_subscription_credentials_repo(
     return AzureSubscriptionCredentialsRepository(async_session_maker)
 
 
+class AzureSubscriptionServiceMock(AzureSubscriptionService):
+
+    def __init__(self) -> None:
+        pass
+
+    async def start(self) -> Any:
+        return None
+
+    async def stop(self) -> None:
+        return None
+
+    async def list_subscriptions(
+        self, azure_tenant_id: str, client_id: str, client_secret: str
+    ) -> List[SubscriptionInfo]:
+        return []
+
+    async def update_cloud_accounts(
+        self,
+        subscriptions: List[SubscriptionInfo],
+        tenant_id: WorkspaceId,
+        credentials_id: AzureSubscriptionCredentialsId,
+    ) -> None:
+        return None
+
+
+@pytest.fixture
+def azure_subscription_service() -> AzureSubscriptionService:
+    return AzureSubscriptionServiceMock()
+
+
 @pytest.fixture
 async def dispatcher(
     arq_redis: Redis,
@@ -888,6 +920,7 @@ async def fix_deps(
     azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     inventory_service: InventoryService,
     gcp_service_account_service: GcpServiceAccountService,
+    azure_subscription_service: AzureSubscriptionService,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -913,6 +946,7 @@ async def fix_deps(
             ServiceNames.aws_tier_preference_repo: AwsTierPreferenceRepository(async_session_maker),
             ServiceNames.azure_subscription_repo: azure_subscription_credentials_repo,
             ServiceNames.gcp_service_account_service: gcp_service_account_service,
+            ServiceNames.azure_subscription_service: azure_subscription_service,
         }
     )
 

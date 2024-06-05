@@ -40,6 +40,7 @@ from fixbackend.analytics.events import (
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
+    AzureCloudAccess,
     CloudAccess,
     CloudAccount,
     CloudAccountState,
@@ -69,6 +70,7 @@ from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.errors import NotAllowed, ResourceNotFound, WrongState
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountId,
     CloudAccountName,
     CloudNames,
@@ -803,7 +805,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         set_workspace_id(workspace_id)
         set_cloud_account_id(account_id)
 
-        log.info("create_aws_account called")
+        log.info("create_gcp_account called")
 
         workspace = await self.workspace_repository.get_workspace(workspace_id)
         if workspace is None:
@@ -846,6 +848,69 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         await self.domain_events.publish(
             CloudAccountConfigured(
                 cloud=CloudNames.GCP,
+                cloud_account_id=result.id,
+                tenant_id=workspace_id,
+                account_id=account_id,
+            )
+        )
+
+        return result
+
+    async def create_azure_account(
+        self,
+        *,
+        workspace_id: WorkspaceId,
+        account_id: CloudAccountId,
+        subscription_credentials_id: AzureSubscriptionCredentialsId,
+        account_name: Optional[CloudAccountName],
+    ) -> CloudAccount:
+
+        set_workspace_id(workspace_id)
+        set_cloud_account_id(account_id)
+
+        log.info("create_azure_account called")
+
+        workspace = await self.workspace_repository.get_workspace(workspace_id)
+        if workspace is None:
+            raise ResourceNotFound("Organization does not exist")
+
+        if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
+            log.info("Azure account already exists")
+            return existing
+
+        should_be_enabled = await self._should_be_enabled(workspace)
+
+        created_at = utc()
+        account = CloudAccount(
+            id=FixCloudAccountId(uuid.uuid4()),
+            account_id=account_id,
+            workspace_id=workspace_id,
+            cloud=CloudNames.Azure,
+            state=CloudAccountStates.Configured(
+                access=AzureCloudAccess(subscription_credentials_id), enabled=should_be_enabled, scan=should_be_enabled
+            ),
+            account_alias=None,
+            account_name=account_name,
+            user_account_name=None,
+            privileged=False,
+            next_scan=None,
+            last_scan_duration_seconds=0,
+            last_scan_resources_scanned=0,
+            last_scan_started_at=None,
+            created_at=created_at,
+            updated_at=created_at,
+            state_updated_at=created_at,
+            cf_stack_version=0,
+            failed_scan_count=0,
+            last_task_id=None,
+        )
+
+        result = await self.cloud_account_repository.create(account)
+        log.info(f"Azure cloud Account {account_id} created")
+
+        await self.domain_events.publish(
+            CloudAccountConfigured(
+                cloud=CloudNames.Azure,
                 cloud_account_id=result.id,
                 tenant_id=workspace_id,
                 account_id=account_id,

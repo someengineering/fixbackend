@@ -39,6 +39,8 @@ redis = ">5"
 
 
 python-multipart = "0.0.7"
+azure-identity = "^1.16.0"
+azure-mgmt-resource = "^23.1.1"
 [tool.poetry.group.dev.dependencies]
 ipykernel = ">=6.25.1"
 mypy = ">=1.5.1"
