@@ -15,6 +15,7 @@
 import asyncio
 from datetime import timedelta
 from typing import Any, List, Optional
+import warnings
 from attr import frozen
 from fixcloudutils.service import Service
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
@@ -107,7 +108,13 @@ class AzureSubscriptionService(Service):
     async def _import_subscriptions(self, creds: AzureSubscriptionCredentials) -> None:
         log.info(f"Importing azure subscriptions for credential_id {creds.id}")
         try:
-            subscriptions = await self.list_subscriptions(creds.azure_tenant_id, creds.client_id, creds.client_secret)
+            with warnings.catch_warnings(record=True) as captured_warnings:
+                subscriptions = await self.list_subscriptions(
+                    creds.azure_tenant_id, creds.client_id, creds.client_secret
+                )
+                for warning in captured_warnings:
+                    log.info(warning.message, extra={"lineno": warning.lineno, "filename": warning.filename})
+
         except Exception as e:
             log.info(f"Failed to list azure subscriptions, credential_id {creds.id}, marking it as invalid: {e}")
             await self.azure_subscriptions_repo.update_status(creds.id, can_access_accounts=False)
