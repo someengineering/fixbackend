@@ -155,7 +155,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
     async def create(self, cloud_account: CloudAccount) -> CloudAccount:
         """Create a cloud account."""
         async with self.session_maker() as session:
-            if cloud_account.cloud not in [CloudNames.AWS, CloudNames.GCP]:
+            if cloud_account.cloud not in [CloudNames.AWS, CloudNames.GCP, CloudNames.Azure]:
                 raise ValueError(f"Unknown cloud {cloud_account.cloud}")
 
             orm_cloud_account = orm.CloudAccount(

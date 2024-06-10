@@ -25,6 +25,7 @@ from datetime import datetime
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
 from fixbackend.ids import (
+    AzureSubscriptionCredentialsId,
     GcpServiceAccountKeyId,
     TaskId,
     WorkspaceId,
@@ -50,6 +51,7 @@ class CloudAccount(Base):
     aws_external_id: Mapped[Optional[ExternalId]] = mapped_column(GUID, nullable=True)
     aws_role_name: Mapped[Optional[AwsRoleName]] = mapped_column(String(length=2048), nullable=True)
     gcp_service_account_key_id: Mapped[Optional[GcpServiceAccountKeyId]] = mapped_column(GUID, nullable=True)
+    azure_credential_id: Mapped[Optional[AzureSubscriptionCredentialsId]] = mapped_column(GUID, nullable=True)
     privileged: Mapped[bool] = mapped_column(Boolean, nullable=False)
     user_account_name: Mapped[Optional[UserCloudAccountName]] = mapped_column(String(length=256), nullable=True)
     api_account_name: Mapped[Optional[CloudAccountName]] = mapped_column(String(length=256), nullable=True)
@@ -89,6 +91,12 @@ class CloudAccount(Base):
                         raise ValueError("GCP service account key id is not set")
                     return models.GcpCloudAccess(
                         service_account_key_id=self.gcp_service_account_key_id,
+                    )
+                case CloudNames.Azure:
+                    if self.azure_credential_id is None:
+                        raise ValueError("Azure credential id is not set")
+                    return models.AzureCloudAccess(
+                        subscription_credentials_id=self.azure_credential_id,
                     )
                 case _:
                     raise ValueError(f"Unknown cloud {self.cloud}")
