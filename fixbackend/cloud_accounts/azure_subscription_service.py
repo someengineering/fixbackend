@@ -94,6 +94,7 @@ class AzureSubscriptionService(Service):
         credentials_id: AzureSubscriptionCredentialsId,
     ) -> None:
         for subscription in subscriptions:
+
             await self.cloud_account_service.create_azure_account(
                 workspace_id=tenant_id,
                 account_id=CloudAccountId(subscription.subscription_id),
@@ -104,12 +105,14 @@ class AzureSubscriptionService(Service):
             )
 
     async def _import_subscriptions(self, creds: AzureSubscriptionCredentials) -> None:
+        log.info(f"Importing azure subscriptions for credential_id {creds.id}")
         try:
             subscriptions = await self.list_subscriptions(creds.azure_tenant_id, creds.client_id, creds.client_secret)
         except Exception as e:
             log.info(f"Failed to list azure subscriptions, credential_id {creds.id}, marking it as invalid: {e}")
             await self.azure_subscriptions_repo.update_status(creds.id, can_access_accounts=False)
             return None
+        log.info("found %s subscriptions", len(subscriptions))
         await self.azure_subscriptions_repo.update_status(creds.id, can_access_accounts=True)
         await self.update_cloud_accounts(subscriptions, creds.tenant_id, creds.id)
 
