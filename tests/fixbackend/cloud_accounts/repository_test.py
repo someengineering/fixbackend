@@ -23,6 +23,7 @@ from fixcloudutils.util import utc
 from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
+    AzureCloudAccess,
     CloudAccount,
     CloudAccountState,
     CloudAccountStates,
@@ -31,6 +32,7 @@ from fixbackend.cloud_accounts.models import (
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountAlias,
     CloudAccountId,
     CloudAccountName,
@@ -246,5 +248,56 @@ async def test_create_gcp_cloud_account(
     # get by account_id
     account_by_id = await cloud_account_repository.get_by_account_id(
         workspace_id=workspace_id, account_id=CloudAccountId("gcp-123")
+    )
+    assert account_by_id is not None
+
+
+@pytest.mark.asyncio
+async def test_create_azure_cloud_account(
+    async_session_maker: AsyncSessionMaker,
+    workspace_repository: WorkspaceRepository,
+    user: User,
+) -> None:
+    cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
+    org = await workspace_repository.create_workspace("foo", "foo", user)
+    workspace_id = org.id
+
+    cloud_access = AzureCloudAccess(
+        subscription_credentials_id=AzureSubscriptionCredentialsId(uuid.uuid4()),
+    )
+
+    account = CloudAccount(
+        id=FixCloudAccountId(uuid.uuid4()),
+        account_id=CloudAccountId("azure-123"),
+        workspace_id=workspace_id,
+        cloud=CloudNames.Azure,
+        state=CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user_provided_name"),
+        privileged=False,
+        last_scan_started_at=None,
+        last_scan_duration_seconds=0,
+        last_scan_resources_scanned=0,
+        next_scan=None,
+        created_at=utc().replace(microsecond=0),
+        updated_at=utc().replace(microsecond=0),
+        state_updated_at=utc().replace(microsecond=0),
+        cf_stack_version=0,
+        failed_scan_count=0,  # only the last one has failed scans
+        last_task_id=None,
+    )
+
+    # create
+    created = await cloud_account_repository.create(cloud_account=account)
+    assert created == account
+
+    # get
+    stored_account = await cloud_account_repository.get(id=account.id)
+    assert account == stored_account
+
+    # get by account_id
+    account_by_id = await cloud_account_repository.get_by_account_id(
+        workspace_id=workspace_id, account_id=CloudAccountId("azure-123")
     )
     assert account_by_id is not None

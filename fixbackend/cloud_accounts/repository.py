@@ -22,6 +22,7 @@ from fixcloudutils.util import utc
 
 from fixbackend.cloud_accounts.models import (
     AwsCloudAccess,
+    AzureCloudAccess,
     CloudAccess,
     CloudAccount,
     CloudAccountState,
@@ -33,6 +34,7 @@ from fixbackend.db import AsyncSessionMakerDependency
 from fixbackend.errors import ResourceNotFound
 from fixbackend.ids import (
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
     CloudAccountId,
     CloudNames,
     ExternalId,
@@ -100,13 +102,14 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         role_name: Optional[AwsRoleName] = None
         external_id: Optional[ExternalId] = None
         gcp_service_key_id: Optional[GcpServiceAccountKeyId] = None
+        azure_credential_id: Optional[AzureSubscriptionCredentialsId] = None
         enabled = False
         scan = False
         error: Optional[str] = None
         state: Optional[str] = None
 
         def update_cloud_access_fields(cloud_access: CloudAccess) -> None:
-            nonlocal role_name, external_id, gcp_service_key_id
+            nonlocal role_name, external_id, gcp_service_key_id, azure_credential_id
 
             match cloud_access:
                 case AwsCloudAccess():
@@ -115,6 +118,9 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
                 case GcpCloudAccess():
                     gcp_service_key_id = cloud_access.service_account_key_id
+
+                case AzureCloudAccess():
+                    azure_credential_id = cloud_access.subscription_credentials_id
 
         match account_state:
             case CloudAccountStates.Detected():
@@ -147,6 +153,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
         orm_cloud_account.aws_external_id = external_id
         orm_cloud_account.aws_role_name = role_name
         orm_cloud_account.gcp_service_account_key_id = gcp_service_key_id
+        orm_cloud_account.azure_credential_id = azure_credential_id
         orm_cloud_account.state = state
         orm_cloud_account.error = error
         orm_cloud_account.enabled = enabled
