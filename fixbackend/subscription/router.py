@@ -85,7 +85,7 @@ def subscription_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/workspaces/{workspace_id}/aws_marketplace_product")
     async def redirect_to_aws_marketplace_product(
-        workspace_id: WorkspaceId, product_tier: Optional[ProductTierRead]
+        workspace_id: WorkspaceId, product_tier: Optional[ProductTierRead] = None
     ) -> Response:
 
         if product_tier:
