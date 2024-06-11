@@ -82,6 +82,10 @@ class Scatter(BaseModel):
         # Assume 0 if no value is present
         return [self.values.get(at, 0) for at in ats]
 
+    @property
+    def avg(self) -> float:
+        return sum(self.values.values()) / len(self.values) if self.values else 0
+
 
 class Scatters(BaseModel):
     start: datetime
