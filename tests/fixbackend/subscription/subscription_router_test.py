@@ -93,7 +93,10 @@ async def client(
 async def test_aws_marketplace_fulfillment_after_login(client: AsyncClient) -> None:
     response = await client.get("/api/subscriptions/aws/marketplace/add", cookies={"fix-aws-marketplace-token": "foo"})
     assert response.status_code == 307
-    assert response.headers["location"] == f"/subscription/choose-workspace?subscription_id={subscription.id}"
+    assert (
+        response.headers["location"]
+        == f"http://localhost:8000/subscription/choose-workspace?subscription_id={subscription.id}"
+    )
 
 
 @pytest.mark.asyncio
@@ -110,4 +113,7 @@ async def test_aws_marketplace_fulfillment_no_workspace_id(client: AsyncClient) 
     handler.subcriptions[user.id] = SimpleNamespace(id=subscription.id, workspace_id=None)  # type: ignore
     response = await client.get("/api/subscriptions/aws/marketplace/add", cookies={"fix-aws-marketplace-token": "foo"})
     assert response.status_code == 307
-    assert response.headers["location"] == f"/subscription/choose-workspace?subscription_id={subscription.id}"
+    assert (
+        response.headers["location"]
+        == f"http://localhost:8000/subscription/choose-workspace?subscription_id={subscription.id}"
+    )
