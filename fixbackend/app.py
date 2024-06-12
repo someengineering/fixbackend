@@ -300,7 +300,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
                 response = await call_next(request)
             except RuntimeError as err:
                 if "No response returned" in str(err):
-                    log.info(f"No response returned error, requested url: {request.url}")
+                    log.info(f"No response returned error. {request.method}: {request.url}, headers: {request.headers}")
                     return Response(status_code=500)
                 raise
 
