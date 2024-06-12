@@ -30,7 +30,7 @@ from fixbackend.config import trial_period_duration
 from fixbackend.domain_events.events import ProductTierChanged, UserRegistered, WorkspaceCreated
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.ids import ProductTier
-from fixbackend.notification.email.email_messages import Signup, TrialExpiresSoon
+from fixbackend.notification.email.email_messages import Signup, TrialExpired, TrialExpiresSoon
 from fixbackend.notification.email.one_time_email import OneTimeEmailKind, OneTimeEmailService
 from fixbackend.notification.notification_service import NotificationService
 from fixcloudutils.util import utc
@@ -70,6 +70,14 @@ class ScheduleTrialEndReminder(Service):
                 workspace_id=event.workspace_id,
                 message=TrialExpiresSoon(days_till_expire=days_before_expiration),
             )
+
+        await self.one_time_email_service.schedule_one_time_email(
+            kind=OneTimeEmailKind.TrialEndNotification,
+            scheduled_at=utc() + trial_period_duration(),
+            user_id=None,
+            workspace_id=event.workspace_id,
+            message=TrialExpired(),
+        )
 
 
 class UnscheduleTrialEndReminder(Service):
