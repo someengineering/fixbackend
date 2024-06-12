@@ -23,6 +23,8 @@ from fixcloudutils.service import Service
 from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.config import ProductTierSettings, trial_period_duration
 from fixbackend.ids import ProductTier
+from fixbackend.notification.email.email_messages import TrialExpired
+from fixbackend.notification.notification_service import NotificationService
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -36,10 +38,12 @@ class TrialEndService(Service):
         workspace_repository: WorkspaceRepository,
         session_maker: AsyncSessionMaker,
         cloud_account_service: CloudAccountService,
+        notification_service: NotificationService,
     ):
         self.workspace_repository = workspace_repository
         self.cloud_account_service = cloud_account_service
         self.session_maker = session_maker
+        self.notification_service = notification_service
         self.periodic: Optional[Periodic] = Periodic(
             "move_trials_to_free_tier", self.move_trials_to_free_tier, timedelta(minutes=60)
         )
@@ -59,9 +63,12 @@ class TrialEndService(Service):
             workspaces = await self.workspace_repository.list_expired_trials(
                 been_in_trial_tier_for=trial_period_duration(), session=session
             )
+
             for workspace in workspaces:
                 new_tier = ProductTier.Free
                 if limit := ProductTierSettings[new_tier].account_limit:
                     await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
                 log.info(f"Moving workspace {workspace.id} to free tier from trial tier because trial has expired.")
                 await self.workspace_repository.update_product_tier(workspace.id, new_tier, session=session)
+                message = TrialExpired()
+                await self.notification_service.send_message_to_workspace(workspace_id=workspace.id, message=message)

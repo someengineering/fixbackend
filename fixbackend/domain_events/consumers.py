@@ -30,7 +30,7 @@ from fixbackend.config import trial_period_duration
 from fixbackend.domain_events.events import ProductTierChanged, UserRegistered, WorkspaceCreated
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.ids import ProductTier
-from fixbackend.notification.email.email_messages import Signup, TrialExpired, TrialExpiresSoon
+from fixbackend.notification.email.email_messages import Signup, TrialExpiresSoon
 from fixbackend.notification.email.one_time_email import OneTimeEmailKind, OneTimeEmailService
 from fixbackend.notification.notification_service import NotificationService
 from fixcloudutils.util import utc
@@ -59,8 +59,7 @@ class ScheduleTrialEndReminder(Service):
         one_time_email_service: OneTimeEmailService,
     ) -> None:
         self.one_time_email_service = one_time_email_service
-        # uncomment once we have payment
-        # subscriber.subscribe(WorkspaceCreated, self.schedule_trial_end_reminder, "schedule_trial_end_reminder")
+        subscriber.subscribe(WorkspaceCreated, self.schedule_trial_end_reminder, "schedule_trial_end_reminder")
 
     async def schedule_trial_end_reminder(self, event: WorkspaceCreated) -> None:
         for days_before_expiration in [2, 1]:
@@ -72,14 +71,6 @@ class ScheduleTrialEndReminder(Service):
                 message=TrialExpiresSoon(days_till_expire=days_before_expiration),
             )
 
-        await self.one_time_email_service.schedule_one_time_email(
-            kind=OneTimeEmailKind.TrialEndNotification,
-            scheduled_at=utc() + trial_period_duration(),
-            user_id=None,
-            workspace_id=event.workspace_id,
-            message=TrialExpired(),
-        )
-
 
 class UnscheduleTrialEndReminder(Service):
     def __init__(
@@ -88,8 +79,7 @@ class UnscheduleTrialEndReminder(Service):
         one_time_email_service: OneTimeEmailService,
     ) -> None:
         self.one_time_email_service = one_time_email_service
-        # uncomment once we have payment
-        # subscriber.subscribe(ProductTierChanged, self.unschedule_trial_end_reminder, "unschedule_trial_end_reminder")
+        subscriber.subscribe(ProductTierChanged, self.unschedule_trial_end_reminder, "unschedule_trial_end_reminder")
 
     async def unschedule_trial_end_reminder(self, event: ProductTierChanged) -> None:
         moved_from_trial = event.previous_tier == ProductTier.Trial and event.product_tier != ProductTier.Trial
