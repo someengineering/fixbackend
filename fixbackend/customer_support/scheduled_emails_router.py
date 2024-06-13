@@ -81,8 +81,8 @@ def scheduled_emails_router(dependencies: FixDependencies, templates: Jinja2Temp
         email_kind: Annotated[OneTimeEmailKind, Form()],
     ) -> Response:
 
-        for id in workspace_ids:
-            await unschedule_trial_end.unschedule_trial_end_reminder(id, kind=email_kind)
+        for workspace_id in workspace_ids:
+            await unschedule_trial_end.unschedule_trial_end_reminder(workspace_id, kind=email_kind)
 
         return Response(
             status_code=status.HTTP_201_CREATED,
