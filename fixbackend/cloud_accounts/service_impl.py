@@ -1084,7 +1084,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         account = await self.cloud_account_repository.update(account_id, set_degraded)
         await self.domain_events.publish(
             CloudAccountDegraded(
-                cloud=CloudNames.AWS,
+                cloud=account.cloud,
                 cloud_account_id=account.id,
                 tenant_id=account.workspace_id,
                 account_id=account.account_id,
