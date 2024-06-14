@@ -1,0 +1,36 @@
+{% extends "navbar.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full" hx-history="false">
+    <h2 class="text-xl mt-8 ml-8">Trial end email reminders</h2>
+    <div class="flex flex-col m-8 items-start gap-8">
+        <form class="join">
+            <div class="form-control">
+                <input type="number" name="days_in_trial" placeholder="-42" class="input input-bordered join-item" />
+                <label class="label">
+                    <span class="label-text-alt">Days on Trial tier</span>
+                </label>
+            </div>
+            <div class="form-control">
+                <input type="datetime-local" name="schedule_at" placeholder=""
+                    class="input input-bordered w-full max-w-xs join-item" />
+                <label class="label">
+                    <span class="label-text-alt">Send at (in UTC)</span>
+                </label>
+            </div>
+            <div class="form-contaol">
+                <select class="select select-bordered w-full max-w-xs join-item" name="email_kind">
+                    <option>trial_end</option>
+                  </select>
+                <label class="label">
+                    <span class="label-text-alt">Email kind</span>
+                </label>
+            </div>
+            <button hx-post="{{ url_for('scheduled_emails:schedule_trial_end') }}"
+                hx-target="#result" class="btn btn-outline btn-primary join-item">Schedule trial end
+                reminders</button>
+        </form>
+        <div id="result"></div>
+    </div>
+</div>
+{% endblock %}

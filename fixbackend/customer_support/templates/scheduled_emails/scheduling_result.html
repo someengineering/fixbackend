@@ -1,0 +1,17 @@
+
+<p>
+    Affected workspaces:
+</p>
+<form class="flex gap-4 w-full max-w-4xl flex-wrap">
+
+{% for workspace_id in workspace_ids %}
+<div class="border rounded-sm p-2">
+    {{ workspace_id }}
+</div>
+<input type="hidden" name="workspace_ids" value="{{ workspace_id }}">
+{% endfor %}
+<input type="hidden" name="email_kind" value="{{ email_kind }}">
+
+<button hx-post="{{ url_for('scheduled_emails:unschedule_trial_end') }}"
+hx-target="#result" class="btn btn-outline join-item">Unschedule emails</button>
+</form>

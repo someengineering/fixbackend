@@ -704,7 +704,13 @@ class InventoryService(Service):
                         existing.values.update(scatter.values)
                     else:
                         scatters[scatter.group_name] = scatter
-        return Scatters(start=start, end=end, granularity=granularity, ats=sorted(ats), groups=list(scatters.values()))
+        return Scatters(
+            start=start,
+            end=end,
+            granularity=granularity,
+            ats=sorted(ats),
+            groups=sorted(scatters.values(), key=lambda x: x.avg, reverse=True),  # sort by scatter, biggest first
+        )
 
     async def __aggregate_roots(self, db: GraphDatabaseAccess) -> Dict[str, Json]:
         if self.__cached_aggregate_roots is not None:

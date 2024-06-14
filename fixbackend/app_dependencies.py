@@ -58,7 +58,11 @@ from fixbackend.dependencies import ServiceNames as SN  # noqa
 from fixbackend.dispatcher.dispatcher_service import DispatcherService
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
-from fixbackend.domain_events.consumers import EmailOnSignupConsumer, ScheduleTrialEndReminder
+from fixbackend.domain_events.consumers import (
+    EmailOnSignupConsumer,
+    ScheduleTrialEndReminder,
+    UnscheduleTrialEndReminder,
+)
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.fix_jwt import JwtServiceImpl
@@ -256,6 +260,9 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(SN.email_on_signup_consumer, EmailOnSignupConsumer(notification_service, domain_event_subscriber))
     deps.add(SN.schedule_trial_end_reminder_consumer, ScheduleTrialEndReminder(domain_event_subscriber, one_time_email))
+    deps.add(
+        SN.unschedule_trial_end_reminder_consumer, UnscheduleTrialEndReminder(domain_event_subscriber, one_time_email)
+    )
     cloud_account_service = deps.add(
         SN.cloud_account_service,
         CloudAccountServiceImpl(
@@ -633,6 +640,19 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     password_helper = deps.add(SN.password_helper, PasswordHelper())
     auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service, cfg))
+    one_time_email = deps.add(
+        SN.one_time_email_service,
+        OneTimeEmailService(notification_service, user_repo, session_maker, dispatching=False),
+    )
+    deps.add(
+        SN.schedule_trial_end_reminder_consumer,
+        ScheduleTrialEndReminder(domain_event_subscriber, one_time_email, listen_to_events=False),
+    )
+    deps.add(
+        SN.unschedule_trial_end_reminder_consumer,
+        UnscheduleTrialEndReminder(domain_event_subscriber, one_time_email, listen_to_events=False),
+    )
+
     deps.add(
         SN.user_manager,
         UserManager(

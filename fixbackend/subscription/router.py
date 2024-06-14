@@ -74,10 +74,14 @@ def subscription_router(fix: FixDependencies) -> APIRouter:
         elif (user := maybe_user) and fix_aws_marketplace_token is not None:  # logged in and token present
             subscription, workspace_assigned = await marketplace_handler.subscribed(user, fix_aws_marketplace_token)
             if not workspace_assigned:
-                response = RedirectResponse(f"/subscription/choose-workspace?subscription_id={subscription.id}")
+                response = RedirectResponse(
+                    f"{config.service_base_url}/subscription/choose-workspace?subscription_id={subscription.id}"
+                )
                 return response
             # load the app and show a message
-            response = RedirectResponse("/workspace-settings/billing-receipts?message=aws-marketplace-subscribed")
+            response = RedirectResponse(
+                f"{config.service_base_url}/workspace-settings/billing-receipts?message=aws-marketplace-subscribed"
+            )
             response.set_cookie(MarketplaceTokenCookie, expires=0, secure=True, httponly=True)  # delete the cookie
             return response
         else:  # something went wrong
@@ -85,7 +89,7 @@ def subscription_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/workspaces/{workspace_id}/aws_marketplace_product")
     async def redirect_to_aws_marketplace_product(
-        workspace_id: WorkspaceId, product_tier: Optional[ProductTierRead]
+        workspace_id: WorkspaceId, product_tier: Optional[ProductTierRead] = None
     ) -> Response:
 
         if product_tier:
