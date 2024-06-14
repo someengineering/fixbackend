@@ -731,6 +731,7 @@ async def billing_entry_service(
     metering_repository: MeteringRepository,
     domain_event_sender: DomainEventPublisher,
     default_config: Config,
+    cloud_account_repository: CloudAccountRepository,
 ) -> BillingEntryService:
     return BillingEntryService(
         subscription_repository,
@@ -738,6 +739,7 @@ async def billing_entry_service(
         metering_repository,
         domain_event_sender,
         default_config.billing_period,
+        cloud_account_repository,
     )
 
 
