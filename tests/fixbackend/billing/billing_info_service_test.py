@@ -137,8 +137,9 @@ async def test_update_billing(
         new_user = await user_repository.create(user_dict)
         await workspace_repository.add_to_workspace(too_many_users_workspace.id, new_user.id, Roles.workspace_member)
 
-    too_many_users_workspace = await workspace_repository.get_workspace(too_many_users_workspace.id)
-    assert too_many_users_workspace
+    updated_too_many_users_workspace = await workspace_repository.get_workspace(too_many_users_workspace.id)
+    assert updated_too_many_users_workspace
+    too_many_users_workspace = updated_too_many_users_workspace
 
     with pytest.raises(NotAllowed) as exc_info:
         await billing_entry_service.update_billing(user.id, too_many_users_workspace, new_product_tier=ProductTier.Free)
