@@ -36,6 +36,7 @@ from fixbackend.billing.models import (
     WorkspacePaymentMethods,
     BillingEntry,
 )
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.config import ProductTierSettings
 from fixbackend.dependencies import FixDependency, ServiceNames
 from fixbackend.domain_events.events import BillingEntryCreated
@@ -80,12 +81,14 @@ class BillingEntryService:
         metering_repository: MeteringRepository,
         domain_event_sender: DomainEventPublisher,
         billing_period: BillingPeriod,
+        cloud_account_repository: CloudAccountRepository,
     ) -> None:
         self.subscription_repository = subscription_repository
         self.workspace_repository = workspace_repository
         self.metering_repository = metering_repository
         self.domain_event_sender = domain_event_sender
         self.billing_period = billing_period
+        self.cloud_account_repository = cloud_account_repository
 
     async def list_billing_info(self, workspace_id: WorkspaceId) -> List[BillingEntry]:
         billing_entries = [
@@ -143,6 +146,9 @@ class BillingEntryService:
     ) -> Workspace:
         current_tier = workspace.product_tier
         workspace_payment_methods = await self.get_payment_methods(workspace, user_id)
+        number_of_cloud_accounts = await self.cloud_account_repository.count_by_workspace_id(
+            workspace.id, non_deleted=True
+        )
 
         def payment_method_available() -> bool:
             new_payment_method_provided = (
@@ -155,17 +161,28 @@ class BillingEntryService:
         if new_product_tier is not None:
             # non-free tiers require a valid payment method
             if new_product_tier.paid and not payment_method_available():
-                raise NotAllowed("You must have a payment method to use non-free tiers")
+                raise NotAllowed("payment_required")
+
+            new_tier_account_limit = ProductTierSettings[new_product_tier].account_limit
+
+            new_tier_seat_limit = ProductTierSettings[new_product_tier].seats_included
+
+            if new_tier_account_limit and new_tier_account_limit < number_of_cloud_accounts:
+                raise NotAllowed("too_many_cloud_accounts")
+
+            # todo: count users more efficiently when this one is slows
+            if new_tier_seat_limit and new_tier_seat_limit < len(workspace.all_users()):
+                raise NotAllowed("too_many_users")
 
         # validate the payment method update
         if new_payment_method is not None:
             # the payment method must be assigned to the workspace
             if new_payment_method not in workspace_payment_methods.available:
-                raise NotAllowed("The payment method is not available for this workspace")
+                raise NotAllowed("unknown_payment_method")
 
             # removing the payment method is not allowed for non-free tiers
             if new_payment_method is PaymentMethods.NoPaymentMethod() and current_tier.paid:
-                raise NotAllowed("Cannot remove payment method for non-free tiers, downgrade the tier first")
+                raise NotAllowed("downgrade_not_allowed")
 
         async def update_payment_method(payment_method: PaymentMethod) -> Workspace:
             if payment_method == workspace_payment_methods.current:

@@ -193,7 +193,12 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     billing_entry_service = deps.add(
         SN.billing_entry_service,
         BillingEntryService(
-            subscription_repo, workspace_repo, metering_repo, domain_event_publisher, cfg.billing_period
+            subscription_repo,
+            workspace_repo,
+            metering_repo,
+            domain_event_publisher,
+            cfg.billing_period,
+            cloud_account_repo,
         ),
     )
     analytics_event_sender = deps.add(
@@ -516,10 +521,16 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
             role_repo,
         ),
     )
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
     billing_entry_service = deps.add(
         SN.billing_entry_service,
         BillingEntryService(
-            subscription_repo, workspace_repo, metering_repo, domain_event_publisher, cfg.billing_period
+            subscription_repo,
+            workspace_repo,
+            metering_repo,
+            domain_event_publisher,
+            cfg.billing_period,
+            cloud_account_repo,
         ),
     )
     aws_tier_preference_repo = deps.add(SN.aws_tier_preference_repo, AwsTierPreferenceRepository(session_maker))
