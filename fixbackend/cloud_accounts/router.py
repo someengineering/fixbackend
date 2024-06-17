@@ -246,7 +246,6 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 
         await azure_subscription_repo.upsert(
             workspace.id,
-            credentials.azure_subscription_id,
             credentials.azure_tenant_id,
             credentials.client_id,
             credentials.client_secret,

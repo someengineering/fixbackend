@@ -166,7 +166,6 @@ class GcpServiceAccountKeyRead(BaseModel):
 
 
 class AzureSubscriptionCredentialsUpdate(BaseModel):
-    azure_subscription_id: CloudAccountId
     azure_tenant_id: str
     client_id: str
     client_secret: str
@@ -175,7 +174,6 @@ class AzureSubscriptionCredentialsUpdate(BaseModel):
 class AzureSubscriptionCredentialsRead(BaseModel):
     id: AzureSubscriptionCredentialsId
     workspace_id: WorkspaceId
-    azure_subscription_id: CloudAccountId
     can_access_azure_account: Optional[bool]
     created_at: datetime
 
@@ -184,7 +182,6 @@ class AzureSubscriptionCredentialsRead(BaseModel):
         return AzureSubscriptionCredentialsRead(
             id=model.id,
             workspace_id=model.tenant_id,
-            azure_subscription_id=model.azure_subscription_id,
             can_access_azure_account=model.can_access_azure_account,
             created_at=model.created_at,
         )
