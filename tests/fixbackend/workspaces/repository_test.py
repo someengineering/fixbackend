@@ -54,7 +54,8 @@ async def test_create_workspace(workspace_repository: WorkspaceRepository, user:
     assert organization.slug == "test-organization"
     assert organization.owner_id == user.id
 
-    assert organization.product_tier == ProductTier.Trial
+    assert organization.current_product_tier() == ProductTier.Trial
+    assert organization.selected_product_tier == ProductTier.Trial
 
     assert len(organization.members) == 1
     for member in organization.members:
@@ -192,13 +193,26 @@ async def test_update_product_tier(
 
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
 
-    current_tier = workspace.product_tier
+    current_tier = workspace.current_product_tier()
     assert current_tier == ProductTier.Trial
+    assert workspace.selected_product_tier == ProductTier.Trial
+    assert workspace.active_product_tier is None
 
     updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Enterprise)
-    assert updated.product_tier == ProductTier.Enterprise
+    assert updated.current_product_tier() == ProductTier.Enterprise
+    assert updated.selected_product_tier == ProductTier.Enterprise
+    assert updated.active_product_tier == ProductTier.Enterprise
+    active_tier_ends_at = updated.active_product_tier_ends_at
+    assert active_tier_ends_at is not None
 
     assert await workspace_repository.get_product_tier(workspace.id) == ProductTier.Enterprise
+
+    # when downgrading the tier, we should keep the tier till the end of the billing cycle
+    updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
+    assert updated.current_product_tier() == ProductTier.Enterprise
+    assert updated.selected_product_tier == ProductTier.Plus
+    assert updated.active_product_tier == ProductTier.Enterprise
+    assert updated.active_product_tier_ends_at == active_tier_ends_at
 
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace(

@@ -111,31 +111,6 @@ async def test_invite_accept_user(
         )
     await workspace_repository.update_payment_on_hold(workspace.id, None)
 
-    # can invite a new user on a better tier
-    workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
-    invite, _ = await service.invite_user(
-        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
-    )
-    assert await invitation_repository.list_invitations(workspace.id) == [invite]
-    assert invite.role == Roles.workspace_billing_admin
-
-    # idempotency
-    second_invite, _ = await service.invite_user(
-        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
-    )
-    assert second_invite == invite
-
-    # list invitations
-    assert await invitation_repository.list_invitations(workspace.id) == [invite]
-
-    # check email
-    email = notification_service.call_args[0]
-    assert isinstance(email, Invite)
-    assert email.recipient == new_user_email
-    assert email.subject() == "You've been invited to join a Fix workspace"
-    assert email.text().startswith(f"{user.email} has invited you to join their workspace")
-    assert "https://example.com?token=" in email.text()
-
     # existing user
     existing_user = await user_repository.create(
         {
@@ -148,12 +123,41 @@ async def test_invite_accept_user(
         workspace.id, user, existing_user.email, "https://example.com", Roles.workspace_billing_admin
     )
 
+    workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
+
     # accepting the invite should fail if there are not enough seats
-    await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
     assert await service.accept_invitation(token) == NoFreeSeats()
 
-    # revert to the previous tier
-    await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
+    # also can't even do the invite if there are not enough seats
+    with pytest.raises(NotAllowed):
+        await service.invite_user(
+            workspace.id, user, existing_user.email, "https://example.com", Roles.workspace_billing_admin
+        )
+
+    # can invite a new user on a better tier
+    workspace = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
+    invite, _ = await service.invite_user(
+        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
+    )
+    assert set(await invitation_repository.list_invitations(workspace.id)) == set([invite, existing_invite])
+    assert invite.role == Roles.workspace_billing_admin
+
+    # idempotency
+    second_invite, _ = await service.invite_user(
+        workspace.id, user, new_user_email, "https://example.com", Roles.workspace_billing_admin
+    )
+    assert second_invite == invite
+
+    # list invitations
+    assert set(await invitation_repository.list_invitations(workspace.id)) == set([invite, existing_invite])
+
+    # check email
+    email = notification_service.call_args[1]
+    assert isinstance(email, Invite)
+    assert email.recipient == new_user_email
+    assert email.subject() == "You've been invited to join a Fix workspace"
+    assert email.text().startswith(f"{user.email} has invited you to join their workspace")
+    assert "https://example.com?token=" in email.text()
 
     # accepting the invite should fail if the workspace has payment on hold
     await workspace_repository.update_payment_on_hold(workspace.id, utc())

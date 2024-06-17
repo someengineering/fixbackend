@@ -118,7 +118,7 @@ class InvitationServiceImpl(InvitationService):
             raise ResourceNotFound(f"Workspace {workspace_id} does not exist.")
 
         # check permissions
-        settings = ProductTierSettings[workspace.product_tier]
+        settings = ProductTierSettings[workspace.current_product_tier()]
         if workspace.payment_on_hold_since or (settings.seats_max and len(workspace.all_users()) >= settings.seats_max):
             raise NotAllowed("Cannot add more users to this workspace.")
 
@@ -154,7 +154,7 @@ class InvitationServiceImpl(InvitationService):
         if workspace is None:
             return WorkspaceNotFound()
 
-        settings = ProductTierSettings[workspace.product_tier]
+        settings = ProductTierSettings[workspace.current_product_tier()]
         if workspace.payment_on_hold_since or (settings.seats_max and len(workspace.all_users()) >= settings.seats_max):
             return NoFreeSeats()
 

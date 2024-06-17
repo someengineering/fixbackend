@@ -31,11 +31,21 @@ class Workspace:
     external_id: ExternalId
     owner_id: UserId
     members: List[UserId]
-    product_tier: ProductTier
+    selected_product_tier: ProductTier  # to get the product tier use current_product_tier() method instead
     created_at: datetime
     updated_at: datetime
     subscription_id: Optional[SubscriptionId] = None
     payment_on_hold_since: Optional[datetime] = None
+    active_product_tier: Optional[ProductTier] = (
+        None  # what is active, e.g. higher tier until the end of the billing cycle
+    )
+    active_product_tier_ends_at: Optional[datetime] = None  # when the active product tier ends
+
+    def current_product_tier(self) -> ProductTier:
+        if self.active_product_tier_ends_at and self.active_product_tier_ends_at > utc():
+            if self.active_product_tier:
+                return max(self.active_product_tier, self.selected_product_tier)
+        return self.selected_product_tier
 
     def all_users(self) -> List[UserId]:
         unique = set(self.members)
@@ -43,7 +53,7 @@ class Workspace:
         return list(unique)
 
     def trial_end_days(self) -> Optional[int]:
-        if self.product_tier == ProductTier.Trial:
+        if self.current_product_tier() == ProductTier.Trial:
             return max((self.created_at + trial_period_duration() - utc()).days, 0)
         return None
 

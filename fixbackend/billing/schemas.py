@@ -150,7 +150,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
         return WorkspaceBillingSettingsRead(
             workspace_payment_method=payment(payment_methods.current),
             available_payment_methods=[payment(method) for method in payment_methods.available],
-            product_tier=ProductTierRead.from_tier(workspace.product_tier),
+            product_tier=ProductTierRead.from_tier(workspace.current_product_tier()),
         )
 
 

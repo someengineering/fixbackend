@@ -92,7 +92,7 @@ async def test_redirect_to_stripe_with_product_tier(
     # workspace product tier is updated after the subscription is created
     updated_workspace = await workspace_repository.get_workspace(workspace.id)
     assert updated_workspace
-    assert updated_workspace.product_tier == ProductTier.Business
+    assert updated_workspace.current_product_tier() == ProductTier.Business
 
 
 async def test_refund(stripe_service: StripeServiceImpl, stripe_client: StripeDummyClient) -> None:

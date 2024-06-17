@@ -341,7 +341,7 @@ class DispatcherService(Service):
                 f"Took {duration}. Messages: {messages}"
             )
             if workspace := await self.workspace_repository.get_workspace(workspace_id):
-                tier = workspace.product_tier
+                tier = workspace.current_product_tier()
             else:
                 log.warning(f"Could not find security tier workspace with id {workspace_id}, will use free as default")
                 tier = ProductTier.Free

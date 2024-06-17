@@ -12,6 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import calendar
 import uuid
 from abc import ABC, abstractmethod
 from logging import getLogger
@@ -37,7 +38,7 @@ from fixbackend.ids import ExternalId, SubscriptionId, WorkspaceId, UserId, Prod
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace, orm
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fixcloudutils.util import utc
 
 log = getLogger(__name__)
@@ -83,7 +84,7 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def update_product_tier(
-        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: Optional[AsyncSession] = None
+        self, workspace_id: WorkspaceId, new_tier: ProductTier, *, session: Optional[AsyncSession] = None
     ) -> Workspace:
         """Update a workspace security tier."""
         raise NotImplementedError
@@ -289,15 +290,24 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
     async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
         async with self.session_maker() as session:
-            statement = select(orm.Organization.tier).where(orm.Organization.id == workspace_id)
+            statement = select(
+                orm.Organization.tier,
+                orm.Organization.active_product_tier,
+                orm.Organization.active_product_tier_ends_at,
+            ).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
-            tier = results.unique().scalar_one_or_none()
-            if tier:
-                return ProductTier.from_str(tier)
+            selected_tier: str
+            active_tier: Optional[str]
+            active_tier_expiration: Optional[datetime]
+            selected_tier, active_tier, active_tier_expiration = results.unique().one_or_none()  # type: ignore
+            if selected_tier:
+                if active_tier and active_tier_expiration and active_tier_expiration > utc():
+                    return max(ProductTier.from_str(selected_tier), ProductTier.from_str(active_tier))
+                return ProductTier.from_str(selected_tier)
             return ProductTier.Free
 
     async def update_product_tier(
-        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: Optional[AsyncSession] = None
+        self, workspace_id: WorkspaceId, new_tier: ProductTier, *, session: Optional[AsyncSession] = None
     ) -> Workspace:
         async def do_tx(session: AsyncSession) -> Workspace:
             statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
@@ -309,7 +319,17 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if workspace.subscription_id is None:
                 raise NotAllowed("Workspace must have a subscription to change the security tier")
 
-            workspace.tier = tier.value
+            workspace.tier = new_tier.value
+            active_tier = ProductTier.from_str(workspace.active_product_tier or ProductTier.Free.value)
+            if workspace.active_product_tier is None or active_tier < new_tier:
+                now = utc()
+                _, last_day_of_the_month = calendar.monthrange(now.year, now.month)
+                last_billing_cycle_instant = datetime(
+                    now.year, now.month, last_day_of_the_month, 23, 59, 59, 999999, timezone.utc
+                )
+                workspace.active_product_tier_ends_at = last_billing_cycle_instant
+            workspace.active_product_tier = max(active_tier, new_tier)
+
             await session.commit()
             await session.refresh(workspace)
 
