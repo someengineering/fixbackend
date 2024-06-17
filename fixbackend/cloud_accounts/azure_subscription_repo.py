@@ -16,14 +16,14 @@ from typing import List, Optional
 import uuid
 from fixbackend.base_model import CreatedUpdatedMixin, Base
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, select
+from sqlalchemy import Boolean, ForeignKey, Text, select
 
 from sqlalchemy.orm import Mapped, mapped_column
 from fixbackend.cloud_accounts.models import (
     AzureSubscriptionCredentials,
 )
 from fixbackend.errors import ResourceNotFound
-from fixbackend.ids import AzureSubscriptionCredentialsId, CloudAccountId, WorkspaceId
+from fixbackend.ids import AzureSubscriptionCredentialsId, WorkspaceId
 from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
@@ -37,7 +37,6 @@ class AzureSubscriptionCredentialsEntity(Base, CreatedUpdatedMixin):
     tenant_id: Mapped[WorkspaceId] = mapped_column(
         GUID, ForeignKey("organization.id"), nullable=False, index=True, unique=True
     )
-    azure_subscription_id: Mapped[CloudAccountId] = mapped_column(String(length=64), nullable=False)
     azure_tenant_id: Mapped[str] = mapped_column(
         Text, nullable=False
     )  # ID of the service principal's tenant. Also called its "directory" ID.
@@ -49,7 +48,6 @@ class AzureSubscriptionCredentialsEntity(Base, CreatedUpdatedMixin):
         return AzureSubscriptionCredentials(
             id=self.id,
             tenant_id=self.tenant_id,
-            azure_subscription_id=self.azure_subscription_id,
             azure_tenant_id=self.azure_tenant_id,
             client_id=self.client_id,
             client_secret=self.client_secret,
@@ -67,7 +65,6 @@ class AzureSubscriptionCredentialsRepository:
     async def upsert(
         self,
         tenant_id: WorkspaceId,
-        azure_subscription_id: CloudAccountId,
         azure_tenant_id: str,
         client_id: str,
         client_secret: str,
@@ -81,7 +78,6 @@ class AzureSubscriptionCredentialsRepository:
             result = await session.execute(statement)
             existing = result.scalars().first()
             if existing is not None:
-                existing.azure_subscription_id = azure_subscription_id
                 existing.azure_tenant_id = azure_tenant_id
                 existing.client_id = client_id
                 existing.client_secret = client_secret
@@ -92,7 +88,6 @@ class AzureSubscriptionCredentialsRepository:
             # create new
             entity = AzureSubscriptionCredentialsEntity(
                 tenant_id=tenant_id,
-                azure_subscription_id=azure_subscription_id,
                 azure_tenant_id=azure_tenant_id,
                 client_id=client_id,
                 client_secret=client_secret,

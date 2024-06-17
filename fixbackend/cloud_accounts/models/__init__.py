@@ -74,7 +74,6 @@ class AzureCloudAccess(CloudAccess):
 class AzureSubscriptionCredentials:
     id: AzureSubscriptionCredentialsId
     tenant_id: WorkspaceId
-    azure_subscription_id: CloudAccountId
     azure_tenant_id: str
     client_id: str
     client_secret: str
