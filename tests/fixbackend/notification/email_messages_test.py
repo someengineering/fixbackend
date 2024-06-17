@@ -15,10 +15,10 @@ from fixbackend.notification.email.email_messages import get_env
 
 
 def test_readable_number() -> None:
-    assert get_env().from_string("{{ 0|readable_number }}").render() == "zero"
-    assert get_env().from_string("{{ 1|readable_number }}").render() == "one"
-    assert get_env().from_string("{{ 2|readable_number }}").render() == "two"
-    assert get_env().from_string("{{ 3|readable_number }}").render() == "three"
+    assert get_env().from_string("{{ 0|readable_number }}").render() == "0"
+    assert get_env().from_string("{{ 1|readable_number }}").render() == "1"
+    assert get_env().from_string("{{ 2|readable_number }}").render() == "2"
+    assert get_env().from_string("{{ 3|readable_number }}").render() == "3"
     assert get_env().from_string("{{ 4|readable_number }}").render() == "4"
     assert get_env().from_string("{{ -3|readable_number }}").render() == "-3"
     assert get_env().from_string("{{ 1000|readable_number }}").render() == "1 K"
@@ -28,8 +28,8 @@ def test_readable_number() -> None:
 
 
 def test_pluralize() -> None:
-    assert get_env().from_string("{{ 'word'|pluralize(1) }}").render() == "one word"
-    assert get_env().from_string("{{ 'word'|pluralize(2) }}").render() == "two words"
+    assert get_env().from_string("{{ 'word'|pluralize(1) }}").render() == "1 word"
+    assert get_env().from_string("{{ 'word'|pluralize(2) }}").render() == "2 words"
     assert get_env().from_string("{{ 'word'|pluralize(23) }}").render() == "23 words"
     assert get_env().from_string("{{ 'word'|pluralize(-2) }}").render() == "-2 words"
 
