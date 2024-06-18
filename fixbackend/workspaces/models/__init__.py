@@ -31,20 +31,20 @@ class Workspace:
     external_id: ExternalId
     owner_id: UserId
     members: List[UserId]
-    selected_product_tier: ProductTier  # to get the product tier use current_product_tier() method instead
+    selected_product_tier: ProductTier  # what the user currently selected in the UI
     created_at: datetime
     updated_at: datetime
     subscription_id: Optional[SubscriptionId] = None
     payment_on_hold_since: Optional[datetime] = None
-    active_product_tier: Optional[ProductTier] = (
-        None  # what is active, e.g. higher tier until the end of the billing cycle
+    highest_current_cycle_tier: Optional[ProductTier] = (
+        None  # which tier we saw as the highest until the end of the billing cycle
     )
-    active_product_tier_ends_at: Optional[datetime] = None  # when the active product tier ends
+    current_cycle_ends_at: Optional[datetime] = None  # when the active product tier ends, typically end of the month
 
     def current_product_tier(self) -> ProductTier:
-        if self.active_product_tier_ends_at and self.active_product_tier_ends_at > utc():
-            if self.active_product_tier:
-                return max(self.active_product_tier, self.selected_product_tier)
+        if self.current_cycle_ends_at and self.current_cycle_ends_at > utc():
+            if self.highest_current_cycle_tier:
+                return max(self.highest_current_cycle_tier, self.selected_product_tier)
         return self.selected_product_tier
 
     def all_users(self) -> List[UserId]:

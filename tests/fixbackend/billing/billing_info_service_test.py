@@ -118,7 +118,7 @@ async def test_update_billing(
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     workspace = await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Plus)
     assert workspace.current_product_tier() == ProductTier.Plus
-    assert workspace.active_product_tier == ProductTier.Plus
+    assert workspace.highest_current_cycle_tier == ProductTier.Plus
     assert workspace.selected_product_tier == ProductTier.Plus
 
     # removing the payment method on non-free tier is not possible
@@ -189,7 +189,7 @@ async def test_update_billing(
     workspace = await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Free)
     assert workspace.current_product_tier() == ProductTier.Plus
     assert workspace.selected_product_tier == ProductTier.Free
-    assert workspace.active_product_tier == ProductTier.Plus
+    assert workspace.highest_current_cycle_tier == ProductTier.Plus
 
     # we can't remove the payment method
     with pytest.raises(NotAllowed) as exc_info:
@@ -207,4 +207,4 @@ async def test_update_billing(
     )
     assert workspace.current_product_tier() == ProductTier.Business
     assert workspace.selected_product_tier == ProductTier.Business
-    assert workspace.active_product_tier == ProductTier.Business
+    assert workspace.highest_current_cycle_tier == ProductTier.Business

@@ -196,13 +196,13 @@ async def test_update_product_tier(
     current_tier = workspace.current_product_tier()
     assert current_tier == ProductTier.Trial
     assert workspace.selected_product_tier == ProductTier.Trial
-    assert workspace.active_product_tier is None
+    assert workspace.highest_current_cycle_tier is None
 
     updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Enterprise)
     assert updated.current_product_tier() == ProductTier.Enterprise
     assert updated.selected_product_tier == ProductTier.Enterprise
-    assert updated.active_product_tier == ProductTier.Enterprise
-    active_tier_ends_at = updated.active_product_tier_ends_at
+    assert updated.highest_current_cycle_tier == ProductTier.Enterprise
+    active_tier_ends_at = updated.current_cycle_ends_at
     assert active_tier_ends_at is not None
 
     assert await workspace_repository.get_product_tier(workspace.id) == ProductTier.Enterprise
@@ -211,8 +211,8 @@ async def test_update_product_tier(
     updated = await workspace_repository.update_product_tier(workspace.id, ProductTier.Plus)
     assert updated.current_product_tier() == ProductTier.Enterprise
     assert updated.selected_product_tier == ProductTier.Plus
-    assert updated.active_product_tier == ProductTier.Enterprise
-    assert updated.active_product_tier_ends_at == active_tier_ends_at
+    assert updated.highest_current_cycle_tier == ProductTier.Enterprise
+    assert updated.current_cycle_ends_at == active_tier_ends_at
 
     # we can't update the security tier of an organization without a subscription
     without_subscription = await workspace_repository.create_workspace(

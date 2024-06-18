@@ -20,5 +20,5 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("organization", sa.Column("active_product_tier", sa.String(length=64), nullable=True))
-    op.add_column("organization", sa.Column("active_product_tier_ends_at", UTCDateTime(timezone=True), nullable=True))
+    op.add_column("organization", sa.Column("highest_current_cycle_tier", sa.String(length=64), nullable=True))
+    op.add_column("organization", sa.Column("current_cycle_ends_at", UTCDateTime(timezone=True), nullable=True))

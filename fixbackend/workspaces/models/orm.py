@@ -41,8 +41,8 @@ class Organization(Base, CreatedUpdatedMixin):
     subscription_id: Mapped[Optional[SubscriptionId]] = mapped_column(GUID, nullable=True, index=True)
     payment_on_hold_since: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), index=True)
-    active_product_tier: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
-    active_product_tier_ends_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    highest_current_cycle_tier: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
+    current_cycle_ends_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     def to_model(self) -> models.Workspace:
         return models.Workspace(
@@ -53,8 +53,10 @@ class Organization(Base, CreatedUpdatedMixin):
             owner_id=UserId(self.owner_id),
             members=[UserId(member.user_id) for member in self.members],
             selected_product_tier=ProductTier.from_str(self.tier),
-            active_product_tier=ProductTier.from_str(self.active_product_tier) if self.active_product_tier else None,
-            active_product_tier_ends_at=self.active_product_tier_ends_at,
+            highest_current_cycle_tier=(
+                ProductTier.from_str(self.highest_current_cycle_tier) if self.highest_current_cycle_tier else None
+            ),
+            current_cycle_ends_at=self.current_cycle_ends_at,
             subscription_id=self.subscription_id,
             payment_on_hold_since=self.payment_on_hold_since,
             created_at=self.created_at,

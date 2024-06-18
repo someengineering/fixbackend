@@ -292,8 +292,8 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         async with self.session_maker() as session:
             statement = select(
                 orm.Organization.tier,
-                orm.Organization.active_product_tier,
-                orm.Organization.active_product_tier_ends_at,
+                orm.Organization.highest_current_cycle_tier,
+                orm.Organization.current_cycle_ends_at,
             ).where(orm.Organization.id == workspace_id)
             results = await session.execute(statement)
             selected_tier: str
@@ -320,15 +320,15 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 raise NotAllowed("Workspace must have a subscription to change the security tier")
 
             workspace.tier = new_tier.value
-            active_tier = ProductTier.from_str(workspace.active_product_tier or ProductTier.Free.value)
-            if workspace.active_product_tier is None or active_tier < new_tier:
+            active_tier = ProductTier.from_str(workspace.highest_current_cycle_tier or ProductTier.Free.value)
+            if workspace.highest_current_cycle_tier is None or active_tier < new_tier:
                 now = utc()
                 _, last_day_of_the_month = calendar.monthrange(now.year, now.month)
                 last_billing_cycle_instant = datetime(
                     now.year, now.month, last_day_of_the_month, 23, 59, 59, 999999, timezone.utc
                 )
-                workspace.active_product_tier_ends_at = last_billing_cycle_instant
-            workspace.active_product_tier = max(active_tier, new_tier)
+                workspace.current_cycle_ends_at = last_billing_cycle_instant
+            workspace.highest_current_cycle_tier = max(active_tier, new_tier)
 
             await session.commit()
             await session.refresh(workspace)
