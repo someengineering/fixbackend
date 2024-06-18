@@ -103,7 +103,10 @@ PaymentMethod = Union[AwsSubscription, StripeSubscription, NoPaymentMethod]
 class WorkspaceBillingSettingsRead(BaseModel):
     workspace_payment_method: PaymentMethod = Field(description="The payment method selected for workspace")
     available_payment_methods: List[PaymentMethod] = Field(description="The payment methods available for workspace")
-    product_tier: ProductTierRead = Field(description="The product tier of this workspace")
+    product_tier: ProductTierRead = Field(
+        description="The product tier of this workspace for the current billing cycle"
+    )
+    selected_product_tier: ProductTierRead = Field(description="The user selected product tier")
 
     model_config = {
         "json_schema_extra": {
@@ -127,6 +130,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
                         },
                     ],
                     "product_tier": "Free",
+                    "selected_product_tier": "Plus",
                 }
             ]
         }
@@ -151,6 +155,7 @@ class WorkspaceBillingSettingsRead(BaseModel):
             workspace_payment_method=payment(payment_methods.current),
             available_payment_methods=[payment(method) for method in payment_methods.available],
             product_tier=ProductTierRead.from_tier(workspace.current_product_tier()),
+            selected_product_tier=ProductTierRead.from_tier(workspace.selected_product_tier),
         )
 
 
