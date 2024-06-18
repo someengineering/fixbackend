@@ -17,7 +17,6 @@ from datetime import timedelta
 import pytest
 
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
-from fixbackend.ids import CloudAccountId
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.models import Workspace
 from fixcloudutils.util import utc
@@ -30,17 +29,13 @@ async def test_store_azure_subscription(
 ) -> None:
     azure_repo = AzureSubscriptionCredentialsRepository(session_maker=async_session_maker)
 
-    azure_subscription_id = CloudAccountId("some id")
     azure_tenant_id = "some tenant id"
     client_id = "some client id"
     client_secret = "foo_bar"
-    azure_credentials = await azure_repo.upsert(
-        workspace.id, azure_subscription_id, azure_tenant_id, client_id, client_secret
-    )
+    azure_credentials = await azure_repo.upsert(workspace.id, azure_tenant_id, client_id, client_secret)
 
     assert azure_credentials.can_access_azure_account is None
     assert azure_credentials.tenant_id == workspace.id
-    assert azure_credentials.azure_subscription_id == azure_subscription_id
     assert azure_credentials.azure_tenant_id == azure_tenant_id
     assert azure_credentials.client_id == client_id
     assert azure_credentials.client_secret == client_secret
@@ -66,7 +61,6 @@ async def test_store_azure_subscription(
     assert updated_acc.updated_at >= azure_credentials.updated_at
     assert updated_acc.created_at == azure_credentials.created_at
     assert updated_acc.tenant_id == azure_credentials.tenant_id
-    assert updated_acc.azure_subscription_id == azure_subscription_id
     assert updated_acc.azure_tenant_id == azure_tenant_id
     assert updated_acc.client_id == client_id
     assert updated_acc.client_secret == client_secret
