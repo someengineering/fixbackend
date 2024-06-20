@@ -23,11 +23,12 @@ from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
 from fixbackend.domain_events.events import InvitationAccepted, UserJoinedWorkspace
 from fixbackend.errors import NotAllowed
-from fixbackend.ids import ProductTier
+from fixbackend.ids import ProductTier, WorkspaceId
 from fixbackend.notification.email.email_messages import EmailMessage, Invite
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.permissions.models import Roles
 from fixbackend.subscription.models import AwsMarketplaceSubscription
+from fixbackend.utils import uid
 from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.invitation_service import (
     InvitationNotFound,
@@ -160,7 +161,11 @@ async def test_invite_accept_user(
     assert await service.accept_invitation(token) == NoFreeSeats()
     await workspace_repository.update_payment_on_hold(workspace.id, None)
 
-    # when the existinng user accepts the invite, they should be added to the workspace automatically
+    # invite cannot be revoked, if not in correct workspace
+    with pytest.raises(NotAllowed):
+        await service.revoke_invitation(WorkspaceId(uid()), existing_invite.id)
+
+    # when the existing user accepts the invite, they should be added to the workspace automatically
     # and the invitation should be deleted
     await service.accept_invitation(token)
     assert list(map(lambda w: w.id, await workspace_repository.list_workspaces(existing_user))) == [workspace.id]
@@ -184,7 +189,7 @@ async def test_invite_accept_user(
     assert await service.accept_invitation(token) == InvitationNotFound()
 
     # invite can be revoked
-    await service.revoke_invitation(invite.id)
+    await service.revoke_invitation(workspace.id, invite.id)
     assert await service.list_invitations(workspace.id) == []
 
     # invalid token is rejected
