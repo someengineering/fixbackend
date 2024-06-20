@@ -224,7 +224,7 @@ def workspaces_router() -> APIRouter:
         _: Annotated[bool, Depends(WorkspacePermissionChecker(WorkspacePermissions.update))],
     ) -> None:
         """Delete invite."""
-        await invitation_service.revoke_invitation(invite_id)
+        await invitation_service.revoke_invitation(workspace.id, invite_id)
 
     @router.get("/{workspace_id}/accept_invite", name=ACCEPT_INVITE_ROUTE_NAME)
     async def accept_invitation(
