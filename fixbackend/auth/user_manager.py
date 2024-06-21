@@ -114,7 +114,7 @@ class UserManager(BaseUserManager[User, UserId]):
             else:
                 # wtf?
                 workspace = await self.create_default_workspace(user)
-            await self.invitation_repository.delete_invitation(pending_invitation.id)
+            await self.invitation_repository.delete_invitation(workspace.id, pending_invitation.id)
         else:
             workspace = await self.create_default_workspace(user)
             log.info(f"Create new workspace {workspace.id} for {user.email}.")

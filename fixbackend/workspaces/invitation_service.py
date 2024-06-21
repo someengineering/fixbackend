@@ -88,7 +88,7 @@ class InvitationService(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    async def revoke_invitation(self, invitation_id: InvitationId) -> None:
+    async def revoke_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
         """Revoke an invitation to a workspace."""
         raise NotImplementedError()
 
@@ -165,15 +165,15 @@ class InvitationServiceImpl(InvitationService):
         # in case the user already exists, add it to the workspace and delete the invitation
         if user := await self.user_repository.get_by_email(invitation.email):
             await self.workspace_repository.add_to_workspace(invitation.workspace_id, user.id, invitation.role)
-            await self.invitation_repository.delete_invitation(invitation_id)
+            await self.invitation_repository.delete_invitation(workspace.id, invitation_id)
 
         event = InvitationAccepted(invitation.workspace_id, user.id if user else None, invitation.email)
         await self.domain_events.publish(event)
 
         return updated
 
-    async def revoke_invitation(self, invitation_id: InvitationId) -> None:
-        await self.invitation_repository.delete_invitation(invitation_id)
+    async def revoke_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
+        await self.invitation_repository.delete_invitation(workspace_id, invitation_id)
 
 
 def get_invitation_service(

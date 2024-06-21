@@ -9,7 +9,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.dependencies import FixDependency, ServiceNames
-from fixbackend.errors import ResourceNotFound, WrongState
+from fixbackend.errors import ResourceNotFound, WrongState, NotAllowed
 from fixbackend.ids import InvitationId, WorkspaceId
 from fixbackend.permissions.models import Roles
 from fixbackend.types import AsyncSessionMaker
@@ -51,8 +51,7 @@ class InvitationRepository(ABC):
         """Update an invitation."""
         raise NotImplementedError
 
-    @abstractmethod
-    async def delete_invitation(self, invitation_id: InvitationId) -> None:
+    async def delete_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
         """Delete an invitation."""
         raise NotImplementedError
 
@@ -155,12 +154,14 @@ class InvitationRepositoryImpl(InvitationRepository):
             except StaleDataError:  # in case of concurrent update
                 pass
 
-    async def delete_invitation(self, invitation_id: InvitationId) -> None:
+    async def delete_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
         async with self.session_maker() as session:
             invite = await session.get(orm.OrganizationInvite, invitation_id)
             if invite is None:
                 log.info(f"Invitation {invitation_id} does not exist, skipping deletion.")
                 return None  # let's be idempotent
+            if invite.organization_id != workspace_id:
+                raise NotAllowed(f"Invitation {invitation_id} does not belong to workspace {workspace_id}")
             await session.delete(invite)
             await session.commit()
 
