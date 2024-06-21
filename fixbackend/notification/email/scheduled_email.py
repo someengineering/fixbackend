@@ -125,7 +125,7 @@ class ScheduledEmailSender(Service):
                 send_fn: Optional[Callable[[UserModel], Tuple[str, str, str, Dict[str, bytes]]]] = None
                 for org, orm_user in (await session.execute(statement)).unique().all():
                     user = orm_user.to_model()
-                    workspace = org.to_model()
+                    workspace: Workspace = org.to_model()
                     try:
                         if last_workspace != workspace:
                             send_fn = await self.status_update_creator.create_messages_fn(workspace, now, duration)
@@ -141,7 +141,7 @@ class ScheduledEmailSender(Service):
                         )
                         log.info(
                             f"Sent status update email={user.email}, workspace={workspace.id}, "
-                            f"tier={workspace.product_tier}, subject: {subject}"
+                            f"tier={workspace.current_product_tier()}, subject: {subject}"
                         )
                         # Only add the user once for this update.
                         # If the user is in multiple workspaces, they will get multiple emails.

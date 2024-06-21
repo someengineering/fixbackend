@@ -101,7 +101,10 @@ class BillingEntryService:
         current: PaymentMethod = PaymentMethods.NoPaymentMethod()
 
         payment_methods: List[PaymentMethod] = []
-        if workspace.product_tier == ProductTier.Free or workspace.product_tier == ProductTier.Trial:
+        if (
+            workspace.current_product_tier() == ProductTier.Free
+            or workspace.current_product_tier() == ProductTier.Trial
+        ):
             payment_methods.append(PaymentMethods.NoPaymentMethod())
 
         async def get_current_subscription() -> Optional[SubscriptionMethod]:
@@ -144,7 +147,7 @@ class BillingEntryService:
         new_product_tier: Optional[ProductTier] = None,
         new_payment_method: Optional[PaymentMethod] = None,
     ) -> Workspace:
-        current_tier = workspace.product_tier
+        current_tier = workspace.current_product_tier()
         workspace_payment_methods = await self.get_payment_methods(workspace, user_id)
         number_of_cloud_accounts = await self.cloud_account_repository.count_by_workspace_id(
             workspace.id, non_deleted=True
@@ -180,8 +183,8 @@ class BillingEntryService:
             if new_payment_method not in workspace_payment_methods.available:
                 raise NotAllowed("unknown_payment_method")
 
-            # removing the payment method is not allowed for non-free tiers
-            if new_payment_method is PaymentMethods.NoPaymentMethod() and current_tier.paid:
+            # removing the payment method is not allowed
+            if new_payment_method is PaymentMethods.NoPaymentMethod():
                 raise NotAllowed("downgrade_not_allowed")
 
         async def update_payment_method(payment_method: PaymentMethod) -> Workspace:
@@ -193,14 +196,14 @@ class BillingEntryService:
                 case PaymentMethods.StripeSubscription(subscription_id):
                     return await self.workspace_repository.update_subscription(workspace.id, subscription_id)
                 case PaymentMethods.NoPaymentMethod():
-                    return await self.workspace_repository.update_subscription(workspace.id, None)
+                    raise NotAllowed("downgrade_not_allowed")
 
         async def update_product_tier(product_tier: ProductTier) -> Workspace:
             if product_tier == current_tier:
                 return workspace
 
             updated_workspace = await self.workspace_repository.update_product_tier(
-                workspace_id=workspace.id, tier=product_tier
+                workspace_id=workspace.id, new_tier=product_tier
             )
             event = ProductTierChanged(
                 workspace.id,

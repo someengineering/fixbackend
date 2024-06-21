@@ -128,7 +128,7 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
     async def update_product_tier(
         self, workspace_id: WorkspaceId, tier: ProductTier, *, session: AsyncSession | None = None
     ) -> Workspace:
-        return evolve(workspace, product_tier=tier)
+        return evolve(workspace, selected_product_tier=tier)
 
     @override
     async def update_subscription(

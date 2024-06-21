@@ -216,7 +216,7 @@ async def test_delete_invitation(
     )
 
     # delete the invitation
-    await invitation_repository.delete_invitation(invitation_id=invitation.id)
+    await invitation_repository.delete_invitation(workspace_id=org_id, invitation_id=invitation.id)
 
     # the invitation should not exist anymore
     invitations = await invitation_repository.list_invitations(workspace_id=org_id)

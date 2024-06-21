@@ -666,7 +666,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
     async def _should_be_enabled(self, workspace: Workspace) -> bool:
         should_be_enabled = True
 
-        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+        if limit := ProductTierSettings[workspace.current_product_tier()].account_limit:
             existing_accounts = await self.cloud_account_repository.count_by_workspace_id(
                 workspace.id, non_deleted=True
             )
@@ -1004,7 +1004,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _, scan):
                     if enabled:
-                        if limit := ProductTierSettings[workspace.product_tier].account_limit:
+                        if limit := ProductTierSettings[workspace.current_product_tier()].account_limit:
                             if accounts_count >= limit:
                                 raise NotAllowed("Account limit reached")
                         if workspace.payment_on_hold_since:
