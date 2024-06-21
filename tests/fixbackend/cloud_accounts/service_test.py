@@ -223,7 +223,7 @@ async def test_create_aws_account(
     assert event.tenant_id == acc.workspace_id
 
     # reaching the account limit of the free tier, expext a Discovered account with enabled=False
-    previous_tier = workspace.product_tier
+    previous_tier = workspace.current_product_tier()
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
     new_account = await service.create_aws_account(
@@ -1169,7 +1169,7 @@ async def test_create_gcp_account(
     assert event.tenant_id == acc.workspace_id
 
     # reaching the account limit of the free tier, expext a Discovered account with enabled=False
-    previous_tier = workspace.product_tier
+    previous_tier = workspace.current_product_tier()
     await workspace_repository.update_subscription(workspace.id, aws_marketplace_subscription.id)
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
     new_account = await service.create_gcp_account(
