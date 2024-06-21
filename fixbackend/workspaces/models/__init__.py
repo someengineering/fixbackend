@@ -31,11 +31,27 @@ class Workspace:
     external_id: ExternalId
     owner_id: UserId
     members: List[UserId]
-    product_tier: ProductTier
+    selected_product_tier: ProductTier  # only use it to show the user the tier they selected in the UI
     created_at: datetime
     updated_at: datetime
     subscription_id: Optional[SubscriptionId] = None
     payment_on_hold_since: Optional[datetime] = None
+    highest_current_cycle_tier: Optional[ProductTier] = (
+        None  # which tier we saw as the highest until the end of the billing cycle
+    )
+    current_cycle_ends_at: Optional[datetime] = None  # when the active product tier ends, typically end of the month
+
+    # this is the product tier that is active for the workspace at the moment
+    # it is based on the highest tier we saw during the billing cycle
+    # when the billing cycle ends, we look at the selected_product_tier
+    #
+    # billing will record usages with every collect based on this method, and then will take
+    # the highest tier from the usage metrict to determine on which tier you should be billed
+    def current_product_tier(self) -> ProductTier:
+        if self.current_cycle_ends_at and self.current_cycle_ends_at > utc():
+            if self.highest_current_cycle_tier:
+                return max(self.highest_current_cycle_tier, self.selected_product_tier)
+        return self.selected_product_tier
 
     def all_users(self) -> List[UserId]:
         unique = set(self.members)
@@ -43,7 +59,7 @@ class Workspace:
         return list(unique)
 
     def trial_end_days(self) -> Optional[int]:
-        if self.product_tier == ProductTier.Trial:
+        if self.current_product_tier() == ProductTier.Trial:
             return max((self.created_at + trial_period_duration() - utc()).days, 0)
         return None
 
