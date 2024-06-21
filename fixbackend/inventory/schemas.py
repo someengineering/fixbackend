@@ -223,7 +223,7 @@ class UpdateSecurityIgnore(BaseModel):
     )
 
 
-class InventoryInfoRead(BaseModel):
+class InventorySummaryRead(BaseModel):
     resources_per_account_timeline: Scatters = Field(description="The number of resources per account over time.")
     score_progress: Tuple[int, int]
     resource_changes: Tuple[int, int, int]

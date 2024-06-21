@@ -32,7 +32,7 @@ from fixbackend.inventory.schemas import (
     SearchStartData,
     SearchListGraphRequest,
     UpdateSecurityIgnore,
-    InventoryInfoRead,
+    InventorySummaryRead,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -321,10 +321,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/workspace-info", tags=["report"])
-    async def workspace_info(graph_db: CurrentGraphDbDependency) -> InventoryInfoRead:
+    async def workspace_info(graph_db: CurrentGraphDbDependency) -> InventorySummaryRead:
         now = utc()
-        info = await inventory().info(graph_db, now, timedelta(days=7))
-        return InventoryInfoRead(
+        info = await inventory().inventory_summary(graph_db, now, timedelta(days=7))
+        return InventorySummaryRead(
             resources_per_account_timeline=info.resources_per_account_timeline,
             score_progress=info.score_progress,
             resource_changes=info.resource_changes,

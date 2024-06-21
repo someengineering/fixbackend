@@ -121,7 +121,7 @@ def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterab
 
 
 @frozen
-class InventoryInfo:
+class InventorySummary:
     resources_per_account_timeline: Scatters
     score_progress: Tuple[int, int]
     resource_changes: Tuple[int, int, int]
@@ -746,9 +746,9 @@ class InventoryService(Service):
         cmd = f"workflows log {task_id} | dump"
         return self.client.execute_single(db, cmd)
 
-    async def info(self, dba: GraphDatabaseAccess, now: datetime, duration: timedelta) -> InventoryInfo:
+    async def inventory_summary(self, dba: GraphDatabaseAccess, now: datetime, duration: timedelta) -> InventorySummary:
 
-        async def compute_inventory_info() -> InventoryInfo:
+        async def compute_inventory_info(duration: timedelta) -> InventorySummary:
             start = now - duration
 
             async with self.client.search(dba, "is(account)") as response:
@@ -837,7 +837,7 @@ class InventoryService(Service):
                 progress("buckets_size_bytes", 0, group=set(), aggregation="sum"),
             )
 
-            return InventoryInfo(
+            return InventorySummary(
                 scatters,  # type: ignore
                 score_progress,  # type: ignore
                 resource_changes,  # type: ignore
@@ -852,7 +852,4 @@ class InventoryService(Service):
                 buckets_size_bytes_progress,  # type: ignore
             )
 
-        return await self.cache.call(
-            compute_inventory_info,
-            key=str(dba.workspace_id) + str(now.replace(minute=0, second=0, microsecond=0)) + str(duration.seconds),
-        )()
+        return await self.cache.call(compute_inventory_info, key=str(dba.workspace_id))(duration)
