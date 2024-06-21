@@ -12,18 +12,23 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from uuid import uuid4
 import pytest
 from fixcloudutils.util import utc
 
 from fixbackend.auth.models import User
 from fixbackend.billing.models import PaymentMethods
 from fixbackend.billing.service import BillingEntryService
+from fixbackend.cloud_accounts.models import CloudAccount, CloudAccountStates
 from fixbackend.errors import NotAllowed
-from fixbackend.ids import ProductTier
+from fixbackend.ids import CloudAccountId, CloudNames, FixCloudAccountId, ProductTier
+from fixbackend.permissions.models import Roles
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.subscription_repository import SubscriptionRepository
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 
 
 @pytest.mark.asyncio
@@ -104,6 +109,8 @@ async def test_update_billing(
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
     user: User,
+    user_repository: UserRepository,
+    cloud_account_repository: CloudAccountRepository,
 ) -> None:
     # we're on the free tier:
     assert workspace.product_tier == ProductTier.Trial
@@ -117,6 +124,64 @@ async def test_update_billing(
         await billing_entry_service.update_billing(
             user.id, workspace, new_payment_method=PaymentMethods.NoPaymentMethod()
         )
+
+    # downgrading to free is not possible with too many users
+    too_many_users_workspace = await workspace_repository.create_workspace("too-many-users", "too-many-users", user)
+    await workspace_repository.update_subscription(too_many_users_workspace.id, aws_marketplace_subscription.id)
+    for i in range(50):
+        user_dict = {
+            "email": f"test-{i}@example.com",
+            "hashed_password": "notreallyhashed",
+            "is_verified": True,
+        }
+        new_user = await user_repository.create(user_dict)
+        await workspace_repository.add_to_workspace(too_many_users_workspace.id, new_user.id, Roles.workspace_member)
+
+    updated_too_many_users_workspace = await workspace_repository.get_workspace(too_many_users_workspace.id)
+    assert updated_too_many_users_workspace
+    too_many_users_workspace = updated_too_many_users_workspace
+
+    with pytest.raises(NotAllowed) as exc_info:
+        await billing_entry_service.update_billing(user.id, too_many_users_workspace, new_product_tier=ProductTier.Free)
+    assert "too_many_users" in str(exc_info.value)
+
+    # downgrading to free is not possible with too many cloud accounts
+    too_many_cloud_accounts_workspace = await workspace_repository.create_workspace(
+        "too-many-cloud-accounts", "too-many-cloud-accounts", user
+    )
+    await workspace_repository.update_subscription(
+        too_many_cloud_accounts_workspace.id, aws_marketplace_subscription.id
+    )
+    for i in range(50):
+        await cloud_account_repository.create(
+            CloudAccount(
+                id=FixCloudAccountId(uuid4()),
+                account_id=CloudAccountId(f"test-account-{i}"),
+                workspace_id=too_many_cloud_accounts_workspace.id,
+                cloud=CloudNames.AWS,
+                state=CloudAccountStates.Detected(),
+                account_name=None,
+                account_alias=None,
+                user_account_name=None,
+                privileged=False,
+                next_scan=None,
+                last_scan_duration_seconds=0,
+                last_scan_started_at=None,
+                last_scan_resources_scanned=0,
+                created_at=utc(),
+                updated_at=utc(),
+                state_updated_at=utc(),
+                cf_stack_version=None,
+                failed_scan_count=0,
+                last_task_id=None,
+            )
+        )
+    with pytest.raises(NotAllowed) as exc_info:
+        await billing_entry_service.update_billing(
+            user.id, too_many_cloud_accounts_workspace, new_product_tier=ProductTier.Free
+        )
+
+    assert "too_many_cloud_accounts" in str(exc_info.value)
 
     # downgrading to free is possible
     workspace = await billing_entry_service.update_billing(user.id, workspace, new_product_tier=ProductTier.Free)

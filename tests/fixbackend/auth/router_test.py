@@ -83,10 +83,6 @@ class InMemoryInvitationRepo(InvitationRepository):
         """Update an invitation."""
         raise NotImplementedError
 
-    async def delete_invitation(self, invitation_id: InvitationId) -> None:
-        """Delete an invitation."""
-        raise NotImplementedError
-
 
 class InMemoryRoleRepository(RoleRepository):
     def __init__(self) -> None:

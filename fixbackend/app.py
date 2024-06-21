@@ -296,7 +296,14 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
         @app.middleware("http")
         async def refresh_session(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            except RuntimeError as err:
+                if "No response returned" in str(err):
+                    log.info(f"No response returned error. {request.method}: {request.url}, headers: {request.headers}")
+                    return Response(status_code=500)
+                raise
+
             if refresh_session_token := request.scope.get(refreshed_session_scope):
                 # refresh the session token on every request
                 cookie._set_login_cookie(response, refresh_session_token)  # noqa
