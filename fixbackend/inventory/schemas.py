@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
 from enum import StrEnum
-from typing import List, Dict, Optional, Literal, Union, Any
+from typing import List, Dict, Optional, Literal, Tuple, Union, Any
 from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
@@ -221,3 +221,18 @@ class UpdateSecurityIgnore(BaseModel):
         description="Checks to ignore. Use '*' to ignore all checks. Use null to reset all checks.",
         examples=[["check1", "check2"], "*", None],
     )
+
+
+class InventoryInfoRead(BaseModel):
+    resources_per_account_timeline: Scatters = Field(description="The number of resources per account over time.")
+    score_progress: Tuple[int, int]
+    resource_changes: Tuple[int, int, int]
+    instances_progress: Tuple[int, int]
+    cores_progress: Tuple[int, int]
+    memory_progress: Tuple[int, int]
+    volumes_progress: Tuple[int, int]
+    volume_bytes_progress: Tuple[int, int]
+    databases_progress: Tuple[int, int]
+    databases_bytes_progress: Tuple[int, int]
+    buckets_objects_progress: Tuple[int, int]
+    buckets_size_bytes_progress: Tuple[int, int]
