@@ -41,7 +41,10 @@ class TrialEndService(Service):
         self.cloud_account_service = cloud_account_service
         self.session_maker = session_maker
         self.periodic: Optional[Periodic] = Periodic(
-            "move_trials_to_free_tier", self.move_trials_to_free_tier, timedelta(minutes=60)
+            "move_trials_to_free_tier",
+            self.move_trials_to_free_tier,
+            frequency=timedelta(minutes=60),
+            first_run=timedelta(seconds=30),
         )
 
     @override
