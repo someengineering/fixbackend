@@ -62,7 +62,6 @@ class TrialEndService(Service):
             workspaces = await self.workspace_repository.list_expired_trials(
                 been_in_trial_tier_for=trial_period_duration(), session=session
             )
-
             for workspace in workspaces:
                 new_tier = ProductTier.Free
                 if limit := ProductTierSettings[new_tier].account_limit:
