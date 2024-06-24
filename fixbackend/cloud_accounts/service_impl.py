@@ -63,6 +63,7 @@ from fixbackend.domain_events.events import (
     CloudAccountActiveToggled,
     CloudAccountNameChanged,
     CloudAccountScanToggled,
+    SubscriptionCreated,
     TenantAccountsCollectFailed,
     TenantAccountsCollected,
 )
@@ -518,6 +519,15 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         # third disable all accounts
                         account_limit = Free.account_limit or 1
                         await self.disable_cloud_accounts(ws.id, account_limit)
+
+                case SubscriptionCreated.kind:
+                    sub_created_evt = SubscriptionCreated.from_json(message)
+                    workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(
+                        sub_created_evt.subscription_id
+                    )
+                    for ws in workspaces:
+                        # cleanup payment onhold status
+                        await self.workspace_repository.update_payment_on_hold(ws.id, None)
 
                 case _:  # pragma: no cover
                     pass  # ignore other domain events
