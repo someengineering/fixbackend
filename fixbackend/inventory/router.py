@@ -12,7 +12,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, List, Literal, Optional, AsyncIterator
 
 from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
@@ -32,9 +32,11 @@ from fixbackend.inventory.schemas import (
     SearchStartData,
     SearchListGraphRequest,
     UpdateSecurityIgnore,
+    InventorySummaryRead,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
+from fixcloudutils.util import utc
 
 log = logging.getLogger(__name__)
 
@@ -317,5 +319,24 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
                     yield elem
 
         return StreamOnSuccessResponse(stream(), media_type=media_type)
+
+    @router.get("/workspace-info", tags=["report"])
+    async def workspace_info(graph_db: CurrentGraphDbDependency) -> InventorySummaryRead:
+        now = utc()
+        info = await inventory().inventory_summary(graph_db, now, timedelta(days=7))
+        return InventorySummaryRead(
+            resources_per_account_timeline=info.resources_per_account_timeline,
+            score_progress=info.score_progress,
+            resource_changes=info.resource_changes,
+            instances_progress=info.instances_progress,
+            cores_progress=info.cores_progress,
+            memory_progress=info.memory_progress,
+            volumes_progress=info.volumes_progress,
+            volume_bytes_progress=info.volume_bytes_progress,
+            databases_progress=info.databases_progress,
+            databases_bytes_progress=info.databases_bytes_progress,
+            buckets_objects_progress=info.buckets_objects_progress,
+            buckets_size_bytes_progress=info.buckets_size_bytes_progress,
+        )
 
     return router

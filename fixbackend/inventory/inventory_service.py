@@ -43,11 +43,12 @@ from typing import (
 
 from arq import func
 from arq.connections import RedisSettings
+from attr import frozen
 from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.redis.worker_queue import WorkDispatcher, WorkerInstance
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
-from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str
+from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str, value_in_path_get
 
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.config import ProductTierSettings, Trial
@@ -117,6 +118,22 @@ def dict_values_by(d: Mapping[T, Iterable[V]], fn: Callable[[T], Any]) -> Iterab
         if v not in visited:
             visited.add(v)
             yield v
+
+
+@frozen
+class InventorySummary:
+    resources_per_account_timeline: Scatters
+    score_progress: Tuple[int, int]
+    resource_changes: Tuple[int, int, int]
+    instances_progress: Tuple[int, int]
+    cores_progress: Tuple[int, int]
+    memory_progress: Tuple[int, int]
+    volumes_progress: Tuple[int, int]
+    volume_bytes_progress: Tuple[int, int]
+    databases_progress: Tuple[int, int]
+    databases_bytes_progress: Tuple[int, int]
+    buckets_objects_progress: Tuple[int, int]
+    buckets_size_bytes_progress: Tuple[int, int]
 
 
 class InventoryService(Service):
@@ -728,3 +745,111 @@ class InventoryService(Service):
     ) -> AsyncContextManager[AsyncIteratorWithContext[JsonElement]]:
         cmd = f"workflows log {task_id} | dump"
         return self.client.execute_single(db, cmd)
+
+    async def inventory_summary(self, dba: GraphDatabaseAccess, now: datetime, duration: timedelta) -> InventorySummary:
+
+        async def compute_inventory_info(duration: timedelta) -> InventorySummary:
+            start = now - duration
+
+            async with self.client.search(dba, "is(account)") as response:
+                account_names = {
+                    value_in_path(acc, "reported.id"): value_in_path(acc, "reported.name") async for acc in response
+                }
+
+            async def progress(
+                metric: str, not_exist: int, group: Optional[Set[str]] = None, aggregation: Optional[str] = None
+            ) -> Tuple[int, int]:
+                async with self.client.timeseries(
+                    dba,
+                    metric,
+                    start=now - duration,
+                    end=now,
+                    granularity=duration,
+                    group=group,
+                    aggregation=aggregation,
+                ) as response:
+                    entries = [int(r["v"]) async for r in response]
+                    if len(entries) == 0:  # timeseries haven't been created yet
+                        return not_exist, 0
+                    elif len(entries) == 1:  # the timeseries does not exist longer than the current period
+                        return entries[0], 0
+                    else:
+                        return entries[1], entries[1] - entries[0]
+
+            async def resources_per_account_timeline() -> Scatters:
+                scatters = await self.timeseries_scattered(
+                    dba,
+                    "resources",
+                    start=now - duration,
+                    end=now,
+                    granularity=timedelta(days=1),
+                    group={"account_id"},
+                    aggregation="sum",
+                )
+                for scatter in scatters.groups:
+                    acc_id = scatter.group.get("account_id", "<no account name>")
+                    scatter.attributes["name"] = account_names.get(acc_id, acc_id)
+
+                return scatters
+
+            async def nr_of_changes() -> Tuple[int, int, int]:
+                cmd = (
+                    f"history --after {utc_str(start)} --change node_created --change node_updated --change node_deleted | "
+                    "aggregate /change: sum(1) as count | dump"
+                )
+                async with self.client.execute_single(dba, cmd) as result:
+                    changes = {value_in_path(r, "group.change"): value_in_path_get(r, "count", 0) async for r in result}
+                    return (
+                        changes.get("node_created", 0),
+                        changes.get("node_updated", 0),
+                        changes.get("node_deleted", 0),
+                    )
+
+            async def overall_score() -> Tuple[int, int]:
+                current, diff = await progress("account_score", 100, group=set(), aggregation="avg")
+                return current, diff
+
+            (
+                scatters,
+                score_progress,
+                resource_changes,
+                instances_progress,
+                cores_progress,
+                memory_progress,
+                volumes_progress,
+                volume_bytes_progress,
+                databases_progress,
+                databases_bytes_progress,
+                buckets_objects_progress,
+                buckets_size_bytes_progress,
+            ) = await asyncio.gather(
+                resources_per_account_timeline(),
+                overall_score(),
+                nr_of_changes(),
+                progress("instances_total", 0, group=set(), aggregation="sum"),
+                progress("cores_total", 0, group=set(), aggregation="sum"),
+                progress("memory_bytes", 0, group=set(), aggregation="sum"),
+                progress("volumes_total", 0, group=set(), aggregation="sum"),
+                progress("volume_bytes", 0, group=set(), aggregation="sum"),
+                progress("databases_total", 0, group=set(), aggregation="sum"),
+                progress("databases_bytes", 0, group=set(), aggregation="sum"),
+                progress("buckets_objects_total", 0, group=set(), aggregation="sum"),
+                progress("buckets_size_bytes", 0, group=set(), aggregation="sum"),
+            )
+
+            return InventorySummary(
+                scatters,  # type: ignore
+                score_progress,  # type: ignore
+                resource_changes,  # type: ignore
+                instances_progress,  # type: ignore
+                cores_progress,  # type: ignore
+                memory_progress,  # type: ignore
+                volumes_progress,  # type: ignore
+                volume_bytes_progress,  # type: ignore
+                databases_progress,  # type: ignore
+                databases_bytes_progress,  # type: ignore
+                buckets_objects_progress,  # type: ignore
+                buckets_size_bytes_progress,  # type: ignore
+            )
+
+        return await self.cache.call(compute_inventory_info, key=str(dba.workspace_id))(duration)
