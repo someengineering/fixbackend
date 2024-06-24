@@ -120,9 +120,9 @@ class InvitationServiceImpl(InvitationService):
         # check permissions
         settings = ProductTierSettings[workspace.current_product_tier()]
         if workspace.payment_on_hold_since:
-            raise NotAllowed("Cannot add more users to a workspace, because payment is on hold.")
+            raise NotAllowed("payment_on_hold")
         if settings.seats_max and len(workspace.all_users()) >= settings.seats_max:
-            raise NotAllowed("Cannot add more users to this workspace.")
+            raise NotAllowed("user_limit_reached")
 
         # this is idempotent and will return the existing invitation if it exists
         invitation = await self.invitation_repository.create_invitation(workspace_id, invitee_email, role)
