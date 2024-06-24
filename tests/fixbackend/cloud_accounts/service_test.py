@@ -41,6 +41,7 @@ from fixbackend.domain_events.events import (
     CloudAccountNameChanged,
     DegradationReason,
     Event,
+    SubscriptionCreated,
     TenantAccountsCollectFailed,
     TenantAccountsCollected,
     ProductTierChanged,
@@ -1119,6 +1120,7 @@ async def test_handle_events(
             is_higher_tier=False,
             previous_tier=ProductTier.Business,
         ),
+        SubscriptionCreated(workspace.id, user.id, subscription_id, method="aws_marketplace"),
         SubscriptionCancelled(subscription_id=subscription_id, method="aws_marketplace"),
     ]:
         await service.process_domain_event(event.to_json(), MessageContext("test", event.kind, "test", utc(), utc()))
