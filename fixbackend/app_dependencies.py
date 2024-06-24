@@ -83,6 +83,7 @@ from fixbackend.subscription.subscription_repository import AwsTierPreferenceRep
 from fixbackend.types import Redis
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.trial_end_service import TrialEndService
 
 log = logging.getLogger(__name__)
 
@@ -379,9 +380,6 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
         ),
     )
 
-    # uncomment once aws marketplace suscriptions are available on prd
-    # trial_end_service = deps.add(SN.trial_end_service, TrialEndService(workspace_repo))
-
     cloud_accounts_redis_publisher = RedisPubSubPublisher(
         redis=readwrite_redis,
         channel="cloud_accounts",
@@ -442,6 +440,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             analytics_event_sender=analytics_event_sender,
         ),
     )
+
+    # uncomment once aws marketplace suscriptions are available on prd
+    deps.add(SN.trial_end_service, TrialEndService(workspace_repo, session_maker, cloud_account_service))
+
     gcp_account_repo = deps.add(
         SN.gcp_service_account_repo,
         GcpServiceAccountKeyRepository(session_maker),

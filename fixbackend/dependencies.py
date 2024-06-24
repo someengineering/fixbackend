@@ -80,6 +80,7 @@ class ServiceNames:
     aws_tier_preference_repo = "aws_tier_preference_repo"
     azure_subscription_repo = "azure_subscription_repo"
     azure_subscription_service = "azure_subscription_service"
+    trial_end_service = "trial_end_service"
 
 
 class FixDependencies(Dependencies):
