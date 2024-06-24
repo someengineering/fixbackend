@@ -316,7 +316,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             if workspace is None:
                 raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
-            if workspace.subscription_id is None:
+            if workspace.subscription_id is None and new_tier.paid:
                 raise NotAllowed("Workspace must have a subscription to change the security tier")
 
             workspace.tier = new_tier.value
