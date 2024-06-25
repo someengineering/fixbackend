@@ -13,7 +13,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -129,9 +128,8 @@ class OneTimeEmailService(Service):
 
     async def _send_emails_job(self) -> None:
         pending_emails = await self.list_pending_emails()
-        async with asyncio.TaskGroup() as tg:
-            for email in pending_emails:
-                tg.create_task(self._send_pending_email(email))
+        for email in pending_emails:
+            await self._send_pending_email(email)
 
     async def list_pending_emails(self) -> List[OneTimeEmail]:
         async with self.session_maker() as session:
