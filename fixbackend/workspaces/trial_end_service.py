@@ -56,7 +56,7 @@ class TrialEndService(Service):
 
     @override
     async def stop(self) -> None:
-        # pass
+        pass
         # if self.periodic:
         #     await self.periodic.stop()
 
