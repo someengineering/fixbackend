@@ -49,13 +49,16 @@ class TrialEndService(Service):
 
     @override
     async def start(self) -> Any:
-        if self.periodic:
-            await self.periodic.start()
+        pass
+        # todo: change together with trial duration
+        # if self.periodic:
+        #     await self.periodic.start()
 
     @override
     async def stop(self) -> None:
-        if self.periodic:
-            await self.periodic.stop()
+        # pass
+        # if self.periodic:
+        #     await self.periodic.stop()
 
     async def move_trials_to_free_tier(self) -> None:
         async with self.session_maker() as session:
@@ -65,6 +68,9 @@ class TrialEndService(Service):
             for workspace in workspaces:
                 new_tier = ProductTier.Free
                 if limit := ProductTierSettings[new_tier].account_limit:
-                    await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
+                    try:
+                        await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
+                    except Exception as e:
+                        log.info(f"Failed to disable cloud accounts for workspace {workspace.id}, reason: {e}")
                 log.info(f"Moving workspace {workspace.id} to free tier from trial tier because trial has expired.")
                 await self.workspace_repository.update_product_tier(workspace.id, new_tier, session=session)
