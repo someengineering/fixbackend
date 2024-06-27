@@ -400,7 +400,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
             if workspace.tier != ProductTier.Free.value:
-                return workspace.to_model()
+                raise NotAllowed("wrong_tier")
 
             if workspace.move_to_free_acknowledged_at is not None:
                 return workspace.to_model()
