@@ -15,14 +15,13 @@
 
 import logging
 from datetime import timedelta
-from typing import Any, Optional, override
+from typing import Any, Optional
 
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 
 from fixbackend.cloud_accounts.service import CloudAccountService
-from fixbackend.config import ProductTierSettings, trial_period_duration
-from fixbackend.ids import ProductTier
+from fixbackend.config import trial_period_duration
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
 
@@ -47,27 +46,23 @@ class TrialEndService(Service):
             first_run=timedelta(seconds=30),
         )
 
-    @override
     async def start(self) -> Any:
-        pass
-        # todo: change together with trial duration
-        # if self.periodic:
-        #     await self.periodic.start()
+        if self.periodic:
+            await self.periodic.start()
 
-    @override
     async def stop(self) -> None:
-        pass
-        # if self.periodic:
-        #     await self.periodic.stop()
+        if self.periodic:
+            await self.periodic.stop()
 
     async def move_trials_to_free_tier(self) -> None:
         async with self.session_maker() as session:
             workspaces = await self.workspace_repository.list_expired_trials(
                 been_in_trial_tier_for=trial_period_duration(), session=session
             )
-            for workspace in workspaces:
-                new_tier = ProductTier.Free
-                if limit := ProductTierSettings[new_tier].account_limit:
-                    await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
-                log.info(f"Moving workspace {workspace.id} to free tier from trial tier because trial has expired.")
-                await self.workspace_repository.update_product_tier(workspace.id, new_tier, session=session)
+            log.info(f"dry run: moving workspaces {[w.id for w in workspaces]} to free tier")
+            # for workspace in workspaces:
+            # new_tier = ProductTier.Free
+            # if limit := ProductTierSettings[new_tier].account_limit:
+            #     await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
+            # log.info(f"Moving workspace {workspace.id} to free tier from trial tier because trial has expired.")
+            # await self.workspace_repository.update_product_tier(workspace.id, new_tier, session=session)
