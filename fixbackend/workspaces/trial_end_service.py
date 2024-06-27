@@ -49,13 +49,16 @@ class TrialEndService(Service):
 
     @override
     async def start(self) -> Any:
-        if self.periodic:
-            await self.periodic.start()
+        pass
+        # todo: change together with trial duration
+        # if self.periodic:
+        #     await self.periodic.start()
 
     @override
     async def stop(self) -> None:
-        if self.periodic:
-            await self.periodic.stop()
+        pass
+        # if self.periodic:
+        #     await self.periodic.stop()
 
     async def move_trials_to_free_tier(self) -> None:
         async with self.session_maker() as session:

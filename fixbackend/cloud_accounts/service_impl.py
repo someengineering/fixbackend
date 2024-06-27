@@ -1106,9 +1106,16 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return account
 
     async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
+
+        async def disable_account(cloud_account: CloudAccount) -> None:
+            try:
+                await self.update_cloud_account_enabled(workspace_id, cloud_account.id, False)
+            except Exception as e:
+                log.warning(f"Failed to disable account {cloud_account.id}: {e}, skipping")
+
         async with asyncio.TaskGroup() as tg:
             all_accounts = await self.list_accounts(workspace_id)
             # keep the last account_limit accounts
             to_disable = all_accounts[:-keep_enabled]
             for cloud_account in to_disable:
-                tg.create_task(self.update_cloud_account_enabled(workspace_id, cloud_account.id, False))
+                tg.create_task(disable_account(cloud_account))
