@@ -211,12 +211,7 @@ ConfigDependency = Annotated[Config, Depends(config)]
 
 
 def trial_period_duration() -> timedelta:
-    # todo: use a constant here
-    # timedelta(days=14)
-    # until we have payment set up, we always promise you 14 days of trial
-    day_of_the_commit = datetime(2024, 4, 15)  # when this line of code was addded.
-    now = datetime.now()
-    return now - day_of_the_commit + timedelta(days=14)
+    return timedelta(days=14)
 
 
 @frozen
