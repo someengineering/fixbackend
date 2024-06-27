@@ -281,4 +281,18 @@ def workspaces_router() -> APIRouter:
         """Get a workspaces external id."""
         return ExternalIdRead(external_id=workspace.external_id)
 
+    @router.post("/{workspace_id}/ack_move_to_free")
+    async def acknowledge_move_to_free(
+        workspace: UserWorkspaceDependency,
+        user: AuthenticatedUser,
+        workspace_repository: WorkspaceRepositoryDependency,
+    ) -> WorkspaceRead:
+        """Acknowledge the move to free tier."""
+
+        workspace = await workspace_repository.ack_move_to_free(workspace.id)
+
+        roles = next(filter(lambda role: role.workspace_id == workspace.id, user.roles), None)
+
+        return WorkspaceRead.from_model(workspace, user.id, roles)
+
     return router

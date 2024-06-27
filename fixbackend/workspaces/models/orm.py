@@ -43,6 +43,7 @@ class Organization(Base, CreatedUpdatedMixin):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), index=True)
     highest_current_cycle_tier: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     current_cycle_ends_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    move_to_free_acknowledged_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     def to_model(self) -> models.Workspace:
         return models.Workspace(
@@ -61,6 +62,7 @@ class Organization(Base, CreatedUpdatedMixin):
             payment_on_hold_since=self.payment_on_hold_since,
             created_at=self.created_at,
             updated_at=self.updated_at,
+            move_to_free_acknowledged_at=self.move_to_free_acknowledged_at,
         )
 
 

@@ -18,6 +18,7 @@ from functools import reduce
 import logging
 from typing import List, Literal, Optional, Union
 from fixbackend.auth.models import User
+from fixbackend.billing.schemas import ProductTierRead
 from fixbackend.ids import InvitationId, WorkspaceId, UserId, ExternalId
 
 from pydantic import BaseModel, EmailStr, Field
@@ -74,6 +75,10 @@ class WorkspaceRead(BaseModel):
     trial_end_days: Optional[int] = Field(description="Days left before the trial ends.")
     user_has_access: bool = Field(description="Whether the user has access to the workspace")
     user_permissions: int = Field(description="The permissions the user has in the workspace")
+    tier: ProductTierRead = Field(description="The workspace's current tier")
+    move_to_free_acknowledged_at: Optional[datetime] = Field(
+        default=None, description="The time at which the user acknowledged the move to the free tier."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -89,6 +94,8 @@ class WorkspaceRead(BaseModel):
                     "trial_end_days": 13,
                     "user_has_access": True,
                     "user_permissions": "3",
+                    "tier": "Trial",
+                    "move_to_free_acknowledged_at": "2020-01-01T00:00:00Z",
                 }
             ]
         }
@@ -107,6 +114,8 @@ class WorkspaceRead(BaseModel):
             trial_end_days=model.trial_end_days(),
             user_has_access=model.paid_tier_access(user_id),
             user_permissions=user_roles.permissions() if user_roles else 0,
+            tier=ProductTierRead.from_tier(model.current_product_tier()),
+            move_to_free_acknowledged_at=model.move_to_free_acknowledged_at,
         )
 
 

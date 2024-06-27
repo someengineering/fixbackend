@@ -281,3 +281,23 @@ async def test_expired_trials(
     assert await workspace_repository.list_expired_trials(been_in_trial_tier_for=datetime.timedelta(seconds=0)) == [
         workspace
     ]
+
+
+@pytest.mark.asyncio
+async def test_ack_move_to_free(workspace_repository: WorkspaceRepository, user: User) -> None:
+    # we can get an existing organization by id
+    workspace = await workspace_repository.create_workspace(
+        name="Test Organization", slug="test-organization", owner=user
+    )
+
+    await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
+
+    updated_workspace = await workspace_repository.get_workspace(workspace.id)
+    assert updated_workspace
+    assert updated_workspace.current_product_tier() == ProductTier.Free
+    assert updated_workspace.move_to_free_acknowledged_at is None
+
+    await workspace_repository.ack_move_to_free(workspace.id)
+    updated_workspace = await workspace_repository.get_workspace(workspace.id)
+    assert updated_workspace
+    assert updated_workspace.move_to_free_acknowledged_at is not None
