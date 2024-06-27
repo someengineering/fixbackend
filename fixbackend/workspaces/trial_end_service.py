@@ -68,9 +68,6 @@ class TrialEndService(Service):
             for workspace in workspaces:
                 new_tier = ProductTier.Free
                 if limit := ProductTierSettings[new_tier].account_limit:
-                    try:
-                        await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
-                    except Exception as e:
-                        log.info(f"Failed to disable cloud accounts for workspace {workspace.id}, reason: {e}")
+                    await self.cloud_account_service.disable_cloud_accounts(workspace.id, limit)
                 log.info(f"Moving workspace {workspace.id} to free tier from trial tier because trial has expired.")
                 await self.workspace_repository.update_product_tier(workspace.id, new_tier, session=session)
