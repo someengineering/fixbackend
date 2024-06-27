@@ -122,6 +122,11 @@ class WorkspaceRepository(ABC):
         """List all workspaces which have been in trial for mor that provided time."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def ack_move_to_free(self, workspace_id: WorkspaceId) -> Workspace:
+        """Acknowledge that the workspace moved to free tier."""
+        raise NotImplementedError
+
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -384,6 +389,27 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
         else:
             async with self.session_maker() as session:
                 return await do_tx(session)
+
+    async def ack_move_to_free(self, workspace_id: WorkspaceId) -> Workspace:
+        """Acknowledge that the workspace moved to free tier."""
+        async with self.session_maker() as session:
+            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            results = await session.execute(statement)
+            workspace = results.unique().scalar_one_or_none()
+            if workspace is None:
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+
+            if workspace.tier != ProductTier.Free.value:
+                return workspace.to_model()
+
+            if workspace.move_to_free_acknowledged_at is not None:
+                return workspace.to_model()
+
+            workspace.move_to_free_acknowledged_at = utc()
+            await session.commit()
+            await session.refresh(workspace)
+
+            return workspace.to_model()
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

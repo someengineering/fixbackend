@@ -52,6 +52,8 @@ async def test_list_organizations(client: AsyncClient, workspace: Workspace) -> 
     assert response.json()[0] is not None
     assert response.json()[0].get("id") == str(workspace.id)
     assert response.json()[0].get("user_permissions") == 8191
+    assert response.json()[0].get("tier") == ProductTier.Trial.value
+    assert response.json()[0].get("move_to_free_acknowledged_at") is None
 
 
 @pytest.mark.asyncio
@@ -162,3 +164,15 @@ async def test_workspace_trial_period() -> None:
     # todo: ucomment this once we disable rolling trial period duration
     # assert evolve(workspace, created_at=utc() - timedelta(days=15)).trial_end_days() == 0
     # assert evolve(workspace, created_at=utc() - timedelta(days=10)).trial_end_days() == 4
+
+
+@pytest.mark.asyncio
+async def test_ack_free_move(client: AsyncClient, workspace: Workspace) -> None:
+    response = await client.get("/api/workspaces/")
+    assert response.json()[0] is not None
+    assert response.json()[0].get("id") == str(workspace.id)
+    assert response.json()[0].get("user_permissions") == 8191
+    assert response.json()[0].get("tier") == ProductTier.Trial.value
+    assert response.json()[0].get("move_to_free_acknowledged_at") is None
+    response = await client.post("/api/workspaces/{workspace.id}/ack_move_to_free")
+    assert response.json()[0].get("move_to_free_acknowledged_at") is not None
