@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import ForeignKey, String, DateTime, Integer, func
+from sqlalchemy import ForeignKey, Index, String, DateTime, Integer, func
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from fixbackend.auth.models import orm
@@ -43,9 +43,8 @@ class Organization(Base, CreatedUpdatedMixin):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), index=True)
     highest_current_cycle_tier: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     current_cycle_ends_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
-    move_to_free_acknowledged_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
-    def to_model(self) -> models.Workspace:
+    def to_model(self, move_to_free_acknowledged_at: Optional[datetime] = None) -> models.Workspace:
         return models.Workspace(
             id=self.id,
             slug=self.slug,
@@ -62,7 +61,7 @@ class Organization(Base, CreatedUpdatedMixin):
             payment_on_hold_since=self.payment_on_hold_since,
             created_at=self.created_at,
             updated_at=self.updated_at,
-            move_to_free_acknowledged_at=self.move_to_free_acknowledged_at,
+            move_to_free_acknowledged_at=move_to_free_acknowledged_at,
         )
 
 
@@ -113,3 +112,14 @@ class OrganizationMembers(Base):
     organization: Mapped[Organization] = relationship(back_populates="members")
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"), primary_key=True)
     user: Mapped[orm.User] = relationship()
+
+
+class UserTrialNotificationStatus(Base):
+    __tablename__ = "workspace_trial_notification_seen"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("organization.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("user.id"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+
+    __table_args__ = (Index("ix_workspace_id_user_id", "workspace_id", "user_id"),)

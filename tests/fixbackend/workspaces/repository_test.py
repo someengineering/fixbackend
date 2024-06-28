@@ -19,7 +19,7 @@ from attr import evolve
 import pytest
 from sqlalchemy import select
 
-from fixbackend.auth.user_repository import get_user_repository
+from fixbackend.auth.user_repository import get_user_repository, UserRepository
 from fixbackend.auth.models import User
 from fixbackend.ids import WorkspaceId, UserId, ProductTier
 from fixbackend.permissions.models import Roles, UserRole
@@ -284,7 +284,9 @@ async def test_expired_trials(
 
 
 @pytest.mark.asyncio
-async def test_ack_move_to_free(workspace_repository: WorkspaceRepository, user: User) -> None:
+async def test_ack_move_to_free(
+    workspace_repository: WorkspaceRepository, user: User, user_repository: UserRepository
+) -> None:
     # we can get an existing organization by id
     workspace = await workspace_repository.create_workspace(
         name="Test Organization", slug="test-organization", owner=user
@@ -292,12 +294,21 @@ async def test_ack_move_to_free(workspace_repository: WorkspaceRepository, user:
 
     await workspace_repository.update_product_tier(workspace.id, ProductTier.Free)
 
-    updated_workspace = await workspace_repository.get_workspace(workspace.id)
-    assert updated_workspace
+    updated_workspace = (await workspace_repository.list_workspaces(user))[0]
     assert updated_workspace.current_product_tier() == ProductTier.Free
     assert updated_workspace.move_to_free_acknowledged_at is None
 
-    await workspace_repository.ack_move_to_free(workspace.id)
-    updated_workspace = await workspace_repository.get_workspace(workspace.id)
-    assert updated_workspace
+    await workspace_repository.ack_move_to_free(workspace.id, user.id)
+    updated_workspace = (await workspace_repository.list_workspaces(user))[0]
     assert updated_workspace.move_to_free_acknowledged_at is not None
+
+    # unknown user should raise an exception
+    new_user_dict = {"email": "bar@bar.com", "hashed_password": "notreallyhashed", "is_verified": True}
+    new_user = await user_repository.create(new_user_dict)
+    with pytest.raises(Exception):
+        await workspace_repository.ack_move_to_free(workspace.id, new_user.id)
+
+    # trial ack is not shared between users
+    await workspace_repository.add_to_workspace(workspace.id, new_user.id, Roles.workspace_member)
+    updated_workspace = (await workspace_repository.list_workspaces(new_user))[0]
+    assert updated_workspace.move_to_free_acknowledged_at is None

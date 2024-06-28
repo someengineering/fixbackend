@@ -289,7 +289,7 @@ def workspaces_router() -> APIRouter:
     ) -> WorkspaceRead:
         """Acknowledge the move to free tier."""
 
-        workspace = await workspace_repository.ack_move_to_free(workspace.id)
+        workspace = await workspace_repository.ack_move_to_free(workspace.id, user.id)
 
         roles = next(filter(lambda role: role.workspace_id == workspace.id, user.roles), None)
 

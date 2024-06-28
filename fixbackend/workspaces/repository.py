@@ -18,9 +18,10 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Annotated, Optional, Sequence
 
+from attrs import evolve
 from fastapi import Depends
 from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -123,7 +124,7 @@ class WorkspaceRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def ack_move_to_free(self, workspace_id: WorkspaceId) -> Workspace:
+    async def ack_move_to_free(self, workspace_id: WorkspaceId, user_id: UserId) -> Workspace:
         """Acknowledge that the workspace moved to free tier."""
         raise NotImplementedError
 
@@ -211,17 +212,24 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
         async with self.session_maker() as session:
             statement = (
-                select(orm.Organization)
+                select(orm.Organization, orm.UserTrialNotificationStatus.created_at)
                 .join(
                     orm.OrganizationMembers,
                     orm.Organization.id == orm.OrganizationMembers.organization_id,
                     isouter=True,
                 )
+                .outerjoin(
+                    orm.UserTrialNotificationStatus,
+                    and_(
+                        orm.Organization.id == orm.UserTrialNotificationStatus.workspace_id,
+                        orm.UserTrialNotificationStatus.user_id == user.id,
+                    ),
+                )
                 .where(or_(orm.Organization.owner_id == user.id, orm.OrganizationMembers.user_id == user.id))
             )
             results = await session.execute(statement)
-            entities = results.unique().scalars().all()
-            workspaces = [entity.to_model() for entity in entities]
+            entities = results.unique().all()
+            workspaces = [entity[0].to_model(entity[1]) for entity in entities]
 
             if can_assign_subscriptions:
                 result = []
@@ -390,26 +398,38 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             async with self.session_maker() as session:
                 return await do_tx(session)
 
-    async def ack_move_to_free(self, workspace_id: WorkspaceId) -> Workspace:
+    async def ack_move_to_free(self, workspace_id: WorkspaceId, user_id: UserId) -> Workspace:
         """Acknowledge that the workspace moved to free tier."""
         async with self.session_maker() as session:
-            statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
-            results = await session.execute(statement)
-            workspace = results.unique().scalar_one_or_none()
-            if workspace is None:
+            workspace_statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            workspace_entity = (await session.execute(workspace_statement)).unique().scalar_one_or_none()
+            if workspace_entity is None:
                 raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
-            if workspace.tier != ProductTier.Free.value:
+            workspace = workspace_entity.to_model()
+
+            if user_id not in workspace.all_users():
+                raise NotAllowed("user_not_in_workspace")
+
+            if workspace.current_product_tier() != ProductTier.Free.value:
                 raise NotAllowed("wrong_tier")
 
-            if workspace.move_to_free_acknowledged_at is not None:
-                return workspace.to_model()
+            notification_statement = (
+                select(orm.UserTrialNotificationStatus)
+                .where(orm.UserTrialNotificationStatus.workspace_id == workspace_id)
+                .where(orm.UserTrialNotificationStatus.user_id == user_id)
+            )
+            notification_results = await session.execute(notification_statement)
+            notification_status = notification_results.unique().scalar_one_or_none()
 
-            workspace.move_to_free_acknowledged_at = utc()
+            if notification_status is not None:
+                return evolve(workspace, move_to_free_acknowledged_at=notification_status.created_at)
+
+            now = utc()
+            session.add(orm.UserTrialNotificationStatus(workspace_id=workspace_id, user_id=user_id, created_at=now))
             await session.commit()
-            await session.refresh(workspace)
 
-            return workspace.to_model()
+            return evolve(workspace, move_to_free_acknowledged_at=now)
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:
