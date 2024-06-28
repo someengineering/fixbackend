@@ -40,7 +40,7 @@ class Workspace:
         None  # which tier we saw as the highest until the end of the billing cycle
     )
     current_cycle_ends_at: Optional[datetime] = None  # when the active product tier ends, typically end of the month
-    move_to_free_acknowledged_at: Optional[datetime] = None
+    move_to_free_acknowledged_at: Optional[datetime] = None  # only set for list_workspaces when the user_id is provided
 
     # this is the product tier that is active for the workspace at the moment
     # it is based on the highest tier we saw during the billing cycle
