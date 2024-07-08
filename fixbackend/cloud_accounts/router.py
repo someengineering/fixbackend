@@ -18,9 +18,11 @@ import logging
 from typing import Annotated, AsyncIterator
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from fixcloudutils.util import utc
 
 from fixbackend.auth.depedencies import AuthenticatedUser
+from fixbackend.billing.schemas import AzureCallbackPayload
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
@@ -261,6 +263,36 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         if creds is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
         return AzureSubscriptionCredentialsRead.from_model(creds)
+
+    @router.get("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
+    async def azure_oauth_redirect(request: Request) -> Response:
+
+        client_id = dependencies.config.azure_client_id
+
+        url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}"
+
+        return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+    @router.post("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
+    async def azure_oauth_callback(payload: AzureCallbackPayload, workspace: UserWorkspaceDependency) -> Response:
+
+        client_id = dependencies.config.azure_client_id
+        client_secret = dependencies.config.azure_client_secret
+
+        try:
+            await azure_subscription_service.list_subscriptions(payload.azure_tenant_id, client_id, client_secret)
+        except Exception as e:
+            log.info(f"Error listing Azure subscriptions: {e}")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_credentials")
+
+        await azure_subscription_repo.upsert(
+            workspace.id,
+            payload.azure_tenant_id,
+            client_id,
+            client_secret,
+        )
+
+        return Response(status_code=200)
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}/logs", tags=["report"])
     async def logs(
