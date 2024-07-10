@@ -323,7 +323,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.azure_subscription_service,
-        AzureSubscriptionService(azure_subscription_repo, cloud_account_service),
+        AzureSubscriptionService(azure_subscription_repo, cloud_account_service, cfg),
     )
     return deps
 
@@ -484,7 +484,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.azure_subscription_service,
-        AzureSubscriptionService(azure_subscription_credentals_repo, cloud_account_service, dispatching=True),
+        AzureSubscriptionService(azure_subscription_credentals_repo, cloud_account_service, cfg, dispatching=True),
     )
     return deps
 

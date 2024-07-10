@@ -17,9 +17,8 @@ from uuid import UUID, uuid4
 import warnings
 from datetime import timedelta
 from logging import getLogger
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional
 
-import msal
 from attr import frozen
 from azure.identity import ClientSecretCredential
 from azure.mgmt.resource import SubscriptionClient
@@ -149,7 +148,9 @@ class AzureSubscriptionService(Service):
             for azure_credential in created_less_than_30_minutes_ago:
                 tg.create_task(self._import_subscriptions(azure_credential))
 
-    async def create_user_app_registration(self, workspace_id: WorkspaceId, azure_tenant_id: str) -> None:
+    async def create_user_app_registration(
+        self, workspace_id: WorkspaceId, azure_tenant_id: str
+    ) -> Optional[AzureSubscriptionCredentials]:
         fix_client_id = self.config.azure_client_id
         fix_client_secret = self.config.azure_client_secret
 
@@ -218,23 +219,28 @@ class AzureSubscriptionService(Service):
 
             # get the root management group id
             management_client = ManagementGroupsAPI(credentials)
-            tenant_details = management_client.management_groups.get(group_id=azure_tenant_id)
-            root_management_group_id: str = tenant_details.id  # type: ignore
+            tenant_details = await asyncio.to_thread(
+                lambda: management_client.management_groups.get(group_id=azure_tenant_id)
+            )
+            root_management_group_id: str = tenant_details.id
 
             # get a subscription id associated with the tenant
             subscription_client = SubscriptionClient(credentials)
-            subscriptions = subscription_client.subscriptions.list()
+            subscriptions = await asyncio.to_thread(lambda: subscription_client.subscriptions.list())
             if not subscriptions:
                 log.error("Failed to create app registration: no subscriptions found")
                 return None
 
             # here we will get the first subscription id, I guess there is no difference
             subscription_id: Optional[str] = None
-            for subscription in subscriptions:
-                if s_id := subscription.subscription_id:
-                    s_id = cast(Optional[str], s_id)
-                    subscription_id = s_id
-                    break
+
+            def find_subscription_id() -> Optional[str]:
+                for subscription in subscriptions:
+                    if s_id := subscription.subscription_id:
+                        return s_id  # type: ignore
+                return None
+
+            subscription_id = await asyncio.to_thread(find_subscription_id)
 
             if not subscription_id:
                 log.error("Failed to create app registration: no subscription id found")
@@ -242,16 +248,18 @@ class AzureSubscriptionService(Service):
 
             # Create a reader role assignment between the app's service principal and the root management group
             auth_client = AuthorizationManagementClient(credentials, subscription_id)
-            role_definition_id = f"/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"  # Reader role, see https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#general
+            role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"  # noqa, Reader role, see https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#general
             role_assignment_params = RoleAssignmentCreateParameters(
                 role_definition_id=role_definition_id,
                 principal_id=service_principal.id,  # type: ignore
             )
-            role_assignment = auth_client.role_assignments.create(
-                scope=root_management_group_id,
-                role_assignment_name=str(uuid4()),
-                parameters=role_assignment_params,  # type: ignore
-            )  # type: ignore
+            role_assignment = await asyncio.to_thread(
+                lambda: auth_client.role_assignments.create(
+                    scope=root_management_group_id,
+                    role_assignment_name=str(uuid4()),
+                    parameters=role_assignment_params,
+                )
+            )
 
             log.info("Created role assignment: %s", role_assignment.id)
 
@@ -259,7 +267,7 @@ class AzureSubscriptionService(Service):
             log.error(f"Failed to create app registration: {e}")
             return None
 
-        await self.azure_subscriptions_repo.upsert(
+        result = await self.azure_subscriptions_repo.upsert(
             tenant_id=workspace_id,
             azure_tenant_id=azure_tenant_id,
             client_id=created_app.app_id,
@@ -268,4 +276,4 @@ class AzureSubscriptionService(Service):
 
         log.info(f"Created app registration for tenant {azure_tenant_id} with client_id {created_app.app_id}")
 
-        return None
+        return result

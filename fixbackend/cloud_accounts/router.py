@@ -276,21 +276,10 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     @router.post("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
     async def azure_oauth_callback(payload: AzureCallbackPayload, workspace: UserWorkspaceDependency) -> Response:
 
-        client_id = dependencies.config.azure_client_id
-        client_secret = dependencies.config.azure_client_secret
+        creds = await azure_subscription_service.create_user_app_registration(workspace.id, payload.azure_tenant_id)
 
-        try:
-            await azure_subscription_service.list_subscriptions(payload.azure_tenant_id, client_id, client_secret)
-        except Exception as e:
-            log.info(f"Error listing Azure subscriptions: {e}")
+        if creds is None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_credentials")
-
-        await azure_subscription_repo.upsert(
-            workspace.id,
-            payload.azure_tenant_id,
-            client_id,
-            client_secret,
-        )
 
         return Response(status_code=200)
 
