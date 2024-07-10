@@ -2,7 +2,7 @@
 FROM python:3.12 as build-stage
 WORKDIR /app
 ADD . /app
-RUN pip install poetry && poetry build && poetry export -f requirements.txt -o dist/requirements.txt
+RUN pip install poetry && poetry build && poetry export --with-hashes --without dev -f requirements.txt -o dist/requirements.txt
 
 
 # Create final image by installing the wheel with all requirements
