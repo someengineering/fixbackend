@@ -226,7 +226,7 @@ class AzureSubscriptionService(Service):
 
             # get a subscription id associated with the tenant
             subscription_client = SubscriptionClient(credentials)
-            subscriptions = await asyncio.to_thread(lambda: subscription_client.subscriptions.list())
+            subscriptions = await asyncio.to_thread(subscription_client.subscriptions.list)
             if not subscriptions:
                 log.error("Failed to create app registration: no subscriptions found")
                 return None
