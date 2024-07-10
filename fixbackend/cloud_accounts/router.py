@@ -16,18 +16,20 @@ from datetime import timedelta
 import json
 import logging
 from typing import Annotated, AsyncIterator
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fixcloudutils.util import utc
+from stripe import PaymentLink
 
 from fixbackend.auth.depedencies import AuthenticatedUser
-from fixbackend.billing.schemas import AzureCallbackPayload
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.fix_jwt import JwtService
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.router import CurrentGraphDbDependency
 from fixbackend.permissions.models import WorkspacePermissions
@@ -45,7 +47,7 @@ from fixbackend.cloud_accounts.schemas import (
     LastScanInfo,
     ScannedAccount,
 )
-from fixbackend.ids import FixCloudAccountId
+from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
 from fixbackend.streaming_response import StreamOnSuccessResponse, streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -58,6 +60,8 @@ log = logging.getLogger(__name__)
 
 def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
+
+    jwt_service = dependencies.service(ServiceNames.jwt_service, JwtService)
 
     gcp_service_account_repo = dependencies.service(
         ServiceNames.gcp_service_account_repo, GcpServiceAccountKeyRepository
@@ -264,24 +268,45 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
         return AzureSubscriptionCredentialsRead.from_model(creds)
 
+    audience = "azure_oauth_endpoint"
+
     @router.get("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
-    async def azure_oauth_redirect(request: Request) -> Response:
+    async def azure_oauth_redirect(workspace: UserWorkspaceDependency, redirect_url: str) -> Response:
 
         client_id = dependencies.config.azure_client_id
 
-        url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}"
+        payload = {"workspace_id": workspace.id, redirect_url: redirect_url}
+
+        state = await jwt_service.encode(payload, [audience])
+
+        url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}&state={state}"
 
         return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
-    @router.post("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
-    async def azure_oauth_callback(payload: AzureCallbackPayload, workspace: UserWorkspaceDependency) -> Response:
+    @router.post("/{workspace_id}/cloud_account/azure/oauth/callback", tags=["report"])
+    async def azure_oauth_callback(tenant: str, state: str) -> Response:
 
-        creds = await azure_subscription_service.create_user_app_registration(workspace.id, payload.azure_tenant_id)
+        def redirect_to_ui(location: str = "/") -> Response:
+            response = Response()
+            response.headers["location"] = "/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
+
+        payload = await jwt_service.decode(state, [audience])
+        if payload is None:
+            return redirect_to_ui()
+
+        if ws_id := payload.get("workspace_id"):
+            workspace_id = WorkspaceId(ws_id)
+        else:
+            return redirect_to_ui()
+
+        creds = await azure_subscription_service.create_user_app_registration(workspace_id, tenant)
 
         if creds is None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_credentials")
+            return redirect_to_ui()
 
-        return Response(status_code=200)
+        return redirect_to_ui(quote(str(PaymentLink().get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;"))
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}/logs", tags=["report"])
     async def logs(

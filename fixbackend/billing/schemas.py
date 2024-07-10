@@ -178,7 +178,3 @@ class WorkspaceBillingSettingsUpdate(BaseModel):
             ]
         }
     }
-
-
-class AzureCallbackPayload(BaseModel):
-    azure_tenant_id: str = Field(description="Azure tenant id")
