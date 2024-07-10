@@ -2725,7 +2725,7 @@ python-dateutil = ">=2.6"
 tzdata = ">=2020.1"
 
 [package.extras]
-test = ["time-machine (>=2.6.0)"]
+test = ["time-machine (==2.6.0)"]
 
 [[package]]
 name = "pexpect"
