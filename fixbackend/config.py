@@ -193,8 +193,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--customer-support-users", nargs="+", default=os.environ.get("CUSTOMER_SUPPORT_USERS", "").split(",")
     )
-    parser.add_argument("--azure-client-id", default=os.environ.get("AZURE_CLIENT_ID", ""))
-    parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_CLIENT_SECRET", ""))
+    parser.add_argument("--azure-client-id", default=os.environ.get("AZURE_APP_CLIENT_ID", ""))
+    parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_APP_CLIENT_SECRET", ""))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
