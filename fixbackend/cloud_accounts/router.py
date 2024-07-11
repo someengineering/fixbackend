@@ -17,6 +17,7 @@ import json
 import logging
 from typing import Annotated, AsyncIterator
 from urllib.parse import quote
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -276,7 +277,7 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 
         client_id = dependencies.config.azure_client_id
 
-        payload = {"workspace_id": workspace.id, redirect_url: redirect_url}
+        payload = {"workspace_id": f"{workspace.id}", redirect_url: redirect_url}
 
         state = await jwt_service.encode(payload, [audience])
 
@@ -347,7 +348,8 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
             return redirect_to_ui()
 
         if ws_id := payload.get("workspace_id"):
-            workspace_id = WorkspaceId(ws_id)
+            ws_uuid = UUID(ws_id)
+            workspace_id = WorkspaceId(ws_uuid)
         else:
             return redirect_to_ui()
 
