@@ -58,6 +58,9 @@ from googleapiclient.errors import HttpError
 log = logging.getLogger(__name__)
 
 
+audience = "azure_oauth_endpoint"
+
+
 def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
 
@@ -268,8 +271,6 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
         return AzureSubscriptionCredentialsRead.from_model(creds)
 
-    audience = "azure_oauth_endpoint"
-
     @router.get("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
     async def azure_oauth_redirect(workspace: UserWorkspaceDependency, redirect_url: str) -> Response:
 
@@ -282,31 +283,6 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
         url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}&state={state}"
 
         return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
-
-    @router.post("/{workspace_id}/cloud_account/azure/oauth/callback", tags=["report"])
-    async def azure_oauth_callback(tenant: str, state: str) -> Response:
-
-        def redirect_to_ui(location: str = "/") -> Response:
-            response = Response()
-            response.headers["location"] = "/"
-            response.status_code = status.HTTP_303_SEE_OTHER
-            return response
-
-        payload = await jwt_service.decode(state, [audience])
-        if payload is None:
-            return redirect_to_ui()
-
-        if ws_id := payload.get("workspace_id"):
-            workspace_id = WorkspaceId(ws_id)
-        else:
-            return redirect_to_ui()
-
-        creds = await azure_subscription_service.create_user_app_registration(workspace_id, tenant)
-
-        if creds is None:
-            return redirect_to_ui()
-
-        return redirect_to_ui(quote(str(PaymentLink().get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;"))
 
     @router.get("/{workspace_id}/cloud_account/{cloud_account_id}/logs", tags=["report"])
     async def logs(
@@ -336,8 +312,11 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
     return router
 
 
-def cloud_accounts_callback_router() -> APIRouter:
+def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
+
+    jwt_service = dependencies.service(ServiceNames.jwt_service, JwtService)
+    azure_subscription_service = dependencies.service(ServiceNames.azure_subscription_service, AzureSubscriptionService)
 
     @router.post("/callbacks/aws/cf")
     async def aws_cloudformation_callback(
@@ -353,5 +332,30 @@ def cloud_accounts_callback_router() -> APIRouter:
             account_name=None,
         )
         return None
+
+    @router.post("/callbacks/azure/oauth", tags=["report"])
+    async def azure_oauth_callback(tenant: str, state: str) -> Response:
+
+        def redirect_to_ui(location: str = "/") -> Response:
+            response = Response()
+            response.headers["location"] = "/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
+
+        payload = await jwt_service.decode(state, [audience])
+        if payload is None:
+            return redirect_to_ui()
+
+        if ws_id := payload.get("workspace_id"):
+            workspace_id = WorkspaceId(ws_id)
+        else:
+            return redirect_to_ui()
+
+        creds = await azure_subscription_service.create_user_app_registration(workspace_id, tenant)
+
+        if creds is None:
+            return redirect_to_ui()
+
+        return redirect_to_ui(quote(str(PaymentLink().get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;"))
 
     return router
