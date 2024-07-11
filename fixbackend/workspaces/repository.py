@@ -304,7 +304,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
     async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
         workspace = await self.get_workspace(workspace_id)
         if workspace is None:
-            return ProductTier.Free
+            raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
 
         return workspace.current_product_tier()
 
