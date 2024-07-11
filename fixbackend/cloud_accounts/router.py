@@ -272,7 +272,7 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
         return AzureSubscriptionCredentialsRead.from_model(creds)
 
-    @router.get("/{workspace_id}/cloud_account/azure/oauth", tags=["report"])
+    @router.get("/{workspace_id}/cloud_account/azure/oauth")
     async def azure_oauth_redirect(workspace: UserWorkspaceDependency, redirect_url: str) -> Response:
 
         client_id = dependencies.config.azure_client_id
