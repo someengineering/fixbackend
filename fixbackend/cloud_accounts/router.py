@@ -333,7 +333,7 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
         )
         return None
 
-    @router.post("/callbacks/azure/oauth", tags=["report"])
+    @router.post("/callbacks/azure/oauth")
     async def azure_oauth_callback(tenant: str, state: str) -> Response:
 
         def redirect_to_ui(location: str = "/") -> Response:
