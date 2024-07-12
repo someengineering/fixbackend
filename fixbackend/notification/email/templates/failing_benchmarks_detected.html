@@ -5,13 +5,13 @@
 {% set exhaustive = alert.examples|length == alert.failed_checks_count_total %}
 
 <h1 style="font-weight: bold;">New issues detected</h1>
-<p style="font-size: 16px;">We have completed a comprehensive scan of your infrastructure.</p>
-<p style="font-size: 16px;"><strong>{{ alert.failed_checks_count_total }} issues require your attention.</strong> These
+<p>We have completed a comprehensive scan of your infrastructure.</p>
+<p><strong>{{ alert.failed_checks_count_total }} issues require your attention.</strong> These
   issues are in violation of the benchmark standards set in <code>{{ alert.benchmark }}</code>.</p>
-<p style="font-size: 16px;">Here is {{ "the" if exhaustive else "a non exhaustive" }} list of failing checks:</p>
+<p>Here is {{ "the" if exhaustive else "a non exhaustive" }} list of failing checks:</p>
 <ul>
   {% for issue in alert.examples %}
-  <li style="font-size: 16px;">
+  <li>
     {{ issue.emoji() }} <strong> {{ issue.severity.capitalize() }}:</strong> {{ issue.title }}<br />
     {{ issue.failed_resources }} additional resources detected.<br />
     Examples:
@@ -22,7 +22,7 @@
   {% endfor %}
 </ul>
 {% if not exhaustive %}
-<p style="font-size: 16px;">
+<p>
   Please note that this list represents only a portion of the total issues found.
   You can review the full report with all affected resources using the below link.
 </p>
@@ -31,7 +31,7 @@
   <a href="{{ alert.ui_link }}" class="button" target="_blank">View all issues in Fix</a>
 </p>
 <div class="email-footer">
-  <p style="font-size: 10px;">
+  <p class="recieve-error">
     If you believe you have received this email in error,
     please contact your Fix workspace administrator or <a
       href="mailto:support@fix.security?subject=Please%20unsubscribe%20from%20workspace%20{{ alert.workspace_id }}">notify
