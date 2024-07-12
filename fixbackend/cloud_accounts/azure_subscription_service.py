@@ -264,7 +264,8 @@ class AzureSubscriptionService(Service):
             log.info("Created role assignment: %s", role_assignment.id)
 
         except Exception as e:
-            log.error(f"Failed to create app registration: {e}", exc_info=True)
+            log.error("Failed to create app registration")
+            log.error(e, exc_info=True)
             return None
 
         result = await self.azure_subscriptions_repo.upsert(
