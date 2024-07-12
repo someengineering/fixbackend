@@ -190,6 +190,7 @@ class AzureSubscriptionService(Service):
             if created_app.app_id is None:
                 log.error("Failed to create app registration: app_id is None")
                 return None
+            log.info("created app registration")
 
             # create a secret for the app registration
             password_credential = AddPasswordPostRequestBody(
@@ -198,6 +199,7 @@ class AzureSubscriptionService(Service):
                     end_date_time=utc() + (timedelta(days=365) * 10),  # 10 years
                 )
             )
+            log.info("crated password_credential")
             secrets = await graph_client.applications.by_application_id(created_app.app_id).add_password.post(
                 password_credential
             )
@@ -216,6 +218,7 @@ class AzureSubscriptionService(Service):
             if service_principal is None:
                 log.error("Failed to create app registration: service_principal is None")
                 return None
+            log.info("created service principal")
 
             # get the root management group id
             management_client = ManagementGroupsAPI(credentials)
@@ -223,6 +226,8 @@ class AzureSubscriptionService(Service):
                 lambda: management_client.management_groups.get(group_id=azure_tenant_id)
             )
             root_management_group_id: str = tenant_details.id
+
+            log.info("got root management group id")
 
             # get a subscription id associated with the tenant
             subscription_client = SubscriptionClient(credentials)
@@ -245,6 +250,8 @@ class AzureSubscriptionService(Service):
             if not subscription_id:
                 log.error("Failed to create app registration: no subscription id found")
                 return None
+
+            log.info("got subscription id")
 
             # Create a reader role assignment between the app's service principal and the root management group
             auth_client = AuthorizationManagementClient(credentials, subscription_id)
