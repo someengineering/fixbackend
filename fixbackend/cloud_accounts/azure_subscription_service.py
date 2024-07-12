@@ -190,7 +190,7 @@ class AzureSubscriptionService(Service):
             if created_app.app_id is None:
                 log.error("Failed to create app registration: app_id is None")
                 return None
-            log.info("created app registration")
+            log.info(f"created app registration, app_id: {created_app.app_id}")
 
             # create a secret for the app registration
             password_credential = AddPasswordPostRequestBody(
@@ -199,7 +199,7 @@ class AzureSubscriptionService(Service):
                     end_date_time=utc() + (timedelta(days=365) * 10),  # 10 years
                 )
             )
-            log.info("crated password_credential")
+            log.info("created password_credential")
             secrets = await graph_client.applications.by_application_id(created_app.app_id).add_password.post(
                 password_credential
             )
