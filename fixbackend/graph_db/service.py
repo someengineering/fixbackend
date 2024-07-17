@@ -102,6 +102,8 @@ class GraphDatabaseAccessManager(Service):
     def _database_for(self, workspace_id: WorkspaceId) -> str:
         # use consistent hashing to select a server from the list of available servers
         hashed_key = int(hashlib.sha256(str(workspace_id).encode()).hexdigest(), 16)
+        if not self.config.available_db_server or self.config.available_db_server == [""]:
+            raise RuntimeError("No available_db_server defined in the config")
         return self.config.available_db_server[hashed_key % len(self.config.available_db_server)]
 
     def _generate_password(self, length: int) -> str:
