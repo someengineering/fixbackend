@@ -27,7 +27,6 @@ from fixbackend.domain_events.events import WorkspaceCreated
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
-from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
 
