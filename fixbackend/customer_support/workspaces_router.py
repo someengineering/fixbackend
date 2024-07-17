@@ -24,9 +24,9 @@ from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import WorkspaceCreated
+from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
-from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
 
@@ -38,7 +38,7 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
     cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
     next_run_repo = dependencies.service(ServiceNames.next_run_repo, NextRunRepository)
     graph_db_access = dependencies.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
-    inventory_service = dependencies.service(ServiceNames.inventory, InventoryService)
+    domain_event_sender = dependencies.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)
 
     @router.get("/{workspace_id}", response_class=HTMLResponse, name="workspace:get")
     async def get_workspace(request: Request, workspace_id: WorkspaceId) -> Response:
@@ -84,10 +84,8 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
             raise HTTPException(status_code=400, detail="Database access already exists")
 
         await graph_db_access.create_database_access(workspace.id)
-        await inventory_service._process_workspace_created(
-            WorkspaceCreated(
-                workspace_id=workspace.id, name=workspace.name, slug=workspace.slug, user_id=workspace.owner_id
-            )
+        await domain_event_sender.publish(
+            WorkspaceCreated(workspace.id, workspace.name, workspace.slug, workspace.owner_id)
         )
 
         return Response(status_code=status.HTTP_201_CREATED, content="")
