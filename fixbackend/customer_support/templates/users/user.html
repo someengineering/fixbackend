@@ -29,6 +29,8 @@
             <button class="btn btn-neutral" hx-post="{{ url_for('users:resend_verification_email', user_id=user.id)}}"
                 hx-swap="outerHTML">Resend
                 verification email</button>
+            <button class="btn btn-danger" hx-confirm="Are you sure?"
+                hx-post="{{ url_for('users:verify_manually', user_id=user.id) }}" hx-swap="outerHTML">Manually verify</button>
             {% endif %}
             {% if user.is_active %}
             <button class="btn btn-warning" hx-confirm="Are you sure?"
