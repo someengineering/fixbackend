@@ -194,7 +194,7 @@ async def test_scheduled_updates(
 
         # the account should be older than a month
         await session.execute(
-            text("UPDATE organization SET created_at = :created_at").bindparams(created_at=utc() - timedelta(days=128))
+            text("UPDATE organization SET created_at = :created_at").bindparams(created_at=sunday - timedelta(days=128))
         )
 
         # nothing is sent
