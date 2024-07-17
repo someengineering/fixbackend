@@ -318,4 +318,16 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
 
         return Response(status_code=201, content="<div>Verification email sent</div>")
 
+    @router.post("/{user_id}/verify_manually", response_class=HTMLResponse, name="users:verify_manually")
+    async def verify_manually(request: Request, user_id: UserId) -> Response:
+        user = await user_repo.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404)
+
+        await user_repo.update(user, {"is_verified": True})
+
+        await user_manager.on_after_verify(user, request=None)
+
+        return Response(status_code=201, content="<div>User verified</div>")
+
     return router
