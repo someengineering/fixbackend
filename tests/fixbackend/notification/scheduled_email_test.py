@@ -167,7 +167,6 @@ async def test_new_workspaces_without_cloud_account(
 
 
 # noinspection SqlWithoutWhere
-@pytest.mark.skip
 async def test_scheduled_updates(
     scheduled_email_sender: ScheduledEmailSender,
     email_sender: InMemoryEmailSender,
