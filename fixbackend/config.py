@@ -84,6 +84,7 @@ class Config(BaseSettings):
     stripe_api_key: Optional[str]
     stripe_webhook_key: Optional[str]
     customer_support_users: List[str]
+    azure_tenant_id: str
     azure_client_id: str
     azure_client_secret: str
 
@@ -193,6 +194,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument(
         "--customer-support-users", nargs="+", default=os.environ.get("CUSTOMER_SUPPORT_USERS", "").split(",")
     )
+    parser.add_argument("--azure-tenant_id", default=os.environ.get("AZURE_APP_TENANT_ID", ""))
     parser.add_argument("--azure-client-id", default=os.environ.get("AZURE_APP_CLIENT_ID", ""))
     parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_APP_CLIENT_SECRET", ""))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]

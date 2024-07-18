@@ -45,6 +45,7 @@ msgraph-sdk = "^1.4.0"
 azure-mgmt-authorization = "^4.0.0"
 azure-mgmt-managementgroups = "^1.0.0"
 time-machine = "2.14.2"
+msgraph-core = "^1.1.2"
 [tool.poetry.group.dev.dependencies]
 ipykernel = ">=6.25.1"
 mypy = ">=1.5.1"

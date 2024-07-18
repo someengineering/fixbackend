@@ -13,30 +13,29 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from uuid import UUID, uuid4
+from uuid import uuid4
 import warnings
 from datetime import timedelta
 from logging import getLogger
 from typing import Any, List, Optional
 
 from attr import frozen
-from azure.identity import ClientSecretCredential
-from azure.mgmt.resource import SubscriptionClient
+from azure.identity.aio import ClientSecretCredential
+from azure.mgmt.resource.subscriptions.aio import SubscriptionClient
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 from fixcloudutils.util import utc
+from azure.core.credentials_async import AsyncTokenCredential
 
 from msgraph import GraphServiceClient
 from msgraph.generated.models.application import Application
 from msgraph.generated.models.password_credential import PasswordCredential
 from msgraph.generated.applications.item.add_password.add_password_post_request_body import AddPasswordPostRequestBody
-from msgraph.generated.models.required_resource_access import RequiredResourceAccess
-from msgraph.generated.models.resource_access import ResourceAccess
 from msgraph.generated.models.service_principal import ServicePrincipal
-from azure.mgmt.authorization import AuthorizationManagementClient
+from azure.mgmt.authorization.aio import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 
-from azure.mgmt.managementgroups import ManagementGroupsAPI
+from azure.mgmt.managementgroups.aio import ManagementGroupsAPI
 
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.models import AzureSubscriptionCredentials
@@ -82,27 +81,22 @@ class AzureSubscriptionService(Service):
         self, azure_tenant_id: str, client_id: str, client_secret: str
     ) -> List[SubscriptionInfo]:
 
-        def blocking_call() -> List[SubscriptionInfo]:
-            credential = ClientSecretCredential(
-                tenant_id=azure_tenant_id, client_id=client_id, client_secret=client_secret
-            )
-            subscription_client = SubscriptionClient(credential)
-            subscriptions = subscription_client.subscriptions.list()
+        credential = ClientSecretCredential(tenant_id=azure_tenant_id, client_id=client_id, client_secret=client_secret)
+        subscription_client = SubscriptionClient(credential)
+        subscriptions = subscription_client.subscriptions.list()
 
-            subscription_infos = []
+        subscription_infos = []
 
-            for subscription in subscriptions:
-                if subscription.subscription_id:
-                    subscription_infos.append(
-                        SubscriptionInfo(
-                            subscription_id=subscription.subscription_id,
-                            subscription_name=subscription.display_name,
-                        )
+        async for subscription in subscriptions:
+            if subscription.subscription_id:
+                subscription_infos.append(
+                    SubscriptionInfo(
+                        subscription_id=subscription.subscription_id,
+                        subscription_name=subscription.display_name,
                     )
+                )
 
-            return subscription_infos
-
-        return await asyncio.to_thread(blocking_call)
+        return subscription_infos
 
     async def update_cloud_accounts(
         self,
@@ -149,35 +143,52 @@ class AzureSubscriptionService(Service):
                 tg.create_task(self._import_subscriptions(azure_credential))
 
     async def create_user_app_registration(
-        self, workspace_id: WorkspaceId, azure_tenant_id: str
+        self,
+        workspace_id: WorkspaceId,
+        azure_tenant_id: str,
+        management_credential: AsyncTokenCredential,
     ) -> Optional[AzureSubscriptionCredentials]:
+
+        async def create_role_assignment(
+            auth_managemement_client: AuthorizationManagementClient,
+            service_principal_id: str,
+            scope: str,
+            role_definition_id: str,
+        ) -> bool:
+
+            role_assignment_params = RoleAssignmentCreateParameters(
+                role_definition_id=role_definition_id,
+                principal_id=service_principal_id,
+                principal_type="ServicePrincipal",
+            )  # type: ignore
+
+            try:
+                role_assignment = await auth_managemement_client.role_assignments.create(
+                    scope=scope,
+                    role_assignment_name=str(uuid4()),
+                    parameters=role_assignment_params,
+                )
+                log.info("Created role assignment: %s", role_assignment.id)
+                return True
+            except Exception as e:
+                log.info("Failed to create role assignment")
+                log.info(e, exc_info=True)
+                return False
+
         fix_client_id = self.config.azure_client_id
         fix_client_secret = self.config.azure_client_secret
+        fix_azure_tenant_id = self.config.azure_tenant_id
 
-        credentials = ClientSecretCredential(
-            tenant_id=azure_tenant_id, client_id=fix_client_id, client_secret=fix_client_secret
+        service_principal_credentials = ClientSecretCredential(
+            tenant_id=fix_azure_tenant_id, client_id=fix_client_id, client_secret=fix_client_secret
         )
 
-        graph_client = GraphServiceClient(credentials)
-
-        # required permissions for the app registration
-        required_resource_access = [
-            RequiredResourceAccess(
-                resource_app_id="797f4846-ba00-4fd7-ba43-dac1f8f63013",  # Azure Service Management API, see https://learn.microsoft.com/en-us/troubleshoot/azure/entra/entra-id/governance/verify-first-party-apps-sign-in#application-ids-of-commonly-used-microsoft-applications
-                resource_access=[
-                    ResourceAccess(
-                        id=UUID("41094075-9dad-400e-a0bd-54e686782033"),  # user_impersonation permission ID
-                        type="Scope",
-                    )
-                ],
-            )
-        ]
+        graph_client = GraphServiceClient(service_principal_credentials)
 
         # new app registration definition
         app = Application(
             display_name=f"Fix Access {azure_tenant_id}",
             sign_in_audience="AzureADMyOrg",  # see https://learn.microsoft.com/en-us/entra/identity-platform/supported-accounts-validation#validation-differences
-            required_resource_access=required_resource_access,
         )
 
         try:
@@ -185,6 +196,10 @@ class AzureSubscriptionService(Service):
             created_app = await graph_client.applications.post(app)
             if created_app is None:
                 log.error("Failed to create app registration: created_app is None")
+                return None
+
+            if created_app.id is None:
+                log.error("Failed to create app registration: id is None")
                 return None
 
             if created_app.app_id is None:
@@ -200,7 +215,7 @@ class AzureSubscriptionService(Service):
                 )
             )
             log.info("created password_credential")
-            secrets = await graph_client.applications.by_application_id(created_app.app_id).add_password.post(
+            secrets = await graph_client.applications.by_application_id(created_app.id).add_password.post(
                 password_credential
             )
             if secrets is None:
@@ -218,57 +233,85 @@ class AzureSubscriptionService(Service):
             if service_principal is None:
                 log.error("Failed to create app registration: service_principal is None")
                 return None
+            service_principal_id = service_principal.id
+            if service_principal_id is None:
+                log.error("Failed to create app registration: service_principal_id is None")
+                return None
             log.info("created service principal")
 
-            # get the root management group id
-            management_client = ManagementGroupsAPI(credentials)
-            tenant_details = await asyncio.to_thread(
-                lambda: management_client.management_groups.get(group_id=azure_tenant_id)
-            )
-            root_management_group_id: str = tenant_details.id
+            # list all subscriptions and management groups
+            subscription_client = SubscriptionClient(management_credential)
+            subscriptions = []
+            async for subscription in subscription_client.subscriptions.list():
+                subscriptions.append(subscription)
 
-            log.info("got root management group id")
+            management_groups_api = ManagementGroupsAPI(management_credential)
+            management_groups = []
+            async for group in management_groups_api.management_groups.list():
+                management_groups.append(group)
+
+            # get the root management group id
+            def find_tenant_root_group_id() -> Optional[Any]:
+                for group in management_groups:
+                    if group.name == azure_tenant_id:
+                        return group
+                return None
+
+            subscription_id: str = subscriptions[0].id
+            auth_client = AuthorizationManagementClient(management_credential, subscription_id)
+            reader_role_definition_id = (
+                "/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
+            )
+
+            # find the root management group and assign the reader role if possible
+            if root_management_group := find_tenant_root_group_id():
+                assigned = await create_role_assignment(
+                    auth_client, service_principal_id, root_management_group.id, reader_role_definition_id
+                )
+                if assigned:
+                    log.info("Created role assignment for root management group")
+                    result = await self.azure_subscriptions_repo.upsert(
+                        tenant_id=workspace_id,
+                        azure_tenant_id=azure_tenant_id,
+                        client_id=created_app.app_id,
+                        client_secret=secrets.secret_text,
+                    )
+                    log.info(
+                        f"Created app registration for tenant {azure_tenant_id} with client_id {created_app.app_id}"
+                    )
+                    return result
+
+            number_of_assignements = 0
+
+            for group in management_groups:
+                assigned = await create_role_assignment(
+                    auth_client, service_principal_id, group.id, reader_role_definition_id
+                )
+                if assigned:
+                    number_of_assignements += 1
+                    log.info("Created role assignment for management group %s", group.id)
+                else:
+                    log.error("Failed to create role assignment for management group %s", group.id)
+
+            for subscription in subscriptions:
+                assigned = await create_role_assignment(
+                    auth_client, service_principal_id, subscription.id, reader_role_definition_id
+                )
+                if assigned:
+                    number_of_assignements += 1
+                    log.info("Created role assignment for subscription %s", subscription.id)
+                else:
+                    log.error("Failed to create role assignment for subscription %s", subscription.id)
+
+            if number_of_assignements == 0:
+                log.error("Failed to create any role assignments")
 
             # get a subscription id associated with the tenant
-            subscription_client = SubscriptionClient(credentials)
+            subscription_client = SubscriptionClient(service_principal_credentials)
             subscriptions = await asyncio.to_thread(subscription_client.subscriptions.list)
             if not subscriptions:
                 log.error("Failed to create app registration: no subscriptions found")
                 return None
-
-            # here we will get the first subscription id, I guess there is no difference
-            subscription_id: Optional[str] = None
-
-            def find_subscription_id() -> Optional[str]:
-                for subscription in subscriptions:
-                    if s_id := subscription.subscription_id:
-                        return s_id  # type: ignore
-                return None
-
-            subscription_id = await asyncio.to_thread(find_subscription_id)
-
-            if not subscription_id:
-                log.error("Failed to create app registration: no subscription id found")
-                return None
-
-            log.info("got subscription id")
-
-            # Create a reader role assignment between the app's service principal and the root management group
-            auth_client = AuthorizationManagementClient(credentials, subscription_id)
-            role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"  # noqa, Reader role, see https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#general
-            role_assignment_params = RoleAssignmentCreateParameters(
-                role_definition_id=role_definition_id,
-                principal_id=service_principal.id,  # type: ignore
-            )
-            role_assignment = await asyncio.to_thread(
-                lambda: auth_client.role_assignments.create(
-                    scope=root_management_group_id,
-                    role_assignment_name=str(uuid4()),
-                    parameters=role_assignment_params,
-                )
-            )
-
-            log.info("Created role assignment: %s", role_assignment.id)
 
         except Exception as e:
             log.error("Failed to create app registration")

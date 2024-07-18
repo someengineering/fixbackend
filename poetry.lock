@@ -2224,13 +2224,13 @@ portalocker = [
 
 [[package]]
 name = "msgraph-core"
-version = "1.1.0"
+version = "1.1.2"
 description = "Core component of the Microsoft Graph Python SDK"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "msgraph_core-1.1.0-py3-none-any.whl", hash = "sha256:38eed85a7a9d661ba961df7eab436be8d59df23c6f141582e0d969f73363671d"},
-    {file = "msgraph_core-1.1.0.tar.gz", hash = "sha256:65d6932b7d6a52a65410ce8f482f7c7e5cf75ec93bc905b1b47d4358ef54f894"},
+    {file = "msgraph_core-1.1.2-py3-none-any.whl", hash = "sha256:ed0695275d66914994a6ff71e7d71736ee4c4db3548a1021b2dd3a9605247def"},
+    {file = "msgraph_core-1.1.2.tar.gz", hash = "sha256:c533cad1a23980487a4aa229dc5d9b00975fc6590e157e9f51046c6e80349288"},
 ]
 
 [package.dependencies]
@@ -4852,4 +4852,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4.0"
-content-hash = "d750525421ad78853466b83b9ce89796749569c9baa88ad60d88e6dcce4fa827"
+content-hash = "5b2b1660ed5ce37ae939c115b91b75cd5b1949fa9a28511f56c0fecc3b26c8c9"

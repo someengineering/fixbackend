@@ -12,30 +12,27 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import timedelta
 import json
 import logging
-from typing import Annotated, AsyncIterator
-from urllib.parse import quote
+from datetime import timedelta
+from enum import StrEnum
+from typing import Annotated, AsyncIterator, Optional
 from uuid import UUID
 
+from azure.identity.aio import AuthorizationCodeCredential
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fixcloudutils.util import utc
-from stripe import PaymentLink
+from google.auth.exceptions import MalformedError
+from googleapiclient.errors import HttpError
+from msal import ConfidentialClientApplication
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
+from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
-from fixbackend.dependencies import FixDependencies, ServiceNames
-from fixbackend.fix_jwt import JwtService
-from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.router import CurrentGraphDbDependency
-from fixbackend.permissions.models import WorkspacePermissions
-from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
-from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
     AwsCloudAccountUpdate,
@@ -48,18 +45,29 @@ from fixbackend.cloud_accounts.schemas import (
     LastScanInfo,
     ScannedAccount,
 )
+from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.fix_jwt import JwtService
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.router import CurrentGraphDbDependency
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.streaming_response import StreamOnSuccessResponse, streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
-from google.auth.exceptions import MalformedError
-from googleapiclient.errors import HttpError
-
 
 log = logging.getLogger(__name__)
 
 
 audience = "azure_oauth_endpoint"
+
+
+class AzureSetupStep(StrEnum):
+    admin_consent = "admin_consent"
+    get_management_credentials = "get_management_credentials"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
@@ -272,16 +280,21 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_credentials_found")
         return AzureSubscriptionCredentialsRead.from_model(creds)
 
-    @router.get("/{workspace_id}/cloud_account/azure/oauth")
-    async def azure_oauth_redirect(workspace: UserWorkspaceDependency, redirect_url: str) -> Response:
+    @router.get("/{workspace_id}/cloud_account/azure/setup")
+    async def azure_admin_consent(request: Request, workspace: UserWorkspaceDependency) -> Response:
 
         client_id = dependencies.config.azure_client_id
 
-        payload = {"workspace_id": f"{workspace.id}", redirect_url: redirect_url}
+        payload = {
+            "workspace_id": f"{workspace.id}",
+            "step": AzureSetupStep.admin_consent,
+        }
 
         state = await jwt_service.encode(payload, [audience])
 
-        url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}&state={state}"
+        redirect_url = request.url_for("azure_oauth_callback")
+
+        url = f"https://login.microsoftonline.com/organizations/adminconsent?client_id={client_id}&state={state}&redirect_uri={redirect_url}"
 
         return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -316,8 +329,15 @@ def cloud_accounts_router(dependencies: FixDependencies) -> APIRouter:
 def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
 
+    authority = "https://login.microsoftonline.com/common"  # for multi-tenant apps
+
+    config = dependencies.config
     jwt_service = dependencies.service(ServiceNames.jwt_service, JwtService)
     azure_subscription_service = dependencies.service(ServiceNames.azure_subscription_service, AzureSubscriptionService)
+
+    azure_app = ConfidentialClientApplication(
+        client_id=config.azure_client_id, authority=authority, client_credential=config.azure_client_secret
+    )
 
     @router.post("/callbacks/aws/cf")
     async def aws_cloudformation_callback(
@@ -334,8 +354,10 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
         )
         return None
 
-    @router.get("/callbacks/azure/oauth")
-    async def azure_oauth_callback(tenant: str, state: str) -> Response:
+    @router.get("/callbacks/azure/oauth", name="azure_oauth_callback")
+    async def azure_oauth_callback(
+        request: Request, state: str, tenant: Optional[str] = None, code: Optional[str] = None
+    ) -> Response:
 
         def redirect_to_ui(location: str = "/") -> Response:
             response = Response()
@@ -353,11 +375,52 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
         else:
             return redirect_to_ui()
 
-        creds = await azure_subscription_service.create_user_app_registration(workspace_id, tenant)
+        match payload.get("step"):
+            case AzureSetupStep.admin_consent:
+                if not tenant:
+                    redirect_to_ui()
 
-        if creds is None:
-            return redirect_to_ui()
+                management_scopes = ["https://management.azure.com/user_impersonation"]
 
-        return redirect_to_ui(quote(str(PaymentLink().get("redirect_url", "/")), safe=":/%#?=@[]!$&'()*+,;"))
+                payload = dict(payload)
+                payload["step"] = AzureSetupStep.get_management_credentials
+                payload["azure_tenant_id"] = tenant
+
+                state = await jwt_service.encode(payload, [audience])
+                url = azure_app.get_authorization_request_url(
+                    scopes=management_scopes,
+                    redirect_uri=f"{request.url_for("azure_oauth_callback")}",
+                    state=state,
+                )
+                return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+            case AzureSetupStep.get_management_credentials:
+                if code is None:
+                    return redirect_to_ui()
+
+                azure_tenant_id = payload.get("azure_tenant_id")
+                if azure_tenant_id is None:
+                    return redirect_to_ui()
+
+                credential = AuthorizationCodeCredential(
+                    tenant_id=config.azure_tenant_id,
+                    client_id=config.azure_client_id,
+                    client_secret=config.azure_client_secret,
+                    authorization_code=code,
+                    redirect_uri=f"{request.url_for("azure_oauth_callback")}",
+                    additionally_allowed_tenants=["*"],
+                )
+
+                creds = await azure_subscription_service.create_user_app_registration(
+                    workspace_id, azure_tenant_id, credential
+                )
+
+                if creds is None:
+                    return redirect_to_ui()
+
+                return redirect_to_ui()
+
+            case _:
+                return redirect_to_ui()
 
     return router
