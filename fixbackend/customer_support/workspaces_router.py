@@ -23,6 +23,9 @@ from fixcloudutils.util import utc
 from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
+from fixbackend.domain_events.events import WorkspaceCreated
+from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
+from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 
@@ -34,6 +37,8 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
     workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
     cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
     next_run_repo = dependencies.service(ServiceNames.next_run_repo, NextRunRepository)
+    graph_db_access = dependencies.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
+    domain_event_sender = dependencies.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)
 
     @router.get("/{workspace_id}", response_class=HTMLResponse, name="workspace:get")
     async def get_workspace(request: Request, workspace_id: WorkspaceId) -> Response:
@@ -45,11 +50,14 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
 
         next_run = await next_run_repo.get(workspace.id)
 
+        db_access_not_existent = (await graph_db_access.get_database_access(workspace.id)) is None
+
         context: Dict[str, Any] = {
             "request": request,
             "workspace": workspace,
             "cloud_accounts": cloud_accounts,
             "next_run": next_run,
+            "db_access_not_existent": db_access_not_existent,
         }
 
         if request.headers.get("HX-Request"):
@@ -60,6 +68,27 @@ def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates)
         return templates.TemplateResponse(
             request=request, name="workspaces/workspace.html", headers=headers, context=context
         )
+
+    @router.post(
+        "/{workspace_id}/create_graph_db_access",
+        response_class=HTMLResponse,
+        name="workspace:create_graph_db_access",
+    )
+    async def create_graph_db_access(request: Request, workspace_id: WorkspaceId) -> Response:
+        workspace = await workspace_repo.get_workspace(workspace_id)
+        if not workspace:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        existing_db_access = await graph_db_access.get_database_access(workspace.id)
+        if existing_db_access:
+            raise HTTPException(status_code=400, detail="Database access already exists")
+
+        await graph_db_access.create_database_access(workspace.id)
+        await domain_event_sender.publish(
+            WorkspaceCreated(workspace.id, workspace.name, workspace.slug, workspace.owner_id)
+        )
+
+        return Response(status_code=status.HTTP_201_CREATED, content="")
 
     @router.post(
         "/{workspace_id}/accounts/{cloud_account_id}",

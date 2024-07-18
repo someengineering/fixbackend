@@ -302,22 +302,11 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
 
     async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
-        async with self.session_maker() as session:
-            statement = select(
-                orm.Organization.tier,
-                orm.Organization.highest_current_cycle_tier,
-                orm.Organization.current_cycle_ends_at,
-            ).where(orm.Organization.id == workspace_id)
-            results = await session.execute(statement)
-            selected_tier: str
-            active_tier: Optional[str]
-            active_tier_expiration: Optional[datetime]
-            selected_tier, active_tier, active_tier_expiration = results.unique().one_or_none()  # type: ignore
-            if selected_tier:
-                if active_tier and active_tier_expiration and active_tier_expiration > utc():
-                    return max(ProductTier.from_str(selected_tier), ProductTier.from_str(active_tier))
-                return ProductTier.from_str(selected_tier)
-            return ProductTier.Free
+        workspace = await self.get_workspace(workspace_id)
+        if workspace is None:
+            raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+
+        return workspace.current_product_tier()
 
     async def update_product_tier(
         self, workspace_id: WorkspaceId, new_tier: ProductTier, *, session: Optional[AsyncSession] = None

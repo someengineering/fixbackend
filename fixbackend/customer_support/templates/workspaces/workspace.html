@@ -15,6 +15,10 @@
             <button class="btn btn-neutral"
                 hx-delete="{{ url_for('workspace:reset_next_run', workspace_id=workspace.id) }}"
                 hx-target="#next-run">Reset next run</button>
+
+            {% if db_access_not_existent %}
+            <button class="btn btn-primary" hx-post="{{ url_for('workspace:create_graph_db_access', workspace_id=workspace.id) }}" hx-swap="outerHTML">Create graph database</button>
+            {% endif %}
         </div>
     </div>
 </div>
