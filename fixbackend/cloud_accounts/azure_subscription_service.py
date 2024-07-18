@@ -42,6 +42,7 @@ from fixbackend.cloud_accounts.models import AzureSubscriptionCredentials
 from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.config import Config
 from fixbackend.ids import AzureSubscriptionCredentialsId, CloudAccountId, CloudAccountName, WorkspaceId
+from fixbackend.logging_context import set_workspace_id
 
 log = getLogger(__name__)
 
@@ -148,6 +149,8 @@ class AzureSubscriptionService(Service):
         azure_tenant_id: str,
         management_credential: AsyncTokenCredential,
     ) -> Optional[AzureSubscriptionCredentials]:
+
+        set_workspace_id(workspace_id)
 
         async def create_role_assignment(
             auth_managemement_client: AuthorizationManagementClient,
