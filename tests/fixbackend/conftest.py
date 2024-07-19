@@ -22,7 +22,6 @@ from asyncio import AbstractEventLoop
 from contextlib import suppress
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from ssl import Purpose, create_default_context
 from typing import (
     Any,
     AsyncIterator,
@@ -955,7 +954,6 @@ async def fix_deps(
             ServiceNames.gcp_service_account_service: gcp_service_account_service,
             ServiceNames.azure_subscription_service: azure_subscription_service,
             ServiceNames.jwt_service: jwt_service,
-            ServiceNames.ssl_context: create_default_context(purpose=Purpose.SERVER_AUTH),
         }
     )
 

@@ -107,7 +107,6 @@ async def base_dependencies(cfg: Config) -> FixDependencies:
     client_context = create_default_context(purpose=Purpose.SERVER_AUTH)
     if ca_cert_path:
         client_context.load_verify_locations(ca_cert_path)
-    deps.add(SN.ssl_context, client_context)
     deps.add(
         SN.http_client,
         AsyncClient(

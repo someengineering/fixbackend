@@ -81,7 +81,6 @@ class ServiceNames:
     azure_subscription_repo = "azure_subscription_repo"
     azure_subscription_service = "azure_subscription_service"
     trial_end_service = "trial_end_service"
-    ssl_context = "ssl_context"
 
 
 class FixDependencies(Dependencies):
