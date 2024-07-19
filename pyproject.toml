@@ -46,6 +46,8 @@ azure-mgmt-authorization = "^4.0.0"
 azure-mgmt-managementgroups = "^1.0.0"
 time-machine = "2.14.2"
 msgraph-core = "^1.1.2"
+azure-mgmt-resourcegraph = "^8.0.0"
+networkx = "^3.3"
 [tool.poetry.group.dev.dependencies]
 ipykernel = ">=6.25.1"
 mypy = ">=1.5.1"
