@@ -11,6 +11,7 @@ WORKDIR /app
 COPY --from=build-stage /app/dist /app/dist
 RUN  apt-get update \
       && apt-get -y --no-install-recommends install apt-utils dumb-init ca-certificates \
+      && update-ca-certificates \
       && pip install --no-cache-dir -r dist/requirements.txt \
       && pip install --no-cache-dir --no-deps dist/*.whl  \
       && rm -rf /app/dist
