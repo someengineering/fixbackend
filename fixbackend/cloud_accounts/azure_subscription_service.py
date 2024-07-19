@@ -17,7 +17,7 @@ from uuid import uuid4
 import warnings
 from datetime import timedelta
 from logging import getLogger
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from attr import frozen
 from azure.identity.aio import ClientSecretCredential
@@ -34,6 +34,9 @@ from msgraph.generated.applications.item.add_password.add_password_post_request_
 from msgraph.generated.models.service_principal import ServicePrincipal
 from azure.mgmt.authorization.aio import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
+from azure.mgmt.resourcegraph.aio import ResourceGraphClient
+from azure.mgmt.resourcegraph.models import QueryRequest
+import networkx as nx
 
 from azure.mgmt.managementgroups.aio import ManagementGroupsAPI
 
@@ -158,7 +161,6 @@ class AzureSubscriptionService(Service):
             scope: str,
             role_definition_id: str,
         ) -> bool:
-
             role_assignment_params = RoleAssignmentCreateParameters(
                 role_definition_id=role_definition_id,
                 principal_id=service_principal_id,
@@ -190,7 +192,7 @@ class AzureSubscriptionService(Service):
 
         # new app registration definition
         app = Application(
-            display_name=f"Fix Access {azure_tenant_id}",
+            display_name=f"Fix Access for Workspace {workspace_id}",
             sign_in_audience="AzureADMyOrg",  # see https://learn.microsoft.com/en-us/entra/identity-platform/supported-accounts-validation#validation-differences
         )
 
@@ -242,16 +244,27 @@ class AzureSubscriptionService(Service):
                 return None
             log.info("created service principal")
 
-            # list all subscriptions and management groups
+            # list all subscriptions
             subscription_client = SubscriptionClient(management_credential)
             subscriptions = []
             async for subscription in subscription_client.subscriptions.list():
                 subscriptions.append(subscription)
 
+            # list all management groups
             management_groups_api = ManagementGroupsAPI(management_credential)
             management_groups = []
             async for group in management_groups_api.management_groups.list():
                 management_groups.append(group)
+
+            # list the subscriptions ancestors
+            resource_graph_client = ResourceGraphClient(management_credential)
+            query = """
+            resourcecontainers
+            | where type == 'microsoft.resources/subscriptions'
+            | project name, id, properties.managementGroupAncestorsChain
+            """
+
+            request = QueryRequest(query=query)
 
             # get the root management group id
             def find_tenant_root_group_id() -> Optional[Any]:
@@ -260,59 +273,62 @@ class AzureSubscriptionService(Service):
                         return group
                 return None
 
+            response = await resource_graph_client.resources(request)
+            sub_ancestors: List[Dict[str, Any]] = response.data
+
+            # management group id from name
+            def mg_id(name: str) -> str:
+                return f"/providers/Microsoft.Management/managementGroups/{name}"
+
+            G = nx.DiGraph()
+            for mg in management_groups:
+                G.add_node(mg.id, type="mg")
+
+            for sub in sub_ancestors:
+                G.add_node(sub["id"], type="sub")
+                # ancestors are in order from root to leaf, so reverse them
+                ancestors = list(sub["properties_managementGroupAncestorsChain"])
+                ancestors.reverse()
+                for i in range(len(ancestors)):
+                    ancestor = ancestors[i]
+                    # add edge from ancestor to subscription
+                    if i == 0:
+                        G.add_edge(mg_id(ancestor["name"]), sub["id"])
+                    # add edge from ancestor to previous ancestor
+                    if i > 0:
+                        prev = ancestors[i - 1]
+                        G.add_edge(mg_id(ancestor["name"]), mg_id(prev["name"]))
+
+            async def assign_role_dfs(node_id: str) -> None:
+                assigned = await create_role_assignment(
+                    auth_client, service_principal_id, node_id, reader_role_definition_id
+                )
+                if assigned:
+                    log.info("Created role assignment for %s", node_id)
+                    return
+                else:
+                    for child in G.successors(node_id):
+                        await assign_role_dfs(child)
+
             subscription_id: str = subscriptions[0].id
             auth_client = AuthorizationManagementClient(management_credential, subscription_id)
             reader_role_definition_id = (
                 "/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
             )
 
-            # find the root management group and assign the reader role if possible
-            if root_management_group := find_tenant_root_group_id():
-                assigned = await create_role_assignment(
-                    auth_client, service_principal_id, root_management_group.id, reader_role_definition_id
-                )
-                if assigned:
-                    log.info("Created role assignment for root management group")
-                    result = await self.azure_subscriptions_repo.upsert(
-                        tenant_id=workspace_id,
-                        azure_tenant_id=azure_tenant_id,
-                        client_id=created_app.app_id,
-                        client_secret=secrets.secret_text,
-                    )
-                    log.info(
-                        f"Created app registration for tenant {azure_tenant_id} with client_id {created_app.app_id}"
-                    )
-                    return result
+            # find the graph root (or whatever is at the top of the hierarchy)
+            topological_order = list(nx.topological_sort(G))
+            root_node = topological_order[0]
 
-            number_of_assignements = 0
+            # traverse the groups/subscriptions tree and assign the reader role to the service principal
+            await assign_role_dfs(root_node)
 
-            for group in management_groups:
-                assigned = await create_role_assignment(
-                    auth_client, service_principal_id, group.id, reader_role_definition_id
-                )
-                if assigned:
-                    number_of_assignements += 1
-                    log.info("Created role assignment for management group %s", group.id)
-                else:
-                    log.error("Failed to create role assignment for management group %s", group.id)
-
-            for subscription in subscriptions:
-                assigned = await create_role_assignment(
-                    auth_client, service_principal_id, subscription.id, reader_role_definition_id
-                )
-                if assigned:
-                    number_of_assignements += 1
-                    log.info("Created role assignment for subscription %s", subscription.id)
-                else:
-                    log.error("Failed to create role assignment for subscription %s", subscription.id)
-
-            if number_of_assignements == 0:
-                log.error("Failed to create any role assignments")
-
-            # get a subscription id associated with the tenant
+            # test access by listing subscriptions as the new service principal
             subscription_client = SubscriptionClient(service_principal_credentials)
-            subscriptions = await asyncio.to_thread(subscription_client.subscriptions.list)
-            if not subscriptions:
+            principal_subscriptions = []
+            async for sub in subscription_client.subscriptions.list():
+                principal_subscriptions.append(sub)
+            if not principal_subscriptions:
                 log.error("Failed to create app registration: no subscriptions found")
                 return None
 
