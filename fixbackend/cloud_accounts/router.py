@@ -16,7 +16,8 @@ import json
 import logging
 from datetime import timedelta
 from enum import StrEnum
-from typing import Annotated, AsyncIterator, Optional
+from ssl import SSLContext
+from typing import Annotated, Any, AsyncIterator, Optional
 from uuid import UUID
 
 from azure.identity.aio import AuthorizationCodeCredential
@@ -26,6 +27,7 @@ from fixcloudutils.util import utc
 from google.auth.exceptions import MalformedError
 from googleapiclient.errors import HttpError
 from msal import ConfidentialClientApplication
+from azure.core.credentials import AccessToken
 
 from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
@@ -334,6 +336,7 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
     config = dependencies.config
     jwt_service = dependencies.service(ServiceNames.jwt_service, JwtService)
     azure_subscription_service = dependencies.service(ServiceNames.azure_subscription_service, AzureSubscriptionService)
+    ssl_context = dependencies.service(ServiceNames.ssl_context, SSLContext)
 
     azure_app = ConfidentialClientApplication(
         client_id=config.azure_client_id, authority=authority, client_credential=config.azure_client_secret
@@ -410,6 +413,14 @@ def cloud_accounts_callback_router(dependencies: FixDependencies) -> APIRouter:
                     redirect_uri=f"{request.url_for("azure_oauth_callback")}",
                     additionally_allowed_tenants=["*"],
                 )
+
+                old_request_token = credential._request_token
+
+                async def requestTokenWithSsl(self, *scopes: str, **kwargs: Any) -> AccessToken:
+                    kwargs.setdefault("ssl", ssl_context)
+                    return await old_request_token(self, *scopes, **kwargs)
+
+                credential._request_token = requestTokenWithSsl
 
                 creds = await azure_subscription_service.create_user_app_registration(
                     workspace_id, azure_tenant_id, credential
