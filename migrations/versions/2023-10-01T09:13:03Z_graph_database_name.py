@@ -5,6 +5,7 @@ Revises: 9b414d0c477f
 Create Date: 2023-10-01 09:13:03.651887+00:00
 
 """
+
 #  Copyright (c) 2023. Some Engineering
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +24,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "3b44ef1c41a0"
@@ -37,7 +38,7 @@ def upgrade() -> None:
     op.alter_column(
         "graph_database_access",
         "database",
-        existing_type=mysql.VARCHAR(length=36),
+        existing_type=postgresql.VARCHAR(length=36),
         type_=sa.String(length=40),
         existing_nullable=False,
     )

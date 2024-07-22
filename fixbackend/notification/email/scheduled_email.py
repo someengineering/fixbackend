@@ -23,6 +23,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.util import utc
 from sqlalchemy import String, Integer, select, Index, and_, or_, func, text, Select, ColumnExpressionArgument
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import INTERVAL
 
 from fixbackend.auth.models.orm import User
 from fixbackend.auth.models import User as UserModel
@@ -245,7 +246,9 @@ class ScheduledEmailSender(Service):
                 )
                 .where(
                     and_(
-                        text("user.created_at + INTERVAL scheduled_email.after SECOND") < func.now(),
+                        User.created_at
+                        + func.cast(func.cast(ScheduledEmailEntity.after, String) + " seconds", INTERVAL)
+                        < func.now(),
                         ScheduledEmailSentEntity.id.is_(None),
                         UserNotificationSettingsEntity.user_id.is_(None),
                     )

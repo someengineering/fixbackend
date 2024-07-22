@@ -244,10 +244,11 @@ class SubscriptionRepository:
             query = (
                 select(BillingEntity, SubscriptionEntity)
                 .join(SubscriptionEntity, BillingEntity.subscription_id == SubscriptionEntity.id)
-                .where(BillingEntity.reported == False)  # noqa
-                .where(SubscriptionEntity.aws_customer_identifier != None)  # noqa
+                .where(BillingEntity.reported.is_(False))
+                .where(SubscriptionEntity.aws_customer_identifier.is_not(None))
             )
-            async for billing_entity, subscription_entity in await session.stream(query):
+            result = await session.execute(query)
+            for billing_entity, subscription_entity in result.unique().all():
                 yield billing_entity.to_model(), cast(AwsMarketplaceSubscription, subscription_entity.to_model())
 
     async def unreported_stripe_billing_entries(self) -> AsyncIterator[Tuple[BillingEntry, StripeSubscription]]:
