@@ -17,7 +17,7 @@ from uuid import uuid4
 import warnings
 from datetime import timedelta
 from logging import getLogger
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Set
 
 from attr import frozen
 from azure.identity.aio import ClientSecretCredential
@@ -299,16 +299,22 @@ class AzureSubscriptionService(Service):
                         prev = ancestors[i - 1]
                         G.add_edge(mg_id(ancestor["name"]), mg_id(prev["name"]))
 
-            async def assign_role_dfs(node_id: str) -> None:
-                assigned = await create_role_assignment(
-                    auth_client, service_principal_id, node_id, reader_role_definition_id
-                )
-                if assigned:
-                    log.info("Created role assignment for %s", node_id)
+            async def assign_role_dfs(node_id: str, already_assigned: bool, visited_nodes: Set[str]) -> None:
+                if node_id in visited_nodes:
                     return
-                else:
-                    for child in G.successors(node_id):
-                        await assign_role_dfs(child)
+                visited_nodes.add(node_id)
+
+                assigned = already_assigned
+
+                if not already_assigned:
+                    assigned = await create_role_assignment(
+                        auth_client, service_principal_id, node_id, reader_role_definition_id
+                    )
+                    if assigned:
+                        log.info("Created role assignment for %s", node_id)
+
+                for child in G.successors(node_id):
+                    await assign_role_dfs(child, assigned, visited_nodes)
 
             subscription_id: str = subscriptions[0].id
             auth_client = AuthorizationManagementClient(management_credential, subscription_id)
@@ -318,11 +324,11 @@ class AzureSubscriptionService(Service):
 
             # find the graph root (or whatever is at the top of the hierarchy)
             topological_order = list(nx.topological_sort(G))
-            root_node = topological_order[0]
+            visited: Set[str] = set()
 
             # traverse the groups/subscriptions tree and assign the reader role to the service principal
-            await assign_role_dfs(root_node)
-
+            for node in topological_order:
+                await assign_role_dfs(node, False, visited)
             # test access by listing subscriptions as the new service principal
             subscription_client = SubscriptionClient(service_principal_credentials)
             principal_subscriptions = []
