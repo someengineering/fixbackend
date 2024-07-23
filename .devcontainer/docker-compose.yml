@@ -25,20 +25,19 @@ services:
     container_name: "fixbackend-redis-${USER}"
 
   db:
-    image: mysql:8
+    image: postgres:16
     network_mode: service:app
     restart: unless-stopped
-    container_name: "fixbackend-mysql-${USER}"
+    container_name: "fixbackend-postgres-${USER}"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: 1
-      MYSQL_ROOT_PASSWORD: null
-      MYSQL_DATABASE: fix
-      MYSQL_USER: fix
-      MYSQL_PASSWORD: fix
-    # Add "forwardPorts": ["3306"] to **devcontainer.json** to forward locally.
+      POSTGRES_USER: fix
+      POSTGRES_DB: fix
+      POSTGRES_PASSWORD: fix
+
+    # Add "forwardPorts": ["5432"] to **devcontainer.json** to forward PostgreSQL locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
 volumes:
-  mysql-data:
+  postgres-data:

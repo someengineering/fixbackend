@@ -17,7 +17,7 @@ from typing import Union
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import DefaultClause, text
-from sqlalchemy.dialects import mysql
+from sqlalchemy.dialects import postgresql
 
 from fixbackend.sqlalechemy_extensions import UTCDateTime, GUID
 
@@ -46,5 +46,7 @@ def upgrade() -> None:
     op.add_column("subscriptions", sa.Column("stripe_subscription_id", sa.String(length=128), nullable=True))
     op.add_column("subscriptions", sa.Column("stripe_customer_identifier", sa.String(length=128), nullable=True))
     # define the aws columns as nullable
-    op.alter_column("subscriptions", "aws_customer_identifier", existing_type=mysql.VARCHAR(length=128), nullable=True)
-    op.alter_column("subscriptions", "aws_product_code", existing_type=mysql.VARCHAR(length=128), nullable=True)
+    op.alter_column(
+        "subscriptions", "aws_customer_identifier", existing_type=postgresql.VARCHAR(length=128), nullable=True
+    )
+    op.alter_column("subscriptions", "aws_product_code", existing_type=postgresql.VARCHAR(length=128), nullable=True)

@@ -56,7 +56,7 @@ from fixcloudutils.redis.pub_sub import RedisPubSubPublisher
 from fixcloudutils.types import Json, JsonElement
 from fixcloudutils.util import utc
 from httpx import AsyncClient, MockTransport, Request, Response
-from sqlalchemy import text
+from sqlalchemy import NullPool, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
@@ -119,9 +119,9 @@ from fixbackend.workspaces.invitation_repository import InvitationRepository, In
 from fixbackend.workspaces.models import Workspace
 from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
 
-DATABASE_URL = "mysql+aiomysql://root@127.0.0.1:3306/fixbackend-testdb"
+DATABASE_URL = "postgresql+asyncpg://fix@127.0.0.1:5432/fixbackend-testdb"
 # only used to create/drop the database
-SYNC_DATABASE_URL = "mysql+pymysql://root@127.0.0.1:3306/fixbackend-testdb"
+SYNC_DATABASE_URL = "postgresql+psycopg://fix@127.0.0.1:5432/fixbackend-testdb"
 RequestHandlerMock = List[Callable[[Request], Awaitable[Response]]]
 os.environ["LOCAL_DEV_ENV"] = "true"
 
@@ -185,10 +185,10 @@ def default_config() -> Config:
         environment="dev",
         instance_id="test",
         database_name="fixbackend-testdb",
-        database_user="root",
+        database_user="fix",
         database_password=None,
         database_host="127.0.0.1",
-        database_port=3306,
+        database_port=5432,
         secret="",
         google_oauth_client_id="",
         google_oauth_client_secret="",
@@ -260,7 +260,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     while not database_exists(SYNC_DATABASE_URL):
         await asyncio.sleep(0.1)
 
-    engine = create_async_engine(DATABASE_URL)
+    engine = create_async_engine(DATABASE_URL, isolation_level="SERIALIZABLE", poolclass=NullPool)
     project_folder = Path(__file__).parent.parent.parent
     alembic_config = AlembicConfig((project_folder / "alembic.ini").absolute())
     alembic_config.set_main_option("script_location", str((project_folder / "migrations").absolute()))
@@ -296,12 +296,12 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     transaction = connection.begin()
     await transaction.start()
     session = AsyncSession(bind=connection)
-
-    yield session
-
-    await session.close()
-    await transaction.close()
-    await connection.close()
+    try:
+        yield session
+    finally:
+        await session.close()
+        await transaction.rollback()
+        await connection.close()
 
 
 @pytest.fixture

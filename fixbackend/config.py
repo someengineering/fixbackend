@@ -91,7 +91,7 @@ class Config(BaseSettings):
     @property
     def database_url(self) -> str:
         password = f":{self.database_password}" if self.database_password else ""
-        return f"mysql+aiomysql://{self.database_user}{password}@{self.database_host}:{self.database_port}/{self.database_name}"  # noqa
+        return f"postgresql+asyncpg://{self.database_user}{password}@{self.database_host}:{self.database_port}/{self.database_name}"  # noqa
 
     class Config:
         extra = "ignore"  # allow extra fields in the config
@@ -106,7 +106,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--database-user", default=os.environ.get("FIX_DATABASE_USER", "fix"))
     parser.add_argument("--database-password", default=os.environ.get("FIX_DATABASE_PASSWORD", "fix"))
     parser.add_argument("--database-host", default=os.environ.get("FIX_DATABASE_HOST", "localhost"))
-    parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "3306")))
+    parser.add_argument("--database-port", type=int, default=int(os.environ.get("FIX_DATABASE_PORT", "5432")))
     parser.add_argument("--secret", default=os.environ.get("FIX_OAUTH_SECRET", "secret"))
     parser.add_argument("--google-oauth-client-id", default=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""))
     parser.add_argument("--google-oauth-client-secret", default=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""))

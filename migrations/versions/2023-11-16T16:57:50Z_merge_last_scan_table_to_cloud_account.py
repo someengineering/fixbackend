@@ -5,11 +5,11 @@ Revises: 886ab1ab881e
 Create Date: 2023-11-16 16:57:50.123194+00:00
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
 from fixbackend.sqlalechemy_extensions import UTCDateTime
 
 # revision identifiers, used by Alembic.

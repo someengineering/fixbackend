@@ -222,7 +222,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
             async with deps.session_maker() as session:
                 result = await session.execute(select(1))
                 if result.scalar_one() != 1:
-                    log.error("MySQL did not return 1 from select 1")
+                    log.error("Postgres did not return 1 from select 1")
                     return Response(status_code=500)
 
         except Exception as e:
