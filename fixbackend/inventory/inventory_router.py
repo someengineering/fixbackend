@@ -23,7 +23,7 @@ from fixbackend.dependencies import FixDependencies, FixDependency, ServiceNames
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import NodeId
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.schemas import (
+from fixbackend.inventory.inventory_schemas import (
     CompletePathRequest,
     HistoryChange,
     ReportConfig,
@@ -158,9 +158,13 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     @router.get("/model", tags=["inventory"])
     async def model(
         graph_db: CurrentGraphDbDependency,
-        kind: List[str] = Query(description="Kinds to return."),
+        kind: Optional[List[str]] = Query(default=None, description="Kinds to return."),
         with_bases: bool = Query(default=False, description="Include base kinds."),
         with_property_kinds: bool = Query(default=False, description="Include property kinds."),
+        aggregate_roots_only: bool = Query(default=True, description="Include only aggregate roots."),
+        with_properties: bool = Query(default=True, description="Include properties."),
+        with_relatives: bool = Query(default=True, description="Include property kinds."),
+        with_metadata: bool = Query(default=True, description="Include property kinds."),
         flat: bool = Query(default=True, description="Return a flat list of kinds."),
     ) -> List[Json]:
         return await inventory().client.model(
@@ -169,6 +173,10 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             kind=kind,
             with_bases=with_bases,
             with_property_kinds=with_property_kinds,
+            aggregate_roots_only=aggregate_roots_only,
+            with_properties=with_properties,
+            with_relatives=with_relatives,
+            with_metadata=with_metadata,
             flat=flat,
         )
 
