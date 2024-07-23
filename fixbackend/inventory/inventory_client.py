@@ -50,7 +50,7 @@ from httpx._types import QueryParamTypes
 from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import CloudAccountId, NodeId
-from fixbackend.inventory.schemas import CompletePathRequest, HistoryChange
+from fixbackend.inventory.inventory_schemas import CompletePathRequest, HistoryChange
 
 T = TypeVar("T")
 ContextHeaders = {"Total-Count", "Result-Count"}

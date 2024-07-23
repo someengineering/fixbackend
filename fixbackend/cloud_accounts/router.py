@@ -27,7 +27,7 @@ from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccount
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.router import CurrentGraphDbDependency
+from fixbackend.inventory.inventory_router import CurrentGraphDbDependency
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency

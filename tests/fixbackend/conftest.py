@@ -268,9 +268,10 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
     await asyncio.to_thread(alembic_upgrade, alembic_config, "head")  # noqa
     await asyncio.to_thread(alembic_check, alembic_config)  # noqa
 
-    if no_db_drop:
+    tables_to_truncate: List[str] = []
+    if no_db_drop and tables_to_truncate:
         async with engine.connect() as conn:
-            for table in ["key_value_json"]:
+            for table in tables_to_truncate:
                 await conn.execute(text(f"TRUNCATE TABLE {table}"))
 
     yield engine

@@ -47,7 +47,7 @@ from fixbackend.dependencies import ServiceNames as SN, FixDependency, FixDepend
 from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
 from fixbackend.events.router import websocket_router
 from fixbackend.inventory.inventory_client import InventoryException
-from fixbackend.inventory.router import inventory_router
+from fixbackend.inventory.inventory_router import inventory_router
 from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router

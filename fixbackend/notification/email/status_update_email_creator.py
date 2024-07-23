@@ -22,7 +22,7 @@ from fixcloudutils.util import utc_str, value_in_path_get, value_in_path
 from fixbackend.auth.models import User
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.schemas import Scatters
+from fixbackend.inventory.inventory_schemas import Scatters
 from fixbackend.notification.email.email_messages import render
 from fixbackend.workspaces.models import Workspace
 
