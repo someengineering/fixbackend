@@ -14,7 +14,7 @@
 import logging
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Dict, Optional, ClassVar, Any
+from typing import Dict, Optional, ClassVar
 from uuid import UUID
 
 from arq import ArqRedis
