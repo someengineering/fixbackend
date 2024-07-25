@@ -47,7 +47,7 @@ from fixbackend.dependencies import ServiceNames as SN, FixDependency, FixDepend
 from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
 from fixbackend.events.router import websocket_router
 from fixbackend.inventory.inventory_client import InventoryException
-from fixbackend.inventory.router import inventory_router
+from fixbackend.inventory.inventory_router import inventory_router
 from fixbackend.logging_context import get_logging_context, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
@@ -222,7 +222,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
             async with deps.session_maker() as session:
                 result = await session.execute(select(1))
                 if result.scalar_one() != 1:
-                    log.error("MySQL did not return 1 from select 1")
+                    log.error("Postgres did not return 1 from select 1")
                     return Response(status_code=500)
 
         except Exception as e:

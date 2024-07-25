@@ -50,7 +50,7 @@ from fixbackend.ids import (
     ProductTier,
 )
 from fixbackend.inventory.inventory_service import InventoryService, dict_values_by
-from fixbackend.inventory.schemas import (
+from fixbackend.inventory.inventory_schemas import (
     BenchmarkAccountSummary,
     CheckSummary,
     NoVulnerabilitiesChanged,

@@ -41,7 +41,7 @@ def upgrade() -> None:
     op.execute(
         f"""
         INSERT INTO user_role_assignment (id, user_id, workspace_id, role_names)
-        SELECT uuid(), user_id, organization_id, '{workspace_owner}'
+        SELECT gen_random_uuid(), user_id, organization_id, '{workspace_owner}'
         FROM organization_owners
         """
     )
@@ -51,7 +51,7 @@ def upgrade() -> None:
     op.execute(
         f"""
         INSERT INTO user_role_assignment (id, user_id, workspace_id, role_names)
-        SELECT uuid(), user_id, organization_id, '{workspace_member}'
+        SELECT gen_random_uuid(), user_id, organization_id, '{workspace_member}'
         FROM organization_members
         """
     )

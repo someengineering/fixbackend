@@ -72,7 +72,7 @@ from fixbackend.inventory.inventory_client import (
     InventoryException,
     NoSuchGraph,
 )
-from fixbackend.inventory.schemas import (
+from fixbackend.inventory.inventory_schemas import (
     AccountSummary,
     ReportSummary,
     BenchmarkSummary,

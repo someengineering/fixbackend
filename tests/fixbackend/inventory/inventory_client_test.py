@@ -30,7 +30,7 @@ from httpx import Request, Response
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import WorkspaceId, CloudAccountId, NodeId
 from fixbackend.inventory.inventory_client import InventoryClient
-from fixbackend.inventory.schemas import CompletePathRequest, HistoryChange
+from fixbackend.inventory.inventory_schemas import CompletePathRequest, HistoryChange
 from tests.fixbackend.conftest import RequestHandlerMock, nd_json_response, json_response
 
 db_access = GraphDatabaseAccess(WorkspaceId(uuid.uuid1()), "server", "database", "username", "password")

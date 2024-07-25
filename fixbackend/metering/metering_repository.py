@@ -107,7 +107,7 @@ class MeteringRepository:
                 MeteringRecordEntity.account_id,
                 MeteringRecordEntity.account_name,
                 func.count().label("num_records"),
-                func.group_concat(func.distinct(MeteringRecordEntity.tier)).label("tiers"),
+                func.aggregate_strings(func.distinct(MeteringRecordEntity.tier), ",").label("tiers"),
             )
             .where(
                 (MeteringRecordEntity.tenant_id == workspace_id)
@@ -122,7 +122,7 @@ class MeteringRepository:
         async with self.session_maker() as session:
             async for account_id, account_name, count, tiers in await session.stream(query):
                 if count >= min_nr_of_collects:
-                    tiers = [ProductTier.from_str(t) for t in tiers.split(",")]
+                    tiers = [ProductTier.from_str(t) for t in tiers.split(",")] if tiers else []
 
                     max_tier = max(tiers, default=ProductTier.Free)
 

@@ -10,7 +10,6 @@ python = ">=3.12,<4.0"
 fastapi = ">=0.109.0"
 uvicorn = {extras = ["standard"], version = ">=0.27.0"}
 fastapi-users = {extras = ["oauth", "sqlalchemy"], version = ">=12.1.1"}
-aiomysql = ">=0.2.0"
 sqlalchemy = {extras = ["asyncio"], version = ">=2.0.20"}
 alembic = ">=1.11.3"
 pydantic-settings = ">=2.0.3"
@@ -41,13 +40,14 @@ redis = ">5"
 python-multipart = "0.0.7"
 azure-identity = "^1.16.1"
 azure-mgmt-resource = "^23.1.1"
+asyncpg = "^0.29.0"
+psycopg = {extras = ["binary", "pool"], version = "^3.2.1"}
 [tool.poetry.group.dev.dependencies]
 ipykernel = ">=6.25.1"
 mypy = ">=1.5.1"
 pytest = ">=7.4.0"
 pytest-asyncio = "==0.21.2" # why can't we use latest version?
 sqlalchemy-utils = ">=0.41.1"
-pymysql = ">=1.1.0"
 black = ">=23.7.0"
 flake8 = ">=6.1.0"
 coverage = {extras = ["toml"], version = ">=7.3.1"}

@@ -5,11 +5,12 @@ Revises: e5a452318fa7
 Create Date: 2023-11-08 16:10:12.694233+00:00
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "886ab1ab881e"
@@ -26,8 +27,8 @@ def upgrade() -> None:
     op.add_column("cloud_account", sa.Column("api_account_alias", sa.String(length=64), nullable=True))
     op.add_column("cloud_account", sa.Column("state", sa.String(length=64), nullable=True))
     op.add_column("cloud_account", sa.Column("error", sa.String(length=64), nullable=True))
-    op.alter_column("cloud_account", "aws_external_id", existing_type=mysql.CHAR(length=36), nullable=True)
-    op.alter_column("cloud_account", "aws_role_name", existing_type=mysql.VARCHAR(length=64), nullable=True)
+    op.alter_column("cloud_account", "aws_external_id", existing_type=postgresql.CHAR(length=36), nullable=True)
+    op.alter_column("cloud_account", "aws_role_name", existing_type=postgresql.VARCHAR(length=64), nullable=True)
     op.drop_column("cloud_account", "name")
 
     # ### end Alembic commands ###
