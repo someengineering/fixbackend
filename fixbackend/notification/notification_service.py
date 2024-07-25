@@ -40,7 +40,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId, UserId
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
-from fixbackend.inventory.schemas import SearchRequest, HistorySearch, HistoryChange
+from fixbackend.inventory.inventory_schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
 from fixbackend.notification.discord.discord_notification import DiscordNotificationSender
 from fixbackend.notification.email.email_messages import EmailMessage, UserJoinedWorkspaceMail

@@ -5,6 +5,7 @@ Revises: 9f0f5d8ec3d5
 Create Date: 2023-09-28 13:38:59.635966+00:00
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -23,7 +24,7 @@ def upgrade() -> None:
     op.create_table(
         "next_run",
         sa.Column("cloud_account_id", GUID(), nullable=False),
-        sa.Column("at", sa.DATETIME(), nullable=False),
+        sa.Column("at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("cloud_account_id"),
     )
     op.create_index("idx_at", "next_run", ["at"], unique=False)

@@ -33,6 +33,12 @@ from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscripti
 from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
+from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.inventory.inventory_service import InventoryService
+from fixbackend.inventory.inventory_router import CurrentGraphDbDependency
+from fixbackend.permissions.models import WorkspacePermissions
+from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
+from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
     AwsCloudAccountUpdate,
