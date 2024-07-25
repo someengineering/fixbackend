@@ -87,7 +87,7 @@ class StreamOnSuccessResponse(StreamingResponse):
                 if not isinstance(chunk, bytes):
                     chunk = chunk.encode(self.charset)
                 await send({"type": "http.response.body", "body": chunk, "more_body": True})
-            else:  # no content
+            if first:
                 if self.additional_headers:
                     self.init_headers(self.additional_headers)
                 await send({"type": "http.response.start", "status": self.status_code, "headers": self.raw_headers})
