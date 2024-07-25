@@ -79,6 +79,9 @@ class GcpServiceAccountService(Service):
                 response = request.execute()
 
                 for project in response.get("projects", []):
+                    # ignore all gcp internal "sys" projects
+                    if project.get("projectId", "").startswith("sys-"):
+                        continue
                     projects.append(project)
 
                 request = service.projects().list_next(previous_request=request, previous_response=response)
