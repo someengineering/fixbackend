@@ -460,6 +460,7 @@ class DispatcherService(Service):
                                 tenant_id=azure_credential.azure_tenant_id,
                                 client_id=azure_credential.client_id,
                                 client_secret=azure_credential.client_secret,
+                                collect_microsoft_graph=kwargs.get("collect_microsoft_graph", False),
                             )
                         case _:
                             log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")
@@ -479,7 +480,7 @@ class DispatcherService(Service):
                 account.workspace_id, account.id, ai, job_id, utc()
             )
             await self.collect_queue.enqueue(
-                db, ai, job_id=str(job_id), defer_by=defer_by, retry_failed_for=retry_failed_for, **kwargs
+                db, ai, job_id=str(job_id), defer_by=defer_by, retry_failed_for=retry_failed_for
             )
 
     async def schedule_next_runs(self) -> None:

@@ -71,6 +71,7 @@ class AzureSubscriptionInformation(AccountInformation):
     tenant_id: str  # ID of the service principal's tenant. Also called its "directory" ID.
     client_id: str  # The service principal's client ID
     client_secret: str  # One of the service principal's client secrets
+    collect_microsoft_graph: bool = False  # Whether to collect Microsoft Graph data
 
 
 class CollectQueue(ABC):
@@ -85,7 +86,6 @@ class CollectQueue(ABC):
         wait_until_done: bool = False,
         defer_by: Optional[timedelta] = None,
         retry_failed_for: Optional[timedelta] = None,
-        **kwargs: Any,
     ) -> None:
         """
         Enqueue a collect job. This method will only put the job into the queue.
@@ -117,7 +117,6 @@ class RedisCollectQueue(CollectQueue):
         wait_until_done: bool = False,
         defer_by: Optional[timedelta] = None,
         retry_failed_for: Optional[timedelta] = None,
-        **kwargs: Any,
     ) -> None:
         collect_job = dict(
             tenant_id=str(db.workspace_id),
@@ -129,7 +128,6 @@ class RedisCollectQueue(CollectQueue):
             env=env or {},
             retry_failed_for_seconds=retry_failed_for.total_seconds() if retry_failed_for else None,
         )
-        collect_job.update(kwargs)
         job = await self.arq.enqueue_job("collect", collect_job, _job_id=job_id, _defer_by=defer_by)
         if job is None:
             raise JobAlreadyEnqueued(f"Failed to enqueue collect job {job_id}")
