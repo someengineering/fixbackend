@@ -38,7 +38,6 @@ from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.inventory_router import CurrentGraphDbDependency
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
-from fixbackend.cloud_accounts.dependencies import CloudAccountServiceDependency
 from fixbackend.cloud_accounts.models import CloudAccountStates
 from fixbackend.cloud_accounts.schemas import (
     AwsCloudAccountUpdate,
@@ -51,14 +50,9 @@ from fixbackend.cloud_accounts.schemas import (
     LastScanInfo,
     ScannedAccount,
 )
-from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.fix_jwt import JwtService
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
-from fixbackend.inventory.inventory_service import InventoryService
-from fixbackend.inventory.router import CurrentGraphDbDependency
 from fixbackend.logging_context import set_cloud_account_id, set_workspace_id
-from fixbackend.permissions.models import WorkspacePermissions
-from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
 from fixbackend.streaming_response import StreamOnSuccessResponse, streaming_response
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
 
