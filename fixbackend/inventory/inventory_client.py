@@ -255,6 +255,34 @@ class InventoryClient(Service):
             expected_media_types=ExpectMediaTypeNdJson,
         )
 
+    def history_timeline(
+        self,
+        access: GraphDatabaseAccess,
+        query: str,
+        after: datetime,
+        before: datetime,
+        *,
+        granularity: Optional[str] = None,
+        change: Optional[List[HistoryChange]] = None,
+        graph: str = DefaultGraph,
+        section: str = DefaultSection,
+    ) -> AsyncContextManager[AsyncIteratorWithContext[Json]]:
+        log.info(f"History Timeline {after}-{before}: query:{query}, granularity:{granularity}, change:{change}")
+        headers = self.__headers(access, accept=MediaTypeNdJson, content_type=MediaTypeText)
+        params: Json = dict(after=utc_str(after), before=utc_str(before), section=section)
+        if granularity:
+            params["granularity"] = granularity
+        if change:
+            params["change"] = ",".join(change)
+        return self._stream(
+            "POST",
+            f"/graph/{graph}/search/history/timeline",
+            content=query,
+            params=params,
+            headers=headers,
+            expected_media_types=ExpectMediaTypeNdJson,
+        )
+
     def aggregate(
         self,
         access: GraphDatabaseAccess,
