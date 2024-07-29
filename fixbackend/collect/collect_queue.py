@@ -80,7 +80,8 @@ class PostCollectAccountInfo:
     task_id: TaskId
 
     def to_json(self) -> Json:
-        return json_converter.unstructure(self)
+        js: Json = json_converter.unstructure(self)
+        return js
 
 
 class CollectQueue(ABC):
