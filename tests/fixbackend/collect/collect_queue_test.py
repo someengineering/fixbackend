@@ -109,6 +109,7 @@ def test_azure_subscription_json() -> None:
         tenant_id="test1",
         client_id="test2",
         client_secret="test3",
+        collect_microsoft_graph=False,
     )
     assert subscription.to_json() == {
         "kind": "azure_subscription_information",
@@ -116,4 +117,21 @@ def test_azure_subscription_json() -> None:
         "tenant_id": "test1",
         "client_id": "test2",
         "client_secret": "test3",
+        "collect_microsoft_graph": False,
+    }
+
+    graph_subscription = AzureSubscriptionInformation(
+        azure_subscription_id=CloudAccountId("test"),
+        tenant_id="test1",
+        client_id="test2",
+        client_secret="test3",
+        collect_microsoft_graph=True,
+    )
+    assert graph_subscription.to_json() == {
+        "kind": "azure_subscription_information",
+        "azure_subscription_id": "test",
+        "tenant_id": "test1",
+        "client_id": "test2",
+        "client_secret": "test3",
+        "collect_microsoft_graph": True,
     }

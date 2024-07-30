@@ -71,6 +71,7 @@ class AzureSubscriptionInformation(AccountInformation):
     tenant_id: str  # ID of the service principal's tenant. Also called its "directory" ID.
     client_id: str  # The service principal's client ID
     client_secret: str  # One of the service principal's client secrets
+    collect_microsoft_graph: bool = False  # Whether to collect Microsoft Graph data
 
 
 class CollectQueue(ABC):
