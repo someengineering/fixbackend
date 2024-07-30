@@ -64,7 +64,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import NodeId
+from fixbackend.ids import NodeId, ProductTier
 from fixbackend.ids import TaskId, WorkspaceId
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
@@ -90,6 +90,7 @@ from fixbackend.inventory.inventory_schemas import (
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.types import Redis
+from fixbackend.workspaces.models import Workspace
 
 log = logging.getLogger(__name__)
 
@@ -425,7 +426,9 @@ class InventoryService(Service):
         )
         return self.client.execute_single(db, cmd, env={"with-kind": "true"})  # type: ignore
 
-    async def summary(self, db: GraphDatabaseAccess) -> ReportSummary:
+    async def summary(self, db: GraphDatabaseAccess, workspace: Workspace) -> ReportSummary:
+        is_free = workspace.current_product_tier() == ProductTier.Free
+
         async def compute_summary() -> ReportSummary:
             now = utc()
 
@@ -538,9 +541,8 @@ class InventoryService(Service):
                 return summaries, benchmark_checks
 
             async def timeseries_infected() -> TimeSeries:
-                # TODO: start should be based on tenant creation date up to some max value (e.g. 1 year)
-                start = now - timedelta(days=14)
-                granularity = timedelta(days=1)
+                start = now - timedelta(days=62 if is_free else 14)
+                granularity = timedelta(days=7 if is_free else 1)
                 groups = {"severity"}
                 async with self.client.timeseries(
                     db, "infected_resources", start=start, end=now, granularity=granularity, group=groups
