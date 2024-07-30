@@ -128,6 +128,11 @@ class WorkspaceRepository(ABC):
         """Acknowledge that the workspace moved to free tier."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def list_overdue_free_tier_cleanup(self, been_in_free_tier_for: timedelta) -> Sequence[Workspace]:
+        """List all workspaces where the free tier cleanup is overdue."""
+        raise NotImplementedError
+
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -419,6 +424,19 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
 
             return evolve(workspace, move_to_free_acknowledged_at=now)
+
+    async def list_overdue_free_tier_cleanup(self, been_in_free_tier_for: timedelta) -> Sequence[Workspace]:
+        """List all workspaces where the free tier cleanup is overdue."""
+        async with self.session_maker() as session:
+            statement = (
+                select(orm.Organization)
+                .where(orm.Organization.tier == ProductTier.Free.value)
+                .where(orm.Organization.free_tier_cleanup_done_at.is_(None))
+                .where(orm.Organization.created_at < utc() - been_in_free_tier_for)
+            )
+            results = await session.execute(statement)
+            workspaces = results.unique().scalars().all()
+            return [ws.to_model() for ws in workspaces]
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:
