@@ -62,7 +62,6 @@ from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.types import Redis
 from fixbackend.workspaces.repository import WorkspaceRepository
-from fixbackend.ids import CloudNames
 
 log = logging.getLogger(__name__)
 
