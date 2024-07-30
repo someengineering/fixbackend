@@ -266,13 +266,6 @@ class AzureSubscriptionService(Service):
 
             request = QueryRequest(query=query)
 
-            # get the root management group id
-            def find_tenant_root_group_id() -> Optional[Any]:
-                for group in management_groups:
-                    if group.name == azure_tenant_id:
-                        return group
-                return None
-
             response = await resource_graph_client.resources(request)
             sub_ancestors: List[Dict[str, Any]] = response.data
 
