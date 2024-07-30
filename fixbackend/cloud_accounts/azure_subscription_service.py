@@ -282,7 +282,7 @@ class AzureSubscriptionService(Service):
                 # ancestors are in order from root to leaf, so reverse them
                 ancestors = list(sub["properties_managementGroupAncestorsChain"])
                 ancestors.reverse()
-                for i in range(len(ancestors)):
+                for i, _ in enumerate(ancestors):
                     ancestor = ancestors[i]
                     # add edge from ancestor to subscription
                     if i == 0:
