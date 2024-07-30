@@ -153,8 +153,8 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/report-summary", tags=["report"])
-    async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
-        return await inventory().summary(graph_db)
+    async def summary(graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency) -> ReportSummary:
+        return await inventory().summary(graph_db, workspace)
 
     @router.get("/model", tags=["inventory"])
     async def model(

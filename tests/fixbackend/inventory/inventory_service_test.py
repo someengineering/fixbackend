@@ -176,8 +176,10 @@ async def test_benchmark_command(
         assert response == benchmark_json
 
 
-async def test_summary(inventory_service: InventoryService, mocked_answers: RequestHandlerMock) -> None:
-    summary = await inventory_service.summary(db)
+async def test_summary(
+    inventory_service: InventoryService, mocked_answers: RequestHandlerMock, workspace: Workspace
+) -> None:
+    summary = await inventory_service.summary(db, workspace)
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 42
     # checks summary
@@ -231,6 +233,7 @@ async def test_summary(inventory_service: InventoryService, mocked_answers: Requ
 async def test_no_graph_db_access(
     inventory_service: InventoryService,
     request_handler_mock: RequestHandlerMock,
+    workspace: Workspace,
 ) -> None:
     async def app(_: Request) -> Response:
         return Response(status_code=400, content="[HTTP 401][ERR 11] not authorized to execute this request")
@@ -244,7 +247,7 @@ async def test_no_graph_db_access(
         failed_resources=0,
         failed_resources_by_severity={},
     )
-    assert await inventory_service.summary(db) == ReportSummary(
+    assert await inventory_service.summary(db, workspace) == ReportSummary(
         check_summary=empty,
         overall_score=0,
         accounts=[],
