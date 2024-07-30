@@ -33,6 +33,7 @@ from fixbackend.inventory.inventory_schemas import (
     SearchListGraphRequest,
     UpdateSecurityIgnore,
     InventorySummaryRead,
+    HistoryTimelineRequest,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -152,8 +153,8 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/report-summary", tags=["report"])
-    async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
-        return await inventory().summary(graph_db)
+    async def summary(graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency) -> ReportSummary:
+        return await inventory().summary(graph_db, workspace)
 
     @router.get("/model", tags=["inventory"])
     async def model(
@@ -246,6 +247,26 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
         async def stream() -> AsyncIterator[str]:
             async with inventory().client.search(graph_db, query.query, with_edges=query.with_edges) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamOnSuccessResponse(stream(), media_type=media_type)
+
+    @router.post("/history/timeline", description="History timeline", tags=["search"])
+    async def history_timeline(
+        graph_db: CurrentGraphDbDependency, request: Request, body: HistoryTimelineRequest = Body()
+    ) -> StreamOnSuccessResponse:
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.history_timeline(
+                access=graph_db,
+                query=body.query,
+                after=body.after,
+                before=body.before,
+                granularity=body.granularity,
+                change=body.changes,
+            ) as result:
                 async for elem in fn(result):
                     yield elem
 
