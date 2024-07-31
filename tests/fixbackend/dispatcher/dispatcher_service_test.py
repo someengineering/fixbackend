@@ -248,9 +248,6 @@ async def test_receive_collect_done_message(
     assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
 
     await dispatcher.process_collect_done_message(message, context)
-    post_collect_context = MessageContext("test", "post-collect-done", "test", utc(), utc())
-    message["success"] = True
-    await dispatcher.process_post_collect_done_message(message, post_collect_context)
     assert await in_progress_hash_len() == 0
     assert await jobs_mapping_hash_len() == 0
     assert await redis.exists(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == 0
@@ -411,94 +408,3 @@ async def test_receive_collect_error_message(
 
     # failure event is emitted in case of failure
     assert len(domain_event_sender.events) == current_events_length + 1
-
-
-@pytest.mark.asyncio
-async def test_trigger_post_collect(
-    dispatcher: DispatcherService,
-    metering_repository: MeteringRepository,
-    workspace: Workspace,
-    domain_event_sender: InMemoryDomainEventPublisher,
-    arq_redis: Redis,
-    redis: Redis,
-) -> None:
-    async def in_progress_hash_len() -> int:
-        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher.collect_progress._collect_progress_hash_key(workspace.id)
-        )  # type: ignore # noqa
-        return len(in_progress_hash)
-
-    async def jobs_mapping_hash_len() -> int:
-        in_progress_hash: Dict[bytes, bytes] = await redis.hgetall(
-            dispatcher.collect_progress._jobs_hash_key(workspace.id)
-        )  # type: ignore # noqa
-        return len(in_progress_hash)
-
-    job_id = uuid.uuid4()
-    cloud_account_id = FixCloudAccountId(uuid.uuid4())
-    aws_account_id = CloudAccountId("123")
-    k8s_account_id = CloudAccountId("456")
-    message = {
-        "job_id": str(job_id),
-        "task_id": "t1",
-        "tenant_id": str(workspace.id),
-        "account_info": {
-            aws_account_id: dict(
-                id=aws_account_id,
-                name="test",
-                cloud="aws",
-                exported_at="2023-09-29T09:00:18Z",
-                summary={"instance": 23, "volume": 12},
-            ),
-            k8s_account_id: dict(
-                id=k8s_account_id,
-                name="foo",
-                cloud="k8s",
-                exported_at="2023-09-29T09:00:18Z",
-                summary={"instance": 12, "volume": 13},
-            ),
-        },
-        "messages": ["m1", "m2"],
-        "started_at": "2023-09-29T09:00:00Z",
-        "duration": 18,
-    }
-    context = MessageContext("test", "collect-done", "test", utc(), utc())
-
-    now = utc()
-    external_id = ExternalId(uuid.uuid4())
-    await dispatcher.collect_progress.track_account_collection_progress(
-        workspace.id,
-        cloud_account_id,
-        AwsAccountInformation(
-            aws_account_id=aws_account_id,
-            aws_account_name=CloudAccountName("test"),
-            aws_role_arn=AwsARN("arn"),
-            external_id=external_id,
-        ),
-        job_id,
-        now,
-    )
-    assert await in_progress_hash_len() == 1
-    assert await jobs_mapping_hash_len() == 1
-    assert await redis.get(dispatcher.collect_progress._jobs_to_workspace_key(str(job_id))) == str(workspace.id)
-    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
-
-    # just a collect does not mark a job as done
-    await dispatcher.process_collect_done_message(message, context)
-    assert await in_progress_hash_len() == 1
-    assert await jobs_mapping_hash_len() == 1
-    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is True
-
-    # when the post-collect message is received, the collect progress is removed and considered finally done
-    post_collect_context = MessageContext("test", "post-collect-done", "test", utc(), utc())
-    post_collect_done_message = {
-        "tenant_id": str(workspace.id),
-        "success": True,
-    }
-    await dispatcher.process_post_collect_done_message(
-        post_collect_done_message,
-        post_collect_context,
-    )
-    assert await in_progress_hash_len() == 0
-    assert await jobs_mapping_hash_len() == 0
-    assert await dispatcher.collect_progress.account_collection_ongoing(workspace.id, cloud_account_id) is False
