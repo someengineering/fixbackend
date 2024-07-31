@@ -21,7 +21,7 @@ from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.dependencies import FixDependencies, FixDependency, ServiceNames
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import NodeId
+from fixbackend.ids import NodeId, ProductTier
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.inventory_schemas import (
     CompletePathRequest,
@@ -350,9 +350,14 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/workspace-info", tags=["report"])
-    async def workspace_info(graph_db: CurrentGraphDbDependency) -> InventorySummaryRead:
+    async def workspace_info(
+        graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency
+    ) -> InventorySummaryRead:
         now = utc()
-        info = await inventory().inventory_summary(graph_db, now, timedelta(days=7))
+        duration = timedelta(days=7)
+        if workspace.current_product_tier() == ProductTier.Free:
+            duration = timedelta(days=31)
+        info = await inventory().inventory_summary(graph_db, now, duration)
         return InventorySummaryRead(
             resources_per_account_timeline=info.resources_per_account_timeline,
             score_progress=info.score_progress,
