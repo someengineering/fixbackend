@@ -80,3 +80,5 @@ class FreeTierCleanupService(Service):
                         "because it is over the limit."
                     )
                     await self.cloud_account_service.delete_cloud_account(workspace.owner_id, account.id, workspace.id)
+
+                await self.workspace_repository.ack_overdue_free_tier_cleanup(workspace.id)

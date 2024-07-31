@@ -133,6 +133,11 @@ class WorkspaceRepository(ABC):
         """List all workspaces where the free tier cleanup is overdue."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def ack_overdue_free_tier_cleanup(self, workspace_id: WorkspaceId) -> None:
+        """Acknowledge that the workspace moved to free tier."""
+        raise NotImplementedError
+
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -437,6 +442,21 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             results = await session.execute(statement)
             workspaces = results.unique().scalars().all()
             return [ws.to_model() for ws in workspaces]
+
+    async def ack_overdue_free_tier_cleanup(self, workspace_id: WorkspaceId) -> None:
+        """Acknowledge that the workspace moved to free tier."""
+        async with self.session_maker() as session:
+            workspace_statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
+            workspace_entity = (await session.execute(workspace_statement)).unique().scalar_one_or_none()
+            if workspace_entity is None:
+                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
+
+            if workspace_entity.tier != ProductTier.Free.value:
+                raise NotAllowed("wrong_tier")
+
+            workspace_entity.free_tier_cleanup_done_at = utc()
+
+            await session.commit()
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

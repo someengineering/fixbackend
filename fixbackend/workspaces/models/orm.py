@@ -43,7 +43,7 @@ class Organization(Base, CreatedUpdatedMixin):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), index=True)
     highest_current_cycle_tier: Mapped[Optional[str]] = mapped_column(String(length=64), nullable=True)
     current_cycle_ends_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
-    free_tier_cleanup_done_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    free_tier_cleanup_done_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, index=True)
 
     def to_model(self, move_to_free_acknowledged_at: Optional[datetime] = None) -> models.Workspace:
         return models.Workspace(
