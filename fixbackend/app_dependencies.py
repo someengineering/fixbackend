@@ -443,7 +443,9 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     )
 
     deps.add(SN.trial_end_service, TrialEndService(workspace_repo, session_maker, cloud_account_service))
-    deps.add(SN.free_tier_cleanup_service, FreeTierCleanupService(workspace_repo, session_maker, cloud_account_service))
+    deps.add(
+        SN.free_tier_cleanup_service, FreeTierCleanupService(workspace_repo, session_maker, cloud_account_service, cfg)
+    )
 
     gcp_account_repo = deps.add(
         SN.gcp_service_account_repo,
