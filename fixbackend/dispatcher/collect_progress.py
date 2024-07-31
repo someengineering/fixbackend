@@ -3,10 +3,9 @@ from typing import Optional, Union
 
 from cattrs.preconf.json import make_converter
 from attrs import evolve
-from fixbackend.ids import FixCloudAccountId, CloudAccountId, TaskId, CloudName, CloudNames
+from fixbackend.ids import FixCloudAccountId, CloudAccountId, TaskId
 from uuid import UUID
 from datetime import datetime
-import json
 
 json_converter = make_converter()
 
@@ -33,7 +32,6 @@ CollectionResult = Union[CollectionFailure, CollectionSuccess]
 
 @frozen
 class AccountCollectProgress:
-    cloud: CloudName
     cloud_account_id: FixCloudAccountId
     account_id: CloudAccountId
     started_at: datetime
@@ -58,10 +56,4 @@ class AccountCollectProgress:
 
     @staticmethod
     def from_json_str(value: bytes | str) -> "AccountCollectProgress":
-        # todo: remove the next day after this change is rolled out
-        dict_value = json.loads(value)
-        if dict_value.get("cloud") is None:
-            dict_value["cloud"] = CloudNames.AWS
-            value = json.dumps(dict_value)
-
         return json_converter.loads(value, AccountCollectProgress)
