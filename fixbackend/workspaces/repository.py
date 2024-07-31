@@ -128,6 +128,11 @@ class WorkspaceRepository(ABC):
         """Acknowledge that the workspace moved to free tier."""
         raise NotImplementedError
 
+    @abstractmethod
+    async def list_overdue_free_tier_cleanup(self, been_in_free_tier_for: timedelta) -> Sequence[Workspace]:
+        """List all workspaces where the free tier cleanup is overdue."""
+        raise NotImplementedError
+
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -157,7 +162,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 slug = f"{slug}-{workspace_id}"
 
             organization = orm.Organization(
-                id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
+                id=workspace_id,
+                name=name,
+                slug=slug,
+                tier=ProductTier.Trial.value,
+                owner_id=owner.id,
+                tier_updated_at=utc(),
             )
             member_relationship = orm.OrganizationMembers(user_id=owner.id)
             organization.members.append(member_relationship)
@@ -331,6 +341,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 )
                 workspace.current_cycle_ends_at = last_billing_cycle_instant
             workspace.highest_current_cycle_tier = max(active_tier, new_tier)
+            workspace.tier_updated_at = utc()
 
             await session.commit()
             await session.refresh(workspace)
@@ -419,6 +430,21 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             await session.commit()
 
             return evolve(workspace, move_to_free_acknowledged_at=now)
+
+    async def list_overdue_free_tier_cleanup(
+        self, been_in_free_tier_for: timedelta, window: timedelta = timedelta(days=1)
+    ) -> Sequence[Workspace]:
+        """List all workspaces where the free tier cleanup is overdue."""
+        async with self.session_maker() as session:
+            statement = (
+                select(orm.Organization)
+                .where(orm.Organization.tier == ProductTier.Free.value)
+                .where(orm.Organization.tier_updated_at < utc() - been_in_free_tier_for)
+                .where(orm.Organization.tier_updated_at > utc() - been_in_free_tier_for - window)
+            )
+            results = await session.execute(statement)
+            workspaces = results.unique().scalars().all()
+            return [ws.to_model() for ws in workspaces]
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:

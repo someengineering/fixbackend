@@ -84,6 +84,7 @@ class Config(BaseSettings):
     stripe_api_key: Optional[str]
     stripe_webhook_key: Optional[str]
     customer_support_users: List[str]
+    free_tier_cleanup_timeout_days: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -190,6 +191,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--stripe-webhook-key", default=os.environ.get("STRIPE_WEBHOOK_KEY"))
     parser.add_argument(
         "--customer-support-users", nargs="+", default=os.environ.get("CUSTOMER_SUPPORT_USERS", "").split(",")
+    )
+    parser.add_argument(
+        "--free-tier-cleanup-timeout-days",
+        type=int,
+        default=int(os.environ.get("FREE_TIER_CLEANUP_TIMEOUT_DAYS", "7")),
     )
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
