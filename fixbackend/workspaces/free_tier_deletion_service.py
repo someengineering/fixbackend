@@ -63,22 +63,26 @@ class FreeTierCleanupService(Service):
             been_in_free_tier_for=trial_period_duration() + free_tier_cleanup_timeout
         )
         for workspace in workspaces:
+            account_limit = ProductTierSettings[ProductTier.Free].account_limit
 
-            if limit := ProductTierSettings[ProductTier.Free].account_limit:
+            if account_limit is None:
+                continue
+
+            accounts = await self.cloud_account_service.list_accounts(workspace.id)
+
+            if len(accounts) <= account_limit:
+                continue
+
+            log.info(
+                f"Cleaning up workspace {workspace.id}"
+                " because it has been in free tier for"
+                f"{free_tier_cleanup_timeout}."
+            )
+            for i, account in enumerate(accounts):
+                if i < account_limit:
+                    continue
+
                 log.info(
-                    f"Cleaning up workspace {workspace.id}"
-                    " because it has been in free tier for"
-                    f"{free_tier_cleanup_timeout}."
+                    f"Deleting cloud account {account.id} on workspace {workspace.id} " "because it is over the limit."
                 )
-                accounts = await self.cloud_account_service.list_accounts(workspace.id)
-                for i, account in enumerate(accounts):
-                    if i < limit:
-                        continue
-
-                    log.info(
-                        f"Deleting cloud account {account.id} on workspace {workspace.id} "
-                        "because it is over the limit."
-                    )
-                    await self.cloud_account_service.delete_cloud_account(workspace.owner_id, account.id, workspace.id)
-
-                await self.workspace_repository.ack_overdue_free_tier_cleanup(workspace.id)
+                await self.cloud_account_service.delete_cloud_account(workspace.owner_id, account.id, workspace.id)

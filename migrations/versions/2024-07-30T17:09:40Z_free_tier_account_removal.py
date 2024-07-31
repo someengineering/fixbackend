@@ -21,10 +21,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("organization", sa.Column("free_tier_cleanup_done_at", UTCDateTime(timezone=True), nullable=True))
-    op.create_index(
-        op.f("ix_organization_free_tier_cleanup_done_at"), "organization", ["free_tier_cleanup_done_at"], unique=False
-    )
+    op.add_column("organization", sa.Column("tier_updated_at", UTCDateTime(timezone=True), nullable=True))
+    op.create_index(op.f("ix_organization_tier_updated_at"), "organization", ["tier_updated_at"], unique=False)
 
 
 def downgrade() -> None:

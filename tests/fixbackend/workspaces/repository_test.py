@@ -310,13 +310,6 @@ async def test_overdue_free_tiers(
         been_in_free_tier_for=datetime.timedelta(seconds=0)
     ) == [workspace]
 
-    await workspace_repository.ack_overdue_free_tier_cleanup(workspace.id)
-
-    assert (
-        await workspace_repository.list_overdue_free_tier_cleanup(been_in_free_tier_for=datetime.timedelta(seconds=0))
-        == []
-    )
-
 
 @pytest.mark.asyncio
 async def test_ack_move_to_free(

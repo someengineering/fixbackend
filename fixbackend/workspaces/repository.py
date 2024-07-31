@@ -133,11 +133,6 @@ class WorkspaceRepository(ABC):
         """List all workspaces where the free tier cleanup is overdue."""
         raise NotImplementedError
 
-    @abstractmethod
-    async def ack_overdue_free_tier_cleanup(self, workspace_id: WorkspaceId) -> None:
-        """Acknowledge that the workspace moved to free tier."""
-        raise NotImplementedError
-
 
 class WorkspaceRepositoryImpl(WorkspaceRepository):
     def __init__(
@@ -167,7 +162,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 slug = f"{slug}-{workspace_id}"
 
             organization = orm.Organization(
-                id=workspace_id, name=name, slug=slug, tier=ProductTier.Trial.value, owner_id=owner.id
+                id=workspace_id,
+                name=name,
+                slug=slug,
+                tier=ProductTier.Trial.value,
+                owner_id=owner.id,
+                tier_updated_at=utc(),
             )
             member_relationship = orm.OrganizationMembers(user_id=owner.id)
             organization.members.append(member_relationship)
@@ -341,6 +341,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
                 )
                 workspace.current_cycle_ends_at = last_billing_cycle_instant
             workspace.highest_current_cycle_tier = max(active_tier, new_tier)
+            workspace.tier_updated_at = utc()
 
             await session.commit()
             await session.refresh(workspace)
@@ -436,27 +437,12 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
             statement = (
                 select(orm.Organization)
                 .where(orm.Organization.tier == ProductTier.Free.value)
-                .where(orm.Organization.free_tier_cleanup_done_at.is_(None))
-                .where(orm.Organization.created_at < utc() - been_in_free_tier_for)
+                .where(orm.Organization.tier_updated_at < utc() - been_in_free_tier_for)
+                .where(orm.Organization.tier_updated_at > utc() - been_in_free_tier_for - timedelta(days=1))
             )
             results = await session.execute(statement)
             workspaces = results.unique().scalars().all()
             return [ws.to_model() for ws in workspaces]
-
-    async def ack_overdue_free_tier_cleanup(self, workspace_id: WorkspaceId) -> None:
-        """Acknowledge that the workspace moved to free tier."""
-        async with self.session_maker() as session:
-            workspace_statement = select(orm.Organization).where(orm.Organization.id == workspace_id)
-            workspace_entity = (await session.execute(workspace_statement)).unique().scalar_one_or_none()
-            if workspace_entity is None:
-                raise ResourceNotFound(f"Organization {workspace_id} does not exist.")
-
-            if workspace_entity.tier != ProductTier.Free.value:
-                raise NotAllowed("wrong_tier")
-
-            workspace_entity.free_tier_cleanup_done_at = utc()
-
-            await session.commit()
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:
