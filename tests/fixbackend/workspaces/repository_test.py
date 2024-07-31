@@ -284,6 +284,34 @@ async def test_expired_trials(
 
 
 @pytest.mark.asyncio
+async def test_overdue_free_tiers(
+    workspace_repository: WorkspaceRepository,
+    workspace: Workspace,
+    async_session_maker: AsyncSessionMaker,
+) -> None:
+
+    async with async_session_maker() as session:
+        statement = select(orm.Organization).where(orm.Organization.id == workspace.id)
+        results = await session.execute(statement)
+        org = results.unique().scalar_one_or_none()
+        assert org
+        org.created_at = utc() - datetime.timedelta(days=1)
+        org.tier = ProductTier.Free
+        await session.commit()
+        await session.refresh(org)
+        workspace = org.to_model()
+
+    assert (
+        await workspace_repository.list_overdue_free_tier_cleanup(been_in_free_tier_for=datetime.timedelta(days=14))
+        == []
+    )
+
+    assert await workspace_repository.list_overdue_free_tier_cleanup(
+        been_in_free_tier_for=datetime.timedelta(seconds=0)
+    ) == [workspace]
+
+
+@pytest.mark.asyncio
 async def test_ack_move_to_free(
     workspace_repository: WorkspaceRepository, user: User, user_repository: UserRepository
 ) -> None:

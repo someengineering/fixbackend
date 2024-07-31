@@ -236,6 +236,7 @@ def default_config() -> Config:
         stripe_api_key=None,
         stripe_webhook_key=None,
         customer_support_users=[],
+        free_tier_cleanup_timeout_days=7,
     )
 
 
