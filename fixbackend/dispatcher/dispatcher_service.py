@@ -416,6 +416,10 @@ class DispatcherService(Service):
 
         tenant_collect_state = await self.collect_progress.get_tenant_collect_state(workspace_id)
 
+        if not all(job.is_done() for job in tenant_collect_state.values()):
+            log.info("One of multiple jobs finished. Waiting for the remaining jobs.")
+            return
+
         if all([isinstance(progress.collection_done, CollectionFailure) for progress in tenant_collect_state.values()]):
             log.info("Allcollect jobs failed, completing collect run")
             await self.complete_collect_job(workspace_id)
