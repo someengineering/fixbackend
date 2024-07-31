@@ -214,6 +214,10 @@ def trial_period_duration() -> timedelta:
     return timedelta(days=14)
 
 
+def free_tier_cleanup_timeout() -> timedelta:
+    return timedelta(days=7)
+
+
 @frozen
 class ProductTierSetting:
     retention_period: timedelta

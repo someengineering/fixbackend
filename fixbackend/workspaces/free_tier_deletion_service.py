@@ -21,15 +21,13 @@ from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.service import Service
 
 from fixbackend.cloud_accounts.service import CloudAccountService
-from fixbackend.config import ProductTierSettings, trial_period_duration
+from fixbackend.config import ProductTierSettings
 from fixbackend.ids import ProductTier
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.config import free_tier_cleanup_timeout
 
 log = logging.getLogger(__name__)
-
-
-free_tier_cleanup_timeout = timedelta(days=14)
 
 
 class FreeTierCleanupService(Service):
@@ -60,7 +58,7 @@ class FreeTierCleanupService(Service):
 
     async def cleanup_free_tiers(self) -> None:
         workspaces = await self.workspace_repository.list_overdue_free_tier_cleanup(
-            been_in_free_tier_for=trial_period_duration() + free_tier_cleanup_timeout
+            been_in_free_tier_for=free_tier_cleanup_timeout()
         )
         for workspace in workspaces:
             account_limit = ProductTierSettings[ProductTier.Free].account_limit
@@ -76,7 +74,7 @@ class FreeTierCleanupService(Service):
             log.info(
                 f"Cleaning up workspace {workspace.id}"
                 " because it has been in free tier for"
-                f"{free_tier_cleanup_timeout}."
+                f"{free_tier_cleanup_timeout()}."
             )
             for i, account in enumerate(accounts):
                 if i < account_limit:
