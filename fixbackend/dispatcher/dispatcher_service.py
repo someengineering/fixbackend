@@ -17,7 +17,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, cast, List
+from typing import Any, Dict, Optional, cast
 from uuid import UUID
 
 from fixcloudutils.asyncio.periodic import Periodic
@@ -41,7 +41,6 @@ from fixbackend.collect.collect_queue import (
     AzureSubscriptionInformation,
     CollectQueue,
     GcpProjectInformation,
-    PostCollectAccountInfo,
 )
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionFailure, CollectionSuccess
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
@@ -56,12 +55,13 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskId, WorkspaceId, AwsARN, CloudNames
+from fixbackend.ids import CloudAccountId, FixCloudAccountId, ProductTier, TaskId, WorkspaceId, AwsARN
 from fixbackend.logging_context import set_workspace_id, set_fix_cloud_account_id, set_cloud_account_id
 from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.types import Redis
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.ids import CloudNames
 
 log = logging.getLogger(__name__)
 
@@ -92,17 +92,14 @@ class CollectAccountProgress:
     ) -> None:
         if isinstance(account_information, AwsAccountInformation):
             account_id = account_information.aws_account_id
-            cloud = CloudNames.AWS
         elif isinstance(account_information, GcpProjectInformation):
             account_id = account_information.gcp_project_id
-            cloud = CloudNames.GCP
         elif isinstance(account_information, AzureSubscriptionInformation):
             account_id = account_information.azure_subscription_id
-            cloud = CloudNames.Azure
         else:
             raise NotImplementedError("Unsupported account information type")
         value = AccountCollectProgress(
-            cloud=cloud, cloud_account_id=cloud_account_id, account_id=account_id, started_at=now
+            cloud_account_id=cloud_account_id, account_id=account_id, started_at=now
         ).to_json_str()
         # store account_collect_progress
         async with self.redis.pipeline(transaction=True) as pipe:
@@ -265,8 +262,6 @@ class DispatcherService(Service):
 
     async def process_collect_done_message(self, message: Json, context: MessageContext) -> None:
         match context.kind:
-            case "post-collect-done":
-                await self.process_post_collect_done_message(message, context)
             case "collect-done":
                 await self.collect_job_finished(message)
             case "job-failed":
@@ -324,24 +319,6 @@ class DispatcherService(Service):
         # all jobs are finished, send domain event and delete the hash
         await send_domain_event(tenant_collect_state)
         await self.collect_progress.delete_tenant_collect_state(workspace_id)
-
-    async def process_post_collect_done_message(self, message: Json, context: MessageContext) -> None:
-        tenant_id = message["tenant_id"]
-        success = message["success"]
-
-        workspace_id = WorkspaceId(uuid.UUID(tenant_id))
-
-        tenant_collect_state = await self.collect_progress.get_tenant_collect_state(workspace_id)
-
-        if not all(job.is_done() for job in tenant_collect_state.values()):
-            log.error("Post collect job finished, but not all collect jobs are done. This is a bug!")
-            return
-
-        if not success:
-            log.error(f"Post collect job failed: {message}")
-            return
-
-        await self.complete_collect_job(workspace_id)
 
     async def collect_job_finished(self, message: Json, failed: bool = False) -> None:
         job_id = message["job_id"]
@@ -413,33 +390,8 @@ class DispatcherService(Service):
         if workspace_id is None:
             log.warning(f"Could not find workspace id for job id {job_id}")
             return
-
-        tenant_collect_state = await self.collect_progress.get_tenant_collect_state(workspace_id)
-
-        if all([isinstance(progress.collection_done, CollectionFailure) for progress in tenant_collect_state.values()]):
-            log.info("Allcollect jobs failed, completing collect run")
-            await self.complete_collect_job(workspace_id)
-            return
-
-        log.info("starting post collect job")
-        collected: List[PostCollectAccountInfo] = []
-
-        for progress in tenant_collect_state.values():
-            result = progress.collection_done
-            if isinstance(result, CollectionSuccess):
-                collected.append(
-                    PostCollectAccountInfo(
-                        progress.cloud,
-                        progress.account_id,
-                        result.task_id,
-                    )
-                )
-
-        if not collected:
-            log.info("Nothing to post collect. Completing the collect job.")
-            await self.complete_collect_job(workspace_id)
-
-        await self.trigger_post_collect(workspace_id, collected)
+        await self.complete_collect_job(workspace_id)
+        log.info("Successfully processed collect job finished message")
 
     async def process_workspace_created(self, event: WorkspaceCreated) -> None:
         workspace_id = event.workspace_id
@@ -530,11 +482,6 @@ class DispatcherService(Service):
             await self.collect_queue.enqueue(
                 db, ai, job_id=str(job_id), defer_by=defer_by, retry_failed_for=retry_failed_for
             )
-
-    async def trigger_post_collect(self, workspace_id: WorkspaceId, collected: List[PostCollectAccountInfo]) -> None:
-
-        if db := await self.access_manager.get_database_access(workspace_id):
-            await self.collect_queue.enqueue_post_collect(db, collected)
 
     async def schedule_next_runs(self) -> None:
         now = utc()
