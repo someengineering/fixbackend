@@ -431,14 +431,16 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
             return evolve(workspace, move_to_free_acknowledged_at=now)
 
-    async def list_overdue_free_tier_cleanup(self, been_in_free_tier_for: timedelta) -> Sequence[Workspace]:
+    async def list_overdue_free_tier_cleanup(
+        self, been_in_free_tier_for: timedelta, window: timedelta = timedelta(days=1)
+    ) -> Sequence[Workspace]:
         """List all workspaces where the free tier cleanup is overdue."""
         async with self.session_maker() as session:
             statement = (
                 select(orm.Organization)
                 .where(orm.Organization.tier == ProductTier.Free.value)
                 .where(orm.Organization.tier_updated_at < utc() - been_in_free_tier_for)
-                .where(orm.Organization.tier_updated_at > utc() - been_in_free_tier_for - timedelta(days=1))
+                .where(orm.Organization.tier_updated_at > utc() - been_in_free_tier_for - window)
             )
             results = await session.execute(statement)
             workspaces = results.unique().scalars().all()
