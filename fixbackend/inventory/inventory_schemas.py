@@ -184,6 +184,14 @@ class SearchListGraphRequest(BaseModel):
     with_edges: bool = Field(default=False, description="If the edges should be included.")
 
 
+class HistoryTimelineRequest(BaseModel):
+    query: str = Field(description="The query to execute.")
+    before: datetime = Field(default=None, description="The time before which to search.")
+    after: datetime = Field(default=None, description="The time after which to search.")
+    changes: List[HistoryChange] = Field(default_factory=list, description="The change to search for.")
+    granularity: Optional[str] = Field(default=None, description="The granularity of the timeline.")
+
+
 class SearchRequest(BaseModel):
     query: str = Field(description="The query to execute.")
     history: Optional[HistorySearch] = Field(default=None, description="If the history should be searched.")

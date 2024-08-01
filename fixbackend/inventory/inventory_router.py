@@ -21,7 +21,7 @@ from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.dependencies import FixDependencies, FixDependency, ServiceNames
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import NodeId
+from fixbackend.ids import NodeId, ProductTier
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.inventory_schemas import (
     CompletePathRequest,
@@ -33,6 +33,7 @@ from fixbackend.inventory.inventory_schemas import (
     SearchListGraphRequest,
     UpdateSecurityIgnore,
     InventorySummaryRead,
+    HistoryTimelineRequest,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -152,8 +153,8 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/report-summary", tags=["report"])
-    async def summary(graph_db: CurrentGraphDbDependency) -> ReportSummary:
-        return await inventory().summary(graph_db)
+    async def summary(graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency) -> ReportSummary:
+        return await inventory().summary(graph_db, workspace)
 
     @router.get("/model", tags=["inventory"])
     async def model(
@@ -251,6 +252,26 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
+    @router.post("/history/timeline", description="History timeline", tags=["search"])
+    async def history_timeline(
+        graph_db: CurrentGraphDbDependency, request: Request, body: HistoryTimelineRequest = Body()
+    ) -> StreamOnSuccessResponse:
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.history_timeline(
+                access=graph_db,
+                query=body.query,
+                after=body.after,
+                before=body.before,
+                granularity=body.granularity,
+                change=body.changes,
+            ) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamOnSuccessResponse(stream(), media_type=media_type)
+
     @router.post(
         "/search/table",
         description="Search the inventory and return the results as a table. "
@@ -329,9 +350,14 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.get("/workspace-info", tags=["report"])
-    async def workspace_info(graph_db: CurrentGraphDbDependency) -> InventorySummaryRead:
+    async def workspace_info(
+        graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency
+    ) -> InventorySummaryRead:
         now = utc()
-        info = await inventory().inventory_summary(graph_db, now, timedelta(days=7))
+        duration = timedelta(days=7)
+        if workspace.current_product_tier() == ProductTier.Free:
+            duration = timedelta(days=31)
+        info = await inventory().inventory_summary(graph_db, now, duration)
         return InventorySummaryRead(
             resources_per_account_timeline=info.resources_per_account_timeline,
             score_progress=info.score_progress,

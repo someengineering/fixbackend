@@ -61,6 +61,7 @@ from fixbackend.metering import MeteringRecord
 from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.types import Redis
 from fixbackend.workspaces.repository import WorkspaceRepository
+from fixbackend.ids import CloudNames
 
 log = logging.getLogger(__name__)
 
@@ -421,6 +422,7 @@ class DispatcherService(Service):
         *,
         defer_by: Optional[timedelta] = None,
         retry_failed_for: Optional[timedelta] = None,
+        **kwargs: Any,
     ) -> None:
         set_cloud_account_id(account.account_id)
         set_fix_cloud_account_id(account.id)
@@ -458,6 +460,7 @@ class DispatcherService(Service):
                                 tenant_id=azure_credential.azure_tenant_id,
                                 client_id=azure_credential.client_id,
                                 client_secret=azure_credential.client_secret,
+                                collect_microsoft_graph=kwargs.get("collect_microsoft_graph", False),
                             )
                         case _:
                             log.error(f"Don't know how to handle this cloud access {access}. Ignore it.")
@@ -483,13 +486,18 @@ class DispatcherService(Service):
     async def schedule_next_runs(self) -> None:
         now = utc()
 
+        azure_graph_scheduled = False
         async for workspace_id, at in self.next_run_repo.older_than(now):
             set_workspace_id(workspace_id)
             accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, ready_for_collection=True)
             product_tier = await self.workspace_repository.get_product_tier(workspace_id)
             log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
             for account in accounts:
-                await self.trigger_collect(account)
+                if account.cloud == CloudNames.Azure and not azure_graph_scheduled:
+                    azure_graph_scheduled = True
+                    await self.trigger_collect(account, collect_microsoft_graph=True)
+                else:
+                    await self.trigger_collect(account)
 
             next_run_at = await self.next_run_repo.update_next_run_for(workspace_id, product_tier, last_run=at)
             log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")

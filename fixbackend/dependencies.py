@@ -81,6 +81,7 @@ class ServiceNames:
     azure_subscription_repo = "azure_subscription_repo"
     azure_subscription_service = "azure_subscription_service"
     trial_end_service = "trial_end_service"
+    free_tier_cleanup_service = "free_tier_cleanup_service"
 
 
 class FixDependencies(Dependencies):
