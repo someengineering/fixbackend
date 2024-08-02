@@ -183,8 +183,10 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
 
         if user is None or not user.is_active:
             maybe_existing = await user_manager.get_by_email(credentials.username)
+            metric = FailedLoginAttempts
             if maybe_existing:
-                FailedLoginAttempts.labels(user_id=maybe_existing.id).inc()
+                metric = FailedLoginAttempts.labels(user_id=maybe_existing.id)
+            metric.inc()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
