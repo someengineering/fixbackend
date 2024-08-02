@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm.exc import StaleDataError
 from fixcloudutils.util import utc
 
@@ -89,6 +89,10 @@ class CloudAccountRepository(ABC):
 
     @abstractmethod
     async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_next_scan(self, workspace_id: WorkspaceId, next_scan: datetime) -> None:
         raise NotImplementedError
 
 
@@ -325,6 +329,15 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             results = await session.execute(statement)
             accounts = results.scalars().all()
             return [acc.to_model() for acc in accounts]
+
+    async def update_next_scan(self, workspace_id: WorkspaceId, next_scan: datetime) -> None:
+        """Update next scan for all accounts in the workspace."""
+        async with self.session_maker() as session:
+            statement = (
+                update(orm.CloudAccount).where(orm.CloudAccount.tenant_id == workspace_id).values(next_scan=next_scan)
+            )
+            await session.execute(statement)
+            await session.commit()
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:
