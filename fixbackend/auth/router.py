@@ -44,7 +44,7 @@ from disposable_email_domains import blocklist
 from prometheus_client import Counter
 
 log = getLogger(__name__)
-FailedLoginAttempts = Counter("failed_login_attempts", "Failed login attempts", ["user_id"])
+FailedLoginAttempts = Counter("fixbackend_failed_login_attempts", "Failed login attempts", ["user_id"])
 
 
 async def get_auth_url(

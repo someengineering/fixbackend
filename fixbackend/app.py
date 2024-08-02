@@ -60,7 +60,7 @@ from prometheus_client import Counter
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
 
-UnauthorizedRequests = Counter("unauthorized_requests", "Unauthorized requests", ["endpoint"])
+UnauthorizedRequests = Counter("fixbackend_unauthorized_requests", "Unauthorized requests", ["endpoint"])
 
 
 def dev_router(deps: FixDependencies) -> APIRouter:
