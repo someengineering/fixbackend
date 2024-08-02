@@ -54,9 +54,13 @@ from fixbackend.notification.notification_router import notification_router, uns
 from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
 from fixbackend.workspaces.router import workspaces_router
+from prometheus_client import Counter
+
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
+
+UnauthorizedRequests = Counter("fixbackend_unauthorized_requests", "Unauthorized requests", ["endpoint"])
 
 
 def dev_router(deps: FixDependencies) -> APIRouter:
@@ -76,8 +80,8 @@ def dev_router(deps: FixDependencies) -> APIRouter:
         headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         headers["Content-Security-Policy"] = (
             "default-src 'self' https://cdn.fix.security;"
-            f" connect-src 'self' data: https://capture.trackjs.com https://ph.fix.security;"
-            f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
+            f" connect-src 'self' data: https://cdn.fix.security https://capture.trackjs.com https://ph.fix.security;"
+            f" script-src 'self' 'nonce-{nonce}' https://ph.fix.security https://cdn.fix.security https://www.googletagmanager.com;"
             f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
             " font-src 'self' data: https://cdn.fix.security;"
             " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com https://i.ytimg.com https://www.googletagmanager.com/;"
@@ -330,8 +334,8 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
             headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
             headers["Content-Security-Policy"] = (
                 "default-src 'self' https://cdn.fix.security;"
-                f" connect-src 'self' data: https://capture.trackjs.com https://ph.fix.security;"
-                f" script-src 'self' 'nonce-{nonce}' https://cdn.fix.security https://www.googletagmanager.com;"
+                f" connect-src 'self' data: https://cdn.fix.security https://capture.trackjs.com https://ph.fix.security;"
+                f" script-src 'self' 'nonce-{nonce}' https://ph.fix.security https://cdn.fix.security https://www.googletagmanager.com;"
                 f" style-src 'self' 'nonce-{nonce}' https://cdn.fix.security;"
                 " font-src 'self' data: https://cdn.fix.security;"
                 " img-src 'self' data: https://cdn.fix.security https://usage.trackjs.com https://i.ytimg.com https://www.googletagmanager.com/;"
@@ -352,6 +356,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
         @app.exception_handler(401)
         async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
+            UnauthorizedRequests.labels(endpoint=request.url.path).inc()
             response = await http_exception_handler(request, exception)
             logout_cookie._set_logout_cookie(response)  # noqa
             return response

@@ -84,6 +84,7 @@ from fixbackend.types import Redis
 from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
 from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
 from fixbackend.workspaces.trial_end_service import TrialEndService
+from fixbackend.workspaces.free_tier_deletion_service import FreeTierCleanupService
 
 log = logging.getLogger(__name__)
 
@@ -441,8 +442,10 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
         ),
     )
 
-    # uncomment once aws marketplace suscriptions are available on prd
     deps.add(SN.trial_end_service, TrialEndService(workspace_repo, session_maker, cloud_account_service))
+    deps.add(
+        SN.free_tier_cleanup_service, FreeTierCleanupService(workspace_repo, session_maker, cloud_account_service, cfg)
+    )
 
     gcp_account_repo = deps.add(
         SN.gcp_service_account_repo,
