@@ -199,9 +199,9 @@ async def test_create_aws_cloud_account(
     # update next_scan
     timestamp = utc().replace(microsecond=0) + timedelta(minutes=1)
     await cloud_account_repository.update_next_scan(with_last_scan.workspace_id, timestamp)
-    updated = await cloud_account_repository.get(id=configured_account_id)
-    assert updated
-    assert updated.next_scan == timestamp
+    with_next_scan = await cloud_account_repository.get(id=configured_account_id)
+    assert with_next_scan
+    assert with_next_scan.next_scan == timestamp
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)
