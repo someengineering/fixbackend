@@ -966,10 +966,13 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         return account
 
     async def list_accounts(self, workspace_id: WorkspaceId) -> List[CloudAccount]:
-        return await self.cloud_account_repository.list_by_workspace_id(
+        accounts = await self.cloud_account_repository.list_by_workspace_id(
             workspace_id,
             non_deleted=True,
         )
+        next_run = await self.next_run_repository.get(workspace_id)
+        accounts = [evolve(acc, next_scan=next_run) for acc in accounts]
+        return accounts
 
     async def update_cloud_account_name(
         self,
