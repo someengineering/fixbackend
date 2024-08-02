@@ -54,9 +54,13 @@ from fixbackend.notification.notification_router import notification_router, uns
 from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
 from fixbackend.workspaces.router import workspaces_router
+from prometheus_client import Counter
+
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
+
+UnauthorizedRequests = Counter("unauthorized_requests", "Unauthorized requests", ["endpoint"])
 
 
 def dev_router(deps: FixDependencies) -> APIRouter:
@@ -352,6 +356,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
         @app.exception_handler(401)
         async def unauthorized_handler(request: Request, exception: HTTPException) -> Response:
+            UnauthorizedRequests.labels(endpoint=request.url.path).inc()
             response = await http_exception_handler(request, exception)
             logout_cookie._set_logout_cookie(response)  # noqa
             return response

@@ -41,8 +41,10 @@ from fixbackend.config import Config
 from fixbackend.ids import UserId
 from fastapi_users import schemas
 from disposable_email_domains import blocklist
+from prometheus_client import Counter
 
 log = getLogger(__name__)
+FailedLoginAttempts = Counter("failed_login_attempts", "Failed login attempts", ["user_id"])
 
 
 async def get_auth_url(
@@ -180,6 +182,9 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         user = await user_manager.authenticate(credentials)
 
         if user is None or not user.is_active:
+            maybe_existing = await user_manager.get_by_email(credentials.username)
+            if maybe_existing:
+                FailedLoginAttempts.labels(user_id=maybe_existing.id).inc()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
