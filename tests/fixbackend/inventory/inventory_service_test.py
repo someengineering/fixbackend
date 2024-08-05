@@ -63,6 +63,7 @@ from fixbackend.inventory.inventory_schemas import (
     SortOrder,
 )
 from fixbackend.utils import uid
+from fixcloudutils.util import utc
 from fixbackend.workspaces.models import Workspace
 from tests.fixbackend.conftest import RequestHandlerMock, json_response, nd_json_response, eventually
 
@@ -126,9 +127,9 @@ def mocked_answers(
             )
         elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
             return nd_json_response(
-                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "medium"}, "count": 50000},  # fmt: skip
-                 {"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "high"}, "count": 4321},  # fmt: skip
-                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp", "severity": "medium"}, "count": 12345}]  # fmt: skip
+                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "medium", "score": 85}, "count": 50000},  # fmt: skip
+                 {"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "high", "score": 85}, "count": 4321},  # fmt: skip
+                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp", "severity": "medium", "score": 0}, "count": 12345}]  # fmt: skip
             )
         elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
             return nd_json_response(
@@ -179,7 +180,9 @@ async def test_benchmark_command(
 async def test_summary(
     inventory_service: InventoryService, mocked_answers: RequestHandlerMock, workspace: Workspace
 ) -> None:
-    summary = await inventory_service.summary(db, workspace)
+    now = utc()
+    duration = timedelta(days=7)
+    summary = await inventory_service.summary(db, workspace, now, duration)
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 42
     # checks summary
@@ -202,7 +205,8 @@ async def test_summary(
     }
     assert len(summary.accounts) == 2
     # check accounts
-    gcp, aws = summary.accounts
+    gcp = next(filter(lambda acc: acc.cloud == "gcp", summary.accounts))
+    aws = next(filter(lambda acc: acc.cloud == "aws", summary.accounts))
     assert gcp.id == "234"
     assert gcp.name == "account 1"
     assert gcp.cloud == "gcp"
@@ -247,7 +251,9 @@ async def test_no_graph_db_access(
         failed_resources=0,
         failed_resources_by_severity={},
     )
-    assert await inventory_service.summary(db, workspace) == ReportSummary(
+    now = utc()
+    duration = timedelta(days=7)
+    assert await inventory_service.summary(db, workspace, now, duration) == ReportSummary(
         check_summary=empty,
         overall_score=0,
         accounts=[],

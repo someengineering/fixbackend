@@ -48,7 +48,7 @@ from fixcloudutils.redis.cache import RedisCache
 from fixcloudutils.redis.worker_queue import WorkDispatcher, WorkerInstance
 from fixcloudutils.service import Service
 from fixcloudutils.types import Json, JsonElement
-from fixcloudutils.util import value_in_path, utc_str, utc, parse_utc_str, value_in_path_get
+from fixcloudutils.util import value_in_path, utc_str, parse_utc_str, value_in_path_get
 
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.config import ProductTierSettings, Trial
@@ -426,12 +426,12 @@ class InventoryService(Service):
         )
         return self.client.execute_single(db, cmd, env={"with-kind": "true"})  # type: ignore
 
-    async def summary(self, db: GraphDatabaseAccess, workspace: Workspace) -> ReportSummary:
+    async def summary(
+        self, db: GraphDatabaseAccess, workspace: Workspace, now: datetime, duration: timedelta
+    ) -> ReportSummary:
         is_free = workspace.current_product_tier() == ProductTier.Free
 
         async def compute_summary() -> ReportSummary:
-            now = utc()
-            duration = timedelta(days=31 if is_free else 7)
 
             async def issues_since(
                 duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
@@ -584,7 +584,7 @@ class InventoryService(Service):
                 # The overall score is the average of all account scores
                 scores = []
                 for account in accounts.values():
-                    if account.exported_at and account.exported_at > now - duration:
+                    if not account.exported_at or account.exported_at > now - duration:
                         scores.append(account.score)
                 total_score = sum(scores)
                 total_accounts = len(accounts)

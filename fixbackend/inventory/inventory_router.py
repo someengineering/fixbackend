@@ -154,7 +154,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/report-summary", tags=["report"])
     async def summary(graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency) -> ReportSummary:
-        return await inventory().summary(graph_db, workspace)
+        now = utc()
+        duration = timedelta(days=7)
+        if workspace.current_product_tier() == ProductTier.Free:
+            duration = timedelta(days=31)
+        return await inventory().summary(graph_db, workspace, now, duration)
 
     @router.get("/model", tags=["inventory"])
     async def model(
