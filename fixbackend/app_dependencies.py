@@ -119,7 +119,9 @@ async def base_dependencies(cfg: Config) -> FixDependencies:
     )
     engine = deps.add(
         SN.async_engine,
-        create_async_engine(cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True),
+        create_async_engine(
+            cfg.database_url, pool_size=10, pool_recycle=3600, pool_pre_ping=True, isolation_level="REPEATABLE READ"
+        ),
     )
     EngineMetrics.register(engine)
     deps.add(SN.session_maker, async_sessionmaker(engine))
