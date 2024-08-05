@@ -65,7 +65,7 @@ from fixbackend.domain_events.consumers import (
 )
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
-from fixbackend.fix_jwt import JwtServiceImpl
+from fixbackend.fix_jwt import JwtService
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.inventory.inventory_client import InventoryClient
 from fixbackend.inventory.inventory_service import InventoryService
@@ -243,7 +243,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
 
     cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
 
-    jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+    jwt_service = deps.add(SN.jwt_service, JwtService(cert_store))
 
     notification_service = deps.add(
         SN.notification_service,
@@ -324,7 +324,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.azure_subscription_service,
-        AzureSubscriptionService(azure_subscription_repo, cloud_account_service),
+        AzureSubscriptionService(azure_subscription_repo, cloud_account_service, cfg),
     )
     return deps
 
@@ -396,7 +396,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
 
     cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
 
-    jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+    jwt_service = deps.add(SN.jwt_service, JwtService(cert_store))
 
     notification_service = deps.add(
         SN.notification_service,
@@ -487,7 +487,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     )
     deps.add(
         SN.azure_subscription_service,
-        AzureSubscriptionService(azure_subscription_credentals_repo, cloud_account_service, dispatching=True),
+        AzureSubscriptionService(azure_subscription_credentals_repo, cloud_account_service, cfg, dispatching=True),
     )
     return deps
 
@@ -632,7 +632,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
         ),
     )
     cert_store = deps.add(SN.certificate_store, CertificateStore(cfg))
-    jwt_service = deps.add(SN.jwt_service, JwtServiceImpl(cert_store))
+    jwt_service = deps.add(SN.jwt_service, JwtService(cert_store))
     notification_service = deps.add(
         SN.notification_service,
         NotificationService(

@@ -85,6 +85,9 @@ class Config(BaseSettings):
     stripe_webhook_key: Optional[str]
     customer_support_users: List[str]
     free_tier_cleanup_timeout_days: int
+    azure_tenant_id: str
+    azure_client_id: str
+    azure_client_secret: str
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -197,6 +200,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
         type=int,
         default=int(os.environ.get("FREE_TIER_CLEANUP_TIMEOUT_DAYS", "7")),
     )
+    parser.add_argument("--azure-tenant_id", default=os.environ.get("AZURE_APP_TENANT_ID", ""))
+    parser.add_argument("--azure-client-id", default=os.environ.get("AZURE_APP_CLIENT_ID", ""))
+    parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_APP_CLIENT_SECRET", ""))
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 

@@ -14,12 +14,11 @@
 
 
 import hashlib
-from typing import Any, Dict, List, Optional, override
+from typing import Any, Dict, List, Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
 from fixbackend.certificates.cert_store import CertificateStore
-from abc import ABC, abstractmethod
 
 
 def kid(key: rsa.RSAPublicKey) -> str:
@@ -71,28 +70,15 @@ def decode_token(token: str, audience: List[str], public_keys: List[rsa.RSAPubli
         return None
 
 
-class JwtService(ABC):
-
-    @abstractmethod
-    async def encode(self, payload: Dict[str, Any], audience: List[str]) -> str:
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def decode(self, token: str, audience: List[str]) -> Optional[Dict[str, Any]]:
-        raise NotImplementedError()
-
-
-class JwtServiceImpl(JwtService):
+class JwtService:
     def __init__(self, cert_store: CertificateStore) -> None:
         self.cert_store = cert_store
 
-    @override
     async def encode(self, payload: Dict[str, Any], audience: List[str]) -> str:
         key_pair = await self.cert_store.get_signing_cert_key_pair()
         newest_key = key_pair[0].private_key
         return encode_token(payload, audience, newest_key)
 
-    @override
     async def decode(self, token: str, audience: List[str]) -> Optional[Dict[str, Any]]:
         key_pair = await self.cert_store.get_signing_cert_key_pair()
         public_keys = [key.private_key.public_key() for key in key_pair]
