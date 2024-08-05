@@ -557,7 +557,6 @@ class DispatcherService(Service):
                     await self.trigger_collect(account)
 
             next_run_at = await self.next_run_repo.update_next_run_for(workspace_id, product_tier, last_run=at)
-            await self.cloud_account_repo.update_next_scan(workspace_id, next_run_at)
             log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")
 
         failed_accounts = await self.cloud_account_repo.list_non_hourly_failed_scans_accounts(now)
