@@ -30,6 +30,7 @@ class AccountSummary(BaseModel):
     resource_count: int = Field(description="The number of resources in the account")
     failed_resources_by_severity: Dict[str, int] = Field(description="The number of failed resources by severity.")
     score: int = Field(description="The score of the account", default=100)
+    exported_at: Optional[datetime] = Field(description="The time the account was exported.")
 
 
 class BenchmarkAccountSummary(BaseModel):

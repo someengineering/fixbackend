@@ -431,7 +431,7 @@ class InventoryService(Service):
 
         async def compute_summary() -> ReportSummary:
             now = utc()
-
+            duration = timedelta(days=31 if is_free else 7)
             async def issues_since(
                 duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
             ) -> VulnerabilitiesChanged:
@@ -480,12 +480,15 @@ class InventoryService(Service):
                     "/ancestors.account.reported.id as account_id, "
                     "/ancestors.account.reported.name as account_name, "
                     "/ancestors.cloud.reported.name as cloud_name, "
+                    "/metadata.score as score, "
+                    "/metadata.exported_at as exported_at, "
                     "/security.severity as severity: sum(1) as count",
                 ) as result:
                     async for entry in result:
                         account_id = entry["group"]["account_id"]
                         count = entry["count"]
                         severity = entry["group"]["severity"]
+                        exported_at = entry["group"].get("exported_at")
                         if account_id not in account_by_id:
                             account_by_id[account_id] = AccountSummary(
                                 id=account_id,
@@ -493,6 +496,8 @@ class InventoryService(Service):
                                 cloud=entry["group"]["cloud_name"],
                                 failed_resources_by_severity={},
                                 resource_count=0,
+                                score=entry["group"].get("score", 100),
+                                exported_at=parse_utc_str(exported_at) if exported_at else None,
                             )
                         resources_by_account[account_id] += count
                         if severity is not None:
@@ -574,13 +579,16 @@ class InventoryService(Service):
                 total = sum(ReportSeverityScore[severity] * count for severity, count in benchmark_checks.items())
                 return int((max(0, total - missing) * 100) // total) if total > 0 else 100
 
-            def overall_score(accounts: Dict[str, AccountSummary]) -> int:
+            def overall_score(accounts: Dict[str, AccountSummary], now: datetime, duration: timedelta) -> int:
                 # The overall score is the average of all account scores
-                total_score = sum(account.score for account in accounts.values())
+                scores = []
+                for account in accounts.values():
+                    if account.exported_at and account.exported_at > now - duration:
+                        scores.append(account.score)
+                total_score = sum(scores)
                 total_accounts = len(accounts)
                 return total_score // total_accounts if total_accounts > 0 else 100
 
-            default_time_since = timedelta(days=7)
 
             (
                 (severity_resource_counter, accounts),
@@ -593,8 +601,8 @@ class InventoryService(Service):
                 account_summary(),
                 benchmark_summary(),
                 check_summary(),
-                issues_since(default_time_since, "node_vulnerable"),
-                issues_since(default_time_since, "node_compliant"),
+                issues_since(duration, "node_vulnerable"),
+                issues_since(duration, "node_compliant"),
                 timeseries_infected(),
             )
 
@@ -632,13 +640,6 @@ class InventoryService(Service):
                             failed_resource_checks=failed_resource_checks,
                         )
 
-            # compute a score for every account by averaging the scores of all benchmark results
-            for account_id, failing in account_counter.items():
-                scores = [
-                    ba.score for b in benchmarks.values() for aid, ba in b.account_summary.items() if aid == account_id
-                ]
-                accounts[account_id].score = sum(scores) // len(scores) if scores else 100
-
             # get issues for the top 5 issue_ids
             tops = await top_issues(failed_checks_by_severity, benchmark_by_check_id, benchmarks, num=5)
 
@@ -655,7 +656,7 @@ class InventoryService(Service):
                     failed_resources=sum(v for v in severity_resource_counter.values()),
                     failed_resources_by_severity=severity_resource_counter,
                 ),
-                overall_score=overall_score(accounts),
+                overall_score=overall_score(accounts, now, duration),
                 accounts=sorted(list(accounts.values()), key=lambda x: x.score),
                 benchmarks=list(benchmarks.values()),
                 changed_vulnerable=vulnerable_changed,
