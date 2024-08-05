@@ -432,6 +432,7 @@ class InventoryService(Service):
         async def compute_summary() -> ReportSummary:
             now = utc()
             duration = timedelta(days=31 if is_free else 7)
+
             async def issues_since(
                 duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
             ) -> VulnerabilitiesChanged:
@@ -588,7 +589,6 @@ class InventoryService(Service):
                 total_score = sum(scores)
                 total_accounts = len(accounts)
                 return total_score // total_accounts if total_accounts > 0 else 100
-
 
             (
                 (severity_resource_counter, accounts),
