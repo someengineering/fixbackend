@@ -237,6 +237,9 @@ def default_config() -> Config:
         stripe_webhook_key=None,
         customer_support_users=[],
         free_tier_cleanup_timeout_days=7,
+        azure_client_id="",
+        azure_client_secret="",
+        azure_tenant_id="",
     )
 
 
@@ -925,6 +928,7 @@ async def fix_deps(
     inventory_service: InventoryService,
     gcp_service_account_service: GcpServiceAccountService,
     azure_subscription_service: AzureSubscriptionService,
+    jwt_service: JwtService,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -951,6 +955,7 @@ async def fix_deps(
             ServiceNames.azure_subscription_repo: azure_subscription_credentials_repo,
             ServiceNames.gcp_service_account_service: gcp_service_account_service,
             ServiceNames.azure_subscription_service: azure_subscription_service,
+            ServiceNames.jwt_service: jwt_service,
         }
     )
 

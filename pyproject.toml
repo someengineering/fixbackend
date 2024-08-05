@@ -40,6 +40,13 @@ redis = ">5"
 python-multipart = "0.0.7"
 azure-identity = "^1.16.1"
 azure-mgmt-resource = "^23.1.1"
+msgraph-sdk = "^1.4.0"
+azure-mgmt-authorization = "^4.0.0"
+azure-mgmt-managementgroups = "^1.0.0"
+time-machine = "2.14.2"
+msgraph-core = "^1.1.2"
+azure-mgmt-resourcegraph = "^8.0.0"
+networkx = "^3.3"
 asyncpg = "^0.29.0"
 psycopg = {extras = ["binary", "pool"], version = "^3.2.1"}
 [tool.poetry.group.dev.dependencies]
@@ -69,6 +76,7 @@ types-aiofiles = "*"
 types-six = "*"
 types-pycurl = "*"
 types-redis = "*"
+
 
 [build-system]
 requires = ["poetry-core"]
