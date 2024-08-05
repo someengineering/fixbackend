@@ -528,6 +528,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                     for ws in workspaces:
                         # cleanup payment onhold status
                         await self.workspace_repository.update_payment_on_hold(ws.id, None)
+                        await self.next_run_repository.update_next_run_for(ws.id, ws.current_product_tier())
 
                 case _:  # pragma: no cover
                     pass  # ignore other domain events
