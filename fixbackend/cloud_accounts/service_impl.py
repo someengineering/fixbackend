@@ -160,6 +160,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
         self.domain_events = domain_event_publisher
         self.notification_service = notification_service
         self.analytics_event_sender = analytics_event_sender
+        self.config = config
         backoff_config: Dict[str, Backoff] = defaultdict(lambda: DefaultBackoff)
         backoff_config[CloudAccountDiscovered.kind] = Backoff(
             base_delay=5,
@@ -367,7 +368,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         set_cloud_account_id(collect_info.account_id)
 
                         def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if collect_info.scanned_resources < 50:
+                            if collect_info.scanned_resources <= self.config.account_failed_resource_count:
                                 return acc.failed_scan_count + 1
                             else:
                                 return 0
@@ -424,7 +425,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         set_cloud_account_id(collect_info.account_id)
 
                         def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if collect_info.scanned_resources < 50:
+                            if collect_info.scanned_resources < self.config.account_failed_resource_count:
                                 return acc.failed_scan_count + 1
                             else:
                                 return 0
