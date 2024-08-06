@@ -17,14 +17,13 @@ from typing import Annotated
 from fastapi import Depends
 
 from fixbackend.cloud_accounts.service import CloudAccountService
-from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
 from fixbackend.dependencies import FixDependency, ServiceNames
 
 
 def get_cloud_account_service(
     fix_dependency: FixDependency,
 ) -> CloudAccountService:
-    return fix_dependency.service(ServiceNames.cloud_account_service, CloudAccountServiceImpl)
+    return fix_dependency.service(ServiceNames.cloud_account_service, CloudAccountService)
 
 
 CloudAccountServiceDependency = Annotated[CloudAccountService, Depends(get_cloud_account_service)]

@@ -13,7 +13,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from abc import ABC, abstractmethod
 from datetime import timedelta
 from logging import getLogger
 from typing import Annotated, Dict, Sequence, Tuple, Union
@@ -69,31 +68,7 @@ class WorkspaceNotFound:
 InvitationError = Union[InvitationNotFound, NoFreeSeats, WorkspaceNotFound]
 
 
-class InvitationService(ABC):
-    @abstractmethod
-    async def invite_user(
-        self, workspace_id: WorkspaceId, inviter: User, invitee_email: str, accept_invite_base_url: str, role: Roles
-    ) -> Tuple[WorkspaceInvitation, str]:
-        """Create an invitation to a workspace."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
-        """List all invitations to a workspace."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def accept_invitation(self, token: str) -> WorkspaceInvitation | InvitationError:
-        """Accept an invitation to a workspace."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def revoke_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
-        """Revoke an invitation to a workspace."""
-        raise NotImplementedError()
-
-
-class InvitationServiceImpl(InvitationService):
+class InvitationService:
     def __init__(
         self,
         workspace_repository: WorkspaceRepository,
@@ -186,7 +161,7 @@ def get_invitation_service(
     deps: FixDependency,
     config: ConfigDependency,
 ) -> InvitationService:
-    return InvitationServiceImpl(
+    return InvitationService(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
         notification_service=deps.service(ServiceNames.notification_service, NotificationService),

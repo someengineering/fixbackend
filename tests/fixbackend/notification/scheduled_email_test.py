@@ -39,7 +39,9 @@ from fixbackend.notification.email.scheduled_email import (
     ScheduledEmailSentEntity,
 )
 from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
-from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
+from fixbackend.notification.user_notification_repo import (
+    UserNotificationSettingsRepository,
+)
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.utils import uid
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -72,7 +74,7 @@ async def test_scheduled_emails(
     email_sender: InMemoryEmailSender,
     async_session_maker: AsyncSessionMaker,
 ) -> None:
-    pref = UserNotificationSettingsRepositoryImpl(async_session_maker)
+    pref = UserNotificationSettingsRepository(async_session_maker)
     now = utc()
 
     async with async_session_maker() as session:

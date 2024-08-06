@@ -33,7 +33,7 @@ from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENC
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import (
-    UserNotificationSettingsRepositoryImpl,
+    UserNotificationSettingsRepository,
 )
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
@@ -384,7 +384,7 @@ def unsubscribe_router(fix: FixDependencies) -> APIRouter:
             log.info("no kind in token")
             raise NotAllowed("Invalid token")
         pref_service = fix.service(
-            ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl
+            ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepository
         )
         await pref_service.update_notification_settings(Email(email), **{kind: False})
         content = dedent(

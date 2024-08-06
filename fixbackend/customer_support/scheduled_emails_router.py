@@ -23,14 +23,14 @@ from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.domain_events.consumers import ScheduleTrialEndReminder, UnscheduleTrialEndReminder
 from fixbackend.ids import WorkspaceId
 from fixbackend.notification.email.one_time_email import OneTimeEmailKind
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 def scheduled_emails_router(dependencies: FixDependencies, templates: Jinja2Templates) -> APIRouter:
 
     router = APIRouter()
 
-    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
+    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepository)
     schedule_trial_end = dependencies.service(
         ServiceNames.schedule_trial_end_reminder_consumer, ScheduleTrialEndReminder
     )

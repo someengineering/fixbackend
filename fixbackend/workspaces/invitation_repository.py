@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Annotated, Callable, Optional, Sequence
 
@@ -21,42 +20,7 @@ from logging import getLogger
 log = getLogger(__name__)
 
 
-class InvitationRepository(ABC):
-    @abstractmethod
-    async def create_invitation(self, workspace_id: WorkspaceId, email: str, role: Roles) -> WorkspaceInvitation:
-        """Create an invite for a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_invitation(self, invitation_id: InvitationId) -> Optional[WorkspaceInvitation]:
-        """Get an invitation by ID."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_invitation_by_email(self, email: str) -> Optional[WorkspaceInvitation]:
-        """Get an invitation by email."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_invitations(self, workspace_id: WorkspaceId) -> Sequence[WorkspaceInvitation]:
-        """List all invitations for a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_invitation(
-        self,
-        invitation_id: InvitationId,
-        update_fn: Callable[[WorkspaceInvitation], WorkspaceInvitation],
-    ) -> WorkspaceInvitation:
-        """Update an invitation."""
-        raise NotImplementedError
-
-    async def delete_invitation(self, workspace_id: WorkspaceId, invitation_id: InvitationId) -> None:
-        """Delete an invitation."""
-        raise NotImplementedError
-
-
-class InvitationRepositoryImpl(InvitationRepository):
+class InvitationRepository:
     def __init__(
         self,
         session_maker: AsyncSessionMaker,
@@ -167,7 +131,7 @@ class InvitationRepositoryImpl(InvitationRepository):
 
 
 async def get_invitation_repository(fix: FixDependency) -> InvitationRepository:
-    return fix.service(ServiceNames.invitation_repository, InvitationRepositoryImpl)
+    return fix.service(ServiceNames.invitation_repository, InvitationRepository)
 
 
 InvitationRepositoryDependency = Annotated[InvitationRepository, Depends(get_invitation_repository)]

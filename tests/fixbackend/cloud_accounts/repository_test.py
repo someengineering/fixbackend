@@ -29,7 +29,7 @@ from fixbackend.cloud_accounts.models import (
     CloudAccountStates,
     GcpCloudAccess,
 )
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.ids import (
     AwsRoleName,
     AzureSubscriptionCredentialsId,
@@ -54,7 +54,7 @@ async def test_create_aws_cloud_account(
     user: User,
     next_run_repository: NextRunRepository,
 ) -> None:
-    cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
+    cloud_account_repository = CloudAccountRepository(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
 
@@ -208,7 +208,7 @@ async def test_create_gcp_cloud_account(
     workspace_repository: WorkspaceRepository,
     user: User,
 ) -> None:
-    cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
+    cloud_account_repository = CloudAccountRepository(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
 
@@ -259,7 +259,7 @@ async def test_create_azure_cloud_account(
     workspace_repository: WorkspaceRepository,
     user: User,
 ) -> None:
-    cloud_account_repository = CloudAccountRepositoryImpl(session_maker=async_session_maker)
+    cloud_account_repository = CloudAccountRepository(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
 
