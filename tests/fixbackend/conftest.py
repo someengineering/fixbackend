@@ -240,6 +240,7 @@ def default_config() -> Config:
         azure_client_id="",
         azure_client_secret="",
         azure_tenant_id="",
+        account_failed_resource_count=1,
     )
 
 

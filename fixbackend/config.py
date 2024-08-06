@@ -88,6 +88,7 @@ class Config(BaseSettings):
     azure_tenant_id: str
     azure_client_id: str
     azure_client_secret: str
+    account_failed_resource_count: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -203,6 +204,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--azure-tenant_id", default=os.environ.get("AZURE_APP_TENANT_ID", ""))
     parser.add_argument("--azure-client-id", default=os.environ.get("AZURE_APP_CLIENT_ID", ""))
     parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_APP_CLIENT_SECRET", ""))
+    parser.add_argument("--account-failed-resource-count", default=1)
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
