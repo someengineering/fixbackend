@@ -157,6 +157,7 @@ async def test_create_aws_cloud_account(
     # if next scan is less than 2 hours from now, it should not be included in the list
     await next_run_repository.update_next_run_at(workspace_id, utc() + timedelta(hours=1))
     assert await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc()) == []
+    next_scan = await next_run_repository.get(workspace_id)
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:
@@ -194,7 +195,7 @@ async def test_create_aws_cloud_account(
     assert with_last_scan.last_scan_duration_seconds == 123
     assert with_last_scan.last_scan_resources_scanned == 456
     assert with_last_scan.last_scan_started_at == timestamp
-    assert with_last_scan.next_scan == (timestamp + timedelta(hours=1))
+    assert with_last_scan.next_scan == next_scan
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)

@@ -375,7 +375,10 @@ async def test_delete_aws_account(
 
 @pytest.mark.asyncio
 async def test_store_last_run_info(
-    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService, workspace: Workspace
+    service: CloudAccountServiceImpl,
+    notification_service: InMemoryNotificationService,
+    workspace: Workspace,
+    next_run_repository: NextRunRepository,
 ) -> None:
     now_without_micros = now.replace(microsecond=0)
     account = await service.create_aws_account(
@@ -408,7 +411,7 @@ async def test_store_last_run_info(
 
     account = await service.get_cloud_account(cloud_account_id, workspace.id)
 
-    assert account.next_scan == now_without_micros
+    assert account.next_scan == await next_run_repository.get(workspace.id)
     assert account.account_id == account_id
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
@@ -417,7 +420,10 @@ async def test_store_last_run_info(
 
 @pytest.mark.asyncio
 async def test_store_last_run_info_on_error(
-    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService, workspace: Workspace
+    service: CloudAccountServiceImpl,
+    notification_service: InMemoryNotificationService,
+    workspace: Workspace,
+    next_run_repository: NextRunRepository,
 ) -> None:
     now_without_micros = now.replace(microsecond=0)
     account = await service.create_aws_account(
@@ -450,7 +456,7 @@ async def test_store_last_run_info_on_error(
 
     account = await service.get_cloud_account(cloud_account_id, workspace.id)
 
-    assert account.next_scan == now_without_micros
+    assert account.next_scan == await next_run_repository.get(workspace.id)
     assert account.account_id == account_id
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
