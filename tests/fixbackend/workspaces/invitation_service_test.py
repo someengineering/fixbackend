@@ -33,7 +33,6 @@ from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.invitation_service import (
     InvitationNotFound,
     InvitationService,
-    InvitationServiceImpl,
     NoFreeSeats,
 )
 from fixbackend.workspaces.repository import WorkspaceRepository
@@ -74,7 +73,7 @@ def service(
     domain_event_sender: InMemoryDomainEventPublisher,
     default_config: Config,
 ) -> InvitationService:
-    return InvitationServiceImpl(
+    return InvitationService(
         workspace_repository=workspace_repository,
         invitation_repository=invitation_repository,
         notification_service=notification_service,

@@ -11,7 +11,6 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
@@ -47,52 +46,6 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
 
 
-class CloudAccountRepository(ABC):
-    @abstractmethod
-    async def create(self, cloud_account: CloudAccount) -> CloudAccount:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_by_account_id(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> Optional[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None, non_deleted: Optional[bool] = None
-    ) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def count_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: bool = False, non_deleted: bool = False
-    ) -> int:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_all_discovered_accounts(self) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def delete(self, id: FixCloudAccountId) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
-        raise NotImplementedError
-
-
 async def get_next_scan(session: AsyncSession, workspace_id: WorkspaceId) -> Optional[datetime]:
 
     next_scan: Optional[datetime] = None
@@ -102,7 +55,7 @@ async def get_next_scan(session: AsyncSession, workspace_id: WorkspaceId) -> Opt
     return next_scan
 
 
-class CloudAccountRepositoryImpl(CloudAccountRepository):
+class CloudAccountRepository:
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
@@ -351,7 +304,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:
-    return CloudAccountRepositoryImpl(session_maker)
+    return CloudAccountRepository(session_maker)
 
 
 CloudAccountRepositoryDependency = Annotated[CloudAccountRepository, Depends(get_cloud_account_repository)]

@@ -13,9 +13,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Annotated, Dict, List, Optional, override
+from typing import Annotated, Dict, List, Optional
 import uuid
-from abc import ABC, abstractmethod
 
 from fastapi import Depends
 
@@ -59,35 +58,7 @@ class UserRoleAssignmentEntity(Base):
         )
 
 
-class RoleRepository(ABC):
-    @abstractmethod
-    async def list_roles(self, user_id: UserId) -> List[UserRole]:
-        pass
-
-    @abstractmethod
-    async def list_roles_by_workspace_id(self, workspace_id: WorkspaceId) -> List[UserRole]:
-        pass
-
-    @abstractmethod
-    async def add_roles(
-        self,
-        user_id: UserId,
-        workspace_id: WorkspaceId,
-        roles: Roles,
-        *,
-        session: Optional[AsyncSession] = None,
-        replace_existing: bool = False
-    ) -> UserRole:
-        pass
-
-    @abstractmethod
-    async def remove_roles(
-        self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
-    ) -> None:
-        pass
-
-
-class RoleRepositoryImpl(RoleRepository):
+class RoleRepository:
 
     def __init__(
         self, session_maker: AsyncSessionMaker, permissions_dict: Dict[Roles, WorkspacePermissions] | None = None
@@ -97,21 +68,18 @@ class RoleRepositoryImpl(RoleRepository):
             permissions_dict = roles_to_permissions
         self.roles_to_permissions = permissions_dict
 
-    @override
     async def list_roles(self, user_id: UserId) -> List[UserRole]:
         async with self.session_maker() as session:
             query = select(UserRoleAssignmentEntity).filter(UserRoleAssignmentEntity.user_id == user_id)
             results = await session.execute(query)
             return [elem.to_model() for elem in results.scalars().all()]
 
-    @override
     async def list_roles_by_workspace_id(self, workspace_id: WorkspaceId) -> List[UserRole]:
         async with self.session_maker() as session:
             query = select(UserRoleAssignmentEntity).filter(UserRoleAssignmentEntity.workspace_id == workspace_id)
             results = await session.execute(query)
             return [elem.to_model() for elem in results.scalars().all()]
 
-    @override
     async def add_roles(
         self,
         user_id: UserId,
@@ -161,7 +129,6 @@ class RoleRepositoryImpl(RoleRepository):
             async with self.session_maker() as session:
                 return await do_tx(session)
 
-    @override
     async def remove_roles(
         self, user_id: UserId, workspace_id: WorkspaceId, roles: Roles, *, session: Optional[AsyncSession] = None
     ) -> None:
@@ -195,7 +162,7 @@ class RoleRepositoryImpl(RoleRepository):
 
 
 def get_role_repository(fix: FixDependency) -> RoleRepository:
-    return fix.service(ServiceNames.role_repository, RoleRepositoryImpl)
+    return fix.service(ServiceNames.role_repository, RoleRepository)
 
 
 RoleRepositoryDependency = Annotated[RoleRepository, Depends(get_role_repository)]

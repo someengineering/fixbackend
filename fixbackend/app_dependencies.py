@@ -49,8 +49,8 @@ from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionC
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
-from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
+from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config
 from fixbackend.dependencies import FixDependencies
@@ -74,15 +74,15 @@ from fixbackend.notification.email.one_time_email import OneTimeEmailService
 from fixbackend.notification.email.scheduled_email import ScheduledEmailSender
 from fixbackend.notification.email.status_update_email_creator import StatusUpdateEmailCreator
 from fixbackend.notification.notification_service import NotificationService
-from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
-from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepository
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.sqlalechemy_extensions import EngineMetrics
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.stripe_subscription import create_stripe_service
 from fixbackend.subscription.subscription_repository import AwsTierPreferenceRepository, SubscriptionRepository
 from fixbackend.types import Redis
-from fixbackend.workspaces.invitation_repository import InvitationRepositoryImpl
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.invitation_repository import InvitationRepository
+from fixbackend.workspaces.repository import WorkspaceRepository
 from fixbackend.workspaces.trial_end_service import TrialEndService
 from fixbackend.workspaces.free_tier_deletion_service import FreeTierCleanupService
 
@@ -148,7 +148,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
         SN.domain_event_subscriber,
         DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
     )
-    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepository(session_maker))
     next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
     metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
     deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
@@ -177,11 +177,11 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
     subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
     user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
-    role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    role_repo = deps.add(SN.role_repository, RoleRepository(session_maker))
 
     workspace_repo = deps.add(
         SN.workspace_repo,
-        WorkspaceRepositoryImpl(
+        WorkspaceRepository(
             session_maker,
             graph_db_access,
             domain_event_publisher,
@@ -210,7 +210,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     invitation_repo = deps.add(
         SN.invitation_repository,
-        InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
+        InvitationRepository(session_maker, workspace_repo, user_repository=user_repo),
     )
     aws_tier_preference_repo = deps.add(SN.aws_tier_preference_repo, AwsTierPreferenceRepository(session_maker))
     deps.add(
@@ -274,9 +274,9 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
     )
     cloud_account_service = deps.add(
         SN.cloud_account_service,
-        CloudAccountServiceImpl(
+        CloudAccountService(
             workspace_repository=workspace_repo,
-            cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+            cloud_account_repository=CloudAccountRepository(session_maker),
             next_run_repository=next_run_repo,
             pubsub_publisher=cloud_accounts_redis_publisher,
             domain_event_publisher=domain_event_publisher,
@@ -291,7 +291,7 @@ async def application_dependencies(cfg: Config) -> FixDependencies:
             analytics_event_sender=analytics_event_sender,
         ),
     )
-    deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl(session_maker))
+    deps.add(SN.user_notification_settings_repository, UserNotificationSettingsRepository(session_maker))
 
     auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service, cfg))
     password_helper = deps.add(SN.password_helper, PasswordHelper())
@@ -349,7 +349,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
         DomainEventSubscriber(readwrite_redis, cfg, "dispatching"),
     )
     temp_store_redis = deps.add(SN.temp_store_redis, create_redis(cfg.redis_temp_store_url, cfg))
-    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepository(session_maker))
     next_run_repo = deps.add(SN.next_run_repo, NextRunRepository(session_maker))
     metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
     collect_queue = deps.add(SN.collect_queue, RedisCollectQueue(arq_redis))
@@ -365,11 +365,11 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     )
     domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
     subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
-    role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    role_repo = deps.add(SN.role_repository, RoleRepository(session_maker))
 
     workspace_repo = deps.add(
         SN.workspace_repo,
-        WorkspaceRepositoryImpl(
+        WorkspaceRepository(
             session_maker,
             graph_db_access,
             domain_event_publisher,
@@ -426,9 +426,9 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
     )
     cloud_account_service = deps.add(
         SN.cloud_account_service,
-        CloudAccountServiceImpl(
+        CloudAccountService(
             workspace_repository=workspace_repo,
-            cloud_account_repository=CloudAccountRepositoryImpl(session_maker),
+            cloud_account_repository=CloudAccountRepository(session_maker),
             next_run_repository=next_run_repo,
             pubsub_publisher=cloud_accounts_redis_publisher,
             domain_event_publisher=domain_event_publisher,
@@ -511,11 +511,11 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
     domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
     metering_repo = deps.add(SN.metering_repo, MeteringRepository(session_maker))
     subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
-    role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    role_repo = deps.add(SN.role_repository, RoleRepository(session_maker))
     user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
     workspace_repo = deps.add(
         SN.workspace_repo,
-        WorkspaceRepositoryImpl(
+        WorkspaceRepository(
             session_maker,
             graph_db_access,
             domain_event_publisher,
@@ -528,7 +528,7 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
             role_repo,
         ),
     )
-    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepository(session_maker))
     billing_entry_service = deps.add(
         SN.billing_entry_service,
         BillingEntryService(
@@ -575,7 +575,7 @@ async def billing_dependencies(cfg: Config) -> FixDependencies:
 async def support_dependencies(cfg: Config) -> FixDependencies:
     deps = await base_dependencies(cfg)
     session_maker = deps.session_maker
-    deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    deps.add(SN.role_repository, RoleRepository(session_maker))
     user_repo = deps.add(SN.user_repo, UserRepository(session_maker))
 
     graph_db_access = deps.add(SN.graph_db_access, GraphDatabaseAccessManager(cfg, session_maker))
@@ -591,10 +591,10 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     domain_event_publisher = deps.add(SN.domain_event_sender, DomainEventPublisherImpl(fixbackend_events))
     subscription_repo = deps.add(SN.subscription_repo, SubscriptionRepository(session_maker))
-    role_repo = deps.add(SN.role_repository, RoleRepositoryImpl(session_maker))
+    role_repo = deps.add(SN.role_repository, RoleRepository(session_maker))
     workspace_repo = deps.add(
         SN.workspace_repo,
-        WorkspaceRepositoryImpl(
+        WorkspaceRepository(
             session_maker,
             graph_db_access,
             domain_event_publisher,
@@ -618,7 +618,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
         SN.domain_event_subscriber,
         DomainEventSubscriber(readwrite_redis, cfg, "fixbackend"),
     )
-    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepositoryImpl(session_maker))
+    cloud_account_repo = deps.add(SN.cloud_account_repo, CloudAccountRepository(session_maker))
     http_client = deps.http_client
     inventory_client = deps.add(SN.inventory_client, InventoryClient(cfg.inventory_url, http_client))
     inventory_service = deps.add(
@@ -654,7 +654,7 @@ async def support_dependencies(cfg: Config) -> FixDependencies:
     )
     invitation_repo = deps.add(
         SN.invitation_repository,
-        InvitationRepositoryImpl(session_maker, workspace_repo, user_repository=user_repo),
+        InvitationRepository(session_maker, workspace_repo, user_repository=user_repo),
     )
     password_helper = deps.add(SN.password_helper, PasswordHelper())
     auth_email_sender = deps.add(SN.auth_email_sender, AuthEmailSender(notification_service, cfg))

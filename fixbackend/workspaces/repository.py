@@ -14,7 +14,6 @@
 
 import calendar
 import uuid
-from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Annotated, Optional, Sequence
 
@@ -45,96 +44,7 @@ from fixcloudutils.util import utc
 log = getLogger(__name__)
 
 
-class WorkspaceRepository(ABC):
-    @abstractmethod
-    async def create_workspace(self, name: str, slug: str, owner: User) -> Workspace:
-        """Create a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_workspace(
-        self, workspace_id: WorkspaceId, *, session: Optional[AsyncSession] = None
-    ) -> Optional[Workspace]:
-        """Get a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_workspaces(self, user: User, can_assign_subscriptions: bool = False) -> Sequence[Workspace]:
-        """List all workspaces where the user is a member."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_workspace(self, workspace_id: WorkspaceId, name: str, generate_external_id: bool) -> Workspace:
-        """Update a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def add_to_workspace(self, workspace_id: WorkspaceId, user_id: UserId, role: Roles) -> None:
-        """Add a user to a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def remove_from_workspace(self, workspace_id: WorkspaceId, user_id: UserId) -> None:
-        """Remove a user from a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_product_tier(self, workspace_id: WorkspaceId) -> ProductTier:
-        """Get the product tier of the workspace"""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_product_tier(
-        self, workspace_id: WorkspaceId, new_tier: ProductTier, *, session: Optional[AsyncSession] = None
-    ) -> Workspace:
-        """Update a workspace security tier."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_workspaces_by_subscription_id(self, subscription_id: SubscriptionId) -> Sequence[Workspace]:
-        """List all workspaces with the assigned subscription."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_subscription(
-        self,
-        workspace_id: WorkspaceId,
-        subscription_id: Optional[SubscriptionId],
-        *,
-        session: Optional[AsyncSession] = None,
-    ) -> Workspace:
-        """Assign a subscription to a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_payment_on_hold(self, workspace_id: WorkspaceId, on_hold_since: Optional[datetime]) -> Workspace:
-        """Set the payment on hold for a workspace."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_by_on_hold(self, before: datetime) -> Sequence[Workspace]:
-        """List all workspaces with the payment on hold marker before the given date."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_expired_trials(
-        self, been_in_trial_tier_for: timedelta, *, session: Optional[AsyncSession] = None
-    ) -> Sequence[Workspace]:
-        """List all workspaces which have been in trial for mor that provided time."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def ack_move_to_free(self, workspace_id: WorkspaceId, user_id: UserId) -> Workspace:
-        """Acknowledge that the workspace moved to free tier."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_overdue_free_tier_cleanup(self, been_in_free_tier_for: timedelta) -> Sequence[Workspace]:
-        """List all workspaces where the free tier cleanup is overdue."""
-        raise NotImplementedError
-
-
-class WorkspaceRepositoryImpl(WorkspaceRepository):
+class WorkspaceRepository:
     def __init__(
         self,
         session_maker: AsyncSessionMaker,
@@ -448,7 +358,7 @@ class WorkspaceRepositoryImpl(WorkspaceRepository):
 
 
 async def get_workspace_repository(fix: FixDependency) -> WorkspaceRepository:
-    return fix.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
+    return fix.service(ServiceNames.workspace_repo, WorkspaceRepository)
 
 
 WorkspaceRepositoryDependency = Annotated[WorkspaceRepository, Depends(get_workspace_repository)]

@@ -18,7 +18,7 @@ import pytest
 
 from fixbackend.auth.models import User
 from fixbackend.permissions.models import Roles
-from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.ids import WorkspaceId
 from fixbackend.workspaces.models import Workspace
 
@@ -28,7 +28,7 @@ from fixbackend.types import AsyncSessionMaker
 @pytest.mark.asyncio
 async def test_role_repository(async_session_maker: AsyncSessionMaker, user: User, workspace: Workspace) -> None:
 
-    role_repository = RoleRepositoryImpl(session_maker=async_session_maker)
+    role_repository = RoleRepository(session_maker=async_session_maker)
 
     workspace_id_2 = WorkspaceId(uuid.uuid4())
 
