@@ -367,7 +367,7 @@ class CloudAccountServiceImpl(CloudAccountService, Service):
                         set_cloud_account_id(collect_info.account_id)
 
                         def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if collect_info.scanned_resources < 50:
+                            if collect_info.scanned_resources <= 1:
                                 return acc.failed_scan_count + 1
                             else:
                                 return 0
