@@ -52,6 +52,7 @@ from fixbackend.config import Config, Free, ProductTierSettings
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events import DomainEventsStreamName
 from fixbackend.domain_events.events import (
+    CloudAccountCollectInfo,
     CloudAccountConfigured,
     CloudAccountDegraded,
     CloudAccountDeleted,
@@ -355,6 +356,12 @@ class CloudAccountService(Service):
             msg.pop("tenant_id", None)
             await self.pubsub_publisher.publish(kind=e.kind, message=msg, channel=f"tenant-events::{e.tenant_id}")
 
+        def compute_failed_scan_count(collect_info: CloudAccountCollectInfo, acc: CloudAccount) -> int:
+            if collect_info.scanned_resources <= self.config.account_failed_resource_count:
+                return acc.failed_scan_count + 1
+            else:
+                return 0
+
         async with asyncio.timeout(10):
             match context.kind:
                 case TenantAccountsCollected.kind:
@@ -370,12 +377,6 @@ class CloudAccountService(Service):
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
-                        def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if collect_info.scanned_resources <= self.config.account_failed_resource_count:
-                                return acc.failed_scan_count + 1
-                            else:
-                                return 0
-
                         updated = await self.cloud_account_repository.update(
                             account_id,
                             lambda acc: evolve(
@@ -384,7 +385,7 @@ class CloudAccountService(Service):
                                 last_scan_resources_scanned=collect_info.scanned_resources,
                                 last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
-                                failed_scan_count=compute_failed_scan_count(acc),
+                                failed_scan_count=compute_failed_scan_count(collect_info, acc),
                                 last_task_id=collect_info.task_id,
                             ),
                         )
@@ -427,12 +428,6 @@ class CloudAccountService(Service):
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
-                        def compute_failed_scan_count(acc: CloudAccount) -> int:
-                            if collect_info.scanned_resources < self.config.account_failed_resource_count:
-                                return acc.failed_scan_count + 1
-                            else:
-                                return 0
-
                         updated = await self.cloud_account_repository.update(
                             account_id,
                             lambda acc: evolve(
@@ -441,7 +436,7 @@ class CloudAccountService(Service):
                                 last_scan_resources_scanned=collect_info.scanned_resources,
                                 last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
-                                failed_scan_count=compute_failed_scan_count(acc),
+                                failed_scan_count=compute_failed_scan_count(collect_info, acc),
                                 last_task_id=collect_info.task_id,
                             ),
                         )
