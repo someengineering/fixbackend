@@ -194,6 +194,7 @@ class CloudAccountCollectInfo:
     duration_seconds: int
     started_at: datetime
     task_id: Optional[TaskId]
+    errors: List[str]
 
 
 @frozen
@@ -202,7 +203,21 @@ class TenantAccountsCollected(Event):
 
     tenant_id: WorkspaceId
     cloud_accounts: Dict[FixCloudAccountId, CloudAccountCollectInfo]
+    cloud_accounts_failed: Dict[FixCloudAccountId, CloudAccountCollectInfo]
     next_run: Optional[datetime]
+
+    # delete me after deploying this change to production
+    @classmethod
+    def from_json(cls: Type["TenantAccountsCollected"], json: Json) -> "TenantAccountsCollected":
+
+        if not json.get("cloud_accounts_failed"):
+            json["cloud_accounts_failed"] = {}
+
+        for cloud_account in json["cloud_accounts"].values():
+            if not cloud_account.get("errors"):
+                cloud_account["errors"] = []
+
+        return converter.structure(json, cls)
 
 
 @frozen

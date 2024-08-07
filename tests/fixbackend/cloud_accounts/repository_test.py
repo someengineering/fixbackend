@@ -92,6 +92,7 @@ async def test_create_aws_cloud_account(
             last_scan_started_at=None,
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
+            last_scan_resources_errors=0,
             next_scan=None,
             created_at=utc().replace(microsecond=0),
             updated_at=utc().replace(microsecond=0),
@@ -99,6 +100,7 @@ async def test_create_aws_cloud_account(
             cf_stack_version=0,
             failed_scan_count=configured_count * 42,  # only the last one has failed scans
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -229,6 +231,7 @@ async def test_create_gcp_cloud_account(
         last_scan_started_at=None,
         last_scan_duration_seconds=0,
         last_scan_resources_scanned=0,
+        last_scan_resources_errors=0,
         next_scan=None,
         created_at=utc().replace(microsecond=0),
         updated_at=utc().replace(microsecond=0),
@@ -236,6 +239,7 @@ async def test_create_gcp_cloud_account(
         cf_stack_version=0,
         failed_scan_count=0,  # only the last one has failed scans
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     # create
@@ -280,6 +284,7 @@ async def test_create_azure_cloud_account(
         last_scan_started_at=None,
         last_scan_duration_seconds=0,
         last_scan_resources_scanned=0,
+        last_scan_resources_errors=0,
         next_scan=None,
         created_at=utc().replace(microsecond=0),
         updated_at=utc().replace(microsecond=0),
@@ -287,6 +292,7 @@ async def test_create_azure_cloud_account(
         cf_stack_version=0,
         failed_scan_count=0,  # only the last one has failed scans
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     # create

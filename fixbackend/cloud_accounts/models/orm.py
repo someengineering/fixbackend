@@ -12,33 +12,38 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import uuid
-
+from datetime import datetime
 from typing import Optional
 
+from cattrs import Converter
 from fastapi_users_db_sqlalchemy.generics import GUID
-from fixbackend.sqlalechemy_extensions import UTCDateTime
-from sqlalchemy import ForeignKey, String, UniqueConstraint, Boolean, Integer
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
 
 from fixbackend.base_model import Base
 from fixbackend.cloud_accounts import models
 from fixbackend.ids import (
-    AzureSubscriptionCredentialsId,
-    GcpServiceAccountKeyId,
-    TaskId,
-    WorkspaceId,
-    FixCloudAccountId,
-    ExternalId,
-    CloudAccountId,
     AwsRoleName,
+    AzureSubscriptionCredentialsId,
+    CloudAccountAlias,
+    CloudAccountId,
+    CloudAccountName,
     CloudName,
     CloudNames,
-    CloudAccountName,
-    CloudAccountAlias,
+    ExternalId,
+    FixCloudAccountId,
+    GcpServiceAccountKeyId,
+    TaskId,
     UserCloudAccountName,
+    WorkspaceId,
 )
+from fixbackend.sqlalechemy_extensions import UTCDateTime
+
+converter = Converter()
+
+log = logging.getLogger(__name__)
 
 
 class CloudAccount(Base):
@@ -63,6 +68,7 @@ class CloudAccount(Base):
     last_scan_duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_scan_started_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     last_scan_resources_scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_scan_resources_errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     state_updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
@@ -71,6 +77,7 @@ class CloudAccount(Base):
     scan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     failed_scan_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_task_id: Mapped[Optional[TaskId]] = mapped_column(String(length=64), nullable=True)
+    last_degraded_scan_started_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     __table_args__ = (UniqueConstraint("tenant_id", "account_id"),)
     __mapper_args__ = {"version_id_col": version_id}  # for optimistic locking
@@ -138,10 +145,12 @@ class CloudAccount(Base):
             last_scan_duration_seconds=self.last_scan_duration_seconds,
             last_scan_started_at=self.last_scan_started_at,
             last_scan_resources_scanned=self.last_scan_resources_scanned,
+            last_scan_resources_errors=self.last_scan_resources_errors,
             created_at=self.created_at,
             updated_at=self.updated_at,
             state_updated_at=self.state_updated_at,
             cf_stack_version=self.cf_stack_version,
             failed_scan_count=self.failed_scan_count,
             last_task_id=self.last_task_id,
+            last_degraded_scan_started_at=self.last_degraded_scan_started_at,
         )

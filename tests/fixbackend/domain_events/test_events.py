@@ -38,7 +38,7 @@ fix_cloud_account_id = FixCloudAccountId(uid())
 workspace_id = WorkspaceId(uid())
 now = utc()
 task_id = TaskId("task_123")
-collect_info = CloudAccountCollectInfo(cloud_account_id, 123, 123, now, task_id)
+collect_info = CloudAccountCollectInfo(cloud_account_id, 123, 123, now, task_id, ["some error"])
 events = [
     UserRegistered(user_id=user_id, email="test@example.com", tenant_id=workspace_id),
     CloudAccountDiscovered(
@@ -67,7 +67,10 @@ events = [
         reason=DegradationReason.other,
     ),
     TenantAccountsCollected(
-        tenant_id=workspace_id, cloud_accounts={fix_cloud_account_id: collect_info}, next_run=now + timedelta(hours=1)
+        tenant_id=workspace_id,
+        cloud_accounts={fix_cloud_account_id: collect_info},
+        cloud_accounts_failed={fix_cloud_account_id: collect_info},
+        next_run=now + timedelta(hours=1),
     ),
     WorkspaceCreated(workspace_id=workspace_id, name="name", slug="slug", user_id=user_id),
 ]

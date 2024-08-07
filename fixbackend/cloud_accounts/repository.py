@@ -217,6 +217,8 @@ class CloudAccountRepository:
                 stored_account.cf_stack_version = cloud_account.cf_stack_version
                 stored_account.failed_scan_count = cloud_account.failed_scan_count
                 stored_account.last_task_id = cloud_account.last_task_id
+                stored_account.last_scan_resources_errors = cloud_account.last_scan_resources_errors
+
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
                 await session.commit()

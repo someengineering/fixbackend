@@ -356,11 +356,14 @@ class CloudAccountService(Service):
             msg.pop("tenant_id", None)
             await self.pubsub_publisher.publish(kind=e.kind, message=msg, channel=f"tenant-events::{e.tenant_id}")
 
-        def compute_failed_scan_count(collect_info: CloudAccountCollectInfo, acc: CloudAccount) -> int:
+        def compute_failed_scan_count(collect_info: CloudAccountCollectInfo, acc: CloudAccount, failed: bool) -> int:
+            if failed:
+                return acc.failed_scan_count + 1
+
             if collect_info.scanned_resources <= self.config.account_failed_resource_count:
                 return acc.failed_scan_count + 1
-            else:
-                return 0
+
+            return 0
 
         async with asyncio.timeout(10):
             match context.kind:
@@ -385,8 +388,9 @@ class CloudAccountService(Service):
                                 last_scan_resources_scanned=collect_info.scanned_resources,
                                 last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
-                                failed_scan_count=compute_failed_scan_count(collect_info, acc),
+                                failed_scan_count=compute_failed_scan_count(collect_info, acc, failed=False),
                                 last_task_id=collect_info.task_id,
+                                last_scan_resources_errors=len(collect_info.errors),
                             ),
                         )
 
@@ -424,7 +428,7 @@ class CloudAccountService(Service):
                 case TenantAccountsCollectFailed.kind:
                     event = TenantAccountsCollected.from_json(message)
                     set_workspace_id(event.tenant_id)
-                    for account_id, collect_info in event.cloud_accounts.items():
+                    for account_id, collect_info in (event.cloud_accounts | event.cloud_accounts_failed).items():
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
@@ -436,8 +440,9 @@ class CloudAccountService(Service):
                                 last_scan_resources_scanned=collect_info.scanned_resources,
                                 last_scan_started_at=collect_info.started_at,
                                 next_scan=event.next_run,
-                                failed_scan_count=compute_failed_scan_count(collect_info, acc),
+                                failed_scan_count=compute_failed_scan_count(collect_info, acc, failed=True),
                                 last_task_id=collect_info.task_id,
+                                last_scan_resources_errors=len(collect_info.errors),
                             ),
                         )
 
@@ -779,12 +784,14 @@ class CloudAccountService(Service):
                 last_scan_duration_seconds=0,
                 last_scan_resources_scanned=0,
                 last_scan_started_at=None,
+                last_scan_resources_errors=0,
                 created_at=created_at,
                 updated_at=created_at,
                 state_updated_at=created_at,
                 cf_stack_version=0,
                 failed_scan_count=0,
                 last_task_id=None,
+                last_degraded_scan_started_at=None,
             )
             # create new account
             result = await self.cloud_account_repository.create(account)
@@ -844,12 +851,14 @@ class CloudAccountService(Service):
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
             last_scan_started_at=None,
+            last_scan_resources_errors=0,
             created_at=created_at,
             updated_at=created_at,
             state_updated_at=created_at,
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
 
         result = await self.cloud_account_repository.create(account)
@@ -907,12 +916,14 @@ class CloudAccountService(Service):
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
             last_scan_started_at=None,
+            last_scan_resources_errors=0,
             created_at=created_at,
             updated_at=created_at,
             state_updated_at=created_at,
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
 
         result = await self.cloud_account_repository.create(account)

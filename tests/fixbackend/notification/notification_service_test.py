@@ -206,7 +206,8 @@ async def test_send_alert(
     await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={aws_cis_2_0: setting}))
     event = TenantAccountsCollected(
         graph_db_access.workspace_id,
-        {FixCloudAccountId(uid()): CloudAccountCollectInfo(CloudAccountId("12345"), 123, 123, utc(), TaskId("1"))},
+        {FixCloudAccountId(uid()): CloudAccountCollectInfo(CloudAccountId("12345"), 123, 123, utc(), TaskId("1"), [])},
+        {},
         None,
     )
 
