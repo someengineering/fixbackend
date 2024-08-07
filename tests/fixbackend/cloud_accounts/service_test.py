@@ -852,19 +852,24 @@ async def test_enable_disable_cloud_account(
 
     await cloud_account_repository.delete(new_account.id)
 
-    # does not work for degraded accounts
+    # does work for degraded accounts
 
-    updated_account = await cloud_account_repository.update(
+    await cloud_account_repository.update(
         account.id,
         lambda account: evolve(
             account,
-            state=CloudAccountStates.Degraded(AwsCloudAccess(workspace.external_id, role_name), error="test error"),
+            state=CloudAccountStates.Degraded(
+                AwsCloudAccess(workspace.external_id, role_name), False, False, error="test error"
+            ),
             privileged=False,
         ),
     )
 
-    with pytest.raises(Exception):
-        await service.update_cloud_account_enabled(workspace.id, account.id, enabled=True)
+    await service.update_cloud_account_enabled(workspace.id, account.id, enabled=True)
+    enabled_degraded = await cloud_account_repository.get(account.id)
+    assert enabled_degraded
+    assert isinstance(enabled_degraded.state, CloudAccountStates.Degraded)
+    assert enabled_degraded.state.enabled is True
 
     # wrong tenant id
     with pytest.raises(Exception):

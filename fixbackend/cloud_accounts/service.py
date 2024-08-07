@@ -1021,16 +1021,23 @@ class CloudAccountService(Service):
             workspace_id=workspace_id, ready_for_collection=True
         )
 
+        def validate_tier_restrictions(enabled: bool, workspace: Workspace, accounts_count: int) -> None:
+            if enabled:
+                if limit := ProductTierSettings[workspace.current_product_tier()].account_limit:
+                    if accounts_count >= limit:
+                        raise NotAllowed("Account limit reached")
+                if workspace.payment_on_hold_since:
+                    raise NotAllowed("Payment on hold")
+
         def update_state(cloud_account: CloudAccount, workspace: Workspace) -> CloudAccount:
             match cloud_account.state:
                 case CloudAccountStates.Configured(access, _, scan):
-                    if enabled:
-                        if limit := ProductTierSettings[workspace.current_product_tier()].account_limit:
-                            if accounts_count >= limit:
-                                raise NotAllowed("Account limit reached")
-                        if workspace.payment_on_hold_since:
-                            raise NotAllowed("Payment on hold")
+                    validate_tier_restrictions(enabled, workspace, accounts_count)
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
+
+                case CloudAccountStates.Degraded():
+                    validate_tier_restrictions(enabled, workspace, accounts_count)
+                    return evolve(cloud_account, state=evolve(cloud_account.state, enabled=enabled))
                 case _:  # pragma: no cover
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
@@ -1092,11 +1099,23 @@ class CloudAccountService(Service):
         self, account_id: FixCloudAccountId, error: str, reason: DegradationReason
     ) -> CloudAccount:
         def set_degraded(cloud_account: CloudAccount) -> CloudAccount:
+            enabled = False
+            scan = False
+            match cloud_account.state:
+                case CloudAccountStates.Discovered(_, e):
+                    enabled = e
+                case CloudAccountStates.Configured(_, e, s):
+                    enabled = e
+                    scan = s
+                case CloudAccountStates.Degraded(_, e, s, _):
+                    enabled = e
+                    scan = s
+
             if access := cloud_account.state.cloud_access():
                 return evolve(
                     cloud_account,
                     next_scan=None,
-                    state=CloudAccountStates.Degraded(access, error),
+                    state=CloudAccountStates.Degraded(access, enabled=enabled, scan=scan, error=error),
                     state_updated_at=utc(),
                 )
             else:

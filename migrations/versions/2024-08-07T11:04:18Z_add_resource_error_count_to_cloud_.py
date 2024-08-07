@@ -21,7 +21,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("cloud_account", sa.Column("last_scan_resources_errors", sa.Integer(), nullable=False))
+    op.add_column(
+        "cloud_account", sa.Column("last_scan_resources_errors", sa.Integer(), nullable=False, server_default="0")
+    )
     op.add_column(
         "cloud_account", sa.Column("last_degraded_scan_started_at", UTCDateTime(timezone=True), nullable=True)
     )

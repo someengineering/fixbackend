@@ -241,6 +241,7 @@ def default_config() -> Config:
         azure_client_secret="",
         azure_tenant_id="",
         account_failed_resource_count=1,
+        degraded_accounts_ping_interval_hours=24,
     )
 
 
@@ -851,6 +852,7 @@ async def dispatcher(
     gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
     azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     redis: Redis,
+    default_config: Config,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -865,6 +867,7 @@ async def dispatcher(
         workspace_repository,
         gcp_service_account_key_repo,
         azure_subscription_credentials_repo,
+        default_config,
     )
 
 

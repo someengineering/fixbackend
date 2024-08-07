@@ -472,6 +472,7 @@ async def dispatcher_dependencies(cfg: Config) -> FixDependencies:
             workspace_repo,
             gcp_account_repo,
             azure_subscription_credentals_repo,
+            cfg,
         ),
     )
     deps.add(

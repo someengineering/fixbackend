@@ -147,6 +147,8 @@ class CloudAccountStates:
 
         state_name: ClassVar[str] = "degraded"
         access: CloudAccess
+        enabled: bool  # is enabled for collection
+        scan: bool  # is enabled for security scanning
         error: str
 
         def cloud_access(self) -> Optional[CloudAccess]:
