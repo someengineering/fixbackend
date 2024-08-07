@@ -57,6 +57,7 @@ async def test_create_aws_cloud_account(
     cloud_account_repository = CloudAccountRepository(session_maker=async_session_maker)
     org = await workspace_repository.create_workspace("foo", "foo", user)
     workspace_id = org.id
+    now = utc()
 
     cloud_access = AwsCloudAccess(
         role_name=AwsRoleName("foo"),
@@ -69,7 +70,7 @@ async def test_create_aws_cloud_account(
         CloudAccountStates.Discovered(cloud_access, enabled=False),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
         CloudAccountStates.Configured(cloud_access, enabled=True, scan=True),
-        CloudAccountStates.Degraded(cloud_access, error="test error"),
+        CloudAccountStates.Degraded(cloud_access, enabled=True, scan=True, error="test error"),
         CloudAccountStates.Deleted(),
     ]
 
@@ -100,7 +101,7 @@ async def test_create_aws_cloud_account(
             cf_stack_version=0,
             failed_scan_count=configured_count * 42,  # only the last one has failed scans
             last_task_id=None,
-            last_degraded_scan_started_at=None,
+            last_degraded_scan_started_at=now,
         )
 
         if isinstance(account_state, CloudAccountStates.Configured):
@@ -160,6 +161,16 @@ async def test_create_aws_cloud_account(
     await next_run_repository.update_next_run_at(workspace_id, utc() + timedelta(hours=1))
     assert await cloud_account_repository.list_non_hourly_failed_scans_accounts(now=utc()) == []
     next_scan = await next_run_repository.get(workspace_id)
+
+    degraded_to_be_pinged = await cloud_account_repository.list_degraded_for_ping(
+        workspace_id, last_ping_before=now + timedelta(hours=1)
+    )
+    assert len(degraded_to_be_pinged) == 1
+
+    degraded_but_too_recent = await cloud_account_repository.list_degraded_for_ping(
+        workspace_id, last_ping_before=now - timedelta(hours=1)
+    )
+    assert len(degraded_but_too_recent) == 0
 
     # update
     def update_account(account: CloudAccount) -> CloudAccount:

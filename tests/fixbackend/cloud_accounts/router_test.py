@@ -407,7 +407,8 @@ async def test_list_cloud_accounts(client: AsyncClient, workspace: Workspace) ->
         CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), enabled=True),
     )
     recent_degraded = add_account(
-        utc() - timedelta(minutes=3), CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), "foo")
+        utc() - timedelta(minutes=3),
+        CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), True, True, "foo"),
     )
 
     response = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts")
