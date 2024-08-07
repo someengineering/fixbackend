@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fixcloudutils.util import utc
@@ -100,8 +100,10 @@ class CloudAccountRepository:
                 enabled = ex_enabled
                 state = CloudAccountStates.Configured.state_name
 
-            case CloudAccountStates.Degraded(access, error):
+            case CloudAccountStates.Degraded(access, ex_enabled, ex_scan, error):
                 update_cloud_access_fields(access)
+                enabled = ex_enabled
+                scan = ex_scan
                 error = error
                 state = CloudAccountStates.Degraded.state_name
 
@@ -145,6 +147,7 @@ class CloudAccountRepository:
                 state_updated_at=cloud_account.state_updated_at,
                 cf_stack_version=cloud_account.cf_stack_version,
                 failed_scan_count=cloud_account.failed_scan_count,
+                last_degraded_scan_started_at=cloud_account.last_degraded_scan_started_at,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
@@ -298,6 +301,25 @@ class CloudAccountRepository:
                 .where(orm.CloudAccount.state == CloudAccountStates.Configured.state_name)
                 .where(orm.CloudAccount.failed_scan_count > 0)
                 .where(NextTenantRun.at > two_hours_from_now)
+            )
+
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model(None) for acc in accounts]
+
+    async def list_degraded_for_ping(self, workspace: WorkspaceId, last_ping_before: datetime) -> List[CloudAccount]:
+        async with self.session_maker() as session:
+
+            statement = (
+                select(orm.CloudAccount)
+                .where(orm.CloudAccount.enabled.is_(True))
+                .where(orm.CloudAccount.state == CloudAccountStates.Degraded.state_name)
+                .where(
+                    or_(
+                        orm.CloudAccount.last_degraded_scan_started_at == None,  # noqa
+                        orm.CloudAccount.last_degraded_scan_started_at < last_ping_before,
+                    )
+                )
             )
 
             results = await session.execute(statement)
