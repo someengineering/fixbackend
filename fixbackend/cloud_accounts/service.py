@@ -376,7 +376,7 @@ class CloudAccountService(Service):
                     first_account_collect = any(account.last_scan_started_at is None for account in collected_accounts)
 
                     set_workspace_id(event.tenant_id)
-                    for account_id, collect_info in event.cloud_accounts.items():
+                    for account_id, collect_info in (event.cloud_accounts | event.cloud_accounts_failed).items():
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
@@ -426,9 +426,9 @@ class CloudAccountService(Service):
                     )
 
                 case TenantAccountsCollectFailed.kind:
-                    event = TenantAccountsCollected.from_json(message)
+                    event = TenantAccountsCollectFailed.from_json(message)
                     set_workspace_id(event.tenant_id)
-                    for account_id, collect_info in (event.cloud_accounts | event.cloud_accounts_failed).items():
+                    for account_id, collect_info in event.cloud_accounts.items():
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
