@@ -12,12 +12,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import logging
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from cattrs import Converter
 from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,10 +38,6 @@ from fixbackend.ids import (
     WorkspaceId,
 )
 from fixbackend.sqlalechemy_extensions import UTCDateTime
-
-converter = Converter()
-
-log = logging.getLogger(__name__)
 
 
 class CloudAccount(Base):
