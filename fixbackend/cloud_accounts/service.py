@@ -426,9 +426,9 @@ class CloudAccountService(Service):
                     )
 
                 case TenantAccountsCollectFailed.kind:
-                    event = TenantAccountsCollectFailed.from_json(message)
-                    set_workspace_id(event.tenant_id)
-                    for account_id, collect_info in event.cloud_accounts.items():
+                    failed_event = TenantAccountsCollectFailed.from_json(message)
+                    set_workspace_id(failed_event.tenant_id)
+                    for account_id, collect_info in failed_event.cloud_accounts.items():
                         set_fix_cloud_account_id(account_id)
                         set_cloud_account_id(collect_info.account_id)
 
@@ -439,7 +439,7 @@ class CloudAccountService(Service):
                                 last_scan_duration_seconds=collect_info.duration_seconds,
                                 last_scan_resources_scanned=collect_info.scanned_resources,
                                 last_scan_started_at=collect_info.started_at,
-                                next_scan=event.next_run,
+                                next_scan=failed_event.next_run,
                                 failed_scan_count=compute_failed_scan_count(collect_info, acc, failed=True),
                                 last_task_id=collect_info.task_id,
                                 last_scan_resources_errors=len(collect_info.errors),
