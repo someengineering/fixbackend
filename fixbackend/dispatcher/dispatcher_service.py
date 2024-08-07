@@ -165,6 +165,7 @@ class CollectAccountProgress:
         nr_of_resources_collected: int,
         scan_duration_seconds: int,
         task_id: TaskId,
+        error_messages: List[str],
     ) -> CollectState:
         hash_key = self._collect_progress_hash_key(workspace_id)
 
@@ -173,7 +174,10 @@ class CollectAccountProgress:
         if cloud_account_id not in collect_state:
             raise Exception(f"Could not find collect job context for accound id {cloud_account_id}")
         collect_progress_done = collect_state[cloud_account_id].done(
-            scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds, task_id=task_id
+            scanned_resources=nr_of_resources_collected,
+            scan_duration=scan_duration_seconds,
+            task_id=task_id,
+            resource_errors=error_messages,
         )
         await self.redis.hset(hash_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str())
         return collect_state | {cloud_account_id: collect_progress_done}
@@ -274,10 +278,7 @@ class DispatcherService(Service):
             case _:
                 log.info(f"Collect messages: will ignore messages of kind {context.kind}")
 
-    async def complete_collect_job(
-        self,
-        workspace_id: WorkspaceId,
-    ) -> None:
+    async def complete_collect_job(self, workspace_id: WorkspaceId) -> None:
         async def send_domain_event(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> None:
             collected_success = {
                 k: CloudAccountCollectInfo(
@@ -286,6 +287,7 @@ class DispatcherService(Service):
                     v.collection_done.duration_seconds,
                     v.started_at,
                     v.collection_done.task_id,
+                    v.collection_done.resource_errors,
                 )
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionSuccess)
@@ -298,6 +300,7 @@ class DispatcherService(Service):
                     v.collection_done.duration_seconds,
                     v.started_at,
                     v.collection_done.task_id,
+                    [v.collection_done.error],
                 )
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionFailure)
@@ -306,7 +309,7 @@ class DispatcherService(Service):
             next_run = await self.next_run_repo.get(workspace_id)
 
             if len(collected_success) > 0:
-                event: Event = TenantAccountsCollected(workspace_id, collected_success, next_run)
+                event: Event = TenantAccountsCollected(workspace_id, collected_success, collected_failed, next_run)
                 await self.domain_event_sender.publish(event)
             elif len(collected_failed) > 0:
                 event = TenantAccountsCollectFailed(workspace_id, collected_failed, next_run)
@@ -399,6 +402,7 @@ class DispatcherService(Service):
                 sum(r.nr_of_resources_collected for r in records),
                 duration,
                 TaskId(task_id),
+                messages,
             )
 
         error: Optional[str] = message.get("error")

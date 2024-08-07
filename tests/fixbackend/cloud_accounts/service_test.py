@@ -391,9 +391,12 @@ async def test_store_last_run_info(
 
     cloud_account_id = account.id
     event = TenantAccountsCollected(
-        workspace.id,
-        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
-        now_without_micros,
+        tenant_id=workspace.id,
+        cloud_accounts={
+            cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id, ["message"])
+        },
+        cloud_accounts_failed={},
+        next_run=now_without_micros,
     )
     await service.process_domain_event(
         event.to_json(),
@@ -416,6 +419,8 @@ async def test_store_last_run_info(
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
+    assert account.failed_scan_count == 0
+    assert account.last_scan_resources_errors == 1
 
 
 @pytest.mark.asyncio
@@ -434,25 +439,27 @@ async def test_store_last_run_info_on_error(
         account_name=None,
     )
 
+    assert account.last_scan_resources_errors == 0
+    assert account.failed_scan_count == 0
+
     cloud_account_id = account.id
     event = TenantAccountsCollectFailed(
         workspace.id,
-        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
+        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id, ["error"])},
         now_without_micros,
     )
     await service.process_domain_event(
         event.to_json(),
         MessageContext(
             id="test",
-            kind=TenantAccountsCollected.kind,
+            kind=TenantAccountsCollectFailed.kind,
             publisher="test",
             sent_at=now_without_micros,
             received_at=now_without_micros,
         ),
     )
 
-    assert len(notification_service.notified_workspaces) == 1
-    assert notification_service.notified_workspaces[0] == workspace.id
+    assert len(notification_service.notified_workspaces) == 0
 
     account = await service.get_cloud_account(cloud_account_id, workspace.id)
 
@@ -462,6 +469,8 @@ async def test_store_last_run_info_on_error(
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
     assert account.last_task_id
+    assert account.last_scan_resources_errors == 1
+    assert account.failed_scan_count == 1
 
 
 @pytest.mark.asyncio
@@ -892,6 +901,7 @@ async def test_configure_account(
             last_scan_duration_seconds=10,
             last_scan_resources_scanned=100,
             last_scan_started_at=utc(),
+            last_scan_resources_errors=0,
             next_scan=utc(),
             created_at=utc(),
             updated_at=utc(),
@@ -899,6 +909,7 @@ async def test_configure_account(
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
 
     # fresh account should be retried
@@ -1042,9 +1053,10 @@ async def test_move_to_degraded(
             workspace.id,
             {
                 cloud_account_id: CloudAccountCollectInfo(
-                    account_id, scanned_resources=0, duration_seconds=10, started_at=now, task_id=task_id
+                    account_id, scanned_resources=0, duration_seconds=10, started_at=now, task_id=task_id, errors=[]
                 )
             },
+            {},
             now,
         )
         await service.process_domain_event(

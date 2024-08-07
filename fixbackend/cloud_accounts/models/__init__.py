@@ -176,12 +176,14 @@ class CloudAccount:
     last_scan_duration_seconds: int
     last_scan_started_at: Optional[datetime]
     last_scan_resources_scanned: int
+    last_scan_resources_errors: int
     created_at: datetime
     updated_at: datetime
     state_updated_at: datetime
     cf_stack_version: Optional[int]
     failed_scan_count: int
     last_task_id: Optional[TaskId]
+    last_degraded_scan_started_at: Optional[datetime]
 
     def aws_access(self) -> Optional[AwsCloudAccess]:
         if isinstance(access := self.state.cloud_access(), AwsCloudAccess):
