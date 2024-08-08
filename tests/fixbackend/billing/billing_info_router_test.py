@@ -35,7 +35,7 @@ from fixbackend.subscription.subscription_repository import SubscriptionReposito
 from fixbackend.utils import uid
 from fixbackend.workspaces.dependencies import get_user_workspace
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl, get_workspace_repository
+from fixbackend.workspaces.repository import WorkspaceRepository, get_workspace_repository
 
 external_id = ExternalId(uuid.uuid4())
 workspace_id = WorkspaceId(uuid.uuid4())
@@ -102,7 +102,7 @@ class SubscriptionRepositoryMock(SubscriptionRepository):
         return subscription_id == sub_id
 
 
-class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
+class WorkspaceRepositoryMock(WorkspaceRepository):
     def __init__(self) -> None:
         pass
 
@@ -126,9 +126,9 @@ class WorkspaceRepositoryMock(WorkspaceRepositoryImpl):
 
     @override
     async def update_product_tier(
-        self, workspace_id: WorkspaceId, tier: ProductTier, *, session: AsyncSession | None = None
+        self, workspace_id: WorkspaceId, new_tier: ProductTier, *, session: AsyncSession | None = None
     ) -> Workspace:
-        return evolve(workspace, selected_product_tier=tier)
+        return evolve(workspace, selected_product_tier=new_tier)
 
     @override
     async def update_subscription(

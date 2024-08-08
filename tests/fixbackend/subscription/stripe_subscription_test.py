@@ -22,7 +22,7 @@ from fixbackend.subscription.models import StripeSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl
 from fixbackend.utils import uid
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import (
     stripe_customer_id,
     stripe_payment_intent_id,
@@ -67,7 +67,7 @@ async def test_redirect_to_stripe(stripe_service: StripeServiceImpl, workspace: 
 
 
 async def test_redirect_to_stripe_with_product_tier(
-    stripe_service: StripeServiceImpl, workspace: Workspace, workspace_repository: WorkspaceRepositoryImpl
+    stripe_service: StripeServiceImpl, workspace: Workspace, workspace_repository: WorkspaceRepository
 ) -> None:
     # new customers need to enter payment data
     assert await stripe_service.stripe_customer_repo.get(workspace.id) is None

@@ -55,6 +55,7 @@ from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
 from fixbackend.workspaces.router import workspaces_router
 from prometheus_client import Counter
+from fastapi_users.exceptions import FastAPIUsersException
 
 
 log = logging.getLogger(__name__)
@@ -201,6 +202,10 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     async def invalid_data(_: Request, exception: AssertionError) -> Response:
         return JSONResponse({"detail": str(exception)}, status_code=422)
 
+    @app.exception_handler(FastAPIUsersException)
+    async def fastapi_users_handler(_: Request, exception: FastAPIUsersException) -> Response:
+        return JSONResponse(status_code=400, content={"message": "invalid user"})
+
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
             "/health",
@@ -283,7 +288,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
         api_router.include_router(cloud_accounts_router(deps), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces")
         api_router.include_router(websocket_router(cfg), prefix="/workspaces", tags=["events"])
-        api_router.include_router(cloud_accounts_callback_router(), prefix="/cloud", tags=["cloud_accounts"])
+        api_router.include_router(cloud_accounts_callback_router(deps), prefix="/cloud", tags=["cloud_accounts"])
         api_router.include_router(users_router(), prefix="/users", tags=["users"])
         api_router.include_router(subscription_router(deps), tags=["billing"])
         api_router.include_router(billing_info_router(cfg), prefix="/workspaces", tags=["billing"])

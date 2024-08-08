@@ -11,13 +11,13 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Annotated, Callable, List, Optional
 
 from fastapi import Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.ext.asyncio import AsyncSession
 from fixcloudutils.util import utc
 
 from fixbackend.cloud_accounts.models import (
@@ -46,53 +46,16 @@ from fixbackend.types import AsyncSessionMaker
 from fixbackend.dispatcher.next_run_repository import NextTenantRun
 
 
-class CloudAccountRepository(ABC):
-    @abstractmethod
-    async def create(self, cloud_account: CloudAccount) -> CloudAccount:
-        raise NotImplementedError
+async def get_next_scan(session: AsyncSession, workspace_id: WorkspaceId) -> Optional[datetime]:
 
-    @abstractmethod
-    async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
-        raise NotImplementedError
+    next_scan: Optional[datetime] = None
+    if next_run := await session.get(NextTenantRun, workspace_id):
+        next_scan = next_run.at
 
-    @abstractmethod
-    async def get_by_account_id(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> Optional[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: Optional[bool] = None, non_deleted: Optional[bool] = None
-    ) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def count_by_workspace_id(
-        self, workspace_id: WorkspaceId, ready_for_collection: bool = False, non_deleted: bool = False
-    ) -> int:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_all_discovered_accounts(self) -> List[CloudAccount]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def delete(self, id: FixCloudAccountId) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def list_non_hourly_failed_scans_accounts(self, now: datetime) -> List[CloudAccount]:
-        raise NotImplementedError
+    return next_scan
 
 
-class CloudAccountRepositoryImpl(CloudAccountRepository):
+class CloudAccountRepository:
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
@@ -137,8 +100,10 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 enabled = ex_enabled
                 state = CloudAccountStates.Configured.state_name
 
-            case CloudAccountStates.Degraded(access, error):
+            case CloudAccountStates.Degraded(access, ex_enabled, ex_scan, error):
                 update_cloud_access_fields(access)
+                enabled = ex_enabled
+                scan = ex_scan
                 error = error
                 state = CloudAccountStates.Degraded.state_name
 
@@ -165,6 +130,8 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             if cloud_account.cloud not in [CloudNames.AWS, CloudNames.GCP, CloudNames.Azure]:
                 raise ValueError(f"Unknown cloud {cloud_account.cloud}")
 
+            next_scan = await get_next_scan(session, cloud_account.workspace_id)
+
             orm_cloud_account = orm.CloudAccount(
                 id=cloud_account.id,
                 tenant_id=cloud_account.workspace_id,
@@ -180,18 +147,23 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 state_updated_at=cloud_account.state_updated_at,
                 cf_stack_version=cloud_account.cf_stack_version,
                 failed_scan_count=cloud_account.failed_scan_count,
+                last_degraded_scan_started_at=cloud_account.last_degraded_scan_started_at,
             )
             self._update_state_dependent_fields(orm_cloud_account, cloud_account.state)
             session.add(orm_cloud_account)
             await session.commit()
             await session.refresh(orm_cloud_account)
-            return orm_cloud_account.to_model()
+            return orm_cloud_account.to_model(next_scan=next_scan)
 
     async def get(self, id: FixCloudAccountId) -> Optional[CloudAccount]:
         """Get a single cloud account by id."""
         async with self.session_maker() as session:
+
             cloud_account = await session.get(orm.CloudAccount, id)
-            return cloud_account.to_model() if cloud_account else None
+            if cloud_account is None:
+                return None
+            next_scan = await get_next_scan(session, cloud_account.tenant_id)
+            return cloud_account.to_model(next_scan)
 
     async def get_by_account_id(self, workspace_id: WorkspaceId, account_id: CloudAccountId) -> Optional[CloudAccount]:
         """Get a single cloud account by account id."""
@@ -203,7 +175,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             )
             results = await session.execute(statement)
             cloud_account = results.scalars().first()
-            return cloud_account.to_model() if cloud_account else None
+            if cloud_account is None:
+                return None
+
+            next_scan = await get_next_scan(session, workspace_id)
+            return cloud_account.to_model(next_scan)
 
     async def list(self, ids: List[FixCloudAccountId]) -> List[CloudAccount]:
         """Get a list of cloud accounts by ids."""
@@ -211,7 +187,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             statement = select(orm.CloudAccount).where(orm.CloudAccount.id.in_(ids))
             results = await session.execute(statement)
             accounts = results.scalars().all()
-            return [acc.to_model() for acc in accounts]
+            return [acc.to_model(None) for acc in accounts]  # not a public API, so we don't need to pass next_scan
 
     async def update(self, id: FixCloudAccountId, update_fn: Callable[[CloudAccount], CloudAccount]) -> CloudAccount:
         async def do_updade() -> CloudAccount:
@@ -220,11 +196,13 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 if stored_account is None:
                     raise ResourceNotFound(f"Cloud account {id} not found")
 
-                cloud_account = update_fn(stored_account.to_model())
+                cloud_account = update_fn(stored_account.to_model(None))
 
-                if stored_account.to_model() == cloud_account:
+                if stored_account.to_model(None) == cloud_account:
                     # nothing to update
                     return cloud_account
+
+                next_scan = await get_next_scan(session, cloud_account.workspace_id)
 
                 stored_account.tenant_id = cloud_account.workspace_id
                 stored_account.cloud = cloud_account.cloud
@@ -233,7 +211,6 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 stored_account.api_account_alias = cloud_account.account_alias
                 stored_account.user_account_name = cloud_account.user_account_name
                 stored_account.privileged = cloud_account.privileged
-                stored_account.next_scan = cloud_account.next_scan
                 stored_account.last_scan_duration_seconds = cloud_account.last_scan_duration_seconds
                 stored_account.last_scan_started_at = cloud_account.last_scan_started_at
                 stored_account.last_scan_resources_scanned = cloud_account.last_scan_resources_scanned
@@ -243,11 +220,13 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 stored_account.cf_stack_version = cloud_account.cf_stack_version
                 stored_account.failed_scan_count = cloud_account.failed_scan_count
                 stored_account.last_task_id = cloud_account.last_task_id
+                stored_account.last_scan_resources_errors = cloud_account.last_scan_resources_errors
+
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
                 await session.commit()
                 await session.refresh(stored_account)
-                return stored_account.to_model()
+                return stored_account.to_model(next_scan)
 
         while True:
             try:
@@ -267,9 +246,11 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
                 )
             if non_deleted is not None and non_deleted:
                 statement = statement.where(orm.CloudAccount.state != CloudAccountStates.Deleted.state_name)
+
+            next_scan = await get_next_scan(session, workspace_id)
             results = await session.execute(statement)
             accounts = results.scalars().all()
-            return [acc.to_model() for acc in accounts]
+            return [acc.to_model(next_scan) for acc in accounts]
 
     async def count_by_workspace_id(
         self, workspace_id: WorkspaceId, ready_for_collection: bool = False, non_deleted: bool = False
@@ -295,7 +276,7 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
             )
             results = await session.execute(statement)
             accounts = results.scalars().all()
-            return [acc.to_model() for acc in accounts]
+            return [acc.to_model(None) for acc in accounts]  # not a public API, so we don't need to pass next_scan
 
     async def delete(self, id: FixCloudAccountId) -> None:
         """Delete a cloud account."""
@@ -324,11 +305,30 @@ class CloudAccountRepositoryImpl(CloudAccountRepository):
 
             results = await session.execute(statement)
             accounts = results.scalars().all()
-            return [acc.to_model() for acc in accounts]
+            return [acc.to_model(None) for acc in accounts]
+
+    async def list_degraded_for_ping(self, workspace: WorkspaceId, last_ping_before: datetime) -> List[CloudAccount]:
+        async with self.session_maker() as session:
+
+            statement = (
+                select(orm.CloudAccount)
+                .where(orm.CloudAccount.enabled.is_(True))
+                .where(orm.CloudAccount.state == CloudAccountStates.Degraded.state_name)
+                .where(
+                    or_(
+                        orm.CloudAccount.last_degraded_scan_started_at == None,  # noqa
+                        orm.CloudAccount.last_degraded_scan_started_at < last_ping_before,
+                    )
+                )
+            )
+
+            results = await session.execute(statement)
+            accounts = results.scalars().all()
+            return [acc.to_model(None) for acc in accounts]
 
 
 def get_cloud_account_repository(session_maker: AsyncSessionMakerDependency) -> CloudAccountRepository:
-    return CloudAccountRepositoryImpl(session_maker)
+    return CloudAccountRepository(session_maker)
 
 
 CloudAccountRepositoryDependency = Annotated[CloudAccountRepository, Depends(get_cloud_account_repository)]

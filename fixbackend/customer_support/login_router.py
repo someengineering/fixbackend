@@ -30,9 +30,11 @@ async def get_auth_url(
     # as defined in oauth_router.py # noqa
     callback_url_name = f"oauth:{client.name}.{auth_backend.name}.callback"
     # where oauth should call us back
-    callback_url = str(request.url_for(callback_url_name))
+    redirect_uri = str(request.url_for(callback_url_name))
+    if not redirect_uri.startswith("http://localhost") and redirect_uri.startswith("http://"):
+        redirect_uri = redirect_uri.replace("http://", "https://", 1)
     # the link to start the authorization with the oauth provider
-    auth_url = await client.get_authorization_url(callback_url, state)
+    auth_url = await client.get_authorization_url(redirect_uri, state)
     return auth_url
 
 

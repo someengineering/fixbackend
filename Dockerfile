@@ -18,5 +18,6 @@ RUN  apt-get update \
 ADD migrations /app/migrations
 ADD alembic.ini /app/alembic.ini
 ADD static /app/static
+ENV SSL_CERT_FILE=/etc/ssl/fix-ca-cert/ca.bundle.pem
 EXPOSE 8000
 ENTRYPOINT ["/bin/dumb-init", "--", "fixbackend"]

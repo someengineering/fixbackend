@@ -170,12 +170,14 @@ async def test_update_billing(
                 last_scan_duration_seconds=0,
                 last_scan_started_at=None,
                 last_scan_resources_scanned=0,
+                last_scan_resources_errors=0,
                 created_at=utc(),
                 updated_at=utc(),
                 state_updated_at=utc(),
                 cf_stack_version=None,
                 failed_scan_count=0,
                 last_task_id=None,
+                last_degraded_scan_started_at=None,
             )
         )
     with pytest.raises(NotAllowed) as exc_info:

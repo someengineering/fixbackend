@@ -20,22 +20,22 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fixcloudutils.util import utc
 
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import WorkspaceCreated
 from fixbackend.domain_events.publisher_impl import DomainEventPublisherImpl
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import FixCloudAccountId, WorkspaceId
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 def workspaces_router(dependencies: FixDependencies, templates: Jinja2Templates) -> APIRouter:
 
     router = APIRouter()
 
-    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
-    cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
+    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepository)
+    cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepository)
     next_run_repo = dependencies.service(ServiceNames.next_run_repo, NextRunRepository)
     graph_db_access = dependencies.service(ServiceNames.graph_db_access, GraphDatabaseAccessManager)
     domain_event_sender = dependencies.service(ServiceNames.domain_event_sender, DomainEventPublisherImpl)

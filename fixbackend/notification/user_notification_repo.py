@@ -13,8 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import uuid
-from abc import ABC, abstractmethod
-from typing import Annotated, override, Optional
+from typing import Annotated, Optional
 
 from attr import frozen
 from fastapi import Depends
@@ -63,29 +62,11 @@ class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
         )
 
 
-class UserNotificationSettingsRepository(ABC):
-    @abstractmethod
-    async def get_notification_settings(self, user_id: UserId) -> UserNotificationSettings:
-        pass
-
-    @abstractmethod
-    async def update_notification_settings(
-        self,
-        user_id_or_email: UserId | Email,
-        *,
-        weekly_report: Optional[bool] = None,
-        inactivity_reminder: Optional[bool] = None,
-        tutorial: Optional[bool] = None,
-    ) -> UserNotificationSettings:
-        pass
-
-
-class UserNotificationSettingsRepositoryImpl(UserNotificationSettingsRepository):
+class UserNotificationSettingsRepository:
 
     def __init__(self, session_maker: AsyncSessionMaker) -> None:
         self.session_maker = session_maker
 
-    @override
     async def get_notification_settings(self, user_id: UserId) -> UserNotificationSettings:
         async with self.session_maker() as session:
             if result := await session.get(UserNotificationSettingsEntity, user_id):
@@ -95,7 +76,6 @@ class UserNotificationSettingsRepositoryImpl(UserNotificationSettingsRepository)
                     user_id=user_id, weekly_report=True, inactivity_reminder=True, tutorial=True
                 )
 
-    @override
     async def update_notification_settings(
         self,
         user_id_or_email: UserId | Email,
@@ -137,7 +117,7 @@ def get_user_notification_settings_repo(
     fix_dependency: FixDependency,
 ) -> UserNotificationSettingsRepository:
     return fix_dependency.service(
-        ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl
+        ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepository
     )
 
 

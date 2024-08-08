@@ -73,7 +73,7 @@ from fixbackend.certificates.cert_store import CertificateStore
 from fixbackend.cloud_accounts.azure_subscription_repo import AzureSubscriptionCredentialsRepository
 from fixbackend.cloud_accounts.azure_subscription_service import AzureSubscriptionService, SubscriptionInfo
 from fixbackend.cloud_accounts.gcp_service_account_repo import GcpServiceAccountKeyRepository
-from fixbackend.cloud_accounts.repository import CloudAccountRepository, CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.cloud_accounts.gcp_service_account_service import GcpServiceAccountService
 from fixbackend.collect.collect_queue import RedisCollectQueue
 from fixbackend.config import Config, get_config
@@ -106,8 +106,8 @@ from fixbackend.metering.metering_repository import MeteringRepository
 from fixbackend.notification.email.email_sender import EmailSender
 from fixbackend.notification.model import FailingBenchmarkChecksDetected, FailedBenchmarkCheck, VulnerableResource
 from fixbackend.notification.notification_service import NotificationService
-from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryImpl
-from fixbackend.permissions.role_repository import RoleRepository, RoleRepositoryImpl
+from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepository
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.subscription.aws_marketplace import AwsMarketplaceHandler
 from fixbackend.subscription.models import AwsMarketplaceSubscription
 from fixbackend.subscription.stripe_subscription import StripeServiceImpl, StripeClient
@@ -115,9 +115,9 @@ from fixbackend.subscription.subscription_repository import AwsTierPreferenceRep
 from fixbackend.types import AsyncSessionMaker
 from fixbackend.types import Redis
 from fixbackend.utils import start_of_next_month, uid
-from fixbackend.workspaces.invitation_repository import InvitationRepository, InvitationRepositoryImpl
+from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import Workspace
-from fixbackend.workspaces.repository import WorkspaceRepository, WorkspaceRepositoryImpl
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 DATABASE_URL = "postgresql+asyncpg://fix@127.0.0.1:5432/fixbackend-testdb"
 # only used to create/drop the database
@@ -237,6 +237,11 @@ def default_config() -> Config:
         stripe_webhook_key=None,
         customer_support_users=[],
         free_tier_cleanup_timeout_days=7,
+        azure_client_id="",
+        azure_client_secret="",
+        azure_tenant_id="",
+        account_failed_resource_count=1,
+        degraded_accounts_ping_interval_hours=24,
     )
 
 
@@ -644,7 +649,7 @@ async def next_run_repository(async_session_maker: AsyncSessionMaker) -> NextRun
 
 @pytest.fixture
 async def cloud_account_repository(async_session_maker: AsyncSessionMaker) -> CloudAccountRepository:
-    return CloudAccountRepositoryImpl(async_session_maker)
+    return CloudAccountRepository(async_session_maker)
 
 
 @pytest.fixture
@@ -695,7 +700,7 @@ def pubsub_publisher() -> InMemoryRedisPubSubPublisher:
 async def role_repository(
     async_session_maker: AsyncSessionMaker,
 ) -> RoleRepository:
-    return RoleRepositoryImpl(async_session_maker)
+    return RoleRepository(async_session_maker)
 
 
 @pytest.fixture
@@ -707,7 +712,7 @@ async def workspace_repository(
     subscription_repository: SubscriptionRepository,
     role_repository: RoleRepository,
 ) -> WorkspaceRepository:
-    return WorkspaceRepositoryImpl(
+    return WorkspaceRepository(
         async_session_maker,
         graph_database_access_manager,
         domain_event_sender,
@@ -723,7 +728,7 @@ async def invitation_repository(
     workspace_repository: WorkspaceRepository,
     user_repository: UserRepository,
 ) -> InvitationRepository:
-    return InvitationRepositoryImpl(async_session_maker, workspace_repository, user_repository)
+    return InvitationRepository(async_session_maker, workspace_repository, user_repository)
 
 
 @pytest.fixture
@@ -847,6 +852,7 @@ async def dispatcher(
     gcp_service_account_key_repo: GcpServiceAccountKeyRepository,
     azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
     redis: Redis,
+    default_config: Config,
 ) -> DispatcherService:
     return DispatcherService(
         arq_redis,
@@ -861,6 +867,7 @@ async def dispatcher(
         workspace_repository,
         gcp_service_account_key_repo,
         azure_subscription_credentials_repo,
+        default_config,
     )
 
 
@@ -925,6 +932,7 @@ async def fix_deps(
     inventory_service: InventoryService,
     gcp_service_account_service: GcpServiceAccountService,
     azure_subscription_service: AzureSubscriptionService,
+    jwt_service: JwtService,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -938,9 +946,7 @@ async def fix_deps(
             ServiceNames.notification_service: notification_service,
             ServiceNames.domain_event_sender: domain_event_sender,
             ServiceNames.invitation_repository: invitation_repository,
-            ServiceNames.user_notification_settings_repository: UserNotificationSettingsRepositoryImpl(
-                async_session_maker
-            ),
+            ServiceNames.user_notification_settings_repository: UserNotificationSettingsRepository(async_session_maker),
             ServiceNames.analytics_event_sender: analytics_event_sender,
             ServiceNames.api_token_service: api_token_service,
             ServiceNames.password_helper: password_helper,
@@ -951,6 +957,7 @@ async def fix_deps(
             ServiceNames.azure_subscription_repo: azure_subscription_credentials_repo,
             ServiceNames.gcp_service_account_service: gcp_service_account_service,
             ServiceNames.azure_subscription_service: azure_subscription_service,
+            ServiceNames.jwt_service: jwt_service,
         }
     )
 
@@ -1164,5 +1171,5 @@ def notification_service(
 
 
 @pytest.fixture
-def user_notification_repository(async_session_maker: AsyncSessionMaker) -> UserNotificationSettingsRepositoryImpl:
-    return UserNotificationSettingsRepositoryImpl(async_session_maker)
+def user_notification_repository(async_session_maker: AsyncSessionMaker) -> UserNotificationSettingsRepository:
+    return UserNotificationSettingsRepository(async_session_maker)

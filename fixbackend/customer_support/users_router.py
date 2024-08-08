@@ -21,17 +21,17 @@ from fixbackend.auth.models import User
 from fixbackend.auth.schemas import UserUpdate
 from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
-from fixbackend.cloud_accounts.repository import CloudAccountRepositoryImpl
+from fixbackend.cloud_accounts.repository import CloudAccountRepository
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fastapi.templating import Jinja2Templates
-from fixbackend.permissions.role_repository import RoleRepositoryImpl
+from fixbackend.permissions.role_repository import RoleRepository
 from fixbackend.workspaces.models import Workspace
 
 from fixbackend.ids import UserId, WorkspaceId
 from fixbackend.permissions.models import Roles
 from attrs import frozen
 
-from fixbackend.workspaces.repository import WorkspaceRepositoryImpl
+from fixbackend.workspaces.repository import WorkspaceRepository
 
 
 @frozen
@@ -55,10 +55,10 @@ def users_router(dependencies: FixDependencies, templates: Jinja2Templates) -> A
     router = APIRouter()
 
     user_repo = dependencies.service(ServiceNames.user_repo, UserRepository)
-    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepositoryImpl)
+    workspace_repo = dependencies.service(ServiceNames.workspace_repo, WorkspaceRepository)
     user_manager = dependencies.service(ServiceNames.user_manager, UserManager)
-    role_repo = dependencies.service(ServiceNames.role_repository, RoleRepositoryImpl)
-    cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepositoryImpl)
+    role_repo = dependencies.service(ServiceNames.role_repository, RoleRepository)
+    cloud_accont_repo = dependencies.service(ServiceNames.cloud_account_repo, CloudAccountRepository)
 
     @router.get("", response_class=HTMLResponse, name="users:index")
     async def index(

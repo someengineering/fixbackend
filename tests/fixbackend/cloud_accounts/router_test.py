@@ -84,6 +84,7 @@ class InMemoryCloudAccountService(CloudAccountService):
             last_scan_started_at=None,
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
+            last_scan_resources_errors=0,
             next_scan=None,
             created_at=utc(),
             updated_at=utc(),
@@ -91,6 +92,7 @@ class InMemoryCloudAccountService(CloudAccountService):
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
         self.accounts[account.id] = account
         return account
@@ -243,6 +245,7 @@ async def test_delete_cloud_account(client: AsyncClient, workspace: Workspace) -
         last_scan_started_at=None,
         last_scan_duration_seconds=0,
         last_scan_resources_scanned=0,
+        last_scan_resources_errors=0,
         next_scan=None,
         created_at=utc(),
         updated_at=utc(),
@@ -250,6 +253,7 @@ async def test_delete_cloud_account(client: AsyncClient, workspace: Workspace) -
         cf_stack_version=0,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
     response = await client.delete(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}")
     assert response.status_code == 200
@@ -276,6 +280,7 @@ async def test_last_scan(client: AsyncClient, workspace: Workspace) -> None:
         last_scan_started_at=started_at,
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
+        last_scan_resources_errors=0,
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -283,6 +288,7 @@ async def test_last_scan(client: AsyncClient, workspace: Workspace) -> None:
         cf_stack_version=0,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     response = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts/last_scan")
@@ -316,6 +322,7 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         last_scan_started_at=started_at,
+        last_scan_resources_errors=456,
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -323,6 +330,7 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
         cf_stack_version=42,
         failed_scan_count=123,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     response = await client.get(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}")
@@ -343,7 +351,7 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
     assert data["last_scan_started_at"] == started_at.isoformat()
     assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
     assert data["cf_stack_version"] == 42
-    assert data["errors"] == 123
+    assert data["errors"] == 456
 
 
 @pytest.mark.asyncio
@@ -366,6 +374,7 @@ async def test_list_cloud_accounts(client: AsyncClient, workspace: Workspace) ->
             last_scan_duration_seconds=10,
             last_scan_resources_scanned=100,
             last_scan_started_at=utc(),
+            last_scan_resources_errors=0,
             next_scan=next_scan,
             created_at=created_at,
             updated_at=utc(),
@@ -373,6 +382,7 @@ async def test_list_cloud_accounts(client: AsyncClient, workspace: Workspace) ->
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
         cloud_account_service.accounts[cloud_account_id] = account
         return account
@@ -397,7 +407,8 @@ async def test_list_cloud_accounts(client: AsyncClient, workspace: Workspace) ->
         CloudAccountStates.Discovered(AwsCloudAccess(external_id, role_name), enabled=True),
     )
     recent_degraded = add_account(
-        utc() - timedelta(minutes=3), CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), "foo")
+        utc() - timedelta(minutes=3),
+        CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), True, True, "foo"),
     )
 
     response = await client.get(f"/api/workspaces/{workspace.id}/cloud_accounts")
@@ -440,6 +451,7 @@ async def test_update_cloud_account(client: AsyncClient, workspace: Workspace) -
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         last_scan_started_at=datetime.utcnow(),
+        last_scan_resources_errors=0,
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -447,6 +459,7 @@ async def test_update_cloud_account(client: AsyncClient, workspace: Workspace) -
         cf_stack_version=0,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     payload: Dict[str, Optional[str]] = {
@@ -490,6 +503,7 @@ async def test_enable_disable_account(client: AsyncClient, workspace: Workspace)
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         last_scan_started_at=utc(),
+        last_scan_resources_errors=0,
         next_scan=next_scan,
         created_at=utc(),
         updated_at=utc(),
@@ -497,6 +511,7 @@ async def test_enable_disable_account(client: AsyncClient, workspace: Workspace)
         cf_stack_version=0,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/disable")
@@ -541,6 +556,7 @@ async def test_enable_disable_account_scan(client: AsyncClient, workspace: Works
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         last_scan_started_at=utc(),
+        last_scan_resources_errors=0,
         next_scan=utc(),
         created_at=utc(),
         updated_at=utc(),
@@ -548,6 +564,7 @@ async def test_enable_disable_account_scan(client: AsyncClient, workspace: Works
         cf_stack_version=None,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
 
     response = await client.patch(f"/api/workspaces/{workspace.id}/cloud_account/{cloud_account_id}/scan/disable")

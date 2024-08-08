@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, cast, List
 from uuid import UUID
 
+from attr import evolve
 from fixcloudutils.asyncio.periodic import Periodic
 from fixcloudutils.redis.event_stream import Json, MessageContext, RedisStreamListener
 from fixcloudutils.service import Service
@@ -43,6 +44,7 @@ from fixbackend.collect.collect_queue import (
     GcpProjectInformation,
     PostCollectAccountInfo,
 )
+from fixbackend.config import Config
 from fixbackend.dispatcher.collect_progress import AccountCollectProgress, CollectionFailure, CollectionSuccess
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
@@ -165,6 +167,7 @@ class CollectAccountProgress:
         nr_of_resources_collected: int,
         scan_duration_seconds: int,
         task_id: TaskId,
+        error_messages: List[str],
     ) -> CollectState:
         hash_key = self._collect_progress_hash_key(workspace_id)
 
@@ -173,7 +176,10 @@ class CollectAccountProgress:
         if cloud_account_id not in collect_state:
             raise Exception(f"Could not find collect job context for accound id {cloud_account_id}")
         collect_progress_done = collect_state[cloud_account_id].done(
-            scanned_resources=nr_of_resources_collected, scan_duration=scan_duration_seconds, task_id=task_id
+            scanned_resources=nr_of_resources_collected,
+            scan_duration=scan_duration_seconds,
+            task_id=task_id,
+            resource_errors=error_messages,
         )
         await self.redis.hset(hash_key, key=str(cloud_account_id), value=collect_progress_done.to_json_str())
         return collect_state | {cloud_account_id: collect_progress_done}
@@ -230,6 +236,7 @@ class DispatcherService(Service):
         workspace_repository: WorkspaceRepository,
         gcp_serivice_account_key_repo: GcpServiceAccountKeyRepository,
         azure_subscription_credentials_repo: AzureSubscriptionCredentialsRepository,
+        config: Config,
     ) -> None:
         self.cloud_account_repo = cloud_account_repo
         self.gcp_service_account_key_repo = gcp_serivice_account_key_repo
@@ -251,6 +258,7 @@ class DispatcherService(Service):
         )
         self.domain_event_sender = domain_event_sender
         self.collect_progress = CollectAccountProgress(temp_store_redis)
+        self.degraded_acc_ping_interval = timedelta(hours=config.degraded_accounts_ping_interval_hours)
 
         domain_event_subscriber.subscribe(WorkspaceCreated, self.process_workspace_created, "dispatcher")
         domain_event_subscriber.subscribe(CloudAccountConfigured, self.process_aws_account_configured, "dispatcher")
@@ -274,10 +282,7 @@ class DispatcherService(Service):
             case _:
                 log.info(f"Collect messages: will ignore messages of kind {context.kind}")
 
-    async def complete_collect_job(
-        self,
-        workspace_id: WorkspaceId,
-    ) -> None:
+    async def complete_collect_job(self, workspace_id: WorkspaceId) -> None:
         async def send_domain_event(collect_state: Dict[FixCloudAccountId, AccountCollectProgress]) -> None:
             collected_success = {
                 k: CloudAccountCollectInfo(
@@ -286,6 +291,7 @@ class DispatcherService(Service):
                     v.collection_done.duration_seconds,
                     v.started_at,
                     v.collection_done.task_id,
+                    v.collection_done.resource_errors,
                 )
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionSuccess)
@@ -298,6 +304,7 @@ class DispatcherService(Service):
                     v.collection_done.duration_seconds,
                     v.started_at,
                     v.collection_done.task_id,
+                    [v.collection_done.error],
                 )
                 for k, v in collect_state.items()
                 if isinstance(v.collection_done, CollectionFailure)
@@ -306,7 +313,7 @@ class DispatcherService(Service):
             next_run = await self.next_run_repo.get(workspace_id)
 
             if len(collected_success) > 0:
-                event: Event = TenantAccountsCollected(workspace_id, collected_success, next_run)
+                event: Event = TenantAccountsCollected(workspace_id, collected_success, collected_failed, next_run)
                 await self.domain_event_sender.publish(event)
             elif len(collected_failed) > 0:
                 event = TenantAccountsCollectFailed(workspace_id, collected_failed, next_run)
@@ -399,6 +406,7 @@ class DispatcherService(Service):
                 sum(r.nr_of_resources_collected for r in records),
                 duration,
                 TaskId(task_id),
+                messages,
             )
 
         error: Optional[str] = message.get("error")
@@ -546,7 +554,13 @@ class DispatcherService(Service):
         azure_graph_scheduled = False
         async for workspace_id, at in self.next_run_repo.older_than(now):
             set_workspace_id(workspace_id)
-            accounts = await self.cloud_account_repo.list_by_workspace_id(workspace_id, ready_for_collection=True)
+            healthy_accounts = await self.cloud_account_repo.list_by_workspace_id(
+                workspace_id, ready_for_collection=True
+            )
+            degraded_accounts = await self.cloud_account_repo.list_degraded_for_ping(
+                workspace_id, now - self.degraded_acc_ping_interval
+            )
+            accounts = healthy_accounts + degraded_accounts
             product_tier = await self.workspace_repository.get_product_tier(workspace_id)
             log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
             for account in accounts:
@@ -555,6 +569,11 @@ class DispatcherService(Service):
                     await self.trigger_collect(account, collect_microsoft_graph=True)
                 else:
                     await self.trigger_collect(account)
+
+            for account in degraded_accounts:
+                await self.cloud_account_repo.update(
+                    account.id, lambda acc: evolve(acc, last_degraded_scan_started_at=now)
+                )
 
             next_run_at = await self.next_run_repo.update_next_run_for(workspace_id, product_tier, last_run=at)
             log.info(f"next run for workspace {workspace_id} will be at {next_run_at}")

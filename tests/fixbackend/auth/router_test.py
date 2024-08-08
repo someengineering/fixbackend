@@ -60,6 +60,10 @@ class InMemoryDomainSender(DomainEventPublisher):
 
 
 class InMemoryInvitationRepo(InvitationRepository):
+
+    def __init__(self) -> None:
+        pass
+
     async def get_invitation_by_email(self, email: str) -> Optional[WorkspaceInvitation]:
         return None
 

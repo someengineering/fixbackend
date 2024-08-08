@@ -30,7 +30,7 @@ from fixbackend.auth.models import User
 from fixbackend.cloud_accounts.account_setup import AssumeRoleResult, AssumeRoleResults, AwsAccountSetupHelper
 from fixbackend.cloud_accounts.models import AwsCloudAccess, CloudAccount, CloudAccountStates, GcpCloudAccess
 from fixbackend.cloud_accounts.repository import CloudAccountRepository
-from fixbackend.cloud_accounts.service_impl import CloudAccountServiceImpl
+from fixbackend.cloud_accounts.service import CloudAccountService
 from fixbackend.config import Config, ProductTierSettings
 from fixbackend.dispatcher.next_run_repository import NextRunRepository
 from fixbackend.domain_events.events import (
@@ -165,8 +165,8 @@ def service(
     http_client: AsyncClient,
     notification_service: InMemoryNotificationService,
     analytics_event_sender: AnalyticsEventSender,
-) -> CloudAccountServiceImpl:
-    return CloudAccountServiceImpl(
+) -> CloudAccountService:
+    return CloudAccountService(
         workspace_repository=workspace_repository,
         cloud_account_repository=cloud_account_repository,
         next_run_repository=next_run_repository,
@@ -188,7 +188,7 @@ def service(
 async def test_create_aws_account(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     user: User,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
@@ -338,7 +338,7 @@ async def test_create_aws_account(
 
 @pytest.mark.asyncio
 async def test_delete_aws_account(
-    cloud_account_repository: CloudAccountRepository, service: CloudAccountServiceImpl, user: User, workspace: Workspace
+    cloud_account_repository: CloudAccountRepository, service: CloudAccountService, user: User, workspace: Workspace
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -375,7 +375,10 @@ async def test_delete_aws_account(
 
 @pytest.mark.asyncio
 async def test_store_last_run_info(
-    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService, workspace: Workspace
+    service: CloudAccountService,
+    notification_service: InMemoryNotificationService,
+    workspace: Workspace,
+    next_run_repository: NextRunRepository,
 ) -> None:
     now_without_micros = now.replace(microsecond=0)
     account = await service.create_aws_account(
@@ -388,9 +391,12 @@ async def test_store_last_run_info(
 
     cloud_account_id = account.id
     event = TenantAccountsCollected(
-        workspace.id,
-        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
-        now_without_micros,
+        tenant_id=workspace.id,
+        cloud_accounts={
+            cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id, ["message"])
+        },
+        cloud_accounts_failed={},
+        next_run=now_without_micros,
     )
     await service.process_domain_event(
         event.to_json(),
@@ -408,16 +414,21 @@ async def test_store_last_run_info(
 
     account = await service.get_cloud_account(cloud_account_id, workspace.id)
 
-    assert account.next_scan == now_without_micros
+    assert account.next_scan == await next_run_repository.get(workspace.id)
     assert account.account_id == account_id
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
+    assert account.failed_scan_count == 0
+    assert account.last_scan_resources_errors == 1
 
 
 @pytest.mark.asyncio
 async def test_store_last_run_info_on_error(
-    service: CloudAccountServiceImpl, notification_service: InMemoryNotificationService, workspace: Workspace
+    service: CloudAccountService,
+    notification_service: InMemoryNotificationService,
+    workspace: Workspace,
+    next_run_repository: NextRunRepository,
 ) -> None:
     now_without_micros = now.replace(microsecond=0)
     account = await service.create_aws_account(
@@ -428,39 +439,43 @@ async def test_store_last_run_info_on_error(
         account_name=None,
     )
 
+    assert account.last_scan_resources_errors == 0
+    assert account.failed_scan_count == 0
+
     cloud_account_id = account.id
     event = TenantAccountsCollectFailed(
         workspace.id,
-        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id)},
+        {cloud_account_id: CloudAccountCollectInfo(account_id, 100, 10, now_without_micros, task_id, ["error"])},
         now_without_micros,
     )
     await service.process_domain_event(
         event.to_json(),
         MessageContext(
             id="test",
-            kind=TenantAccountsCollected.kind,
+            kind=TenantAccountsCollectFailed.kind,
             publisher="test",
             sent_at=now_without_micros,
             received_at=now_without_micros,
         ),
     )
 
-    assert len(notification_service.notified_workspaces) == 1
-    assert notification_service.notified_workspaces[0] == workspace.id
+    assert len(notification_service.notified_workspaces) == 0
 
     account = await service.get_cloud_account(cloud_account_id, workspace.id)
 
-    assert account.next_scan == now_without_micros
+    assert account.next_scan == await next_run_repository.get(workspace.id)
     assert account.account_id == account_id
     assert account.last_scan_duration_seconds == 10
     assert account.last_scan_resources_scanned == 100
     assert account.last_scan_started_at == now_without_micros
     assert account.last_task_id
+    assert account.last_scan_resources_errors == 1
+    assert account.failed_scan_count == 1
 
 
 @pytest.mark.asyncio
 async def test_get_cloud_account(
-    cloud_account_repository: CloudAccountRepository, service: CloudAccountServiceImpl, workspace: Workspace
+    cloud_account_repository: CloudAccountRepository, service: CloudAccountService, workspace: Workspace
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -495,7 +510,7 @@ async def test_get_cloud_account(
 
 @pytest.mark.asyncio
 async def test_list_cloud_accounts(
-    cloud_account_repository: CloudAccountRepository, service: CloudAccountServiceImpl, workspace: Workspace
+    cloud_account_repository: CloudAccountRepository, service: CloudAccountService, workspace: Workspace
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -521,7 +536,7 @@ async def test_list_cloud_accounts(
 
 @pytest.mark.asyncio
 async def test_update_cloud_account_name(
-    cloud_account_repository: CloudAccountRepository, service: CloudAccountServiceImpl, workspace: Workspace
+    cloud_account_repository: CloudAccountRepository, service: CloudAccountService, workspace: Workspace
 ) -> None:
     account = await service.create_aws_account(
         workspace_id=workspace.id,
@@ -562,7 +577,7 @@ async def test_update_cloud_account_name(
 async def test_handle_account_discovered_success(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     pubsub_publisher: RedisPubSubPublisherMock,
     workspace: Workspace,
 ) -> None:
@@ -601,7 +616,7 @@ async def test_handle_account_discovered_success(
 @pytest.mark.asyncio
 async def test_handle_account_discovered_assume_role_success(
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     account_setup_helper: AwsAccountSetupHelperMock,
     workspace: Workspace,
 ) -> None:
@@ -624,7 +639,7 @@ async def test_handle_account_discovered_assume_role_success(
 async def test_handle_account_discovered_assume_role_failure(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     account_setup_helper: AwsAccountSetupHelperMock,
     workspace: Workspace,
 ) -> None:
@@ -677,7 +692,7 @@ async def test_handle_account_discovered_assume_role_failure(
 async def test_handle_account_discovered_list_accounts_success(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     account_setup_helper: AwsAccountSetupHelperMock,
     workspace: Workspace,
 ) -> None:
@@ -720,7 +735,7 @@ async def test_handle_account_discovered_list_accounts_success(
 async def test_handle_account_discovered_list_aliases_success(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     account_setup_helper: AwsAccountSetupHelperMock,
     workspace: Workspace,
 ) -> None:
@@ -764,7 +779,7 @@ async def test_handle_account_discovered_list_aliases_success(
 @pytest.mark.asyncio
 async def test_enable_disable_cloud_account(
     cloud_account_repository: CloudAccountRepository,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
     aws_marketplace_subscription: AwsMarketplaceSubscription,
@@ -837,19 +852,24 @@ async def test_enable_disable_cloud_account(
 
     await cloud_account_repository.delete(new_account.id)
 
-    # does not work for degraded accounts
+    # does work for degraded accounts
 
-    updated_account = await cloud_account_repository.update(
+    await cloud_account_repository.update(
         account.id,
         lambda account: evolve(
             account,
-            state=CloudAccountStates.Degraded(AwsCloudAccess(workspace.external_id, role_name), error="test error"),
+            state=CloudAccountStates.Degraded(
+                AwsCloudAccess(workspace.external_id, role_name), False, False, error="test error"
+            ),
             privileged=False,
         ),
     )
 
-    with pytest.raises(Exception):
-        await service.update_cloud_account_enabled(workspace.id, account.id, enabled=True)
+    await service.update_cloud_account_enabled(workspace.id, account.id, enabled=True)
+    enabled_degraded = await cloud_account_repository.get(account.id)
+    assert enabled_degraded
+    assert isinstance(enabled_degraded.state, CloudAccountStates.Degraded)
+    assert enabled_degraded.state.enabled is True
 
     # wrong tenant id
     with pytest.raises(Exception):
@@ -864,7 +884,7 @@ async def test_enable_disable_cloud_account(
 async def test_configure_account(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     account_setup_helper: AwsAccountSetupHelperMock,
     workspace: Workspace,
 ) -> None:
@@ -886,6 +906,7 @@ async def test_configure_account(
             last_scan_duration_seconds=10,
             last_scan_resources_scanned=100,
             last_scan_started_at=utc(),
+            last_scan_resources_errors=0,
             next_scan=utc(),
             created_at=utc(),
             updated_at=utc(),
@@ -893,6 +914,7 @@ async def test_configure_account(
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
 
     # fresh account should be retried
@@ -956,7 +978,7 @@ async def test_configure_account(
 @pytest.mark.asyncio
 async def test_handle_cf_sqs_message(
     cloud_account_repository: CloudAccountRepository,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     request_handler_mock: RequestHandlerMock,
     workspace: Workspace,
 ) -> None:
@@ -1019,7 +1041,7 @@ async def test_handle_cf_sqs_message(
 
 @pytest.mark.asyncio
 async def test_move_to_degraded(
-    domain_sender: DomainEventSenderMock, service: CloudAccountServiceImpl, workspace: Workspace
+    domain_sender: DomainEventSenderMock, service: CloudAccountService, workspace: Workspace
 ) -> None:
 
     account = await service.create_aws_account(
@@ -1036,9 +1058,10 @@ async def test_move_to_degraded(
             workspace.id,
             {
                 cloud_account_id: CloudAccountCollectInfo(
-                    account_id, scanned_resources=0, duration_seconds=10, started_at=now, task_id=task_id
+                    account_id, scanned_resources=0, duration_seconds=10, started_at=now, task_id=task_id, errors=[]
                 )
             },
+            {},
             now,
         )
         await service.process_domain_event(
@@ -1065,7 +1088,7 @@ async def test_move_to_degraded(
 
 @pytest.mark.asyncio
 async def test_handle_events(
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     workspace: Workspace,
     user: User,
     workspace_repository: WorkspaceRepository,
@@ -1135,7 +1158,7 @@ async def test_handle_events(
 async def test_create_gcp_account(
     cloud_account_repository: CloudAccountRepository,
     domain_sender: DomainEventSenderMock,
-    service: CloudAccountServiceImpl,
+    service: CloudAccountService,
     workspace: Workspace,
     workspace_repository: WorkspaceRepository,
     aws_marketplace_subscription: AwsMarketplaceSubscription,

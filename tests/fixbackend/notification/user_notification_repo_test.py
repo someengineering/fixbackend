@@ -18,7 +18,7 @@ import pytest
 from fixbackend.auth.models import User
 from fixbackend.ids import Email
 from fixbackend.notification.user_notification_repo import (
-    UserNotificationSettingsRepositoryImpl,
+    UserNotificationSettingsRepository,
 )
 from fixbackend.types import AsyncSessionMaker
 
@@ -26,7 +26,7 @@ from fixbackend.types import AsyncSessionMaker
 @pytest.mark.asyncio
 async def test_user_notification_settings_repo(async_session_maker: AsyncSessionMaker, user: User) -> None:
 
-    repo = UserNotificationSettingsRepositoryImpl(async_session_maker)
+    repo = UserNotificationSettingsRepository(async_session_maker)
 
     # default settings are always available
     settings = await repo.get_notification_settings(user.id)

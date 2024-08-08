@@ -84,6 +84,7 @@ async def test_receive_workspace_created(
             last_scan_duration_seconds=0,
             last_scan_resources_scanned=0,
             last_scan_started_at=None,
+            last_scan_resources_errors=0,
             next_scan=None,
             created_at=utc(),
             updated_at=utc(),
@@ -91,6 +92,7 @@ async def test_receive_workspace_created(
             cf_stack_version=0,
             failed_scan_count=0,
             last_task_id=None,
+            last_degraded_scan_started_at=None,
         )
     )
     # signal to the dispatcher that the new workspace was created
@@ -131,6 +133,7 @@ async def test_receive_aws_account_configured(
         last_scan_duration_seconds=10,
         last_scan_resources_scanned=100,
         last_scan_started_at=utc(),
+        last_scan_resources_errors=0,
         next_scan=utc(),
         created_at=utc(),
         updated_at=utc(),
@@ -138,6 +141,7 @@ async def test_receive_aws_account_configured(
         cf_stack_version=0,
         failed_scan_count=0,
         last_task_id=None,
+        last_degraded_scan_started_at=None,
     )
     await cloud_account_repository.create(account)
 
@@ -292,6 +296,7 @@ async def test_receive_collect_done_message(
             mr_1.duration,
             now,
             TaskId(mr_1.task_id),
+            ["m1", "m2"],
         )
     }
 

@@ -27,13 +27,13 @@ from fixbackend.auth.depedencies import AuthenticatedUser
 from fixbackend.dependencies import FixDependencies, ServiceNames
 from fixbackend.errors import NotAllowed
 from fixbackend.ids import WorkspaceId, BenchmarkName, NotificationProvider, Email, UserId
-from fixbackend.fix_jwt import JwtServiceImpl
+from fixbackend.fix_jwt import JwtService
 from fixbackend.logging_context import set_workspace_id, set_context, set_user_id
 from fixbackend.notification.email.email_sender import EMAIL_UNSUBSCRIBE_AUDIENCE
 from fixbackend.notification.model import WorkspaceAlert, AlertingSetting
 from fixbackend.notification.notification_service import NotificationService
 from fixbackend.notification.user_notification_repo import (
-    UserNotificationSettingsRepositoryImpl,
+    UserNotificationSettingsRepository,
 )
 from fixbackend.permissions.models import WorkspacePermissions
 from fixbackend.permissions.permission_checker import WorkspacePermissionChecker
@@ -371,9 +371,7 @@ def unsubscribe_router(fix: FixDependencies) -> APIRouter:
     @router.get("/unsubscribe", include_in_schema=False)
     async def unsubscribe(token: str) -> Response:
 
-        decoded = await fix.service(ServiceNames.jwt_service, JwtServiceImpl).decode(
-            token, [EMAIL_UNSUBSCRIBE_AUDIENCE]
-        )
+        decoded = await fix.service(ServiceNames.jwt_service, JwtService).decode(token, [EMAIL_UNSUBSCRIBE_AUDIENCE])
         if not decoded:
             log.info("invalid token")
             raise NotAllowed("Invalid token")
@@ -386,7 +384,7 @@ def unsubscribe_router(fix: FixDependencies) -> APIRouter:
             log.info("no kind in token")
             raise NotAllowed("Invalid token")
         pref_service = fix.service(
-            ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepositoryImpl
+            ServiceNames.user_notification_settings_repository, UserNotificationSettingsRepository
         )
         await pref_service.update_notification_settings(Email(email), **{kind: False})
         content = dedent(
