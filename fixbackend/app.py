@@ -55,7 +55,7 @@ from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
 from fixbackend.workspaces.router import workspaces_router
 from prometheus_client import Counter
-from fastapi_users.exceptions import UserNotExists
+from fastapi_users.exceptions import FastAPIUsersException
 
 
 log = logging.getLogger(__name__)
@@ -202,9 +202,9 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
     async def invalid_data(_: Request, exception: AssertionError) -> Response:
         return JSONResponse({"detail": str(exception)}, status_code=422)
 
-    @app.exception_handler(UserNotExists)
-    async def user_not_exists_handler(_: Request, exception: UserNotExists) -> Response:
-        return JSONResponse(status_code=404, content={"message": str(exception)})
+    @app.exception_handler(FastAPIUsersException)
+    async def fastapi_users_handler(_: Request, exception: FastAPIUsersException) -> Response:
+        return JSONResponse(status_code=404, content={"message": "invalid user"})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
