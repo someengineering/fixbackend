@@ -27,6 +27,8 @@ StripeCustomerId = NewType("StripeCustomerId", str)
 StripeSubscriptionId = NewType("StripeSubscriptionId", str)
 GcpServiceAccountKeyId = NewType("GcpServiceAccountKeyId", UUID)
 AzureSubscriptionCredentialsId = NewType("AzureSubscriptionCredentialsId", UUID)
+BenchmarkId = NewType("BenchmarkId", str)
+SecurityCheckId = NewType("SecurityCheckId", str)
 
 
 class NotificationProvider(StrEnum):
@@ -39,7 +41,14 @@ class NotificationProvider(StrEnum):
 
 
 BillingPeriod = Literal["month", "day"]
-ReportSeverity = Literal["info", "low", "medium", "high", "critical"]
+
+
+class ReportSeverity(StrEnum):
+    info = "info"
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
 
 
 class CloudNames:

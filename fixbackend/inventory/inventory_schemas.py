@@ -20,13 +20,13 @@ from fixcloudutils.types import Json
 from fixcloudutils.util import utc_str
 from pydantic import BaseModel, Field
 
-from fixbackend.ids import WorkspaceId
+from fixbackend.ids import BenchmarkId, CloudAccountId, CloudAccountName, CloudName, WorkspaceId, ReportSeverity
 
 
 class AccountSummary(BaseModel):
-    id: str = Field(description="The account id")
-    name: str = Field(description="The account name")
-    cloud: str = Field(description="The name of the cloud provider")
+    id: CloudAccountId = Field(description="The account id")
+    name: CloudAccountName = Field(description="The account name")
+    cloud: CloudName = Field(description="The name of the cloud provider")
     resource_count: int = Field(description="The number of resources in the account")
     failed_resources_by_severity: Dict[str, int] = Field(description="The number of failed resources by severity.")
     score: int = Field(description="The score of the account", default=100)
@@ -35,22 +35,24 @@ class AccountSummary(BaseModel):
 
 class BenchmarkAccountSummary(BaseModel):
     score: int = Field(description="The score of the account", default=0)
-    failed_checks: Optional[Dict[str, int]] = Field(description="The unique number of failed checks by severity.")
-    failed_resource_checks: Optional[Dict[str, int]] = Field(
+    failed_checks: Optional[Dict[ReportSeverity, int]] = Field(
+        description="The unique number of failed checks by severity."
+    )
+    failed_resource_checks: Optional[Dict[ReportSeverity, int]] = Field(
         description="The absolite number of failing resources over all checks by severity. "
         "One resource might fail multiple checks."
     )
 
 
 class BenchmarkSummary(BaseModel):
-    id: str = Field(description="The id of the benchmark.")
+    id: BenchmarkId = Field(description="The id of the benchmark.")
     title: str = Field(description="The title of the benchmark.")
     framework: str = Field(description="The framework of the benchmark.")
     version: str = Field(description="The version of the benchmark.")
-    clouds: List[str] = Field(description="The clouds the benchmark is available for.")
+    clouds: List[CloudName] = Field(description="The clouds the benchmark is available for.")
     description: str = Field(description="The description of the benchmark.")
     nr_of_checks: int = Field(description="The number of checks in the benchmark.")
-    account_summary: Dict[str, BenchmarkAccountSummary] = Field(
+    account_summary: Dict[CloudAccountId, BenchmarkAccountSummary] = Field(
         description="Information of the account with respect to this benchmark.", default_factory=dict
     )
 
@@ -58,16 +60,18 @@ class BenchmarkSummary(BaseModel):
 class CheckSummary(BaseModel):
     available_checks: int = Field(description="The number of all available checks.")
     failed_checks: int = Field(description="The number of failed checks.")
-    failed_checks_by_severity: Dict[str, int] = Field(description="The number of failed checks by severity.")
+    failed_checks_by_severity: Dict[ReportSeverity, int] = Field(description="The number of failed checks by severity.")
     available_resources: int = Field("The number of all available resources.")
     failed_resources: int = Field(description="The number of failed resources.")
-    failed_resources_by_severity: Dict[str, int] = Field(description="The number of failed resources by severity.")
+    failed_resources_by_severity: Dict[ReportSeverity, int] = Field(
+        description="The number of failed resources by severity."
+    )
 
 
 class VulnerabilitiesChanged(BaseModel):
     since: timedelta = Field(description="The time since the last report.")
-    accounts_selection: List[str] = Field(description="A selection of accounts with highest impact.")
-    resource_count_by_severity: Dict[str, int] = Field(description="The number of resources by severity.")
+    accounts_selection: List[CloudAccountId] = Field(description="A selection of accounts with highest impact.")
+    resource_count_by_severity: Dict[ReportSeverity, int] = Field(description="The number of resources by severity.")
     resource_count_by_kind_selection: Dict[str, int] = Field(
         default="A selection of resource kinds with highest impact."
     )
@@ -132,7 +136,7 @@ class SearchStartData(BaseModel):
     accounts: List[SearchCloudResource] = Field(description="The available accounts.")
     regions: List[SearchCloudResource] = Field(description="The available regions.")
     kinds: List[SearchCloudResource] = Field(description="The available resource kinds.")
-    severity: List[str] = Field(description="Severity values.")
+    severity: List[ReportSeverity] = Field(description="Severity values.")
 
 
 class CompletePathRequest(BaseModel):

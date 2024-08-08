@@ -64,7 +64,7 @@ from fixbackend.domain_events.events import (
 from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import NodeId, ProductTier
+from fixbackend.ids import BenchmarkId, CloudAccountId, NodeId, ProductTier, SecurityCheckId, ReportSeverity
 from fixbackend.ids import TaskId, WorkspaceId
 from fixbackend.inventory.inventory_client import (
     InventoryClient,
@@ -95,19 +95,36 @@ from fixbackend.workspaces.models import Workspace
 log = logging.getLogger(__name__)
 
 # alias names for better readability
-BenchmarkById = Dict[str, BenchmarkSummary]
-ChecksByBenchmarkId = Dict[str, List[Dict[str, str]]]  # benchmark_id -> [{id: check_id, severity: medium}, ...]
-ChecksByAccountId = Dict[str, Dict[str, int]]  # account_id -> check_id -> count
-SeverityByCheckId = Dict[str, str]
+BenchmarkById = Dict[BenchmarkId, BenchmarkSummary]
+ChecksByBenchmarkId = Dict[BenchmarkId, List[Dict[str, str]]]  # benchmark_id -> [{id: check_id, severity: medium}, ...]
+ChecksByAccountId = Dict[SecurityCheckId, Dict[CloudAccountId, int]]
+SeverityByCheckId = Dict[SecurityCheckId, ReportSeverity]
 T = TypeVar("T")
 V = TypeVar("V")
 
-ReportSeverityList = ["info", "low", "medium", "high", "critical"]
-ReportSeverityScore: Dict[str, int] = defaultdict(
-    lambda: 0, **{"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}  # weights for each severity
+ReportSeverityList: List[ReportSeverity] = [
+    ReportSeverity.info,
+    ReportSeverity.low,
+    ReportSeverity.medium,
+    ReportSeverity.high,
+    ReportSeverity.critical,
+]
+ReportSeverityScore: Dict[ReportSeverity, int] = defaultdict(
+    lambda: 0,
+    **{
+        ReportSeverity.info: 0,
+        ReportSeverity.low: 1,
+        ReportSeverity.medium: 2,
+        ReportSeverity.high: 3,
+        ReportSeverity.critical: 4,
+    },  # weights for each severity
 )
-ReportSeverityPriority: Dict[str, int] = defaultdict(lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)})
-ReportSeverityIncluded: Dict[str, List[str]] = {n: ReportSeverityList[idx:] for idx, n in enumerate(ReportSeverityList)}
+ReportSeverityPriority: Dict[ReportSeverity, int] = defaultdict(
+    lambda: 0, **{n: idx for idx, n in enumerate(ReportSeverityList)}
+)
+ReportSeverityIncluded: Dict[ReportSeverity, List[ReportSeverity]] = {
+    n: ReportSeverityList[idx:] for idx, n in enumerate(ReportSeverityList)
+}
 Inventory = "inventory-service"
 DecoratedFn = TypeVar("DecoratedFn", bound=Callable[..., Any])
 
@@ -268,7 +285,7 @@ class InventoryService(Service):
         service: Optional[str] = None,
         category: Optional[str] = None,
         kind: Optional[str] = None,
-        check_ids: Optional[List[str]] = None,
+        check_ids: Optional[List[SecurityCheckId]] = None,
         ids_only: Optional[bool] = None,
     ) -> List[Json]:
         async def fetch_checks(*_: Any) -> List[Json]:
@@ -433,11 +450,91 @@ class InventoryService(Service):
 
         async def compute_summary() -> ReportSummary:
 
+            # get all account for the given time period
+            accounts_in_time_period: List[Json] = []
+            async with self.client.search(
+                db, f"search is(account) and /metadata.exported_at>={utc_str(now-duration)}"
+            ) as result:
+                async for entry in result:
+                    accounts_in_time_period.append(entry)
+
+            # metrics for the summary that we will fill in from the accounts
+            severity_check_counter: Dict[ReportSeverity, int] = defaultdict(int)
+            failed_checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]] = defaultdict(set)
+            benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]] = defaultdict(set)
+            available_checks: Set[SecurityCheckId] = set()
+
+            severity_resource_counter: Dict[ReportSeverity, int] = defaultdict(int)
+            accounts_by_id: Dict[CloudAccountId, AccountSummary] = {}
+
+            benchmark_account_summaries: Dict[BenchmarkId, Dict[CloudAccountId, BenchmarkAccountSummary]] = defaultdict(
+                dict
+            )
+
+            def populate_info(accounts: List[Json]) -> None:
+                for entry in accounts:
+                    # process the benchmark info
+                    account_id = CloudAccountId(entry["reported"]["id"])
+                    metadata = entry["metadata"]
+                    for benchmark_id, info in metadata.get("benchmark", {}).items():
+
+                        failed_checks: Dict[ReportSeverity, int] = {}
+                        failed_resource_checks: Dict[ReportSeverity, int] = {}
+
+                        for severity, severity_info in info.get("failed", {}).items():
+                            checks = severity_info["checks"]
+                            failed_checks[severity] = checks
+                            failed_resource_checks[severity] = severity_info["resources"]
+
+                            severity_check_counter[severity] += checks
+
+                        benchmark_account_summaries[BenchmarkId(benchmark_id)][account_id] = BenchmarkAccountSummary(
+                            score=info.get("score", 100),
+                            failed_checks=failed_checks if failed_checks else None,
+                            failed_resource_checks=failed_resource_checks if failed_resource_checks else None,
+                        )
+
+                    # process the security checks
+                    security = entry.get("security", {})
+                    if security.get("has_issues", False) is True:
+                        issues = security.get("issues", [])
+                        for issue in issues:
+                            check_id = SecurityCheckId(issue["check"])
+                            available_checks.add(check_id)
+
+                            severity = ReportSeverity(issue["severity"])
+                            failed_checks_by_severity[severity].add(check_id)
+
+                            benchmarks: List[BenchmarkId] = issue.get("benchmarks", [])
+                            benchmark_by_check_id[check_id].update(benchmarks)
+
+                    # fill in the accounts
+                    exported_at = None
+                    if exp := metadata.get("exported_at"):
+                        exported_at = parse_utc_str(exp)
+                    failed_by_severity = {}
+                    for severity, info in metadata.get("failed", {}).items():
+                        failed_resources = info["resources"]
+                        failed_by_severity[severity] = failed_resources
+                        severity_resource_counter[severity] += failed_resources
+                    summary = AccountSummary(
+                        id=account_id,
+                        name=entry["reported"]["name"],
+                        cloud=entry["ancestors"]["cloud"]["reported"]["name"],
+                        resource_count=metadata.get("descendant_count", 0),
+                        failed_resources_by_severity=failed_by_severity,
+                        score=round(metadata.get("score", 100)),
+                        exported_at=exported_at,
+                    )
+                    accounts_by_id[account_id] = summary
+
+            populate_info(accounts_in_time_period)
+
             async def issues_since(
                 duration: timedelta, change: Literal["node_vulnerable", "node_compliant"]
             ) -> VulnerabilitiesChanged:
-                accounts_by_severity: Dict[str, Set[str]] = defaultdict(set)
-                resource_count_by_severity: Dict[str, int] = defaultdict(int)
+                accounts_by_severity: Dict[ReportSeverity, Set[CloudAccountId]] = defaultdict(set)
+                resource_count_by_severity: Dict[ReportSeverity, int] = defaultdict(int)
                 resource_count_by_kind: Dict[str, int] = defaultdict(int)
                 async with self.client.execute_single(
                     db,
@@ -454,7 +551,7 @@ class InventoryService(Service):
                         if severity is None:  # safeguard for history entries in old format
                             continue
                         if isinstance(acc_id := elem["group"]["account_id"], str):
-                            accounts_by_severity[severity].add(acc_id)
+                            accounts_by_severity[severity].add(CloudAccountId(acc_id))
                         resource_count_by_severity[severity] += elem["count"]
                         resource_count_by_kind[elem["group"]["kind"]] += elem["count"]
                 # reduce the count by kind dict to the top 3
@@ -470,81 +567,25 @@ class InventoryService(Service):
                     resource_count_by_kind_selection=reduced,
                 )
 
-            async def account_summary() -> Tuple[Dict[str, int], Dict[str, AccountSummary]]:
-                account_by_id: Dict[str, AccountSummary] = {}
-                resources_by_account: Dict[str, int] = defaultdict(int)
-                resources_by_account_by_severity: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                resources_by_severity: Dict[str, int] = defaultdict(int)
-                async with self.client.aggregate(
-                    db,
-                    "search /ancestors.account.reported.id!=null | aggregate "
-                    "/ancestors.account.reported.id as account_id, "
-                    "/ancestors.account.reported.name as account_name, "
-                    "/ancestors.cloud.reported.name as cloud_name, "
-                    "/metadata.score as score, "
-                    "/metadata.exported_at as exported_at, "
-                    "/security.severity as severity: sum(1) as count",
-                ) as result:
-                    async for entry in result:
-                        account_id = entry["group"]["account_id"]
-                        count = entry["count"]
-                        severity = entry["group"]["severity"]
-                        exported_at = entry["group"].get("exported_at")
-                        if account_id not in account_by_id:
-                            account_by_id[account_id] = AccountSummary(
-                                id=account_id,
-                                name=entry["group"]["account_name"],
-                                cloud=entry["group"]["cloud_name"],
-                                failed_resources_by_severity={},
-                                resource_count=0,
-                                score=entry["group"].get("score", 100),
-                                exported_at=parse_utc_str(exported_at) if exported_at else None,
-                            )
-                        resources_by_account[account_id] += count
-                        if severity is not None:
-                            resources_by_account_by_severity[account_id][severity] = count
-                            resources_by_severity[severity] += count
-                for account_id, account in account_by_id.items():
-                    account.resource_count = resources_by_account.get(account_id, 0)
-                    account.failed_resources_by_severity = resources_by_account_by_severity[account_id]
-                return resources_by_severity, account_by_id
-
-            async def check_summary() -> Tuple[ChecksByAccountId, SeverityByCheckId]:
-                check_accounts: ChecksByAccountId = defaultdict(dict)
-                check_severity: Dict[str, str] = {}
-                async with self.client.aggregate(
-                    db,
-                    "search /security.has_issues==true | aggregate "
-                    "/security.issues[].check as check_id,"
-                    "/security.issues[].severity as severity,"
-                    "/ancestors.account.reported.id as account_id"
-                    ": sum(1) as count",
-                ) as result:
-                    async for entry in result:
-                        group = entry["group"]
-                        count = entry["count"]
-                        check_id = group["check_id"]
-                        if isinstance(account_id := group["account_id"], str):
-                            check_accounts[check_id][account_id] = count
-                        check_severity[check_id] = group["severity"]
-                    return check_accounts, check_severity
-
-            async def benchmark_summary() -> Tuple[BenchmarkById, ChecksByBenchmarkId]:
+            async def benchmark_summary(
+                benmark_account_summaries: Dict[BenchmarkId, Dict[CloudAccountId, BenchmarkAccountSummary]]
+            ) -> BenchmarkById:
                 summaries: BenchmarkById = {}
-                benchmark_checks: ChecksByBenchmarkId = {}
-                for b in await self.client.benchmarks(db, short=True, with_checks=True):
+                benchmarks = await self.client.benchmarks(db, short=True, with_checks=True)
+                for b in benchmarks:
+                    benchmark_id = BenchmarkId(b["id"])
                     summary = BenchmarkSummary(
-                        id=b["id"],
+                        id=benchmark_id,
                         title=b["title"],
                         framework=b["framework"],
                         version=b["version"],
                         clouds=b["clouds"],
                         description=b["description"],
                         nr_of_checks=len(b["report_checks"]),
+                        account_summary=benmark_account_summaries.get(benchmark_id, {}),
                     )
                     summaries[summary.id] = summary
-                    benchmark_checks[summary.id] = b["report_checks"]
-                return summaries, benchmark_checks
+                return summaries
 
             async def timeseries_infected() -> TimeSeries:
                 start = now - timedelta(days=62 if is_free else 14)
@@ -557,9 +598,9 @@ class InventoryService(Service):
                 return TimeSeries(name="infected_resources", start=start, end=now, granularity=granularity, data=data)
 
             async def top_issues(
-                checks_by_severity: Dict[str, Set[str]],
-                benchmark_by_check_id: Dict[str, Set[str]],
-                benchmarks: Dict[str, BenchmarkSummary],
+                checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]],
+                benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]],
+                benchmarks: Dict[BenchmarkId, BenchmarkSummary],
                 num: int,
             ) -> List[Json]:
                 check_ids = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
@@ -573,14 +614,9 @@ class InventoryService(Service):
                     ]
                 return sorted(checks, key=lambda x: ReportSeverityPriority[x.get("severity", "info")], reverse=True)
 
-            def bench_account_score(failing_checks: Dict[str, int], benchmark_checks: Dict[str, int]) -> int:
-                # Compute the score of an account with respect to a benchmark
-                # Weight failing checks by severity and compute an overall percentage
-                missing = sum(ReportSeverityScore[severity] * count for severity, count in failing_checks.items())
-                total = sum(ReportSeverityScore[severity] * count for severity, count in benchmark_checks.items())
-                return int((max(0, total - missing) * 100) // total) if total > 0 else 100
-
-            def overall_score(accounts: Dict[str, AccountSummary], now: datetime, duration: timedelta) -> int:
+            def overall_score(
+                accounts: Dict[CloudAccountId, AccountSummary], now: datetime, duration: timedelta
+            ) -> int:
                 # The overall score is the average of all account scores
                 scores = []
                 for account in accounts.values():
@@ -591,73 +627,39 @@ class InventoryService(Service):
                 return total_score // total_accounts if total_accounts > 0 else 100
 
             (
-                (severity_resource_counter, accounts),
-                (benchmarks, checks),
-                (failed_accounts_by_check_id, severity_by_check_id),
+                benchmarks,
                 vulnerable_changed,
                 compliant_changed,
                 infected_resources_ts,
             ) = await asyncio.gather(
-                account_summary(),
-                benchmark_summary(),
-                check_summary(),
+                benchmark_summary(benchmark_account_summaries),
                 issues_since(duration, "node_vulnerable"),
                 issues_since(duration, "node_compliant"),
                 timeseries_infected(),
             )
 
-            # combine benchmark and account data
-            account_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            severity_check_counter: Dict[str, int] = defaultdict(int)
-            account_check_sum_count: Dict[str, int] = defaultdict(int)
-            failed_checks_by_severity: Dict[str, Set[str]] = defaultdict(set)
-            benchmark_by_check_id: Dict[str, Set[str]] = defaultdict(set)
-            available_checks = 0
-            for bid, bench in benchmarks.items():
-                benchmark_account_issue_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                benchmark_account_resource_counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-                benchmark_severity_count: Dict[str, int] = defaultdict(int)
-                for check_info in checks.get(bid, []):
-                    check_id = check_info["id"]
-                    benchmark_by_check_id[check_id].add(bid)
-                    benchmark_severity_count[check_info["severity"]] += 1
-                    available_checks += 1
-                    if severity := severity_by_check_id.get(check_id):
-                        severity_check_counter[severity] += 1
-                        for account_id, failed_resource_count in failed_accounts_by_check_id[check_id].items():
-                            benchmark_account_issue_counter[account_id][severity] += 1
-                            benchmark_account_resource_counter[account_id][severity] += failed_resource_count
-                            account_counter[account_id][severity] += 1
-                            account_check_sum_count[severity] += 1
-                            failed_checks_by_severity[severity].add(check_id)
-                for account_id, account in accounts.items():
-                    if account.cloud in bench.clouds:
-                        failing = benchmark_account_issue_counter.get(account_id)
-                        failed_resource_checks = benchmark_account_resource_counter.get(account_id)
-                        bench.account_summary[account_id] = BenchmarkAccountSummary(
-                            score=bench_account_score(failing or {}, benchmark_severity_count),
-                            failed_checks=failing,
-                            failed_resource_checks=failed_resource_checks,
-                        )
-
             # get issues for the top 5 issue_ids
             tops = await top_issues(failed_checks_by_severity, benchmark_by_check_id, benchmarks, num=5)
 
             # sort top changed account by score
-            vulnerable_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
-            compliant_changed.accounts_selection.sort(key=lambda x: accounts[x].score if x in accounts else 100)
+            vulnerable_changed.accounts_selection.sort(
+                key=lambda x: accounts_by_id[x].score if x in accounts_by_id else 100
+            )
+            compliant_changed.accounts_selection.sort(
+                key=lambda x: accounts_by_id[x].score if x in accounts_by_id else 100
+            )
 
             return ReportSummary(
                 check_summary=CheckSummary(
-                    available_checks=available_checks,
+                    available_checks=len(available_checks),
                     failed_checks=sum(v for v in severity_check_counter.values()),
                     failed_checks_by_severity=severity_check_counter,
-                    available_resources=sum(v.resource_count for v in accounts.values()),
+                    available_resources=sum(v.resource_count for v in accounts_by_id.values()),
                     failed_resources=sum(v for v in severity_resource_counter.values()),
                     failed_resources_by_severity=severity_resource_counter,
                 ),
-                overall_score=overall_score(accounts, now, duration),
-                accounts=sorted(list(accounts.values()), key=lambda x: x.score),
+                overall_score=overall_score(accounts_by_id, now, duration),
+                accounts=sorted(list(accounts_by_id.values()), key=lambda x: x.score),
                 benchmarks=list(benchmarks.values()),
                 changed_vulnerable=vulnerable_changed,
                 changed_compliant=compliant_changed,

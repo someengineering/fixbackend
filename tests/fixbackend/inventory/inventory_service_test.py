@@ -42,6 +42,7 @@ from fixbackend.ids import (
     CloudNames,
     FixCloudAccountId,
     NodeId,
+    ReportSeverity,
     TaskId,
     WorkspaceId,
     UserCloudAccountName,
@@ -90,6 +91,7 @@ logs_json = [
 def mocked_answers(
     request_handler_mock: RequestHandlerMock,
     benchmark_json: List[Json],
+    accounts_json: List[Json],
     azure_virtual_machine_resource_json: Json,
     example_check: Json,
 ) -> RequestHandlerMock:
@@ -125,12 +127,8 @@ def mocked_answers(
                 [{"clouds": ["aws"], "description": "Test AWS", "framework": "CIS", "id": "aws_test", "report_checks": [{"id": "aws_c1", "severity": "high"}, {"id": "aws_c2", "severity": "critical"}], "title": "AWS Test", "version": "0.1"},  # fmt: skip
                  {"clouds": ["gcp"], "description": "Test GCP", "framework": "CIS", "id": "gcp_test", "report_checks": [{"id": "gcp_c1", "severity": "low"}, {"id": "gcp_c2", "severity": "medium"}], "title": "GCP Test", "version": "0.2"}]  # fmt: skip
             )
-        elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /ancestors.account.reported.id!=null"):  # fmt: skip
-            return nd_json_response(
-                [{"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "medium", "score": 85}, "count": 50000},  # fmt: skip
-                 {"group": {"account_id": "123", "account_name": "account 2", "cloud_name": "aws", "severity": "high", "score": 85}, "count": 4321},  # fmt: skip
-                 {"group": {"account_id": "234", "account_name": "account 1", "cloud_name": "gcp", "severity": "medium", "score": 0}, "count": 12345}]  # fmt: skip
-            )
+        elif request.url.path == "/graph/fix/search/list" and content.startswith("search is(account) and /metadata.exported_at>="):  # fmt: skip
+            return nd_json_response(accounts_json)
         elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
             return nd_json_response(
                 [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "count": 8},  # fmt: skip
@@ -184,44 +182,85 @@ async def test_summary(
     duration = timedelta(days=7)
     summary = await inventory_service.summary(db, workspace, now, duration)
     assert len(summary.benchmarks) == 2
-    assert summary.overall_score == 42
+    assert summary.overall_score == 82
     # checks summary
-    assert summary.check_summary.available_checks == 4
-    assert summary.check_summary.failed_checks == 2
-    assert summary.check_summary.failed_checks_by_severity == {"critical": 1, "low": 1}
-    assert summary.check_summary.failed_resources == 66666
-    assert summary.check_summary.failed_resources_by_severity == {"high": 4321, "medium": 62345}
+    assert summary.check_summary.available_checks == 8
+    assert summary.check_summary.failed_checks == 172
+    assert summary.check_summary.failed_checks_by_severity == {
+        "critical": 8,
+        "low": 12,
+        "high": 20,
+        "info": 13,
+        "medium": 119,
+    }
+    # two accounts, double the resources
+    assert summary.check_summary.failed_resources == 62 * 2
+    assert summary.check_summary.failed_resources_by_severity == {
+        "high": 7 * 2,
+        "medium": 33 * 2,
+        "critical": 6 * 2,
+        "info": 4 * 2,
+        "low": 12 * 2,
+    }
     # check benchmarks
     b1, b2 = summary.benchmarks
     assert b1.id == "aws_test"
     assert b1.clouds == ["aws"]
     assert b1.account_summary == {
-        "123": BenchmarkAccountSummary(score=85, failed_checks={"low": 1}, failed_resource_checks={"low": 8})
+        "123": BenchmarkAccountSummary(
+            score=89,
+            failed_checks={
+                ReportSeverity.high: 1,
+                ReportSeverity.medium: 6,
+                ReportSeverity.low: 2,
+                ReportSeverity.info: 1,
+            },
+            failed_resource_checks={
+                ReportSeverity.high: 1,
+                ReportSeverity.medium: 10,
+                ReportSeverity.low: 8,
+                ReportSeverity.info: 4,
+            },
+        )
     }
     assert b2.id == "gcp_test"
     assert b2.clouds == ["gcp"]
     assert b2.account_summary == {
-        "234": BenchmarkAccountSummary(score=0, failed_checks={"critical": 1}, failed_resource_checks={"critical": 2})
+        "234": BenchmarkAccountSummary(
+            score=70,
+            failed_checks={
+                ReportSeverity.critical: 2,
+                ReportSeverity.high: 1,
+                ReportSeverity.medium: 15,
+                ReportSeverity.info: 2,
+            },
+            failed_resource_checks={
+                ReportSeverity.critical: 2,
+                ReportSeverity.high: 1,
+                ReportSeverity.medium: 19,
+                ReportSeverity.info: 8,
+            },
+        )
     }
     assert len(summary.accounts) == 2
     # check accounts
     gcp = next(filter(lambda acc: acc.cloud == "gcp", summary.accounts))
     aws = next(filter(lambda acc: acc.cloud == "aws", summary.accounts))
     assert gcp.id == "234"
-    assert gcp.name == "account 1"
+    assert gcp.name == "gcp account"
     assert gcp.cloud == "gcp"
-    assert gcp.score == 0
-    assert gcp.failed_resources_by_severity == {"medium": 12345}
+    assert gcp.score == 82
+    assert gcp.failed_resources_by_severity == {"medium": 33, "critical": 6, "high": 7, "info": 4, "low": 12}
     assert aws.id == "123"
-    assert aws.name == "account 2"
+    assert aws.name == "aws account"
     assert aws.cloud == "aws"
-    assert aws.score == 85
-    assert aws.failed_resources_by_severity == {"medium": 50000, "high": 4321}
+    assert aws.score == 82
+    assert aws.failed_resources_by_severity == {"medium": 33, "high": 7, "critical": 6, "info": 4, "low": 12}
     # check becoming vulnerable
-    assert summary.changed_vulnerable.accounts_selection == ["234", "123"]
+    assert set(summary.changed_vulnerable.accounts_selection) == set(["234", "123"])
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_vulnerable.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
-    assert summary.changed_compliant.accounts_selection == ["234", "123"]
+    assert set(summary.changed_compliant.accounts_selection) == set(["234", "123"])
     assert summary.changed_compliant.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
