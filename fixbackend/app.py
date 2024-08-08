@@ -204,7 +204,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
     @app.exception_handler(FastAPIUsersException)
     async def fastapi_users_handler(_: Request, exception: FastAPIUsersException) -> Response:
-        return JSONResponse(status_code=404, content={"message": "invalid user"})
+        return JSONResponse(status_code=400, content={"message": "invalid user"})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
