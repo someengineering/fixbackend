@@ -476,16 +476,18 @@ class InventoryService(Service):
                     # process the benchmark info
                     account_id = CloudAccountId(entry["reported"]["id"])
                     metadata = entry["metadata"]
-                    for benchmark_id, info in metadata.get("benchmark", {}).items():
 
+                    # Process all benchmark results of this account
+                    # "benchmark": {"aws_cis_1_5": { "failed": { ... }, "score": 83 }}
+                    for benchmark_id, info in metadata.get("benchmark", {}).items():
                         failed_checks: Dict[ReportSeverity, int] = {}
                         failed_resource_checks: Dict[ReportSeverity, int] = {}
 
+                        # "failed": { "high": { "checks": 6, "resources": 14 }, "low": { "checks": 4, "resources": 7 }}
                         for severity, severity_info in info.get("failed", {}).items():
                             checks = severity_info["checks"]
                             failed_checks[severity] = checks
                             failed_resource_checks[severity] = severity_info["resources"]
-
                             severity_check_counter[severity] += checks
 
                         benchmark_account_summaries[BenchmarkId(benchmark_id)][account_id] = BenchmarkAccountSummary(
@@ -494,25 +496,13 @@ class InventoryService(Service):
                             failed_resource_checks=failed_resource_checks if failed_resource_checks else None,
                         )
 
-                    # process the security checks
-                    security = entry.get("security", {})
-                    if security.get("has_issues", False) is True:
-                        issues = security.get("issues", [])
-                        for issue in issues:
-                            check_id = SecurityCheckId(issue["check"])
-                            available_checks.add(check_id)
-
-                            severity = ReportSeverity(issue["severity"])
-                            failed_checks_by_severity[severity].add(check_id)
-
-                            benchmarks: List[BenchmarkId] = issue.get("benchmarks", [])
-                            benchmark_by_check_id[check_id].update(benchmarks)
-
                     # fill in the accounts
                     exported_at = None
                     if exp := metadata.get("exported_at"):
                         exported_at = parse_utc_str(exp)
+
                     failed_by_severity = {}
+                    # "failed": { "high": { "checks": 6, "resources": 14 }, "low": { "checks": 4, "resources": 7 }}
                     for severity, info in metadata.get("failed", {}).items():
                         failed_resources = info["resources"]
                         failed_by_severity[severity] = failed_resources
