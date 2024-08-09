@@ -479,6 +479,9 @@ class InventoryService(Service):
 
                         # "failed": { "high": { "checks": 6, "resources": 14 }, "low": { "checks": 4, "resources": 7 }}
                         for severity, severity_info in info.get("failed", {}).items():
+                            if not isinstance(severity_info, dict):
+                                continue
+
                             checks = severity_info["checks"]
                             failed_checks[severity] = checks
                             failed_resource_checks[severity] = severity_info["resources"]
