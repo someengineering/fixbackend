@@ -38,7 +38,16 @@ from fixbackend.domain_events.subscriber import DomainEventSubscriber
 from fixbackend.fix_jwt import JwtService
 from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.graph_db.service import GraphDatabaseAccessManager
-from fixbackend.ids import WorkspaceId, TaskId, BenchmarkName, ReportSeverity, NotificationProvider, NodeId, UserId
+from fixbackend.ids import (
+    SecurityCheckId,
+    WorkspaceId,
+    TaskId,
+    BenchmarkName,
+    ReportSeverity,
+    NotificationProvider,
+    NodeId,
+    UserId,
+)
 from fixbackend.inventory.inventory_service import InventoryService, ReportSeverityIncluded, ReportSeverityPriority
 from fixbackend.inventory.inventory_schemas import SearchRequest, HistorySearch, HistoryChange
 from fixbackend.logging_context import set_workspace_id
@@ -229,7 +238,7 @@ class NotificationService(Service):
             f"/security.has_issues==true and /security.run_id in [{tsk_ids}] and /diff.node_vulnerable[].{{{issue}}}"
         )
         aggregate = "/diff.node_vulnerable[].check, /diff.node_vulnerable[].severity, /diff.node_vulnerable[].benchmarks[] as benchmark : sum(1) as count"  # noqa: E501
-        failing_checks: Dict[str, str] = {}
+        failing_checks: Dict[SecurityCheckId, ReportSeverity] = {}
         failing_resources_count: Dict[str, int] = defaultdict(int)
         total_failed_checks = 0
         change = [HistoryChange.node_vulnerable, HistoryChange.node_compliant]
@@ -334,11 +343,13 @@ class NotificationService(Service):
                 id=md5("test", workspace_id),
                 workspace_id=workspace_id,
                 benchmark=BenchmarkName("Example Benchmark"),
-                severity="info",
+                severity=ReportSeverity.info,
                 failed_checks_count_total=2,
                 examples=[
-                    FailedBenchmarkCheck("test-1", "Example Check Only For Testing!", "info", 1, [resource]),
-                    FailedBenchmarkCheck("test-2", "Please Ignore.", "medium", 1, [resource]),
+                    FailedBenchmarkCheck(
+                        "test-1", "Example Check Only For Testing!", ReportSeverity.info, 1, [resource]
+                    ),
+                    FailedBenchmarkCheck("test-2", "Please Ignore.", ReportSeverity.info, 1, [resource]),
                 ],
                 ui_link=ui_link,
             )

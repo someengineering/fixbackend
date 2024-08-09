@@ -49,7 +49,7 @@ from httpx._types import QueryParamTypes
 
 from fixbackend.errors import ClientError
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import CloudAccountId, NodeId
+from fixbackend.ids import CloudAccountId, NodeId, SecurityCheckId
 from fixbackend.inventory.inventory_schemas import CompletePathRequest, HistoryChange
 
 T = TypeVar("T")
@@ -340,7 +340,7 @@ class InventoryClient(Service):
         service: Optional[str] = None,
         category: Optional[str] = None,
         kind: Optional[str] = None,
-        check_ids: Optional[List[str]] = None,
+        check_ids: Optional[List[SecurityCheckId]] = None,
         ids_only: Optional[bool] = None,
     ) -> List[Json]:
         log.info(

@@ -90,6 +90,7 @@ from fixbackend.graph_db.service import GraphDatabaseAccessManager
 from fixbackend.ids import (
     AzureSubscriptionCredentialsId,
     GcpServiceAccountKeyId,
+    ReportSeverity,
     SubscriptionId,
     WorkspaceId,
     BenchmarkName,
@@ -446,6 +447,196 @@ def benchmark_json() -> List[Json]:
     ]
 
 
+def fake_account(
+    account_id: str,
+    cloud_name: str,
+) -> Json:
+
+    benchmark = {
+        "iso27001": {
+            "score": 76,
+            "failed": {
+                "critical": {"checks": 3, "resources": 6},
+                "medium": {"checks": 14, "resources": 18},
+                "high": {"checks": 3, "resources": 3},
+                "info": {"checks": 2, "resources": 8},
+            },
+        },
+        "gcp_test": {
+            "score": 70,
+            "failed": {
+                "high": {"checks": 1, "resources": 1},
+                "medium": {"checks": 15, "resources": 19},
+                "info": {"checks": 2, "resources": 8},
+                "critical": {"checks": 2, "resources": 2},
+            },
+        },
+        "aws_test": {
+            "score": 89,
+            "failed": {
+                "medium": {"checks": 6, "resources": 10},
+                "low": {"checks": 2, "resources": 8},
+                "high": {"checks": 1, "resources": 1},
+                "info": {"checks": 1, "resources": 4},
+            },
+        },
+        "aws_cis_1_5": {
+            "score": 89,
+            "failed": {
+                "medium": {"checks": 6, "resources": 10},
+                "low": {"checks": 2, "resources": 8},
+                "high": {"checks": 1, "resources": 1},
+                "info": {"checks": 1, "resources": 4},
+            },
+        },
+        "aws_well_architected_framework_security_pillar": {
+            "score": 85,
+            "failed": {
+                "high": {"checks": 5, "resources": 8},
+                "low": {"checks": 3, "resources": 12},
+                "medium": {"checks": 29, "resources": 39},
+                "info": {"checks": 2, "resources": 8},
+            },
+        },
+    }
+
+    if cloud_name == "aws":
+        del benchmark["gcp_test"]
+
+    if cloud_name == "gcp":
+        del benchmark["aws_test"]
+
+    return {
+        "id": "CbkG1xZX2-HXjrdMIrX4OQ",
+        "type": "node",
+        "revision": "_iRG9vXm---",
+        "reported": {
+            "id": account_id,
+            "name": f"{cloud_name} account",
+        },
+        "security": {
+            "has_issues": True,
+            "issues": [
+                {
+                    "check": "aws_iam_password_policy_expire_90",
+                    "severity": "high",
+                    "opened_at": "2024-05-06T12:06:12Z",
+                    "benchmarks": ["iso27001", "nis-2", "aws_well_architected_framework_security_pillar"],
+                },
+                {
+                    "check": "aws_c1",
+                    "severity": "medium",
+                    "opened_at": "2024-07-31T03:42:50Z",
+                    "benchmarks": [
+                        "nis-2",
+                        "aws_well_architected_framework_security_pillar",
+                        "aws_cis_1_5",
+                        "aws_test",
+                        "iso27001",
+                    ],
+                },
+                {
+                    "check": "aws_cloudwatch_changes_to_vpcs_alarm_configured",
+                    "severity": "medium",
+                    "opened_at": "2024-06-24T13:53:30Z",
+                    "benchmarks": [
+                        "iso27001",
+                        "gcp_test",
+                    ],
+                },
+                {
+                    "check": "aws_cloudwatch_changes_to_route_table_alarm_configured",
+                    "severity": "medium",
+                    "opened_at": "2024-06-24T13:53:30Z",
+                    "benchmarks": ["iso27001", "nis-2"],
+                },
+                {
+                    "check": "aws_cloudwatch_changes_to_internet_gateway_alarm_configured",
+                    "severity": "medium",
+                    "opened_at": "2024-06-24T13:53:30Z",
+                    "benchmarks": ["iso27001", "nis-2"],
+                },
+                {
+                    "check": "aws_cloudwatch_changes_to_network_acl_alarm_configured",
+                    "severity": "medium",
+                    "opened_at": "2024-06-24T13:53:30Z",
+                    "benchmarks": ["iso27001", "nis-2"],
+                },
+                {
+                    "check": "aws_cloudwatch_changes_to_s3_bucket_policy_alarm_configured",
+                    "severity": "medium",
+                    "opened_at": "2024-06-24T13:53:30Z",
+                    "benchmarks": ["iso27001", "nis-2"],
+                },
+                {
+                    "check": "aws_cloudwatch_cross_account_sharing_enabled",
+                    "severity": "medium",
+                    "opened_at": "2024-07-31T03:42:50Z",
+                    "benchmarks": ["aws_well_architected_framework_security_pillar"],
+                },
+            ],
+            "severity": "high",
+        },
+        "metadata": {
+            "benchmark": benchmark,
+            "categories": [],
+            "cleaned": False,
+            "descendant_count": 265,
+            "descendant_summary": {
+                "aws_s3_bucket": 4,
+                "aws_iam_instance_profile": 1,
+                "aws_cloudfront_cache_policy": 11,
+                "aws_cloudfront_response_headers_policy": 5,
+                "aws_root_user": 1,
+                "aws_iam_role": 26,
+                "aws_iam_policy": 20,
+                "aws_ec2_instance": 1,
+                "aws_ec2_network_interface": 3,
+                "aws_ec2_volume": 2,
+                "aws_ec2_route_table": 19,
+                "aws_vpc": 18,
+                "aws_ec2_security_group": 20,
+                "aws_ec2_internet_gateway": 18,
+                "aws_ec2_network_acl": 18,
+                "aws_ec2_subnet": 57,
+                "aws_athena_work_group": 17,
+                "aws_cloudformation_stack": 10,
+                "aws_cloudwatch_log_group": 3,
+                "aws_lambda_function": 2,
+                "aws_ec2_keypair": 1,
+                "aws_alb": 1,
+                "aws_rds_instance": 1,
+                "aws_rds_snapshot": 4,
+                "aws_ssm_instance": 1,
+                "aws_dynamodb_table": 1,
+            },
+            "exported_at": "2024-08-08T13:44:30Z",
+            "failed": {
+                "high": {"checks": 4, "resources": 7},
+                "medium": {"checks": 22, "resources": 33},
+                "critical": {"checks": 3, "resources": 6},
+                "info": {"checks": 1, "resources": 4},
+                "low": {"checks": 3, "resources": 12},
+            },
+            "phantom": False,
+            "protected": False,
+            "python_type": "fix_plugin_aws.resource.base.AwsAccount",
+            "replace": True,
+            "score": 81.8,
+            "exported_age": "35min11s",
+        },
+        "ancestors": {
+            "cloud": {"reported": {"name": cloud_name, "id": cloud_name}},
+            "account": {"reported": {"name": f"{cloud_name} account", "id": account_id}},
+        },
+    }
+
+
+@pytest.fixture
+def accounts_json() -> List[Json]:
+    return [fake_account("123", "aws"), fake_account("234", "gcp")]
+
+
 @pytest.fixture
 def example_check() -> Json:
     return {
@@ -530,13 +721,13 @@ def alert_failing_benchmark_checks_detected() -> FailingBenchmarkChecksDetected:
         "some_id",
         WorkspaceId(uid()),
         BenchmarkName("benchmark_name"),
-        "critical",
+        ReportSeverity.critical,
         23,
         [
             FailedBenchmarkCheck(
                 "example_check",
                 "Title of check",
-                "critical",
+                ReportSeverity.critical,
                 12,
                 [
                     VulnerableResource(NodeId("id1"), "test_resource_1", "some_name_1", ui_link="https://fix.tt/1"),

@@ -21,7 +21,7 @@ from fixcloudutils.types import Json, JsonElement
 
 from fixbackend.dependencies import FixDependencies, FixDependency, ServiceNames
 from fixbackend.graph_db.models import GraphDatabaseAccess
-from fixbackend.ids import NodeId, ProductTier
+from fixbackend.ids import NodeId, ProductTier, SecurityCheckId
 from fixbackend.inventory.inventory_service import InventoryService
 from fixbackend.inventory.inventory_schemas import (
     CompletePathRequest,
@@ -114,7 +114,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             service=service,
             category=category,
             kind=kind,
-            check_ids=[cid.strip() for cid in check_ids.split(",")] if check_ids else None,
+            check_ids=[SecurityCheckId(cid.strip()) for cid in check_ids.split(",")] if check_ids else None,
             ids_only=ids_only,
         )
 
@@ -154,7 +154,11 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
 
     @router.get("/report-summary", tags=["report"])
     async def summary(graph_db: CurrentGraphDbDependency, workspace: UserWorkspaceDependency) -> ReportSummary:
-        return await inventory().summary(graph_db, workspace)
+        now = utc()
+        duration = timedelta(days=7)
+        if workspace.current_product_tier() == ProductTier.Free:
+            duration = timedelta(days=31)
+        return await inventory().summary(graph_db, workspace, now, duration)
 
     @router.get("/model", tags=["inventory"])
     async def model(

@@ -28,6 +28,7 @@ from fixbackend.graph_db.models import GraphDatabaseAccess
 from fixbackend.ids import (
     CloudNames,
     NotificationProvider as NP,
+    ReportSeverity,
     WorkspaceId,
     TaskId,
     FixCloudAccountId,
@@ -127,7 +128,7 @@ async def test_example_alert(notification_service: NotificationService) -> None:
         access,
         BenchmarkName("aws_cis_2_0"),
         [TaskId("c8b9f9a4-c420-11ee-b3d8-dad780437c54")],
-        "high",
+        ReportSeverity.high,
         one_year_ago,
         now,
     )
@@ -141,9 +142,9 @@ async def test_marshal_unmarshal_alerts() -> None:
         id="some_id",
         workspace_id=WorkspaceId(uid()),
         benchmark=BenchmarkName("aws_cis_2_0"),
-        severity="high",
+        severity=ReportSeverity.high,
         failed_checks_count_total=123,
-        examples=[FailedBenchmarkCheck("test", "Some title", "high", 23, [resource, resource])],
+        examples=[FailedBenchmarkCheck("test", "Some title", ReportSeverity.high, 23, [resource, resource])],
         ui_link="https://foo.com",
     )
     on_channel = AlertOnChannel(alert, NP.email)
@@ -201,7 +202,7 @@ async def test_send_alert(
     # ensure domain event
     assert len(domain_event_sender.events) == 1
     assert domain_event_sender.events[0].kind == "alert_notification_setup_updated"
-    setting = AlertingSetting(severity="high", channels=[NP.discord])
+    setting = AlertingSetting(severity=ReportSeverity.high, channels=[NP.discord])
     aws_cis_2_0 = BenchmarkName("aws_cis_2_0")
     await notification_service.update_alerting_for(WorkspaceAlert(workspace_id=ws_id, alerts={aws_cis_2_0: setting}))
     event = TenantAccountsCollected(
@@ -251,9 +252,9 @@ async def test_alert_settings(notification_service: NotificationService, workspa
     alerting = WorkspaceAlert(
         workspace_id=ws_id,
         alerts={
-            BenchmarkName("foo"): AlertingSetting(severity="high", channels=list(NP)),
-            BenchmarkName("bla"): AlertingSetting(severity="critical", channels=list(NP)),
-            BenchmarkName("bar"): AlertingSetting(severity="info", channels=list(NP)),
+            BenchmarkName("foo"): AlertingSetting(severity=ReportSeverity.high, channels=list(NP)),
+            BenchmarkName("bla"): AlertingSetting(severity=ReportSeverity.high, channels=list(NP)),
+            BenchmarkName("bar"): AlertingSetting(severity=ReportSeverity.high, channels=list(NP)),
         },
     )
     await notification_service.workspace_alert_repo.set_alerting_for_workspace(alerting)
