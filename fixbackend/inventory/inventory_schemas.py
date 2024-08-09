@@ -58,11 +58,7 @@ class BenchmarkSummary(BaseModel):
 
 
 class CheckSummary(BaseModel):
-    available_checks: int = Field(description="The number of all available checks.")
-    failed_checks: int = Field(description="The number of failed checks.")
-    failed_checks_by_severity: Dict[ReportSeverity, int] = Field(description="The number of failed checks by severity.")
     available_resources: int = Field("The number of all available resources.")
-    failed_resources: int = Field(description="The number of failed resources.")
     failed_resources_by_severity: Dict[ReportSeverity, int] = Field(
         description="The number of failed resources by severity."
     )

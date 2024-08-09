@@ -184,17 +184,6 @@ async def test_summary(
     assert len(summary.benchmarks) == 2
     assert summary.overall_score == 82
     # checks summary
-    assert summary.check_summary.available_checks == 8
-    assert summary.check_summary.failed_checks == 172
-    assert summary.check_summary.failed_checks_by_severity == {
-        "critical": 8,
-        "low": 12,
-        "high": 20,
-        "info": 13,
-        "medium": 119,
-    }
-    # two accounts, double the resources
-    assert summary.check_summary.failed_resources == 62 * 2
     assert summary.check_summary.failed_resources_by_severity == {
         "high": 7 * 2,
         "medium": 33 * 2,

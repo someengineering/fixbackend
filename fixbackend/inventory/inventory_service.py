@@ -458,12 +458,6 @@ class InventoryService(Service):
                 async for entry in result:
                     accounts_in_time_period.append(entry)
 
-            # metrics for the summary that we will fill in from the accounts
-            severity_check_counter: Dict[ReportSeverity, int] = defaultdict(int)
-            failed_checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]] = defaultdict(set)
-            benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]] = defaultdict(set)
-            available_checks: Set[SecurityCheckId] = set()
-
             severity_resource_counter: Dict[ReportSeverity, int] = defaultdict(int)
             accounts_by_id: Dict[CloudAccountId, AccountSummary] = {}
 
@@ -488,7 +482,6 @@ class InventoryService(Service):
                             checks = severity_info["checks"]
                             failed_checks[severity] = checks
                             failed_resource_checks[severity] = severity_info["resources"]
-                            severity_check_counter[severity] += checks
 
                         benchmark_account_summaries[BenchmarkId(benchmark_id)][account_id] = BenchmarkAccountSummary(
                             score=info.get("score", 100),
@@ -559,8 +552,12 @@ class InventoryService(Service):
 
             async def benchmark_summary(
                 benmark_account_summaries: Dict[BenchmarkId, Dict[CloudAccountId, BenchmarkAccountSummary]]
-            ) -> BenchmarkById:
+            ) -> Tuple[
+                BenchmarkById, Dict[ReportSeverity, Set[SecurityCheckId]], Dict[SecurityCheckId, Set[BenchmarkId]]
+            ]:
                 summaries: BenchmarkById = {}
+                failed_checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]] = defaultdict(set)
+                benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]] = defaultdict(set)
                 benchmarks = await self.client.benchmarks(db, short=True, with_checks=True)
                 for b in benchmarks:
                     benchmark_id = BenchmarkId(b["id"])
@@ -575,7 +572,12 @@ class InventoryService(Service):
                         account_summary=benmark_account_summaries.get(benchmark_id, {}),
                     )
                     summaries[summary.id] = summary
-                return summaries
+                    for check in b["report_checks"]:
+                        check_id = SecurityCheckId(check["id"])
+                        severity = ReportSeverity(check["severity"])
+                        failed_checks_by_severity[severity].add(check_id)
+                        benchmark_by_check_id[check_id].add(benchmark_id)
+                return summaries, failed_checks_by_severity, benchmark_by_check_id
 
             async def timeseries_infected() -> TimeSeries:
                 start = now - timedelta(days=62 if is_free else 14)
@@ -617,7 +619,7 @@ class InventoryService(Service):
                 return total_score // total_accounts if total_accounts > 0 else 100
 
             (
-                benchmarks,
+                (benchmarks, failed_checks_by_severity, benchmark_by_check_id),
                 vulnerable_changed,
                 compliant_changed,
                 infected_resources_ts,
@@ -641,11 +643,7 @@ class InventoryService(Service):
 
             return ReportSummary(
                 check_summary=CheckSummary(
-                    available_checks=len(available_checks),
-                    failed_checks=sum(v for v in severity_check_counter.values()),
-                    failed_checks_by_severity=severity_check_counter,
                     available_resources=sum(v.resource_count for v in accounts_by_id.values()),
-                    failed_resources=sum(v for v in severity_resource_counter.values()),
                     failed_resources_by_severity=severity_resource_counter,
                 ),
                 overall_score=overall_score(accounts_by_id, now, duration),
@@ -664,11 +662,7 @@ class InventoryService(Service):
             if not isinstance(ex, NoSuchGraph):
                 log.info(f"Inventory not available yet: {ex}. Returning empty summary.")
             empty = CheckSummary(
-                available_checks=0,
-                failed_checks=0,
-                failed_checks_by_severity={},
                 available_resources=0,
-                failed_resources=0,
                 failed_resources_by_severity={},
             )
             return ReportSummary(
