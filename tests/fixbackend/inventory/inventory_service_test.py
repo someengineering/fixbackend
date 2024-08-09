@@ -272,11 +272,7 @@ async def test_no_graph_db_access(
 
     request_handler_mock.append(app)
     empty = CheckSummary(
-        available_checks=0,
-        failed_checks=0,
-        failed_checks_by_severity={},
         available_resources=0,
-        failed_resources=0,
         failed_resources_by_severity={},
     )
     now = utc()
