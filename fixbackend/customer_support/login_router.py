@@ -51,6 +51,7 @@ def auth_router(dependencies: FixDependencies, templates: Jinja2Templates, googl
             google_client,
             auth_backend,
             config.secret,
+            redirect_url=config.support_base_url + "/auth/google/callback",
             is_verified_by_default=True,
             associate_by_email=True,
             state_token_ttl=config.oauth_state_token_ttl,
