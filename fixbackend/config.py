@@ -80,6 +80,7 @@ class Config(BaseSettings):
     slack_oauth_client_id: str
     slack_oauth_client_secret: str
     service_base_url: str
+    support_base_url: str
     push_gateway_url: Optional[str]
     stripe_api_key: Optional[str]
     stripe_webhook_key: Optional[str]
@@ -185,6 +186,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--google-analytics-api-secret", default=os.environ.get("GOOGLE_ANALYTICS_API_SECRET"))
     parser.add_argument("--aws-marketplace-url", default=os.environ.get("AWS_MARKETPLACE_URL", ""))
     parser.add_argument("--service-base-url", default=os.environ.get("SERVICE_BASE_URL", ""))
+    parser.add_argument("--support-base-url", default=os.environ.get("SUPPORT_BASE_URL", ""))
     parser.add_argument(
         "--billing-period",
         choices=["month", "day"],
