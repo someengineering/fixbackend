@@ -453,7 +453,7 @@ class InventoryService(Service):
             # get all account for the given time period
             accounts_in_time_period: List[Json] = []
             async with self.client.search(
-                db, f"search is(account) and /metadata.exported_at>={utc_str(now-duration)} and /metadata.score!=null"
+                db, f"search is(account) and /metadata.exported_at>={utc_str(now-duration)}"
             ) as result:
                 async for entry in result:
                     accounts_in_time_period.append(entry)
