@@ -473,17 +473,18 @@ class CloudAccountService(Service):
                     if workspace is None:
                         log.error(f"Workspace {degraded_event.tenant_id} not found, can't send email")
                         return None
-                    await self.notification_service.send_message_to_workspace(
-                        workspace_id=degraded_event.tenant_id,
-                        message=email.AccountDegraded(
-                            cloud=degraded_event.cloud,
-                            cloud_account_id=degraded_event.account_id,
-                            tenant_id=degraded_event.tenant_id,
-                            workspace_name=workspace.name,
-                            account_name=degraded_event.account_name,
-                            cf_stack_deleted=degraded_event.reason == DegradationReason.stack_deleted,
-                        ),
-                    )
+                    if degraded_event.cloud != CloudNames.GCP:
+                        await self.notification_service.send_message_to_workspace(
+                            workspace_id=degraded_event.tenant_id,
+                            message=email.AccountDegraded(
+                                cloud=degraded_event.cloud,
+                                cloud_account_id=degraded_event.account_id,
+                                tenant_id=degraded_event.tenant_id,
+                                workspace_name=workspace.name,
+                                account_name=degraded_event.account_name,
+                                cf_stack_deleted=degraded_event.reason == DegradationReason.stack_deleted,
+                            ),
+                        )
                     await send_pub_sub_message(degraded_event)
 
                 case ProductTierChanged.kind:
