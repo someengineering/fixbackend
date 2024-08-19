@@ -19,6 +19,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import datetime
 import json
 import uuid
 from datetime import timedelta
@@ -178,7 +179,7 @@ async def test_benchmark_command(
 async def test_summary(
     inventory_service: InventoryService, mocked_answers: RequestHandlerMock, workspace: Workspace
 ) -> None:
-    now = utc()
+    now = datetime.datetime(year=2024, month=8, day=13, hour=16, minute=52, second=38, tzinfo=datetime.timezone.utc)
     duration = timedelta(days=7)
     summary = await inventory_service.summary(db, workspace, now, duration)
     assert len(summary.benchmarks) == 2

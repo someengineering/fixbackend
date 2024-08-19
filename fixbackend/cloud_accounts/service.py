@@ -1099,6 +1099,14 @@ class CloudAccountService(Service):
     async def __degrade_account(
         self, account_id: FixCloudAccountId, error: str, reason: DegradationReason
     ) -> CloudAccount:
+        account = await self.cloud_account_repository.get(account_id)
+        if account is None:
+            raise ResourceNotFound(f"Account {account_id} not found")
+
+        if isinstance(account.state, CloudAccountStates.Degraded):
+            # already in degraded state, no need to do anything
+            return account
+
         def set_degraded(cloud_account: CloudAccount) -> CloudAccount:
             enabled = False
             scan = False
