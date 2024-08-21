@@ -163,6 +163,9 @@ class InMemoryCloudAccountService(CloudAccountService):
     async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
         return None
 
+    async def enable_cloud_accounts(self, workspace_id: WorkspaceId) -> None:
+        return None
+
     async def create_azure_account(
         self,
         *,

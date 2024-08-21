@@ -513,6 +513,10 @@ class CloudAccountService(Service):
                                     self.delete_cloud_account(user_id, cloud_account.id, ptc_evt.workspace_id)
                                 )
 
+                    if new_account_limit > old_account_limit:
+                        # enable accounts if we have more slots
+                        await self.enable_cloud_accounts(ptc_evt.workspace_id)
+
                 case SubscriptionCancelled.kind:
                     evt = SubscriptionCancelled.from_json(message)
                     workspaces = await self.workspace_repository.list_workspaces_by_subscription_id(evt.subscription_id)
@@ -534,6 +538,7 @@ class CloudAccountService(Service):
                         # cleanup payment onhold status
                         await self.workspace_repository.update_payment_on_hold(ws.id, None)
                         await self.next_run_repository.update_next_run_for(ws.id, ws.current_product_tier())
+                        await self.enable_cloud_accounts(ws.id)
 
                 case _:  # pragma: no cover
                     pass  # ignore other domain events
@@ -1156,9 +1161,40 @@ class CloudAccountService(Service):
             disablable = [
                 account
                 for account in all_accounts
-                if isinstance(account.state, (CloudAccountStates.Configured, CloudAccountStates.Discovered))
+                if isinstance(
+                    account.state,
+                    (CloudAccountStates.Configured, CloudAccountStates.Discovered, CloudAccountStates.Degraded),
+                )
+                and account.state.enabled is True
             ]
             # keep the last account_limit accounts
             to_disable = disablable[:-keep_enabled]
             for cloud_account in to_disable:
                 tg.create_task(disable_account(cloud_account))
+
+    async def enable_cloud_accounts(self, workspace_id: WorkspaceId) -> None:
+        async def enable_account(cloud_account: CloudAccount) -> None:
+            try:
+                await self.update_cloud_account_enabled(workspace_id, cloud_account.id, True)
+
+            except Exception as e:
+                log.info(f"Failed to enable account {cloud_account.id}: {e}, skipping")
+
+        tier = await self.workspace_repository.get_product_tier(workspace_id)
+
+        account_limit: Optional[int] = None
+        if not tier.paid:  # non paid tiers can't have more than one account
+            account_limit = 1
+
+        all_accounts = await self.list_accounts(workspace_id)
+        can_be_enabled = [
+            account
+            for account in all_accounts
+            if isinstance(account.state, (CloudAccountStates.Configured, CloudAccountStates.Degraded))
+            and account.state.enabled is False
+        ]
+
+        for idx, cloud_account in enumerate(can_be_enabled):
+            if account_limit and idx >= account_limit:
+                break
+            await enable_account(cloud_account)
