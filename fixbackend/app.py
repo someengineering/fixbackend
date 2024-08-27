@@ -180,23 +180,23 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
     @app.exception_handler(NotAllowed)
     async def access_denied_handler(_: Request, exception: NotAllowed) -> Response:
-        return JSONResponse(status_code=403, content={"message": str(exception)})
+        return JSONResponse(status_code=403, content={"detail": str(exception)})
 
     @app.exception_handler(ResourceNotFound)
     async def resource_not_found_handler(_: Request, exception: ResourceNotFound) -> Response:
-        return JSONResponse(status_code=404, content={"message": str(exception)})
+        return JSONResponse(status_code=404, content={"detail": str(exception)})
 
     @app.exception_handler(InventoryException)
     async def inventory_exception_handler(_: Request, exception: InventoryException) -> Response:
-        return JSONResponse(status_code=exception.status, content={"message": str(exception)})
+        return JSONResponse(status_code=exception.status, content={"detail": str(exception)})
 
     @app.exception_handler(WrongState)
     async def wrong_state_handler(_: Request, exception: WrongState) -> Response:
-        return JSONResponse(status_code=409, content={"message": str(exception)})
+        return JSONResponse(status_code=409, content={"detail": str(exception)})
 
     @app.exception_handler(ClientError)
     async def client_error_handler(_: Request, exception: ClientError) -> Response:
-        return JSONResponse(status_code=400, content={"message": str(exception)})
+        return JSONResponse(status_code=400, content={"detail": str(exception)})
 
     @app.exception_handler(AssertionError)
     async def invalid_data(_: Request, exception: AssertionError) -> Response:
@@ -204,7 +204,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
     @app.exception_handler(FastAPIUsersException)
     async def fastapi_users_handler(_: Request, exception: FastAPIUsersException) -> Response:
-        return JSONResponse(status_code=400, content={"message": "invalid user"})
+        return JSONResponse(status_code=400, content={"detail": "invalid user"})
 
     class EndpointFilter(logging.Filter):
         endpoints_to_filter: ClassVar[Set[str]] = {
