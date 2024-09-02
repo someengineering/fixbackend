@@ -750,7 +750,11 @@ class InventoryService(Service):
                 }
 
             async def progress(
-                metric: str, not_exist: int, group: Optional[Set[str]] = None, aggregation: Optional[str] = None
+                metric: str,
+                not_exist: int,
+                group: Optional[Set[str]] = None,
+                aggregation: Optional[str] = None,
+                filter_group: Optional[List[str]] = None,
             ) -> Tuple[int, int]:
                 async with self.client.timeseries(
                     dba,
@@ -759,6 +763,7 @@ class InventoryService(Service):
                     end=now,
                     granularity=duration,
                     group=group,
+                    filter_group=filter_group,
                     aggregation=aggregation,
                 ) as response:
                     entries = [int(r["v"]) async for r in response]
@@ -819,7 +824,7 @@ class InventoryService(Service):
                 resources_per_account_timeline(),
                 overall_score(),
                 nr_of_changes(),
-                progress("instances_total", 0, group=set(), aggregation="sum"),
+                progress("instances_total", 0, group=set(), aggregation="sum", filter_group=["status==running"]),
                 progress("cores_total", 0, group=set(), aggregation="sum"),
                 progress("memory_bytes", 0, group=set(), aggregation="sum"),
                 progress("volumes_total", 0, group=set(), aggregation="sum"),
