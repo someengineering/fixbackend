@@ -199,7 +199,7 @@ class RedisCollectQueue(CollectQueue):
         job = await self.arq.enqueue_job("post-collect", collect_job, _job_id=job_id, _defer_by=defer_by)
         if job is None:
             raise JobAlreadyEnqueued(f"Failed to enqueue collect job {job_id}")
-        log.info(f"Enqueuing collect job {job.job_id} for tenant={db.workspace_id}")
+        log.info(f"Enqueuing post-collect job {job.job_id} for tenant={db.workspace_id}")
         if wait_until_done:
             # this will either return none or throw an exception (reraised from the worker)
             log.debug("Waiting for collect job to finish.")
