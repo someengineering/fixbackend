@@ -156,6 +156,7 @@ class StatusUpdateEmailCreator:
                 end=now,
                 granularity=timedelta(days=1),
                 group={"account_id"},
+                filter_group=["account_id!=null"],
                 aggregation="sum",
             )
             for scatter in scatters.groups:
