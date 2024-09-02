@@ -221,6 +221,7 @@ class CloudAccountRepository:
                 stored_account.failed_scan_count = cloud_account.failed_scan_count
                 stored_account.last_task_id = cloud_account.last_task_id
                 stored_account.last_scan_resources_errors = cloud_account.last_scan_resources_errors
+                stored_account.last_degraded_scan_started_at = cloud_account.last_degraded_scan_started_at
 
                 self._update_state_dependent_fields(stored_account, cloud_account.state)
 
