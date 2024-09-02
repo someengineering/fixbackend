@@ -610,7 +610,6 @@ async def test_enable_disable_account_scan(client: AsyncClient, workspace: Works
     assert response.status_code == 200
     data = response.json()
     assert data["scan"] is True
-    assert data[""] == 100
 
 
 @pytest.mark.asyncio
