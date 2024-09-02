@@ -201,6 +201,7 @@ async def test_create_aws_cloud_account(
             last_scan_resources_scanned=456,
             last_scan_started_at=timestamp,
             next_scan=timestamp + timedelta(hours=1),
+            last_degraded_scan_started_at=timestamp + timedelta(hours=1),
         ),
     )
     with_last_scan = await cloud_account_repository.get(id=configured_account_id)
@@ -209,6 +210,7 @@ async def test_create_aws_cloud_account(
     assert with_last_scan.last_scan_resources_scanned == 456
     assert with_last_scan.last_scan_started_at == timestamp
     assert with_last_scan.next_scan == next_scan
+    assert with_last_scan.last_degraded_scan_started_at == timestamp + timedelta(hours=1)
 
     # delete
     await cloud_account_repository.delete(id=configured_account_id)
