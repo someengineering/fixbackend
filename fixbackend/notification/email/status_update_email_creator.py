@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 from datetime import timedelta, datetime
-from typing import Optional, Tuple, Set, Dict, cast, Any, Callable
+from typing import Optional, Tuple, Set, Dict, cast, Any, Callable, List
 
 import plotly.graph_objects as go
 from fixcloudutils.asyncio.process_pool import AsyncProcessPool
@@ -124,10 +124,21 @@ class StatusUpdateEmailCreator:
             }
 
         async def progress(
-            metric: str, not_exist: int, group: Optional[Set[str]] = None, aggregation: Optional[str] = None
+            metric: str,
+            not_exist: int,
+            group: Optional[Set[str]] = None,
+            aggregation: Optional[str] = None,
+            filter_group: Optional[List[str]] = None,
         ) -> Tuple[int, int]:
             async with self.inventory_service.client.timeseries(
-                dba, metric, start=now - duration, end=now, granularity=duration, group=group, aggregation=aggregation
+                dba,
+                metric,
+                start=now - duration,
+                end=now,
+                granularity=duration,
+                group=group,
+                filter_group=filter_group,
+                aggregation=aggregation,
             ) as response:
                 entries = [int(r["v"]) async for r in response]
                 if len(entries) == 0:  # timeseries haven't been created yet
@@ -190,7 +201,7 @@ class StatusUpdateEmailCreator:
             resources_per_account_timeline(),
             overall_score(),
             nr_of_changes(),
-            progress("instances_total", 0, group=set(), aggregation="sum"),
+            progress("instances_total", 0, group=set(), aggregation="sum", filter_group=["status==running"]),
             progress("cores_total", 0, group=set(), aggregation="sum"),
             progress("memory_bytes", 0, group=set(), aggregation="sum"),
             progress("volumes_total", 0, group=set(), aggregation="sum"),
