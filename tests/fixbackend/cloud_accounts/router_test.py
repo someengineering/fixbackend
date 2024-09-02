@@ -310,6 +310,7 @@ async def test_last_scan(client: AsyncClient, workspace: Workspace) -> None:
 async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> None:
     cloud_account_service.accounts = {}
     cloud_account_id = FixCloudAccountId(uuid.uuid4())
+    degraded_cloud_account_id = FixCloudAccountId(uuid.uuid4())
     next_scan = datetime.utcnow()
     started_at = datetime.utcnow()
     cloud_account_service.accounts[cloud_account_id] = CloudAccount(
@@ -318,6 +319,29 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
         workspace_id=workspace.id,
         cloud=CloudNames.AWS,
         state=CloudAccountStates.Configured(AwsCloudAccess(external_id, role_name), enabled=True, scan=True),
+        account_name=CloudAccountName("foo"),
+        account_alias=CloudAccountAlias("foo_alias"),
+        user_account_name=UserCloudAccountName("foo_user"),
+        privileged=True,
+        last_scan_duration_seconds=10,
+        last_scan_resources_scanned=100,
+        last_scan_started_at=started_at,
+        last_scan_resources_errors=456,
+        next_scan=next_scan,
+        created_at=utc(),
+        updated_at=utc(),
+        state_updated_at=utc(),
+        cf_stack_version=42,
+        failed_scan_count=123,
+        last_task_id=None,
+        last_degraded_scan_started_at=None,
+    )
+    cloud_account_service.accounts[degraded_cloud_account_id] = CloudAccount(
+        id=degraded_cloud_account_id,
+        account_id=account_id,
+        workspace_id=workspace.id,
+        cloud=CloudNames.AWS,
+        state=CloudAccountStates.Degraded(AwsCloudAccess(external_id, role_name), enabled=True, scan=True, error="foo"),
         account_name=CloudAccountName("foo"),
         account_alias=CloudAccountAlias("foo_alias"),
         user_account_name=UserCloudAccountName("foo_user"),
@@ -355,6 +379,13 @@ async def test_get_cloud_account(client: AsyncClient, workspace: Workspace) -> N
     assert data["last_scan_finished_at"] == (started_at + timedelta(seconds=10)).isoformat()
     assert data["cf_stack_version"] == 42
     assert data["errors"] == 456
+
+    degraded_response = await client.get(f"/api/workspaces/{workspace.id}/cloud_account/{degraded_cloud_account_id}")
+    assert degraded_response.status_code == 200
+    data = degraded_response.json()
+    assert data["state"] == "degraded"
+    assert data["enabled"] is True
+    assert data["scan"] is True
 
 
 @pytest.mark.asyncio
@@ -579,6 +610,7 @@ async def test_enable_disable_account_scan(client: AsyncClient, workspace: Works
     assert response.status_code == 200
     data = response.json()
     assert data["scan"] is True
+    assert data[""] == 100
 
 
 @pytest.mark.asyncio
