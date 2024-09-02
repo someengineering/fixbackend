@@ -95,6 +95,10 @@ class CloudAccountRead(BaseModel):
                 scan = model.state.scan
                 is_configured = True
 
+            case CloudAccountStates.Degraded():
+                enabled = model.state.enabled
+                scan = model.state.scan
+
         last_scan_finished = None
         if model.last_scan_started_at:
             last_scan_finished = model.last_scan_started_at + timedelta(seconds=model.last_scan_duration_seconds)
