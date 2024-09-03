@@ -290,6 +290,15 @@ class UserManager(BaseUserManager[User, UserId]):
         if len(password) < 16:
             raise fastapi_users.InvalidPasswordException(reason="Password is too short. Minimum length: 16 characters.")
 
+        if not re.search(r"[A-Z]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one uppercase letter.")
+
+        if not re.search(r"[a-z]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one lowercase letter.")
+
+        if not re.search(r"[0-9]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one digit.")
+
 
 def get_password_helper(deps: FixDependency) -> PasswordHelperProtocol | None:
     return deps.service(ServiceNames.password_helper, PasswordHelper)
