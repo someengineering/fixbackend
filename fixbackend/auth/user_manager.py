@@ -17,9 +17,10 @@ import logging
 import re
 import secrets
 from concurrent.futures import ProcessPoolExecutor
-from typing import Annotated, Any, Optional, Tuple
+from typing import Annotated, Any, Optional, Tuple, Union
 from uuid import UUID
 
+import fastapi_users
 import pyotp
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, exceptions
@@ -28,7 +29,7 @@ from passlib.context import CryptContext
 from starlette.responses import Response
 
 from fixbackend.auth.models import User
-from fixbackend.auth.schemas import OTPConfig
+from fixbackend.auth.schemas import OTPConfig, UserCreate
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.config import Config
@@ -284,6 +285,19 @@ class UserManager(BaseUserManager[User, UserId]):
         if recovery_code:
             return await self.user_repository.delete_recovery_code(user.id, recovery_code, self.password_helper)
         return False
+
+    async def validate_password(self, password: str, user: Union[UserCreate, User]) -> None:  # type: ignore
+        if len(password) < 16:
+            raise fastapi_users.InvalidPasswordException(reason="Password is too short. Minimum length: 16 characters.")
+
+        if not re.search(r"[A-Z]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one uppercase letter.")
+
+        if not re.search(r"[a-z]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one lowercase letter.")
+
+        if not re.search(r"[0-9]", password):
+            raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one digit.")
 
 
 def get_password_helper(deps: FixDependency) -> PasswordHelperProtocol | None:
