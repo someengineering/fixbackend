@@ -1076,6 +1076,8 @@ class CloudAccountService(Service):
                         scan=scan,
                     )
                     return evolve(cloud_account, state=CloudAccountStates.Configured(access, enabled, scan))
+                case CloudAccountStates.Degraded():
+                    return evolve(cloud_account, state=evolve(cloud_account.state, scan=scan))
                 case _:  # pragma: no cover
                     raise WrongState(f"Account {cloud_account_id} is not configured, cannot enable account")
 
