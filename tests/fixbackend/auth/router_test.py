@@ -249,7 +249,7 @@ async def test_mfa_flow(
     verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
 
     # register user
-    registration_json = {"email": "user2@example.com", "password": "changeme"}
+    registration_json = {"email": "user2@example.com", "password": "changeMe123456789"}
     response = await api_client.post("/api/auth/register", json=registration_json)
     assert response.status_code == 201
 
