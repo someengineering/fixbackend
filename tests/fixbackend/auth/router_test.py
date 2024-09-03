@@ -165,7 +165,7 @@ async def test_registration_flow(
     role_repo = fix_deps.add(ServiceNames.role_repository, InMemoryRoleRepository())
     registration_json = {
         "email": "user@example.com",
-        "password": "changeme",
+        "password": "changeMe123456789",
     }
 
     # register user
