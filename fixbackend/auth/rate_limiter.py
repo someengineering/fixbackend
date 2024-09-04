@@ -25,9 +25,7 @@ class LoginRateLimiter:
         self.refill_rate = limit / window.total_seconds()
 
     def _new_tokens(self, tokens: int, ttl: int) -> float:
-        now = utc().timestamp()
-        last_update = now + ttl - self.window.total_seconds()
-        time_passed = now - last_update
+        time_passed = self.window.total_seconds() - ttl
         return min(self.limit, tokens + time_passed * self.refill_rate)
 
     async def check(self, username: str) -> bool:
@@ -48,45 +46,47 @@ class LoginRateLimiter:
         return new_tokens >= 1
 
     async def consume(self, username: str) -> bool:
-        [tokens, ttl] = await self.redis.eval(
+        allowed = await self.redis.eval(
             dedent(
                 """
                 local bucket_key = KEYS[1]
                 local limit = tonumber(KEYS[2])
                 local window = tonumber(KEYS[3])
+                local now = tonumber(KEYS[4])
+                local refill_rate = limit / window
 
+                -- get or create the bucket and ttl
                 local tokens = redis.call('GET', bucket_key)
                 local ttl = window
-                -- get or create the bucket and ttl
                 if not tokens then
                     redis.call('SET', bucket_key, limit)
-                    redis.call('EXPIRE', bucket_key, window)
                     tokens = limit
                 else
                     ttl = redis.call('TTL', bucket_key)
                     tokens = tonumber(tokens)
                 end
 
-                -- decrement the number of tokens in the bucket if possible
-                if tokens > 0 then
-                    redis.call('DECR', bucket_key)
+                -- calculate the new number of tokens
+                local time_passed = window - ttl
+                local new_tokens = math.min(limit, tokens + time_passed * refill_rate)
+
+                if new_tokens < 1 then
+                    return false
                 end
 
-                return {tokens, ttl}
+                -- decrement the number of tokens in the bucket and update the ttl
+                redis.call('DECR', bucket_key)
+                redis.call('EXPIRE', bucket_key, window)
+
+                return true
             """
             ),
-            3,
+            4,
             f"rate_limit:{username}",
             self.limit,
             int(self.window.total_seconds()),
+            utc().timestamp(),
         )
 
-        tokens = int(tokens)
-        ttl = int(ttl)
-
-        new_tokens = self._new_tokens(tokens, ttl)
-
-        if new_tokens < 1:
-            return False
-
-        return True
+        allowed = bool(allowed)
+        return allowed
