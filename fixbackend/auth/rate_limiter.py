@@ -1,4 +1,5 @@
 from datetime import timedelta
+from textwrap import dedent
 from typing import Tuple
 from fixbackend.types import Redis
 
@@ -23,31 +24,68 @@ class LoginRateLimiter:
         self.window = window
         self.refill_rate = limit / window.total_seconds()
 
-    async def _get_bucket(self, username: str) -> Tuple[float, int]:
-        bucket = await self.redis.hgetall(f"rate_limit:{username}")
-        if not bucket:
-            return utc().timestamp(), self.limit
-        return float(bucket["last_update"]), int(bucket["tokens"])
-
-    async def _update_bucket(self, username: str, last_update: float, tokens: int) -> None:
-        await self.redis.hmset(f"rate_limit:{username}", {"last_update": last_update, "tokens": tokens})
-        await self.redis.expire(f"rate_limit:{username}", int(2 * self.window.total_seconds()))
+    def _new_tokens(self, tokens: int, ttl: int) -> float:
+        now = utc().timestamp()
+        last_update = now + ttl - self.window.total_seconds()
+        time_passed = now - last_update
+        return min(self.limit, tokens + time_passed * self.refill_rate)
 
     async def check(self, username: str) -> bool:
-        last_update, tokens = await self._get_bucket(username)
-        now = utc().timestamp()
-        time_passed = now - last_update
-        new_tokens = min(self.limit, tokens + time_passed * self.refill_rate)
+        [tokens, ttl] = await self.redis.eval(
+            """ local ttl = redis.call('TTL', KEYS[1])
+                local tokens = redis.call('GET', KEYS[1])
+                return {tokens, ttl}
+            """,
+            1,
+            f"rate_limit:{username}",
+        )
+
+        if tokens is None:
+            return True
+        tokens = int(tokens)
+        ttl = int(ttl)
+        new_tokens = self._new_tokens(tokens, ttl)
         return new_tokens >= 1
 
     async def consume(self, username: str) -> bool:
-        last_update, tokens = await self._get_bucket(username)
-        now = utc().timestamp()
-        time_passed = now - last_update
-        new_tokens = min(self.limit, tokens + time_passed * self.refill_rate)
+        [tokens, ttl] = await self.redis.eval(
+            dedent(
+                """
+                local bucket_key = KEYS[1]
+                local limit = tonumber(KEYS[2])
+                local window = tonumber(KEYS[3])
+
+                -- if a bucket doesn't exist, create one
+                local tokens = redis.call('GET', bucket_key)
+                if not tokens then
+                    redis.call('SET', bucket_key, limit)
+                    redis.call('EXPIRE', bucket_key, window)
+                end
+
+                -- get the number of tokens in the bucket and ttl
+                tokens = tonumber(redis.call('GET', bucket_key))
+                local ttl = redis.call('TTL', bucket_key)
+
+                -- decrement the number of tokens in the bucket if possible
+                if tokens > 0 then
+                    redis.call('DECR', bucket_key)
+                end
+
+                return {tokens, ttl}
+            """
+            ),
+            3,
+            f"rate_limit:{username}",
+            self.limit,
+            int(self.window.total_seconds()),
+        )
+
+        tokens = int(tokens)
+        ttl = int(ttl)
+
+        new_tokens = self._new_tokens(tokens, ttl)
 
         if new_tokens < 1:
             return False
 
-        await self._update_bucket(username, now, int(new_tokens) - 1)
         return True

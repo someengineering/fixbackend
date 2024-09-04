@@ -81,7 +81,7 @@ def auth_router(
 ) -> APIRouter:
     router = APIRouter()
 
-    login_rate_limiter = LoginRateLimiter(redis, limit=10, window=timedelta(minutes=10))
+    login_rate_limiter = LoginRateLimiter(redis, limit=4, window=timedelta(minutes=1))
 
     auth_backend = get_auth_backend(config)
 
@@ -191,7 +191,7 @@ def auth_router(
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many login attempts, please try again in 10 minutes",
+                detail="Too many login attempts, please try again in 15 seconds",
             )
         user = await user_manager.authenticate(credentials)
 
