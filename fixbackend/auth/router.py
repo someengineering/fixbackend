@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi_users.authentication import AuthenticationBackend, Strategy
-from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException
+from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException, UserNotExists
 from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.google import GoogleOAuth2
@@ -187,7 +187,7 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
                 maybe_existing = await user_manager.get_by_email(credentials.username)
                 if maybe_existing:
                     metric = FailedLoginAttempts.labels(user_id=maybe_existing.id)
-            except Exception:
+            except UserNotExists:
                 pass
 
             metric.inc()
