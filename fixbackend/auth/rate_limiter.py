@@ -55,16 +55,17 @@ class LoginRateLimiter:
                 local limit = tonumber(KEYS[2])
                 local window = tonumber(KEYS[3])
 
-                -- if a bucket doesn't exist, create one
                 local tokens = redis.call('GET', bucket_key)
+                local ttl = window
+                -- get or create the bucket and ttl
                 if not tokens then
                     redis.call('SET', bucket_key, limit)
                     redis.call('EXPIRE', bucket_key, window)
+                    tokens = limit
+                else
+                    ttl = redis.call('TTL', bucket_key)
+                    tokens = tonumber(tokens)
                 end
-
-                -- get the number of tokens in the bucket and ttl
-                tokens = tonumber(redis.call('GET', bucket_key))
-                local ttl = redis.call('TTL', bucket_key)
 
                 -- decrement the number of tokens in the bucket if possible
                 if tokens > 0 then
