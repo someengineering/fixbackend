@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
 from fastapi_users.authentication import AuthenticationBackend, Strategy
-from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException
+from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException, UserNotExists
 from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
 from httpx_oauth.clients.google import GoogleOAuth2
@@ -182,10 +182,14 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         user = await user_manager.authenticate(credentials)
 
         if user is None or not user.is_active:
-            maybe_existing = await user_manager.get_by_email(credentials.username)
-            metric = FailedLoginAttempts
-            if maybe_existing:
-                metric = FailedLoginAttempts.labels(user_id=maybe_existing.id)
+            metric = FailedLoginAttempts.labels(user_id=None)
+            try:
+                maybe_existing = await user_manager.get_by_email(credentials.username)
+                if maybe_existing:
+                    metric = FailedLoginAttempts.labels(user_id=maybe_existing.id)
+            except UserNotExists:
+                pass
+
             metric.inc()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
