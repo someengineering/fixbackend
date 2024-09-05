@@ -399,6 +399,9 @@ class CloudAccountService(Service):
                                 updated.id, "Too many consecutive failed scans", DegradationReason.other
                             )
 
+                        if updated.failed_scan_count == 0:
+                            await self.__undegrade_account(updated.id)
+
                     await send_pub_sub_message(event)
                     user_id = await self.analytics_event_sender.user_id_from_workspace(event.tenant_id)
                     if first_workspace_collect:
@@ -1149,6 +1152,35 @@ class CloudAccountService(Service):
                 reason=reason,
             )
         )
+        return account
+
+    async def __undegrade_account(self, account_id: FixCloudAccountId) -> CloudAccount:
+        account = await self.cloud_account_repository.get(account_id)
+        if account is None:
+            raise ResourceNotFound(f"Account {account_id} not found")
+
+        if not isinstance(account.state, CloudAccountStates.Degraded):
+            # already in not degraded state, no need to do anything
+            return account
+
+        def set_configured(cloud_account: CloudAccount) -> CloudAccount:
+            enabled = False
+            scan = False
+            match cloud_account.state:
+                case CloudAccountStates.Degraded(_, e, s, _):
+                    enabled = e
+                    scan = s
+
+            if access := cloud_account.state.cloud_access():
+                return evolve(
+                    cloud_account,
+                    state=CloudAccountStates.Configured(access, enabled=enabled, scan=scan),
+                    state_updated_at=utc(),
+                )
+            else:
+                return cloud_account
+
+        account = await self.cloud_account_repository.update(account_id, set_configured)
         return account
 
     async def disable_cloud_accounts(self, workspace_id: WorkspaceId, keep_enabled: int) -> None:
