@@ -26,14 +26,14 @@ class LoginRateLimiter:
         time_passed = self.window.total_seconds() - ttl
         return min(self.limit, tokens + time_passed * self.refill_rate)
 
-    async def check(self, username: str) -> bool:
+    async def check(self, key: str) -> bool:
         [tokens, ttl] = await self.redis.eval(
             """ local ttl = redis.call('TTL', KEYS[1])
                 local tokens = redis.call('GET', KEYS[1])
                 return {tokens, ttl}
             """,
             1,
-            f"rate_limit:{username}",
+            f"rate_limit:{key}",
         )  # type: ignore
 
         if tokens is None:
@@ -43,7 +43,7 @@ class LoginRateLimiter:
         new_tokens = self._new_tokens(tokens, ttl)
         return new_tokens >= 1
 
-    async def consume(self, username: str) -> bool:
+    async def consume(self, key: str) -> bool:
         allowed: int = await self.redis.eval(
             dedent(
                 """
@@ -80,7 +80,7 @@ class LoginRateLimiter:
             """
             ),
             4,
-            f"rate_limit:{username}",
+            f"rate_limit:{key}",
             self.limit,
             int(self.window.total_seconds()),
             utc().timestamp(),

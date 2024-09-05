@@ -187,7 +187,11 @@ def auth_router(
         user_manager: UserManager = Depends(get_user_manager),
         strategy: FixJWTStrategy = Depends(auth_backend.get_strategy),
     ) -> Response:
-        allowed = await login_rate_limiter.check(credentials.username)
+        rate_limiter_key = credentials.username
+        if request.client:
+            rate_limiter_key = f"{rate_limiter_key}:{request.client.host}"
+
+        allowed = await login_rate_limiter.check(rate_limiter_key)
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -196,7 +200,7 @@ def auth_router(
         user = await user_manager.authenticate(credentials)
 
         if user is None:
-            await login_rate_limiter.consume(credentials.username)
+            await login_rate_limiter.consume(rate_limiter_key)
 
         if user is None or not user.is_active:
             metric = FailedLoginAttempts.labels(user_id=None)
