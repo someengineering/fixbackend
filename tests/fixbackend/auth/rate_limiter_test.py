@@ -11,18 +11,18 @@ def rate_limiter(redis: Redis) -> LoginRateLimiter:
 
 
 @pytest.mark.asyncio
-async def test_check(rate_limiter):
+async def test_check(rate_limiter: LoginRateLimiter) -> None:
     assert await rate_limiter.check("user") is True
 
 
 @pytest.mark.asyncio
-async def test_consume(rate_limiter):
+async def test_consume(rate_limiter: LoginRateLimiter) -> None:
     assert await rate_limiter.consume("user") is True
     assert await rate_limiter.check("user") is True
 
 
 @pytest.mark.asyncio
-async def test_consume_exceed_limit(rate_limiter):
+async def test_consume_exceed_limit(rate_limiter: LoginRateLimiter) -> None:
     # Ensure the bucket is empty initially
     for _ in range(5):
         assert await rate_limiter.check("user") is True

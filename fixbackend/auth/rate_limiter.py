@@ -1,6 +1,5 @@
 from datetime import timedelta
 from textwrap import dedent
-from typing import Tuple
 from fixbackend.types import Redis
 
 from fixcloudutils.util import utc
@@ -36,7 +35,7 @@ class LoginRateLimiter:
             """,
             1,
             f"rate_limit:{username}",
-        )
+        )  # type: ignore
 
         if tokens is None:
             return True
@@ -46,7 +45,7 @@ class LoginRateLimiter:
         return new_tokens >= 1
 
     async def consume(self, username: str) -> bool:
-        allowed = await self.redis.eval(
+        allowed: int = await self.redis.eval(
             dedent(
                 """
                 local bucket_key = KEYS[1]
@@ -71,14 +70,14 @@ class LoginRateLimiter:
                 local new_tokens = math.min(limit, tokens + time_passed * refill_rate)
 
                 if new_tokens < 1 then
-                    return false
+                    return 0
                 end
 
                 -- decrement the number of tokens in the bucket and update the ttl
                 redis.call('DECR', bucket_key)
                 redis.call('EXPIRE', bucket_key, window)
 
-                return true
+                return 1
             """
             ),
             4,
@@ -86,7 +85,6 @@ class LoginRateLimiter:
             self.limit,
             int(self.window.total_seconds()),
             utc().timestamp(),
-        )
+        )  # type: ignore
 
-        allowed = bool(allowed)
-        return allowed
+        return bool(allowed)
