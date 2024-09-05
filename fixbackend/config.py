@@ -139,8 +139,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--cdn-bucket", default=os.environ.get("FIXUI_CDN_BUCKET", "fix-ui"))
     parser.add_argument("--fixui-sha", default=os.environ.get("FIXUI_SHA", "edge"))
     parser.add_argument("--static-assets", type=Path, default=os.environ.get("STATIC_ASSETS"))
-    one_week = 3600 * 24 * 7
-    parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", one_week)))
+    two_days = 3600 * 24 * 2
+    parser.add_argument("--session-ttl", type=int, default=int(os.environ.get("SESSION_TTL", two_days)))
     parser.add_argument(
         "--available-db-server", nargs="+", default=os.environ.get("AVAILABLE_DB_SERVER", "").split(",")
     )
