@@ -16,7 +16,6 @@ class LoginRateLimiter:
         :param redis: Redis connection
         :param requests: Maximum number of requests allowed in the window
         :param window: Time window when the requests are counted
-        :param refill_rate: Number of tokens to add to the bucket per second
         """
         self.redis = redis
         self.limit = limit
