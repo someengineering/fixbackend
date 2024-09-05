@@ -1125,6 +1125,7 @@ async def fix_deps(
     gcp_service_account_service: GcpServiceAccountService,
     azure_subscription_service: AzureSubscriptionService,
     jwt_service: JwtService,
+    redis: Redis,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -1150,6 +1151,7 @@ async def fix_deps(
             ServiceNames.gcp_service_account_service: gcp_service_account_service,
             ServiceNames.azure_subscription_service: azure_subscription_service,
             ServiceNames.jwt_service: jwt_service,
+            ServiceNames.temp_store_redis: redis,
         }
     )
 

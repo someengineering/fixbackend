@@ -11,6 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from datetime import timedelta
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
@@ -28,6 +29,7 @@ from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.models import User
 from fixbackend.auth.oauth_clients import GithubOauthClient
 from fixbackend.auth.oauth_router import get_oauth_associate_router, get_oauth_router
+from fixbackend.auth.rate_limiter import LoginRateLimiter
 from fixbackend.auth.schemas import (
     OAuthProviderAssociateUrl,
     OAuthProviderAuthUrl,
@@ -42,6 +44,8 @@ from fixbackend.ids import UserId
 from fastapi_users import schemas
 from disposable_email_domains import blocklist
 from prometheus_client import Counter
+
+from fixbackend.types import Redis
 
 log = getLogger(__name__)
 FailedLoginAttempts = Counter("fixbackend_failed_login_attempts", "Failed login attempts", ["user_id"])
@@ -72,8 +76,12 @@ async def get_associate_url(
     return await client.get_authorization_url(callback_url, state)
 
 
-def auth_router(config: Config, google_client: GoogleOAuth2, github_client: GithubOauthClient) -> APIRouter:
+def auth_router(
+    config: Config, google_client: GoogleOAuth2, github_client: GithubOauthClient, redis: Redis
+) -> APIRouter:
     router = APIRouter()
+
+    login_rate_limiter = LoginRateLimiter(redis, limit=4, window=timedelta(minutes=1))
 
     auth_backend = get_auth_backend(config)
 
@@ -179,7 +187,20 @@ def auth_router(config: Config, google_client: GoogleOAuth2, github_client: Gith
         user_manager: UserManager = Depends(get_user_manager),
         strategy: FixJWTStrategy = Depends(auth_backend.get_strategy),
     ) -> Response:
+        rate_limiter_key = credentials.username
+        if request.client:
+            rate_limiter_key = f"{rate_limiter_key}:{request.client.host}"
+
+        allowed = await login_rate_limiter.check(rate_limiter_key)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many login attempts, please try again in 15 seconds",
+            )
         user = await user_manager.authenticate(credentials)
+
+        if user is None:
+            await login_rate_limiter.consume(rate_limiter_key)
 
         if user is None or not user.is_active:
             metric = FailedLoginAttempts.labels(user_id=None)

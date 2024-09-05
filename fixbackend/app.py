@@ -53,6 +53,7 @@ from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
+from fixbackend.types import Redis
 from fixbackend.workspaces.router import workspaces_router
 from prometheus_client import Counter
 from fastapi_users.exceptions import FastAPIUsersException
@@ -300,7 +301,9 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
-        api_router.include_router(auth_router(cfg, google, github), prefix="/auth", tags=["auth"])
+        api_router.include_router(
+            auth_router(cfg, google, github, deps.service(SN.temp_store_redis, Redis)), prefix="/auth", tags=["auth"]
+        )
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(deps), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces")
