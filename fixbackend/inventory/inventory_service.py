@@ -766,7 +766,7 @@ class InventoryService(Service):
                     filter_group=filter_group,
                     aggregation=aggregation,
                 ) as response:
-                    entries = [int(r["v"]) async for r in response]
+                    entries = [round(r["v"]) async for r in response]
                     if len(entries) == 0:  # timeseries haven't been created yet
                         return not_exist, 0
                     elif len(entries) == 1:  # the timeseries does not exist longer than the current period
