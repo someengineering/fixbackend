@@ -180,6 +180,8 @@ class AzureSubscriptionCredentialsRead(BaseModel):
     workspace_id: WorkspaceId
     can_access_azure_account: Optional[bool]
     created_at: datetime
+    azure_tenant_id: str
+    client_id: str
 
     @staticmethod
     def from_model(model: AzureSubscriptionCredentials) -> "AzureSubscriptionCredentialsRead":
@@ -188,4 +190,6 @@ class AzureSubscriptionCredentialsRead(BaseModel):
             workspace_id=model.tenant_id,
             can_access_azure_account=model.can_access_azure_account,
             created_at=model.created_at,
+            azure_tenant_id=model.azure_tenant_id,
+            client_id=model.client_id,
         )
