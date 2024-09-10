@@ -180,6 +180,10 @@ class SortOrder(BaseModel):
     direction: Literal["asc", "desc"] = Field(description="The sort direction. Only 'asc' and 'desc' are allowed.")
 
 
+class AggregateRequest(BaseModel):
+    query: str = Field(description="The query to execute.")
+
+
 class SearchListGraphRequest(BaseModel):
     query: str = Field(description="The query to execute.")
     with_edges: bool = Field(default=False, description="If the edges should be included.")
