@@ -34,6 +34,7 @@ from fixbackend.inventory.inventory_schemas import (
     UpdateSecurityIgnore,
     InventorySummaryRead,
     HistoryTimelineRequest,
+    AggregateRequest,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -238,6 +239,23 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     ) -> JSONResponse:
         count, result = await inventory().client.complete_property_path(access=graph_db, request=body)
         return JSONResponse(result, headers={"Total-Count": str(count)})
+
+    @router.post(
+        "/aggregate",
+        description="Search the inventory and return the aggregated result.",
+        tags=["search"],
+    )
+    async def aggregate(
+        graph_db: CurrentGraphDbDependency, request: Request, query: AggregateRequest = Body()
+    ) -> StreamOnSuccessResponse:
+        fn, media_type = streaming_response(request.headers.get("accept", "application/json"))
+
+        async def stream() -> AsyncIterator[str]:
+            async with inventory().client.aggregate(graph_db, query.query) as result:
+                async for elem in fn(result):
+                    yield elem
+
+        return StreamOnSuccessResponse(stream(), media_type=media_type)
 
     @router.post(
         "/search",
