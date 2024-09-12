@@ -244,6 +244,7 @@ def default_config() -> Config:
         azure_tenant_id="",
         account_failed_resource_count=1,
         degraded_accounts_ping_interval_hours=24,
+        auth_rate_limit_per_minute=100,
     )
 
 

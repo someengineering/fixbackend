@@ -91,6 +91,7 @@ class Config(BaseSettings):
     azure_client_secret: str
     account_failed_resource_count: int
     degraded_accounts_ping_interval_hours: int
+    auth_rate_limit_per_minute: int
 
     def frontend_cdn_origin(self) -> str:
         return f"{self.cdn_endpoint}/{self.cdn_bucket}/{self.fixui_sha}"
@@ -209,6 +210,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> Namespace:
     parser.add_argument("--azure-client-secret", default=os.environ.get("AZURE_APP_CLIENT_SECRET", ""))
     parser.add_argument("--account-failed-resource-count", default=1)
     parser.add_argument("--degraded-accounts-ping-interval-hours", default=24)
+    parser.add_argument("--auth-rate-limit-per-minute", default=4)
     return parser.parse_known_args(argv if argv is not None else sys.argv[1:])[0]
 
 
