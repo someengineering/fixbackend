@@ -301,11 +301,11 @@ class UserManager(BaseUserManager[User, UserId]):
 
     async def update(
         self,
-        user_update: UserUpdate,
+        user_update: UserUpdate,  # type: ignore
         user: User,
         safe: bool = False,
         request: Optional[Request] = None,
-    ) -> User:  # type: ignore
+    ) -> User:
         if user_update.password:
             if not user_update.current_password:
                 raise exceptions.InvalidPasswordException(reason="Current password is required to update password.")
