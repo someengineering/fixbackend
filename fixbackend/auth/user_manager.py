@@ -310,10 +310,9 @@ class UserManager(BaseUserManager[User, UserId]):
             if not user_update.current_password:
                 raise exceptions.InvalidPasswordException(reason="Current password is required to update password.")
 
-            db_pwd_hash = user.hashed_password
-            user_pwd_hash = self.password_helper.hash(user_update.current_password)
+            verified, _ = self.password_helper.verify_and_update(user_update.current_password, user.hashed_password)
 
-            if not secrets.compare_digest(db_pwd_hash, user_pwd_hash):
+            if not verified:
                 raise exceptions.InvalidPasswordException(reason="Current password is incorrect.")
 
         return await super().update(user_update, user, safe)

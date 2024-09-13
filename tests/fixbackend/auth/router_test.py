@@ -40,6 +40,7 @@ from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InsecureFastPasswordHelper
+from fastapi_users.password import PasswordHelper
 
 
 class InMemoryVerifier(AuthEmailSender):
@@ -156,11 +157,12 @@ async def test_registration_flow(
     workspace_repository: WorkspaceRepository,
     user_repository: UserRepository,
     cert_store: CertificateStore,
-    password_helper: InsecureFastPasswordHelper,
     user_manager: UserManager,
     jwt_strategy: FixJWTStrategy,
     fix_deps: FixDependencies,
 ) -> None:
+
+    user_manager.password_helper = PasswordHelper()
     verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
     role_repo = fix_deps.add(ServiceNames.role_repository, InMemoryRoleRepository())
     registration_json = {
