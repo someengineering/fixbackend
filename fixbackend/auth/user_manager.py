@@ -29,7 +29,7 @@ from passlib.context import CryptContext
 from starlette.responses import Response
 
 from fixbackend.auth.models import User
-from fixbackend.auth.schemas import OTPConfig, UserCreate
+from fixbackend.auth.schemas import OTPConfig, UserCreate, UserUpdate
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.config import Config
@@ -298,6 +298,25 @@ class UserManager(BaseUserManager[User, UserId]):
 
         if not re.search(r"[0-9]", password):
             raise fastapi_users.InvalidPasswordException(reason="Password must contain at least one digit.")
+
+    async def update(
+        self,
+        user_update: UserUpdate,
+        user: User,
+        safe: bool = False,
+        request: Optional[Request] = None,
+    ) -> User:  # type: ignore
+        if user_update.password:
+            if not user_update.current_password:
+                raise exceptions.InvalidPasswordException(reason="Current password is required to update password.")
+
+            db_pwd_hash = user.hashed_password
+            user_pwd_hash = self.password_helper.hash(user_update.current_password)
+
+            if not secrets.compare_digest(db_pwd_hash, user_pwd_hash):
+                raise exceptions.InvalidPasswordException(reason="Current password is incorrect.")
+
+        return await super().update(user_update, user, safe)
 
 
 def get_password_helper(deps: FixDependency) -> PasswordHelperProtocol | None:

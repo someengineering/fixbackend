@@ -35,6 +35,7 @@ class UserCreate(schemas.BaseUserCreate):
 
 
 class UserUpdate(schemas.BaseUserUpdate):
+    current_password: Optional[str] = None
     pass
 
 

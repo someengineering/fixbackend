@@ -234,6 +234,20 @@ async def test_registration_flow(
     assert isinstance(event1, WorkspaceCreated)
     assert str(event1.workspace_id) == workspace_json["id"]
 
+    # password can be reset only with providing a current one
+    response = await api_client.patch(
+        "/api/users/me", json={"password": "foobar@foo.com"}, cookies={session_cookie_name: auth_cookie}
+    )
+    assert response.status_code == 400
+
+    # password can be reset with providing a current one
+    response = await api_client.patch(
+        "/api/users/me",
+        json={"password": "FooBar123456789123456789", "current_password": registration_json["password"]},
+        cookies={session_cookie_name: auth_cookie},
+    )
+    assert response.status_code == 200
+
 
 @pytest.mark.asyncio
 async def test_mfa_flow(
