@@ -35,7 +35,7 @@ class UserCreate(schemas.BaseUserCreate):
 
 
 class UserUpdate(schemas.BaseUserUpdate):
-    pass
+    current_password: Optional[str] = None
 
 
 class OAuthProviderAuthUrl(BaseModel):
