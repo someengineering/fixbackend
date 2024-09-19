@@ -58,11 +58,11 @@ from fixbackend.inventory.inventory_schemas import (
     NoVulnerabilitiesChanged,
     ReportSummary,
     SearchCloudResource,
-    SearchRequest,
     HistorySearch,
     HistoryChange,
     ReportConfig,
     SortOrder,
+    SearchTableRequest,
 )
 from fixbackend.utils import uid
 from fixcloudutils.util import utc
@@ -247,10 +247,10 @@ async def test_summary(
     assert aws.score == 82
     assert aws.failed_resources_by_severity == {"medium": 33, "high": 7, "critical": 6, "info": 4, "low": 12}
     # check becoming vulnerable
-    assert set(summary.changed_vulnerable.accounts_selection) == set(["234", "123"])
+    assert set(summary.changed_vulnerable.accounts_selection) == {"234", "123"}
     assert summary.changed_vulnerable.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_vulnerable.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
-    assert set(summary.changed_compliant.accounts_selection) == set(["234", "123"])
+    assert set(summary.changed_compliant.accounts_selection) == {"234", "123"}
     assert summary.changed_compliant.resource_count_by_severity == {"critical": 1, "medium": 87}
     assert summary.changed_compliant.resource_count_by_kind_selection == {"aws_instance": 87, "gcp_disk": 1}
     # top checks
@@ -310,20 +310,22 @@ async def test_search_table(inventory_service: InventoryService, mocked_answers:
         {"id": "123", "row": {"name": "a", "some_int": 1}},
     ]
     # simple search against the default graph
-    request = SearchRequest(query="is(account) and name==foo")
+    request = SearchTableRequest(query="is(account) and name==foo")
     async with inventory_service.search_table(db, request) as response:
         result = [e async for e in response]
         assert result == expected
     # search in history data
-    request = SearchRequest(query="is(account) and name==foo", history=HistorySearch(change=HistoryChange.node_created))
+    request = SearchTableRequest(
+        query="is(account) and name==foo", history=HistorySearch(change=HistoryChange.node_created)
+    )
     async with inventory_service.search_table(db, request) as response:
         result = [e async for e in response]
         assert result == expected
-    request = SearchRequest(query="is(account) and name==foo")
+    request = SearchTableRequest(query="is(account) and name==foo")
     async with inventory_service.search_table(db, request, "csv") as response:
         result = [e async for e in response]
     assert result == ["name,some_int", "a,1"]
-    request = SearchRequest(
+    request = SearchTableRequest(
         query="is(account) and name==foo", sort=[SortOrder(path="/reported.name", direction="desc")]
     )
     async with inventory_service.search_table(db, request, "csv") as response:

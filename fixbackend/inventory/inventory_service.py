@@ -82,11 +82,11 @@ from fixbackend.inventory.inventory_schemas import (
     CheckSummary,
     SearchStartData,
     SearchCloudResource,
-    SearchRequest,
     TimeSeries,
     ReportConfig,
     Scatter,
     Scatters,
+    SearchTableRequest,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.types import Redis
@@ -172,6 +172,7 @@ class InventoryService(Service):
         self.cache = RedisCache(redis, "inventory", ttl_memory=timedelta(minutes=5), ttl_redis=timedelta(minutes=30))
         worker_queue_name = "arq:inventory_service_queue"
         self.dispatcher = WorkDispatcher(redis_settings, worker_queue_name)
+        # noinspection PyTypeChecker
         self.worker = WorkerInstance(
             redis_settings=redis_settings,
             queue_name=worker_queue_name,
@@ -362,7 +363,7 @@ class InventoryService(Service):
     def search_table(
         self,
         db: GraphDatabaseAccess,
-        request: SearchRequest,
+        request: SearchTableRequest,
         result_format: Literal["table", "csv"] = "table",
     ) -> AsyncContextManager[AsyncIteratorWithContext[JsonElement]]:
         if history := request.history:
@@ -379,6 +380,10 @@ class InventoryService(Service):
         if request.sort:
             cmd += " | sort " + ", ".join(f"{s.path} {s.direction}" for s in request.sort)
         fmt_option = "--csv" if result_format == "csv" else "--json-table"
+        if request.with_defaults:
+            fmt_option += " --with-defaults"
+        if request.properties_to_show:
+            fmt_option += " " + (", ".join(f"{path} as {name}" for path, name in request.properties_to_show.items()))
         cmd += f" | limit {request.skip}, {request.limit} | list {fmt_option}"
         return self.client.execute_single(db, cmd, env={"count": json.dumps(request.count)})
 
@@ -808,6 +813,7 @@ class InventoryService(Service):
                 current, diff = await progress("account_score", 100, group=set(), aggregation="avg")
                 return current, diff
 
+            # noinspection PyTypeChecker
             (
                 scatters,
                 score_progress,

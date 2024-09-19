@@ -28,13 +28,13 @@ from fixbackend.inventory.inventory_schemas import (
     HistoryChange,
     ReportConfig,
     ReportSummary,
-    SearchRequest,
     SearchStartData,
     SearchListGraphRequest,
     UpdateSecurityIgnore,
     InventorySummaryRead,
     HistoryTimelineRequest,
     AggregateRequest,
+    SearchTableRequest,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -302,7 +302,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         tags=["search"],
     )
     async def search_table(
-        graph_db: CurrentGraphDbDependency, request: Request, query: SearchRequest = Body()
+        graph_db: CurrentGraphDbDependency, request: Request, query: SearchTableRequest = Body()
     ) -> StreamOnSuccessResponse:
         accept = request.headers.get("accept", "application/json")
         fn, media_type = streaming_response(accept)
