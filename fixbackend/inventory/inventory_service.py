@@ -886,7 +886,7 @@ class InventoryService(Service):
                 async for acc in response:
                     if level_name := value_in_path(acc, "reported.id"):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
-                        for descendant_kind, count in descendant_summary.items():
+                        for descendant_kind in descendant_summary:
                             counter[descendant_kind][level_name] = 1
 
             return {k: len(v) for k, v in counter.items()}
