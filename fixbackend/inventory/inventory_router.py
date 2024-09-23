@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from datetime import datetime, timedelta
-from typing import Annotated, List, Literal, Optional, AsyncIterator
+from typing import Annotated, List, Literal, Optional, AsyncIterator, Dict
 
 from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
@@ -409,5 +409,17 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             granularity=ts.granularity,
             aggregation=ts.aggregation,
         )
+
+    @router.get("/descendant/summary/{level}", tags=["timeseries"])
+    async def descendant_summary_account(
+        graph_db: CurrentGraphDbDependency, level: Literal["account", "region", "zone"]
+    ) -> Dict[str, Dict[str, int]]:
+        return await inventory().descendant_summary(graph_db, level)
+
+    @router.get("/descendant/count/{level}", tags=["timeseries"])
+    async def descendant_count_account(
+        graph_db: CurrentGraphDbDependency, level: Literal["account", "region", "zone"]
+    ) -> Dict[str, int]:
+        return await inventory().descendant_count_by(graph_db, level)
 
     return router

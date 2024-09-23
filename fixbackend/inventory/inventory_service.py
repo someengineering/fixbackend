@@ -859,3 +859,36 @@ class InventoryService(Service):
             )
 
         return await self.cache.call(compute_inventory_info, key=str(dba.workspace_id))(duration)
+
+    async def descendant_summary(
+        self, dba: GraphDatabaseAccess, kind: Literal["account", "region", "zone"]
+    ) -> Dict[str, Dict[str, int]]:
+
+        async def compute_descendant_summary(on: str) -> Dict[str, Dict[str, int]]:
+            result: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            async with self.client.search(dba, f"is({on}) and /metadata.descendant_count>0") as response:
+                async for acc in response:
+                    if level_name := value_in_path(acc, "reported.id"):
+                        descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
+                        for descendant_kind, count in descendant_summary.items():
+                            result[level_name][descendant_kind] += count
+            return result
+
+        return await self.cache.call(compute_descendant_summary, key=str(dba.workspace_id))(kind)
+
+    async def descendant_count_by(
+        self, dba: GraphDatabaseAccess, kind: Literal["account", "region", "zone"]
+    ) -> Dict[str, int]:
+
+        async def compute_descendant_count_by(on: str) -> Dict[str, int]:
+            counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            async with self.client.search(dba, f"is({on}) and /metadata.descendant_count>0") as response:
+                async for acc in response:
+                    if level_name := value_in_path(acc, "reported.id"):
+                        descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
+                        for descendant_kind, count in descendant_summary.items():
+                            counter[descendant_kind][level_name] = 1
+
+            return {k: len(v) for k, v in counter.items()}
+
+        return await self.cache.call(compute_descendant_count_by, key=str(dba.workspace_id))(kind)
