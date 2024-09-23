@@ -221,6 +221,17 @@ class SearchRequest(BaseModel):
         return base_url + "/inventory?" + urlencode(params) + f"#{workspace_id}"
 
 
+class SearchTableRequest(SearchRequest):
+    properties_to_show: Dict[str, str] = Field(
+        default_factory=dict,
+        description="The properties to show in the table. Key: property path. Value: display name.",
+    )
+    with_defaults: bool = Field(
+        default=False,
+        description="If the default values should be included. Only has an effect when properties_to_show are defined.",
+    )
+
+
 class ReportConfig(BaseModel):
     ignore_checks: Optional[List[str]] = Field(default=None, description="List of checks to ignore.")
     ignore_benchmarks: Optional[List[str]] = Field(default=None, description="List of benchmarks to ignore.")
