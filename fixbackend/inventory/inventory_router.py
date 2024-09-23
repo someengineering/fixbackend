@@ -35,6 +35,8 @@ from fixbackend.inventory.inventory_schemas import (
     InventorySummaryRead,
     HistoryTimelineRequest,
     AggregateRequest,
+    TimeseriesRequest,
+    Scatters,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -393,6 +395,19 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             databases_bytes_progress=info.databases_bytes_progress,
             buckets_objects_progress=info.buckets_objects_progress,
             buckets_size_bytes_progress=info.buckets_size_bytes_progress,
+        )
+
+    @router.post("/timeseries", tags=["timeseries"])
+    async def timeseries(graph_db: CurrentGraphDbDependency, ts: TimeseriesRequest) -> Scatters:
+        return await inventory().timeseries_scattered(
+            graph_db,
+            name=ts.name,
+            start=ts.start,
+            end=ts.end,
+            group=ts.group,
+            filter_group=ts.filter_group,
+            granularity=ts.granularity,
+            aggregation=ts.aggregation,
         )
 
     return router
