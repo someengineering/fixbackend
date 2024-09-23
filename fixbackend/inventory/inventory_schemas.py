@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import timedelta, datetime
 from enum import StrEnum
-from typing import List, Dict, Optional, Literal, Tuple, Union, Any
+from typing import List, Dict, Optional, Literal, Tuple, Union, Any, Set
 from urllib.parse import urlencode
 
 from fixcloudutils.types import Json
@@ -74,7 +74,7 @@ class VulnerabilitiesChanged(BaseModel):
 
 
 class Scatter(BaseModel):
-    group_name: str
+    group_name: str = Field(exclude=True)
     group: Dict[str, Optional[str]]
     values: Dict[datetime, float]
     attributes: Dict[str, Any] = Field(default_factory=dict)
@@ -260,3 +260,13 @@ class InventorySummaryRead(BaseModel):
     databases_bytes_progress: Tuple[int, int]
     buckets_objects_progress: Tuple[int, int]
     buckets_size_bytes_progress: Tuple[int, int]
+
+
+class TimeseriesRequest(BaseModel):
+    name: str
+    start: datetime
+    end: datetime
+    granularity: timedelta
+    group: Optional[Set[str]] = None
+    filter_group: Optional[List[str]] = None
+    aggregation: Optional[str] = None

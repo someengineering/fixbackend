@@ -709,12 +709,13 @@ class InventoryService(Service):
             aggregation=aggregation,
         ) as cursor:
             async for entry in cursor:
-                if (atstr := entry.get("at")) and (group := entry.get("group")) and (v := entry.get("v")):
-                    at = parse_utc_str(str(atstr))
-                    group_name = "::".join(f"{k}={v}" for k, v in sorted(group.items()))
+                if (at_str := entry.get("at")) and (v := entry.get("v")):
+                    at = parse_utc_str(str(at_str))
+                    groups: Json = entry.get("group") or {}
+                    group_name = "::".join(f"{k}={v}" for k, v in sorted(groups.items())) if groups else "all"
                     ats.add(at)
                     points = {at: v}
-                    scatter = Scatter(group_name=group_name, group=group, values=points)
+                    scatter = Scatter(group_name=group_name, group=groups, values=points)
                     if existing := scatters.get(scatter.group_name):
                         existing.values.update(scatter.values)
                     else:
