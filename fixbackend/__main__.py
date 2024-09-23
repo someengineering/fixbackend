@@ -72,6 +72,8 @@ async def start(args: Namespace) -> None:
             "loggers": {},
         },  # minimal config to disable uvicorns logger and use the default one
         factory=False,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
     )
     server = uvicorn.Server(config)
     wait_for_shutdown: Optional[Task[Any]] = None
