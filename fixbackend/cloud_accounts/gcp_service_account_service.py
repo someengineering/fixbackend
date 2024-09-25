@@ -67,7 +67,7 @@ class GcpServiceAccountService(Service):
             service_account_json = json.loads(service_account_key)
             SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
-            credentials = service_account.Credentials.from_service_account_info(service_account_json, scopes=SCOPES)
+            credentials = service_account.Credentials.from_service_account_info(service_account_json, scopes=SCOPES)  # type: ignore # noqa
 
             service = build("cloudresourcemanager", "v1", credentials=credentials)
 
