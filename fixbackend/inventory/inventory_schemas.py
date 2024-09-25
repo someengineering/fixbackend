@@ -270,3 +270,9 @@ class TimeseriesRequest(BaseModel):
     group: Optional[Set[str]] = None
     filter_group: Optional[List[str]] = None
     aggregation: Optional[str] = None
+
+
+class KindUsage(BaseModel):
+    accounts: int = Field(default=0, description="The number of accounts using this kind.")
+    regions: int = Field(default=0, description="The number of regions using this kind.")
+    resources: int = Field(default=0, description="The number of resources of this kind.")

@@ -87,6 +87,7 @@ from fixbackend.inventory.inventory_schemas import (
     Scatter,
     Scatters,
     SearchTableRequest,
+    KindUsage,
 )
 from fixbackend.logging_context import set_cloud_account_id, set_fix_cloud_account_id, set_workspace_id
 from fixbackend.types import Redis
@@ -860,35 +861,29 @@ class InventoryService(Service):
 
         return await self.cache.call(compute_inventory_info, key=str(dba.workspace_id))(duration)
 
-    async def descendant_summary(
-        self, dba: GraphDatabaseAccess, kind: Literal["account", "region", "zone"]
-    ) -> Dict[str, Dict[str, int]]:
+    async def descendant_summary(self, dba: GraphDatabaseAccess) -> Dict[str, KindUsage]:
 
-        async def compute_descendant_summary(on: str) -> Dict[str, Dict[str, int]]:
-            result: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            async with self.client.search(dba, f"is({on}) and /metadata.descendant_count>0") as response:
+        async def compute_descendant_summary() -> Dict[str, KindUsage]:
+            account_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            region_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            async with self.client.search(dba, f"is(account) and /metadata.descendant_count>0") as response:
                 async for acc in response:
-                    if level_name := value_in_path(acc, "reported.id"):
+                    if account_id := value_in_path(acc, "reported.id"):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
                         for descendant_kind, count in descendant_summary.items():
-                            result[level_name][descendant_kind] += count
-            return result
-
-        return await self.cache.call(compute_descendant_summary, key=str(dba.workspace_id))(kind)
-
-    async def descendant_count_by(
-        self, dba: GraphDatabaseAccess, kind: Literal["account", "region", "zone"]
-    ) -> Dict[str, int]:
-
-        async def compute_descendant_count_by(on: str) -> Dict[str, int]:
-            counter: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            async with self.client.search(dba, f"is({on}) and /metadata.descendant_count>0") as response:
+                            account_usage[descendant_kind][account_id] += count
+            async with self.client.search(dba, f"is(region) and /metadata.descendant_count>0") as response:
                 async for acc in response:
-                    if level_name := value_in_path(acc, "reported.id"):
+                    if region_id := value_in_path(acc, "reported.id"):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
-                        for descendant_kind in descendant_summary:
-                            counter[descendant_kind][level_name] = 1
+                        for descendant_kind, count in descendant_summary.items():
+                            region_usage[descendant_kind][region_id] += count
+            kind_usage: Dict[str, KindUsage] = defaultdict(lambda: KindUsage())
+            for kind, accounts in account_usage.items():
+                kind_usage[kind].accounts = len(accounts)
+                kind_usage[kind].resources = sum(accounts.values())
+            for kind, regions in region_usage.items():
+                kind_usage[kind].regions = len(regions)
+            return kind_usage
 
-            return {k: len(v) for k, v in counter.items()}
-
-        return await self.cache.call(compute_descendant_count_by, key=str(dba.workspace_id))(kind)
+        return await self.cache.call(compute_descendant_summary, key=str(dba.workspace_id))()

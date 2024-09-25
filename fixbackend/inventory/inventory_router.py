@@ -37,6 +37,7 @@ from fixbackend.inventory.inventory_schemas import (
     SearchTableRequest,
     TimeseriesRequest,
     Scatters,
+    KindUsage,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -167,6 +168,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
     async def model(
         graph_db: CurrentGraphDbDependency,
         kind: Optional[List[str]] = Query(default=None, description="Kinds to return."),
+        kind_filter: Optional[List[str]] = Query(default=None, description="Kind filter to apply."),
         with_bases: bool = Query(default=False, description="Include base kinds."),
         with_property_kinds: bool = Query(default=False, description="Include property kinds."),
         aggregate_roots_only: bool = Query(default=True, description="Include only aggregate roots."),
@@ -179,6 +181,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             graph_db,
             result_format="simple",
             kind=kind,
+            kind_filter=kind_filter,
             with_bases=with_bases,
             with_property_kinds=with_property_kinds,
             aggregate_roots_only=aggregate_roots_only,
@@ -410,16 +413,8 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             aggregation=ts.aggregation,
         )
 
-    @router.get("/descendant/summary/{level}", tags=["timeseries"])
-    async def descendant_summary_account(
-        graph_db: CurrentGraphDbDependency, level: Literal["account", "region", "zone"]
-    ) -> Dict[str, Dict[str, int]]:
-        return await inventory().descendant_summary(graph_db, level)
-
-    @router.get("/descendant/count/{level}", tags=["timeseries"])
-    async def descendant_count_account(
-        graph_db: CurrentGraphDbDependency, level: Literal["account", "region", "zone"]
-    ) -> Dict[str, int]:
-        return await inventory().descendant_count_by(graph_db, level)
+    @router.get("/descendant/summary", tags=["search"])
+    async def descendant_summary_account(graph_db: CurrentGraphDbDependency) -> Dict[str, KindUsage]:
+        return await inventory().descendant_summary(graph_db)
 
     return router
