@@ -866,13 +866,13 @@ class InventoryService(Service):
         async def compute_descendant_summary() -> Dict[str, KindUsage]:
             account_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
             region_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            async with self.client.search(dba, f"is(account) and /metadata.descendant_count>0") as response:
+            async with self.client.search(dba, "is(account) and /metadata.descendant_count>0") as response:
                 async for acc in response:
                     if account_id := value_in_path(acc, "reported.id"):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
                         for descendant_kind, count in descendant_summary.items():
                             account_usage[descendant_kind][account_id] += count
-            async with self.client.search(dba, f"is(region) and /metadata.descendant_count>0") as response:
+            async with self.client.search(dba, "is(region) and /metadata.descendant_count>0") as response:
                 async for acc in response:
                     if region_id := value_in_path(acc, "reported.id"):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
