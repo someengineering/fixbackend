@@ -878,7 +878,7 @@ class InventoryService(Service):
                         descendant_summary = value_in_path(acc, "metadata.descendant_summary") or {}
                         for descendant_kind, count in descendant_summary.items():
                             region_usage[descendant_kind][region_id] += count
-            kind_usage: Dict[str, KindUsage] = defaultdict(lambda: KindUsage())
+            kind_usage: Dict[str, KindUsage] = defaultdict(KindUsage)
             for kind, accounts in account_usage.items():
                 kind_usage[kind].accounts = len(accounts)
                 kind_usage[kind].resources = sum(accounts.values())
