@@ -27,7 +27,7 @@ from fixcloudutils.service import Service
 from fixcloudutils.util import utc
 from azure.core.credentials_async import AsyncTokenCredential
 
-from msgraph import GraphServiceClient
+from msgraph import GraphServiceClient  # type: ignore
 from msgraph.generated.models.application import Application
 from msgraph.generated.models.password_credential import PasswordCredential
 from msgraph.generated.applications.item.add_password.add_password_post_request_body import AddPasswordPostRequestBody
@@ -238,10 +238,10 @@ class AzureSubscriptionService(Service):
             if service_principal is None:
                 log.error("Failed to create app registration: service_principal is None")
                 return None
-            service_principal_id = service_principal.id
-            if service_principal_id is None:
-                log.error("Failed to create app registration: service_principal_id is None")
+            if service_principal.id is None:
+                log.error("Failed to create app registration: service_principal.id is None")
                 return None
+            service_principal_id = service_principal.id
             log.info("created service principal")
 
             # list all subscriptions
