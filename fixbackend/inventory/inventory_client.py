@@ -245,7 +245,7 @@ class InventoryClient(Service):
         if after:
             params["after"] = utc_str(after)
         if change:
-            params["change"] = ",".join(c.value for c in change)
+            params["change"] = ",".join(change)
         return self._stream(
             "POST",
             f"/graph/{graph}/search/history/list",
@@ -468,7 +468,7 @@ class InventoryClient(Service):
         # format options
         with_properties: bool = True,
         with_relatives: bool = True,
-        with_metadata: bool = True,
+        with_metadata: Union[bool, List[str]] = True,
         graph: str = DefaultGraph,
     ) -> List[Json]:
         log.info(f"Get model with flat={flat}, with_bases={with_bases}, with_property_kinds={with_property_kinds}")
@@ -482,7 +482,7 @@ class InventoryClient(Service):
             "aggregate_roots_only": json.dumps(aggregate_roots_only),
             "with_properties": json.dumps(with_properties),
             "with_relatives": json.dumps(with_relatives),
-            "with_metadata": json.dumps(with_metadata),
+            "with_metadata": ",".join(with_metadata) if isinstance(with_metadata, list) else json.dumps(with_metadata),
         }
         response = await self._request(
             "GET",
