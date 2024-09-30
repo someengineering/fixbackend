@@ -13,7 +13,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 from datetime import datetime, timedelta
-from typing import Annotated, List, Literal, Optional, AsyncIterator, Dict
+from typing import Annotated, List, Literal, Optional, AsyncIterator, Dict, Union
 
 from fastapi import APIRouter, Body, Depends, Form, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
@@ -174,7 +174,7 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
         aggregate_roots_only: bool = Query(default=True, description="Include only aggregate roots."),
         with_properties: bool = Query(default=True, description="Include properties."),
         with_relatives: bool = Query(default=True, description="Include property kinds."),
-        with_metadata: bool = Query(default=True, description="Include property kinds."),
+        with_metadata: Union[bool, List[str]] = Query(default=True, description="Include property kinds."),
         flat: bool = Query(default=True, description="Return a flat list of kinds."),
     ) -> List[Json]:
         return await inventory().client.model(
