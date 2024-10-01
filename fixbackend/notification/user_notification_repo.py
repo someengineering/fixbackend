@@ -102,7 +102,11 @@ class UserNotificationSettingsRepository:
             value = await session.get(UserNotificationSettingsEntity, user_id)
             if value is None:
                 value = UserNotificationSettingsEntity(
-                    user_id=user_id, weekly_report=True, inactivity_reminder=True, tutorial=True
+                    user_id=user_id,
+                    weekly_report=True,
+                    inactivity_reminder=True,
+                    tutorial=True,
+                    marketing=True,
                 )
                 session.add(value)
             if weekly_report is not None:
