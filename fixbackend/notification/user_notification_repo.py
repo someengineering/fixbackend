@@ -31,9 +31,10 @@ from fixbackend.types import AsyncSessionMaker
 @frozen
 class UserNotificationSettings:
     user_id: UserId
-    weekly_report: bool
-    inactivity_reminder: bool
-    tutorial: bool
+    weekly_report: bool = True
+    inactivity_reminder: bool = True
+    tutorial: bool = True
+    marketing: bool = True
 
 
 class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
@@ -43,6 +44,7 @@ class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
     weekly_report: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     inactivity_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tutorial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    marketing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def to_model(self) -> UserNotificationSettings:
         return UserNotificationSettings(
@@ -50,6 +52,7 @@ class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
             tutorial=self.tutorial,
+            marketing=self.marketing,
         )
 
     @staticmethod
@@ -59,6 +62,7 @@ class UserNotificationSettingsEntity(CreatedUpdatedMixin, Base):
             weekly_report=settings.weekly_report,
             inactivity_reminder=settings.inactivity_reminder,
             tutorial=settings.tutorial,
+            marketing=settings.marketing,
         )
 
 
@@ -72,9 +76,7 @@ class UserNotificationSettingsRepository:
             if result := await session.get(UserNotificationSettingsEntity, user_id):
                 return result.to_model()
             else:
-                return UserNotificationSettings(
-                    user_id=user_id, weekly_report=True, inactivity_reminder=True, tutorial=True
-                )
+                return UserNotificationSettings(user_id=user_id)
 
     async def update_notification_settings(
         self,
@@ -83,6 +85,7 @@ class UserNotificationSettingsRepository:
         weekly_report: Optional[bool] = None,
         inactivity_reminder: Optional[bool] = None,
         tutorial: Optional[bool] = None,
+        marketing: Optional[bool] = None,
     ) -> UserNotificationSettings:
         async with self.session_maker() as session:
             if isinstance(user_id_or_email, str):
@@ -108,6 +111,8 @@ class UserNotificationSettingsRepository:
                 value.inactivity_reminder = inactivity_reminder
             if tutorial is not None:
                 value.tutorial = tutorial
+            if marketing is not None:
+                value.marketing = marketing
             settings = value.to_model()
             await session.commit()
             return settings
