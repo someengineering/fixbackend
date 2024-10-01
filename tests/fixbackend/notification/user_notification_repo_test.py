@@ -41,6 +41,7 @@ async def test_user_notification_settings_repo(async_session_maker: AsyncSession
     assert updated.weekly_report is False
     assert updated.inactivity_reminder is True
     assert updated.tutorial is False
+    assert updated.marketing is True
 
     # get updated settings
     settings = await repo.get_notification_settings(user.id)
@@ -48,6 +49,7 @@ async def test_user_notification_settings_repo(async_session_maker: AsyncSession
     assert settings.weekly_report is False
     assert settings.inactivity_reminder is True
     assert settings.tutorial is False
+    assert settings.marketing is True
 
     # update via email settings
     updated = await repo.update_notification_settings(
@@ -56,3 +58,4 @@ async def test_user_notification_settings_repo(async_session_maker: AsyncSession
     assert updated.weekly_report is True
     assert updated.inactivity_reminder is False
     assert updated.tutorial is True
+    assert updated.marketing is True

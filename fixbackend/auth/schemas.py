@@ -80,6 +80,7 @@ class UserNotificationSettingsRead(BaseModel):
     weekly_report: bool = Field(description="Whether to receive a weekly report")
     inactivity_reminder: bool = Field(description="Whether to receive a reminder for open incidents")
     tutorial: bool = Field(description="Whether to receive tutorial emails")
+    marketing: bool = Field(description="Whether to receive marketing emails")
 
     @staticmethod
     def from_model(model: UserNotificationSettings) -> "UserNotificationSettingsRead":
@@ -87,6 +88,7 @@ class UserNotificationSettingsRead(BaseModel):
             weekly_report=model.weekly_report,
             inactivity_reminder=model.inactivity_reminder,
             tutorial=model.tutorial,
+            marketing=model.marketing,
         )
 
     def to_model(self, user_id: UserId) -> UserNotificationSettings:
@@ -95,6 +97,7 @@ class UserNotificationSettingsRead(BaseModel):
             weekly_report=self.weekly_report,
             inactivity_reminder=self.inactivity_reminder,
             tutorial=self.tutorial,
+            marketing=self.marketing,
         )
 
 
@@ -104,6 +107,7 @@ class UserNotificationSettingsWrite(BaseModel):
         default=None, description="Whether to receive a reminder for open incidents"
     )
     tutorial: Optional[bool] = Field(default=None, description="Whether to receive tutorial emails")
+    marketing: Optional[bool] = Field(default=None, description="Whether to receive marketing emails")
 
 
 class OTPConfig(BaseModel):

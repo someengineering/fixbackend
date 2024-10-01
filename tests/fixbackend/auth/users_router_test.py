@@ -43,8 +43,8 @@ async def client(
 async def test_user_notification_settings(client: AsyncClient) -> None:
     response = await client.get("/api/users/me/settings/notifications")
     assert response.status_code == 200
-    assert response.json() == {"inactivity_reminder": True, "weekly_report": True, "tutorial": True}
+    assert response.json() == {"inactivity_reminder": True, "weekly_report": True, "tutorial": True, "marketing": True}
 
     response = await client.put("/api/users/me/settings/notifications", json={"weekly_report": False})
     assert response.status_code == 200
-    assert response.json() == {"inactivity_reminder": True, "weekly_report": False, "tutorial": True}
+    assert response.json() == {"inactivity_reminder": True, "weekly_report": False, "tutorial": True, "marketing": True}
