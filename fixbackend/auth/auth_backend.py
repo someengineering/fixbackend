@@ -92,12 +92,12 @@ async def get_session_strategy(fix: FixDependency) -> Strategy[User, UserId]:
     return fix.service(ServiceNames.jwt_strategy, FixJWTStrategy)
 
 
-session_cookie_name = "session_token"
+SessionCookie = "session_token"
 
 
 def cookie_transport(session_ttl: int) -> CookieTransport:
     return CookieTransport(
-        cookie_name=session_cookie_name,
+        cookie_name=SessionCookie,
         cookie_secure=True,
         cookie_httponly=True,
         cookie_samesite="lax",

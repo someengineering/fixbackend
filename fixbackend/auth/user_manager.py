@@ -25,6 +25,7 @@ import pyotp
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, exceptions
 from fastapi_users.password import PasswordHelperProtocol, PasswordHelper
+from fixcloudutils.util import utc
 from passlib.context import CryptContext
 from starlette.responses import Response
 
@@ -104,6 +105,8 @@ class UserManager(BaseUserManager[User, UserId]):
         await super().on_after_login(user, request, response)
         log.info(f"User logged in: {user.email} ({user.id})")
         await self.domain_events_publisher.publish(UserLoggedIn(user.id, user.email))
+        now = utc()
+        await self.user_repository.update_partial(user.id, last_active=now, last_login=now)
 
     async def add_to_workspace(self, user: User) -> None:
         if (
