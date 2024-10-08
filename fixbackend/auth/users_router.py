@@ -11,16 +11,23 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import logging
 
 from fastapi.routing import APIRouter
+from fixcloudutils.util import utc
+from starlette.responses import Response
+
 from fixbackend.auth.depedencies import AuthenticatedUser, fastapi_users
 from fixbackend.auth.schemas import UserNotificationSettingsRead, UserRead, UserUpdate, UserNotificationSettingsWrite
+from fixbackend.auth.user_repository import UserRepository
+from fixbackend.dependencies import FixDependencies, ServiceNames
 
 from fixbackend.notification.user_notification_repo import UserNotificationSettingsRepositoryDependency
 
+log = logging.getLogger(__name__)
 
-def users_router() -> APIRouter:
+
+def users_router(dependencies: FixDependencies) -> APIRouter:
     router = APIRouter()
 
     router.include_router(fastapi_users.get_users_router(UserRead, UserUpdate))
@@ -39,7 +46,15 @@ def users_router() -> APIRouter:
         notification_settings: UserNotificationSettingsWrite,
         user_notification_repo: UserNotificationSettingsRepositoryDependency,
     ) -> UserNotificationSettingsRead:
-        updated = await user_notification_repo.update_notification_settings(user.id, **notification_settings.dict())
+        updated = await user_notification_repo.update_notification_settings(
+            user.id, **notification_settings.model_dump()
+        )
         return UserNotificationSettingsRead.from_model(updated)
+
+    @router.post("/me/active")
+    async def signal_active(user: AuthenticatedUser) -> Response:
+        log.info(f"User {user.id} send an active signal")
+        await dependencies.service(ServiceNames.user_repo, UserRepository).update_partial(user.id, last_active=utc())
+        return Response(status_code=204)
 
     return router

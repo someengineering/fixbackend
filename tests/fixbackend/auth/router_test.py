@@ -22,7 +22,7 @@ from pyotp import TOTP
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fixbackend.auth.auth_backend import session_cookie_name, FixJWTStrategy
+from fixbackend.auth.auth_backend import SessionCookie, FixJWTStrategy
 from fixbackend.auth.models import User
 from fixbackend.auth.models.orm import UserMFARecoveryCode
 from fixbackend.auth.schemas import OTPConfig
@@ -62,7 +62,7 @@ class InMemoryDomainSender(DomainEventPublisher):
 
 class InMemoryInvitationRepo(InvitationRepository):
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # noqa
         pass
 
     async def get_invitation_by_email(self, email: str) -> Optional[WorkspaceInvitation]:
@@ -90,7 +90,7 @@ class InMemoryInvitationRepo(InvitationRepository):
 
 
 class InMemoryRoleRepository(RoleRepository):
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # noqa
         self.roles: List[UserRole] = []
 
     @override
@@ -206,7 +206,7 @@ async def test_registration_flow(
     # verified can login
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 204
-    auth_cookie = response.cookies.get(session_cookie_name)
+    auth_cookie = response.cookies.get(SessionCookie)
     assert auth_cookie is not None
 
     # role is set on login
@@ -214,12 +214,12 @@ async def test_registration_flow(
     assert auth_token["payload"]["permissions"] == {str(workspace.id): workspace_owner_permissions.value}
 
     # workspace can be listed
-    response = await api_client.get("/api/workspaces/", cookies={session_cookie_name: auth_cookie})
+    response = await api_client.get("/api/workspaces/", cookies={SessionCookie: auth_cookie})
     workspace_json = response.json()[0]
     assert workspace_json.get("name") == user.email
 
     # workspace can be viewed by an owner
-    response = await api_client.get(f"/api/workspaces/{workspace.id}", cookies={session_cookie_name: auth_cookie})
+    response = await api_client.get(f"/api/workspaces/{workspace.id}", cookies={SessionCookie: auth_cookie})
     assert response.status_code == 200
     workspace_json = response.json()
     assert workspace_json.get("name") == user.email
@@ -238,7 +238,7 @@ async def test_registration_flow(
 
     # password can be reset only with providing a current one
     response = await api_client.patch(
-        "/api/users/me", json={"password": "foobar@foo.com"}, cookies={session_cookie_name: auth_cookie}
+        "/api/users/me", json={"password": "foobar@foo.com"}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 400
 
@@ -246,7 +246,7 @@ async def test_registration_flow(
     response = await api_client.patch(
         "/api/users/me",
         json={"password": "FooBar123456789123456789", "current_password": registration_json["password"]},
-        cookies={session_cookie_name: auth_cookie},
+        cookies={SessionCookie: auth_cookie},
     )
     assert response.status_code == 200
 
@@ -278,16 +278,16 @@ async def test_mfa_flow(
     login_json = {"username": registration_json["email"], "password": registration_json["password"]}
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 204
-    auth_cookie = response.cookies.get(session_cookie_name)
+    auth_cookie = response.cookies.get(SessionCookie)
     assert auth_cookie is not None
 
     # mfa can be added and enabled
-    response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
+    response = await api_client.post("/api/auth/mfa/add", cookies={SessionCookie: auth_cookie})
     assert response.status_code == 200
     otp_config = OTPConfig.model_validate(response.json())
     totp = TOTP(otp_config.secret)
     response = await api_client.post(
-        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 204
 
@@ -301,13 +301,13 @@ async def test_mfa_flow(
 
     # mfa can-not be disabled without valid otp
     response = await api_client.post(
-        "/api/auth/mfa/disable", data={"otp": "wrong"}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/disable", data={"otp": "wrong"}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 428
 
     # mfa can be disabled with otp
     response = await api_client.post(
-        "/api/auth/mfa/disable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/disable", data={"otp": totp.now()}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 204
 
@@ -316,12 +316,12 @@ async def test_mfa_flow(
     assert response.status_code == 204
 
     # enable mfa again
-    response = await api_client.post("/api/auth/mfa/add", cookies={session_cookie_name: auth_cookie})
+    response = await api_client.post("/api/auth/mfa/add", cookies={SessionCookie: auth_cookie})
     assert response.status_code == 200
     otp_config = OTPConfig.model_validate(response.json())
     totp = TOTP(otp_config.secret)
     response = await api_client.post(
-        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/enable", data={"otp": totp.now()}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 204
 
@@ -348,7 +348,7 @@ async def test_mfa_flow(
 
     # mfa can-not be disabled without valid recovery code
     response = await api_client.post(
-        "/api/auth/mfa/disable", data={"recovery_code": "wrong"}, cookies={session_cookie_name: auth_cookie}
+        "/api/auth/mfa/disable", data={"recovery_code": "wrong"}, cookies={SessionCookie: auth_cookie}
     )
     assert response.status_code == 428
 
@@ -356,6 +356,6 @@ async def test_mfa_flow(
     response = await api_client.post(
         "/api/auth/mfa/disable",
         data={"recovery_code": otp_config.recovery_codes[1]},
-        cookies={session_cookie_name: auth_cookie},
+        cookies={SessionCookie: auth_cookie},
     )
     assert response.status_code == 204

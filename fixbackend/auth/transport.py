@@ -21,6 +21,8 @@ from fastapi_users.openapi import OpenAPIResponseType
 
 from fixbackend.auth.cookies import APIKeyCookie
 
+FixAuthenticatedCookie = "fix.authenticated"
+
 
 class CookieTransport(Transport):
     scheme: APIKeyCookie
@@ -53,7 +55,7 @@ class CookieTransport(Transport):
         return self._set_logout_cookie(response)
 
     def _set_login_cookie(self, response: Response, token: str) -> Response:
-        response.set_cookie("fix.authenticated", value="1", samesite="lax", max_age=self.cookie_max_age)
+        response.set_cookie(FixAuthenticatedCookie, value="1", samesite="lax", max_age=self.cookie_max_age)
         response.set_cookie(
             self.cookie_name,
             token,
@@ -67,7 +69,7 @@ class CookieTransport(Transport):
         return response
 
     def _set_logout_cookie(self, response: Response) -> Response:
-        response.set_cookie("fix.authenticated", value="0", samesite="lax", max_age=self.cookie_max_age)
+        response.set_cookie(FixAuthenticatedCookie, value="0", samesite="lax", max_age=self.cookie_max_age)
         response.set_cookie(
             self.cookie_name,
             "",

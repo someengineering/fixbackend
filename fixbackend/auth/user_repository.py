@@ -11,7 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+from datetime import datetime
 from typing import Annotated, Any, AsyncIterator, Dict, List, Optional, Sequence
 from uuid import UUID
 
@@ -110,6 +110,19 @@ class UserRepository(BaseUserDatabase[User, UserId]):
         async with self.user_db() as db:
             user = await db.create(create_dict)
             return user.to_model()
+
+    async def update_partial(
+        self, uid: UserId, last_login: Optional[datetime] = None, last_active: Optional[datetime] = None
+    ) -> None:
+        async with self.user_db() as db:
+            orm_user = await db.session.get(orm.User, uid)
+            if orm_user is None:
+                raise ValueError(f"User {uid} not found")
+            if last_login:
+                orm_user.last_login = last_login
+            if last_active:
+                orm_user.last_active = last_active
+            await db.session.commit()
 
     async def update(self, user: User, update_dict: Dict[str, Any]) -> User:
         """Update a user."""

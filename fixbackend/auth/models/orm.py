@@ -69,6 +69,8 @@ class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
     roles: Mapped[List[UserRoleAssignmentEntity]] = relationship(
         "UserRoleAssignmentEntity", backref="user", lazy="joined"
     )
+    last_login: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_active: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     def to_model(self) -> models.User:
         return models.User(
