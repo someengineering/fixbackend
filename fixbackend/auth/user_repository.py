@@ -112,7 +112,11 @@ class UserRepository(BaseUserDatabase[User, UserId]):
             return user.to_model()
 
     async def update_partial(
-        self, uid: UserId, last_login: Optional[datetime] = None, last_active: Optional[datetime] = None
+        self,
+        uid: UserId,
+        last_login: Optional[datetime] = None,
+        last_active: Optional[datetime] = None,
+        auth_min_time: Optional[datetime] = None,
     ) -> None:
         async with self.user_db() as db:
             orm_user = await db.session.get(orm.User, uid)
@@ -122,6 +126,8 @@ class UserRepository(BaseUserDatabase[User, UserId]):
                 orm_user.last_login = last_login
             if last_active:
                 orm_user.last_active = last_active
+            if auth_min_time:
+                orm_user.auth_min_time = auth_min_time
             await db.session.commit()
 
     async def update(self, user: User, update_dict: Dict[str, Any]) -> User:
@@ -145,7 +151,8 @@ class UserRepository(BaseUserDatabase[User, UserId]):
         """Delete a user."""
 
         async with self.user_db() as db:
-            await db.delete(orm.User.from_model(user))
+            await db.session.execute(delete(orm.User).where(orm.User.id == user.id))  # type: ignore
+            await db.session.commit()
 
     async def add_oauth_account(self, user: User, create_dict: Dict[str, Any]) -> User:
         """Create an OAuth account and add it to the user."""

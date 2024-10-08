@@ -71,6 +71,7 @@ class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
     )
     last_login: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     last_active: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    auth_min_time: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     def to_model(self) -> models.User:
         return models.User(
@@ -85,20 +86,7 @@ class User(SQLAlchemyBaseUserTableUUID, CreatedUpdatedMixin, Base):
             is_mfa_active=self.is_mfa_active,
             roles=[role.to_model() for role in self.roles],
             created_at=self.created_at,
-        )
-
-    @staticmethod
-    def from_model(user: models.User) -> "User":
-        return User(
-            id=user.id,
-            email=user.email,
-            hashed_password=user.hashed_password,
-            is_active=user.is_active,
-            is_superuser=user.is_superuser,
-            is_verified=user.is_verified,
-            otp_secret=user.otp_secret,
-            is_mfa_active=user.is_mfa_active,
-            oauth_accounts=[OAuthAccount.from_model(acc) for acc in user.oauth_accounts],
+            auth_min_time=self.auth_min_time,
         )
 
 

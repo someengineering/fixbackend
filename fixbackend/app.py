@@ -25,24 +25,26 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi_users.exceptions import FastAPIUsersException
 from fixcloudutils.logging import setup_logger
+from prometheus_client import Counter
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import select
 from starlette.exceptions import HTTPException
 
 from fixbackend import config, dependencies
-from fixbackend.auth.api_token_router import api_token_router
-from fixbackend.customer_support.router import admin_console_router
 from fixbackend.analytics.router import analytics_router
 from fixbackend.app_dependencies import create_dependencies
+from fixbackend.auth.api_token_router import api_token_router
 from fixbackend.auth.auth_backend import cookie_transport
 from fixbackend.auth.depedencies import refreshed_session_scope
 from fixbackend.auth.oauth_router import github_client, google_client
-from fixbackend.auth.router import auth_router
+from fixbackend.auth.auth_router import auth_router
 from fixbackend.auth.users_router import users_router
 from fixbackend.billing.router import billing_info_router
 from fixbackend.cloud_accounts.router import cloud_accounts_callback_router, cloud_accounts_router
 from fixbackend.config import Config
+from fixbackend.customer_support.router import admin_console_router
 from fixbackend.dependencies import ServiceNames as SN, FixDependency, FixDependencies  # noqa
 from fixbackend.errors import ClientError, NotAllowed, ResourceNotFound, WrongState
 from fixbackend.events.router import websocket_router
@@ -53,11 +55,7 @@ from fixbackend.middleware.x_real_ip import RealIpMiddleware
 from fixbackend.notification.notification_router import notification_router, unsubscribe_router
 from fixbackend.permissions.router import roles_router
 from fixbackend.subscription.router import subscription_router
-from fixbackend.types import Redis
 from fixbackend.workspaces.router import workspaces_router
-from prometheus_client import Counter
-from fastapi_users.exceptions import FastAPIUsersException
-
 
 log = logging.getLogger(__name__)
 API_PREFIX = "/api"
@@ -301,9 +299,7 @@ async def fast_api_app(cfg: Config, deps: FixDependencies) -> FastAPI:
 
     if cfg.args.mode == "app":
         api_router = APIRouter(prefix=API_PREFIX)
-        api_router.include_router(
-            auth_router(cfg, google, github, deps.service(SN.temp_store_redis, Redis)), prefix="/auth", tags=["auth"]
-        )
+        api_router.include_router(auth_router(cfg, google, github, deps), prefix="/auth", tags=["auth"])
         api_router.include_router(workspaces_router(), prefix="/workspaces", tags=["workspaces"])
         api_router.include_router(cloud_accounts_router(deps), prefix="/workspaces", tags=["cloud_accounts"])
         api_router.include_router(inventory_router(deps), prefix="/workspaces")

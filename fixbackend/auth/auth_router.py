@@ -11,16 +11,18 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
+from fastapi import Query
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists, InvalidPasswordException, UserNotExists
 from fastapi_users.router import ErrorCode
 from fastapi_users.router.oauth import generate_state_token
+from fixcloudutils.util import utc
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import BaseOAuth2
 
@@ -39,7 +41,9 @@ from fixbackend.auth.schemas import (
     OAuth2PasswordMFARequestForm,
 )
 from fixbackend.auth.user_manager import UserManagerDependency, UserManager, get_user_manager
+from fixbackend.auth.user_repository import UserRepository
 from fixbackend.config import Config
+from fixbackend.dependencies import FixDependency, ServiceNames as SN
 from fixbackend.ids import UserId
 from fastapi_users import schemas
 from disposable_email_domains import blocklist
@@ -77,12 +81,14 @@ async def get_associate_url(
 
 
 def auth_router(
-    config: Config, google_client: GoogleOAuth2, github_client: GithubOauthClient, redis: Redis
+    config: Config,
+    google_client: GoogleOAuth2,
+    github_client: GithubOauthClient,
+    dependencies: FixDependency,
 ) -> APIRouter:
     router = APIRouter()
-
+    redis = dependencies.service(SN.temp_store_redis, Redis)
     login_rate_limiter = LoginRateLimiter(redis, limit=config.auth_rate_limit_per_minute, window=timedelta(minutes=1))
-
     auth_backend = get_auth_backend(config)
 
     router.include_router(
@@ -242,6 +248,19 @@ def auth_router(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
         return await auth_backend.logout(strategy, user, token)
+
+    @router.put("/jwt/expire")
+    async def jwt_expire(
+        user: AuthenticatedUser,
+        expire_older_than: Optional[datetime] = Query(
+            default=None,
+            description="All tokens older than this timestamp get invalidated. "
+            "If no value is provided, the current time is assumed.",
+        ),
+    ) -> Response:
+        ts_utc = expire_older_than.astimezone(timezone.utc) if expire_older_than else utc()
+        await dependencies.service(SN.user_repo, UserRepository).update_partial(user.id, auth_min_time=ts_utc)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.post("/register", status_code=status.HTTP_201_CREATED, name="register:register")
     async def register(request: Request, user_create: UserCreate, user_manager: UserManagerDependency) -> UserRead:
