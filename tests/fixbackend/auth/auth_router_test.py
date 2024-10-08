@@ -370,7 +370,7 @@ async def test_mfa_flow(
 
 @pytest.mark.asyncio
 async def test_auth_min_time(api_client: AsyncClient, fix_deps: FixDependencies, user_manager: UserManager) -> None:
-    user, login_json, auth_cookie = await register_user(fix_deps, api_client)
+    _, login_json, auth_cookie = await register_user(fix_deps, api_client)
 
     # API can be accessed
     resp = await api_client.get("/api/users/me", cookies={SessionCookie: auth_cookie})
