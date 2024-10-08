@@ -11,7 +11,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import time
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -63,6 +63,10 @@ class FixJWTStrategy(Strategy[User, UserId]):
         try:
             parsed_id = user_manager.parse_id(user_id)
             user = await user_manager.get(parsed_id)
+            if amt := user.auth_min_time:
+                data_at = data.get("at")
+                if data_at is None or (data_at / 1000) < amt.timestamp():
+                    return None
             return user
         except (exceptions.UserNotExists, exceptions.InvalidID):
             return None
@@ -76,6 +80,7 @@ class FixJWTStrategy(Strategy[User, UserId]):
             "sub": sub,
             "token_origin": token_origin,
             "permissions": {str(ws): perms for ws, perms in permissions.items()},
+            "at": int(time.time() * 1000),  # precision: milliseconds
         }
         if self.lifetime_seconds:
             expire = utc() + timedelta(seconds=self.lifetime_seconds)

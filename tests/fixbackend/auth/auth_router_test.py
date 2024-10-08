@@ -11,12 +11,15 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import time
 from typing import Callable, List, Optional, Sequence, Tuple, override
 
 import jwt
 import pytest
 from fastapi import Request, FastAPI
+from fastapi_users.password import PasswordHelper
+from fixcloudutils.types import Json
+from fixcloudutils.util import utc
 from httpx import AsyncClient
 from pyotp import TOTP
 from sqlalchemy import select
@@ -30,7 +33,7 @@ from fixbackend.auth.user_manager import UserManager
 from fixbackend.auth.user_repository import UserRepository
 from fixbackend.auth.user_verifier import AuthEmailSender
 from fixbackend.certificates.cert_store import CertificateStore
-from fixbackend.dependencies import FixDependencies, ServiceNames
+from fixbackend.dependencies import FixDependencies, ServiceNames as SN
 from fixbackend.domain_events.events import Event, UserRegistered, WorkspaceCreated
 from fixbackend.domain_events.publisher import DomainEventPublisher
 from fixbackend.ids import InvitationId, UserId, WorkspaceId
@@ -40,7 +43,6 @@ from fixbackend.workspaces.invitation_repository import InvitationRepository
 from fixbackend.workspaces.models import WorkspaceInvitation
 from fixbackend.workspaces.repository import WorkspaceRepository
 from tests.fixbackend.conftest import InMemoryDomainEventPublisher, InsecureFastPasswordHelper
-from fastapi_users.password import PasswordHelper
 
 
 class InMemoryVerifier(AuthEmailSender):
@@ -133,10 +135,10 @@ async def user_manager(
     password_helper: InsecureFastPasswordHelper,
     fix_deps: FixDependencies,
 ) -> UserManager:
-    verifier = fix_deps.add(ServiceNames.auth_email_sender, InMemoryVerifier())
-    invitation_repo = fix_deps.add(ServiceNames.invitation_repository, InMemoryInvitationRepo())
+    verifier = fix_deps.add(SN.auth_email_sender, InMemoryVerifier())
+    invitation_repo = fix_deps.add(SN.invitation_repository, InMemoryInvitationRepo())
     return fix_deps.add(
-        ServiceNames.user_manager,
+        SN.user_manager,
         UserManager(
             fix_deps.config,
             user_repository,
@@ -149,22 +151,8 @@ async def user_manager(
     )
 
 
-@pytest.mark.asyncio
-async def test_registration_flow(
-    api_client: AsyncClient,
-    fast_api: FastAPI,
-    domain_event_sender: InMemoryDomainEventPublisher,
-    workspace_repository: WorkspaceRepository,
-    user_repository: UserRepository,
-    cert_store: CertificateStore,
-    user_manager: UserManager,
-    jwt_strategy: FixJWTStrategy,
-    fix_deps: FixDependencies,
-) -> None:
-
-    user_manager.password_helper = PasswordHelper()
-    verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
-    role_repo = fix_deps.add(ServiceNames.role_repository, InMemoryRoleRepository())
+async def register_user(fix_deps: FixDependencies, api_client: AsyncClient) -> Tuple[User, Json, str]:
+    verifier = fix_deps.service(SN.auth_email_sender, InMemoryVerifier)
     registration_json = {
         "email": "user@example.com",
         "password": "changeMe123456789",
@@ -197,17 +185,36 @@ async def test_registration_flow(
     assert response_json["is_active"] is True
     assert response_json["id"] == str(user.id)
 
-    # workspace is created
-    workspaces = await workspace_repository.list_workspaces(user)
-    assert len(workspaces) == 1
-    workspace = workspaces[0]
-    await role_repo.add_roles(user.id, workspace.id, Roles.workspace_owner)
-
     # verified can login
     response = await api_client.post("/api/auth/jwt/login", data=login_json)
     assert response.status_code == 204
     auth_cookie = response.cookies.get(SessionCookie)
     assert auth_cookie is not None
+
+    return user, login_json, auth_cookie
+
+
+@pytest.mark.asyncio
+async def test_registration_flow(
+    api_client: AsyncClient,
+    fast_api: FastAPI,
+    domain_event_sender: InMemoryDomainEventPublisher,
+    workspace_repository: WorkspaceRepository,
+    user_repository: UserRepository,
+    cert_store: CertificateStore,
+    user_manager: UserManager,
+    jwt_strategy: FixJWTStrategy,
+    fix_deps: FixDependencies,
+) -> None:
+    user_manager.password_helper = PasswordHelper()
+    role_repo = fix_deps.add(SN.role_repository, InMemoryRoleRepository())
+    user, login_json, auth_cookie = await register_user(fix_deps, api_client)
+
+    # workspace is created
+    workspaces = await workspace_repository.list_workspaces(user)
+    assert len(workspaces) == 1
+    workspace = workspaces[0]
+    await role_repo.add_roles(user.id, workspace.id, Roles.workspace_owner)
 
     # role is set on login
     auth_token = jwt.api_jwt.decode_complete(auth_cookie, options={"verify_signature": False})
@@ -245,7 +252,7 @@ async def test_registration_flow(
     # password can be reset with providing a current one
     response = await api_client.patch(
         "/api/users/me",
-        json={"password": "FooBar123456789123456789", "current_password": registration_json["password"]},
+        json={"password": "FooBar123456789123456789", "current_password": login_json["password"]},
         cookies={SessionCookie: auth_cookie},
     )
     assert response.status_code == 200
@@ -262,7 +269,7 @@ async def test_mfa_flow(
     jwt_strategy: FixJWTStrategy,
     fix_deps: FixDependencies,
 ) -> None:
-    verifier = fix_deps.service(ServiceNames.auth_email_sender, InMemoryVerifier)
+    verifier = fix_deps.service(SN.auth_email_sender, InMemoryVerifier)
 
     # register user
     registration_json = {"email": "user2@example.com", "password": "changeMe123456789"}
@@ -359,3 +366,33 @@ async def test_mfa_flow(
         cookies={SessionCookie: auth_cookie},
     )
     assert response.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_auth_min_time(api_client: AsyncClient, fix_deps: FixDependencies, user_manager: UserManager) -> None:
+    user, login_json, auth_cookie = await register_user(fix_deps, api_client)
+
+    # API can be accessed
+    resp = await api_client.get("/api/users/me", cookies={SessionCookie: auth_cookie})
+    assert resp.status_code == 200
+
+    # Update user's auth_min_time
+    time.sleep(0.01)
+    resp = await api_client.put(
+        "/api/auth/jwt/expire", params=dict(expire_older_than=str(utc())), cookies={SessionCookie: auth_cookie}
+    )
+    assert resp.status_code == 204
+
+    # API cannot be accessed, since JWT is invalid
+    resp = await api_client.get("/api/users/me", cookies={SessionCookie: auth_cookie})
+    assert resp.status_code == 401
+
+    # Login again
+    time.sleep(0.01)
+    response = await api_client.post("/api/auth/jwt/login", data=login_json)
+    assert response.status_code == 204
+    auth_cookie = response.cookies.get(SessionCookie) or ""
+
+    # API can be accessed
+    resp = await api_client.get("/api/users/me", cookies={SessionCookie: auth_cookie})
+    assert resp.status_code == 200

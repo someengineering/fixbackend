@@ -47,6 +47,7 @@ class User(UserOAuthProtocol[UserId, OAuthAccount]):
     oauth_accounts: List[OAuthAccount]
     roles: List[UserRole]
     created_at: datetime
+    auth_min_time: Optional[datetime] = None
 
 
 @frozen

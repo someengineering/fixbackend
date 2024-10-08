@@ -971,7 +971,7 @@ def gcp_service_account_key_repo(async_session_maker: AsyncSessionMaker) -> GcpS
 
 class GcpServiceAccountServiceMock(GcpServiceAccountService):
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # noqa
         pass
 
     async def start(self) -> Any:
@@ -1003,7 +1003,7 @@ def azure_subscription_credentials_repo(
 
 class AzureSubscriptionServiceMock(AzureSubscriptionService):
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # noqa
         pass
 
     async def start(self) -> Any:
@@ -1127,6 +1127,7 @@ async def fix_deps(
     azure_subscription_service: AzureSubscriptionService,
     jwt_service: JwtService,
     redis: Redis,
+    user_repository: UserRepository,
 ) -> FixDependencies:
     # noinspection PyTestUnpassedFixture
     return FixDependencies(
@@ -1153,6 +1154,7 @@ async def fix_deps(
             ServiceNames.azure_subscription_service: azure_subscription_service,
             ServiceNames.jwt_service: jwt_service,
             ServiceNames.temp_store_redis: redis,
+            ServiceNames.user_repo: user_repository,
         }
     )
 
@@ -1224,11 +1226,11 @@ class StripeDummyClient(StripeClient):
         self.requests.append(dict(call="get_prices"))
         return []
 
-    async def checkout_session(self, customer: str, **params: Any) -> str:  # type: ignore
+    async def checkout_session(self, customer: str, **params: Any) -> str:  # type: ignore # noqa
         self.requests.append(dict(call="checkout_session", customer=customer))
         return f"https://localhost/{customer}/checkout"
 
-    async def billing_portal_session(self, customer: str, **params: Any) -> str:  # type: ignore
+    async def billing_portal_session(self, customer: str, **params: Any) -> str:  # type: ignore # noqa
         self.requests.append(dict(call="billing_portal_session", customer=customer))
         return f"https://localhost/{customer}/billing"
 
@@ -1311,7 +1313,7 @@ def email_sender() -> InMemoryEmailSender:
 
 
 class JwtServiceMock(JwtService):
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # noqa
         self.secret = "secret"
 
     async def encode(self, payload: Json, audience: List[str]) -> str:
