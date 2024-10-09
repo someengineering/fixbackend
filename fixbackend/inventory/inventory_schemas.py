@@ -272,6 +272,13 @@ class TimeseriesRequest(BaseModel):
     aggregation: Optional[str] = None
 
 
+class KindUsageRequest(BaseModel):
+    cloud_ids: Optional[List[str]] = Field(default=None, description="The cloud ids to filter by.")
+    account_ids: Optional[List[str]] = Field(default=None, description="The account ids to filter by.")
+    region_ids: Optional[List[str]] = Field(default=None, description="The region ids to filter by.")
+    kinds: Optional[List[str]] = Field(default=None, description="The kinds to filter by.")
+
+
 class KindUsage(BaseModel):
     accounts: int = Field(default=0, description="The number of accounts using this kind.")
     regions: int = Field(default=0, description="The number of regions using this kind.")

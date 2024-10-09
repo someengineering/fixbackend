@@ -38,6 +38,7 @@ from fixbackend.inventory.inventory_schemas import (
     TimeseriesRequest,
     Scatters,
     KindUsage,
+    KindUsageRequest,
 )
 from fixbackend.streaming_response import streaming_response, StreamOnSuccessResponse
 from fixbackend.workspaces.dependencies import UserWorkspaceDependency
@@ -413,8 +414,16 @@ def inventory_router(fix: FixDependencies) -> APIRouter:
             aggregation=ts.aggregation,
         )
 
-    @router.get("/descendant/summary", tags=["search"])
-    async def descendant_summary_account(graph_db: CurrentGraphDbDependency) -> Dict[str, KindUsage]:
-        return await inventory().descendant_summary(graph_db)
+    @router.post("/descendant/summary", tags=["search"])
+    async def descendant_summary_account(
+        graph_db: CurrentGraphDbDependency, request: KindUsageRequest
+    ) -> Dict[str, KindUsage]:
+        return await inventory().descendant_summary(
+            graph_db,
+            request.cloud_ids or [],
+            request.account_ids or [],
+            request.region_ids or [],
+            request.kinds or [],
+        )
 
     return router
