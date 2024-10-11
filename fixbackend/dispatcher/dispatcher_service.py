@@ -488,6 +488,7 @@ class DispatcherService(Service):
         reason: str,
         defer_by: Optional[timedelta] = None,
         retry_failed_for: Optional[timedelta] = None,
+        privileged_account_id: Optional[CloudAccountId] = None,
         **kwargs: Any,
     ) -> None:
         set_cloud_account_id(account.account_id)
@@ -507,6 +508,9 @@ class DispatcherService(Service):
                                 aws_account_id=account.account_id,
                                 aws_account_name=account.final_name(),
                                 aws_role_arn=AwsARN(f"arn:aws:iam::{account.account_id}:role/{role_name}"),
+                                scrape_org_role_arn=AwsARN(
+                                    f"arn:aws:iam::{privileged_account_id}:role/FixCrossAccountAccessRole"
+                                ),
                                 external_id=external_id,
                             )
                         case GcpCloudAccess(service_account_key_id):
@@ -571,6 +575,7 @@ class DispatcherService(Service):
             accounts = healthy_accounts + degraded_accounts
             product_tier = await self.workspace_repository.get_product_tier(workspace_id)
             log.info(f"scheduling next run for workspace {workspace_id}, {len(accounts)} accounts")
+            priveleged_account_id = next((acc.account_id for acc in accounts if acc.privileged), None)
             for account in accounts:
                 reason = "regular_collect"
 
@@ -579,9 +584,14 @@ class DispatcherService(Service):
 
                 if account.cloud == CloudNames.Azure and not azure_graph_scheduled:
                     azure_graph_scheduled = True
-                    await self.trigger_collect(account, reason=reason, collect_microsoft_graph=True)
+                    await self.trigger_collect(
+                        account,
+                        reason=reason,
+                        collect_microsoft_graph=True,
+                        privileged_account_id=priveleged_account_id,
+                    )
                 else:
-                    await self.trigger_collect(account, reason=reason)
+                    await self.trigger_collect(account, reason=reason, privileged_account_id=priveleged_account_id)
 
             for account in degraded_accounts:
                 await self.cloud_account_repo.update(

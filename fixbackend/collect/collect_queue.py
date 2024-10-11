@@ -54,6 +54,7 @@ class AwsAccountInformation(AccountInformation):
     aws_account_id: CloudAccountId
     aws_account_name: Optional[str]
     aws_role_arn: AwsARN
+    scrape_org_role_arn: Optional[AwsARN]
     external_id: ExternalId
 
 
