@@ -49,7 +49,11 @@ async def test_redis_collect_queue(
     assert set(await arq_redis.keys()) == set()
     # enqueue new job
     aws_account = AwsAccountInformation(
-        CloudAccountId("123"), CloudAccountName("test"), AwsARN("arn"), ExternalId(uuid4())
+        CloudAccountId("123"),
+        CloudAccountName("test"),
+        AwsARN("arn"),
+        AwsARN("scarpe_arn"),
+        ExternalId(uuid4()),
     )
     await collect_queue.enqueue(graph_db_access, aws_account, job_id="test")
     assert set(await arq_redis.keys()) == {b"arq:queue", b"arq:job:test"}
@@ -80,6 +84,7 @@ def test_aws_account_info_json() -> None:
         aws_account_id=CloudAccountId("123456789012"),
         aws_account_name=CloudAccountName("test"),
         aws_role_arn=AwsARN("arn:aws:iam::123456789012:role/test"),
+        scrape_org_role_arn=AwsARN("arn:aws:iam::123456789012:role/scrape-test"),
         external_id=external_id,
     )
     assert aws_account_info.to_json() == {
@@ -87,6 +92,7 @@ def test_aws_account_info_json() -> None:
         "aws_account_id": "123456789012",
         "aws_account_name": "test",
         "aws_role_arn": "arn:aws:iam::123456789012:role/test",
+        "scrape_org_role_arn": "arn:aws:iam::123456789012:role/scrape-test",
         "external_id": str(external_id),
     }
 
