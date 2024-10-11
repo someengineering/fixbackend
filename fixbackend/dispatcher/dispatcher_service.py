@@ -508,8 +508,10 @@ class DispatcherService(Service):
                                 aws_account_id=account.account_id,
                                 aws_account_name=account.final_name(),
                                 aws_role_arn=AwsARN(f"arn:aws:iam::{account.account_id}:role/{role_name}"),
-                                scrape_org_role_arn=AwsARN(
-                                    f"arn:aws:iam::{privileged_account_id}:role/FixCrossAccountAccessRole"
+                                scrape_org_role_arn=(
+                                    AwsARN(f"arn:aws:iam::{privileged_account_id}:role/{role_name}")
+                                    if privileged_account_id
+                                    else None
                                 ),
                                 external_id=external_id,
                             )
