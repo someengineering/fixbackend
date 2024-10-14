@@ -946,12 +946,12 @@ class InventoryService(Service):
         if kinds:
             summary = {k: v.for_kinds(kinds) for k, v in summary.items()}
 
-        account_usage: Dict[str, int] = defaultdict(int)
+        account_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         region_usage: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         account_region_usage: Dict[str, Set[str]] = defaultdict(set)
         for account in summary.values():
             for kind, count in account.count.items():
-                account_usage[kind] += count
+                account_usage[kind][account.account_id] += count
             for region, region_kinds in account.regions.items():
                 for kind, count in region_kinds.items():
                     account_region_usage[kind].add(account.account_id)
@@ -964,11 +964,11 @@ class InventoryService(Service):
                 kd.regions = len(regions)
                 kd.resources = sum(regions.values())
         else:
-            for kind, count in account_usage.items():
+            for kind, accounts in account_usage.items():
                 kd = kind_usage[kind]
-                kd.accounts += 1
+                kd.accounts = len(account_usage[kind])
                 kd.regions = len(region_usage[kind])
-                kd.resources += count
+                kd.resources = sum(accounts.values())
 
         for kind, regions in region_usage.items():
             kind_usage[kind].regions = len(regions)
