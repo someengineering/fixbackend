@@ -28,6 +28,7 @@ from fixbackend.sqlalechemy_extensions import GUID
 from fixbackend.types import AsyncSessionMaker
 
 from datetime import datetime
+from fixcloudutils.util import utc
 
 
 class AzureSubscriptionCredentialsEntity(Base, CreatedUpdatedMixin):
@@ -81,6 +82,7 @@ class AzureSubscriptionCredentialsRepository:
                 existing.azure_tenant_id = azure_tenant_id
                 existing.client_id = client_id
                 existing.client_secret = client_secret
+                existing.created_at = utc()  # update to trigger list_created_after
                 model = existing.to_model()
                 await session.commit()
                 return model
@@ -121,7 +123,7 @@ class AzureSubscriptionCredentialsRepository:
     async def list_created_after(self, time: datetime) -> List[AzureSubscriptionCredentials]:
         async with self._session_maker() as session:
             query = select(AzureSubscriptionCredentialsEntity).filter(
-                AzureSubscriptionCredentialsEntity.updated_at > time
+                AzureSubscriptionCredentialsEntity.created_at > time
             )
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
