@@ -145,9 +145,7 @@ class AzureSubscriptionService(Service):
 
         async with asyncio.TaskGroup() as tg:
             for azure_credential in created_less_than_30_minutes_ago:
-                # Only ping accounts that failed access previously
-                if azure_credential.can_access_azure_account is False:
-                    tg.create_task(self._import_subscriptions(azure_credential))
+                tg.create_task(self._import_subscriptions(azure_credential))
 
     async def create_user_app_registration(
         self,
