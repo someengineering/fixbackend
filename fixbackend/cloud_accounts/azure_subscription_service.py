@@ -139,7 +139,8 @@ class AzureSubscriptionService(Service):
 
     async def _ping_new_subscriptions(self) -> None:
         created_less_than_30_minutes_ago = await self.azure_subscriptions_repo.list_created_after(
-            utc() - timedelta(minutes=30)
+            utc() - timedelta(minutes=30),
+            can_access_azure_account=False
         )
 
         async with asyncio.TaskGroup() as tg:
