@@ -120,11 +120,15 @@ class AzureSubscriptionCredentialsRepository:
 
             return entity.to_model()
 
-    async def list_created_after(self, time: datetime, can_access_azure_account: Optional[bool] = None) -> List[AzureSubscriptionCredentials]:
+    async def list_created_after(
+        self, time: datetime, can_access_azure_account: Optional[bool] = None
+    ) -> List[AzureSubscriptionCredentials]:
         async with self._session_maker() as session:
             filters = [AzureSubscriptionCredentialsEntity.created_at > time]
             if can_access_azure_account is not None:
-                filters.append(AzureSubscriptionCredentialsEntity.can_access_azure_account.is_(can_access_azure_account))
+                filters.append(
+                    AzureSubscriptionCredentialsEntity.can_access_azure_account.is_(can_access_azure_account)
+                )
             query = select(AzureSubscriptionCredentialsEntity).filter(*filters)
             result = await session.execute(query)
             return [entity.to_model() for entity in result.scalars()]
