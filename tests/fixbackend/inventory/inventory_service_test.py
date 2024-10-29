@@ -130,10 +130,10 @@ def mocked_answers(
             )
         elif request.url.path == "/graph/fix/search/list" and content.startswith("search is(account) and /metadata.exported_at>="):  # fmt: skip
             return nd_json_response(accounts_json)
-        elif request.url.path == "/graph/fix/search/aggregate" and content.startswith("search /security.has_issues==true"):  # fmt: skip
+        elif request.url.path == "/graph/fix/search/aggregate" and "/security.has_issues==true" in content:  # fmt: skip
             return nd_json_response(
-                [{"group": {"check_id": "aws_c1", "severity": "low", "account_id": "123", "account_name": "t1", "cloud": "aws"}, "count": 8},  # fmt: skip
-                 {"group": {"check_id": "gcp_c2", "severity": "critical", "account_id": "234", "account_name": "t2", "cloud": "gcp"}, "count": 2}]  # fmt: skip
+                [{"group": {"check": "aws_c1", "severity": "low"}, "count": 8},  # fmt: skip
+                 {"group": {"check": "gcp_c2", "severity": "critical"}, "count": 2}]  # fmt: skip
             )
         elif request.url.path == "/graph/fix/node/some_node_id":
             return json_response(azure_virtual_machine_resource_json)
