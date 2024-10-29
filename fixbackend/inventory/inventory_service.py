@@ -589,12 +589,9 @@ class InventoryService(Service):
                 )
 
             async def benchmark_summary(
-                benmark_account_summaries: Dict[BenchmarkId, Dict[CloudAccountId, BenchmarkAccountSummary]]
-            ) -> Tuple[
-                BenchmarkById, Dict[ReportSeverity, Set[SecurityCheckId]], Dict[SecurityCheckId, Set[BenchmarkId]]
-            ]:
+                bench_account_summaries: Dict[BenchmarkId, Dict[CloudAccountId, BenchmarkAccountSummary]]
+            ) -> Tuple[BenchmarkById, Dict[SecurityCheckId, Set[BenchmarkId]]]:
                 summaries: BenchmarkById = {}
-                failed_checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]] = defaultdict(set)
                 benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]] = defaultdict(set)
                 benchmarks = await self.client.benchmarks(db, short=True, with_checks=True)
                 for b in benchmarks:
@@ -607,15 +604,13 @@ class InventoryService(Service):
                         clouds=b["clouds"],
                         description=b["description"],
                         nr_of_checks=len(b["report_checks"]),
-                        account_summary=benmark_account_summaries.get(benchmark_id, {}),
+                        account_summary=bench_account_summaries.get(benchmark_id, {}),
                     )
                     summaries[summary.id] = summary
                     for check in b["report_checks"]:
                         check_id = SecurityCheckId(check["id"])
-                        severity = ReportSeverity(check["severity"])
-                        failed_checks_by_severity[severity].add(check_id)
                         benchmark_by_check_id[check_id].add(benchmark_id)
-                return summaries, failed_checks_by_severity, benchmark_by_check_id
+                return summaries, benchmark_by_check_id
 
             async def timeseries_infected() -> TimeSeries:
                 start = now - timedelta(days=62 if is_free else 14)
@@ -628,13 +623,21 @@ class InventoryService(Service):
                 return TimeSeries(name="infected_resources", start=start, end=now, granularity=granularity, data=data)
 
             async def top_issues(
-                checks_by_severity: Dict[ReportSeverity, Set[SecurityCheckId]],
                 benchmark_by_check_id: Dict[SecurityCheckId, Set[BenchmarkId]],
                 benchmarks: Dict[BenchmarkId, BenchmarkSummary],
                 num: int,
             ) -> List[Json]:
-                check_ids = dict_values_by(checks_by_severity, lambda x: ReportSeverityPriority[x])
-                top = list(islice(check_ids, num))
+                query = (
+                    "aggregate(/security.issues[*].check, /security.issues[*].severity: sum(1) as count): "
+                    "/security.has_issues = true"
+                )
+                async with self.client.aggregate(db, query) as ctx:
+                    all_failing = sorted(
+                        [e async for e in ctx],
+                        key=lambda x: (ReportSeverityPriority[x["group"]["severity"]], x["count"]),
+                        reverse=True,
+                    )
+                top = list(islice((a["group"]["check"] for a in all_failing), num))
                 checks = await self.client.checks(db, check_ids=top)
                 for check in checks:
                     check["benchmarks"] = [
@@ -657,7 +660,7 @@ class InventoryService(Service):
                 return total_score // total_accounts if total_accounts > 0 else 100
 
             (
-                (benchmarks, failed_checks_by_severity, benchmark_by_check_id),
+                (benchmarks, benchmark_by_check_id),
                 vulnerable_changed,
                 compliant_changed,
                 infected_resources_ts,
@@ -669,7 +672,7 @@ class InventoryService(Service):
             )
 
             # get issues for the top 5 issue_ids
-            tops = await top_issues(failed_checks_by_severity, benchmark_by_check_id, benchmarks, num=5)
+            tops = await top_issues(benchmark_by_check_id, benchmarks, num=5)
 
             # sort top changed account by score
             vulnerable_changed.accounts_selection.sort(
