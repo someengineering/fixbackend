@@ -629,7 +629,7 @@ class InventoryService(Service):
             ) -> List[Json]:
                 query = (
                     "aggregate(/security.issues[*].check, /security.issues[*].severity: sum(1) as count): "
-                    "/security.has_issues = true"
+                    "/security.has_issues==true"
                 )
                 async with self.client.aggregate(db, query) as ctx:
                     all_failing = sorted(
