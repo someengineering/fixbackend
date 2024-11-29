@@ -34,7 +34,7 @@ async def test_store_azure_subscription(
     client_secret = "foo_bar"
     azure_credentials = await azure_repo.upsert(workspace.id, azure_tenant_id, client_id, client_secret)
 
-    assert azure_credentials.can_access_azure_account is None
+    assert azure_credentials.can_access_azure_account is False
     assert azure_credentials.tenant_id == workspace.id
     assert azure_credentials.azure_tenant_id == azure_tenant_id
     assert azure_credentials.client_id == client_id
