@@ -83,6 +83,8 @@ class AzureSubscriptionCredentialsRepository:
                 existing.client_id = client_id
                 existing.client_secret = client_secret
                 existing.created_at = utc()  # update to trigger list_created_after
+                existing.updated_at = utc()
+                existing.can_access_azure_account = False
                 model = existing.to_model()
                 await session.commit()
                 return model
@@ -93,6 +95,7 @@ class AzureSubscriptionCredentialsRepository:
                 azure_tenant_id=azure_tenant_id,
                 client_id=client_id,
                 client_secret=client_secret,
+                can_access_azure_account=False,
             )
             session.add(entity)
             await session.commit()

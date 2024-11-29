@@ -838,8 +838,9 @@ class CloudAccountService(Service):
             raise ResourceNotFound("Organization does not exist")
 
         if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
-            log.info("GCP account already exists")
-            return existing
+            if isinstance(existing.state, CloudAccountStates.Configured):
+                log.info("GCP account already exists")
+                return existing
 
         should_be_enabled = await self._should_be_enabled(workspace)
 
@@ -870,8 +871,25 @@ class CloudAccountService(Service):
             last_degraded_scan_started_at=None,
         )
 
-        result = await self.cloud_account_repository.create(account)
-        log.info(f"GCP cloud Account {account_id} created")
+        if existing:
+
+            def set_state(acc: CloudAccount) -> CloudAccount:
+                return evolve(
+                    acc,
+                    state=CloudAccountStates.Configured(
+                        access=GcpCloudAccess(key_id), enabled=should_be_enabled, scan=should_be_enabled
+                    ),
+                    account_name=account_name,
+                    state_updated_at=utc(),
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+
+            result = await self.cloud_account_repository.update(existing.id, set_state)
+            log.info(f"GCP cloud Account {account_id} updated from deleted to configured")
+        else:
+            result = await self.cloud_account_repository.create(account)
+            log.info(f"GCP cloud Account {account_id} created")
 
         await self.domain_events.publish(
             CloudAccountConfigured(
@@ -903,8 +921,9 @@ class CloudAccountService(Service):
             raise ResourceNotFound("Organization does not exist")
 
         if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
-            log.info("Azure account already exists")
-            return existing
+            if isinstance(existing.state, CloudAccountStates.Configured):
+                log.info("Azure account already exists")
+                return existing
 
         should_be_enabled = await self._should_be_enabled(workspace)
 
@@ -935,8 +954,26 @@ class CloudAccountService(Service):
             last_degraded_scan_started_at=None,
         )
 
-        result = await self.cloud_account_repository.create(account)
-        log.info(f"Azure cloud Account {account_id} created")
+        if existing:
+
+            def set_state(acc: CloudAccount) -> CloudAccount:
+                return evolve(
+                    acc,
+                    state=CloudAccountStates.Configured(
+                        access=AzureCloudAccess(subscription_credentials_id),
+                        enabled=should_be_enabled,
+                        scan=should_be_enabled,
+                    ),
+                    state_updated_at=utc(),
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+
+            result = await self.cloud_account_repository.update(existing.id, set_state)
+            log.info(f"Azure cloud Account {account_id} updated from deleted to configured")
+        else:
+            result = await self.cloud_account_repository.create(account)
+            log.info(f"Azure cloud Account {account_id} created")
 
         await self.domain_events.publish(
             CloudAccountConfigured(
