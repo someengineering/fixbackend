@@ -903,7 +903,7 @@ class CloudAccountService(Service):
             raise ResourceNotFound("Organization does not exist")
 
         if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
-            if not isinstance(existing.state, CloudAccountStates.Deleted):
+            if isinstance(existing.state, CloudAccountStates.Configured):
                 log.info("Azure account already exists")
                 return existing
 
