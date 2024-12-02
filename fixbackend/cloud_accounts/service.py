@@ -874,16 +874,19 @@ class CloudAccountService(Service):
         if existing:
 
             def set_state(acc: CloudAccount) -> CloudAccount:
-                return evolve(
+                evolved = evolve(
                     acc,
                     state=CloudAccountStates.Configured(
                         access=GcpCloudAccess(key_id), enabled=should_be_enabled, scan=should_be_enabled
                     ),
                     account_name=account_name,
                     state_updated_at=utc(),
-                    created_at=created_at,
                     updated_at=created_at,
                 )
+                if isinstance(existing.state, CloudAccountStates.Deleted):
+                    evolved = evolve(evolved, created_at=created_at)
+
+                return evolved
 
             result = await self.cloud_account_repository.update(existing.id, set_state)
             log.info(f"GCP cloud Account {account_id} updated from deleted to configured")
@@ -957,7 +960,7 @@ class CloudAccountService(Service):
         if existing:
 
             def set_state(acc: CloudAccount) -> CloudAccount:
-                return evolve(
+                evolved = evolve(
                     acc,
                     state=CloudAccountStates.Configured(
                         access=AzureCloudAccess(subscription_credentials_id),
@@ -965,9 +968,12 @@ class CloudAccountService(Service):
                         scan=should_be_enabled,
                     ),
                     state_updated_at=utc(),
-                    created_at=created_at,
                     updated_at=created_at,
                 )
+                if isinstance(existing.state, CloudAccountStates.Deleted):
+                    evolved = evolve(evolved, created_at=created_at)
+
+                return evolved
 
             result = await self.cloud_account_repository.update(existing.id, set_state)
             log.info(f"Azure cloud Account {account_id} updated from deleted to configured")
