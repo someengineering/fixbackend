@@ -91,14 +91,18 @@ class GcpServiceAccountService(Service):
         return await asyncio.to_thread(blocking_call)
 
     async def update_cloud_accounts(
-        self, projects: List[Dict[str, Any]], tenant_id: WorkspaceId, key_id: GcpServiceAccountKeyId
+        self, projects: List[Dict[str, Any]], tenant_id: WorkspaceId, key_id: GcpServiceAccountKeyId, only_new: bool
     ) -> None:
         for project in projects:
             await self.cloud_account_service.create_gcp_account(
-                workspace_id=tenant_id, account_id=project["projectId"], account_name=project.get("name"), key_id=key_id
+                workspace_id=tenant_id,
+                account_id=project["projectId"],
+                account_name=project.get("name"),
+                key_id=key_id,
+                only_new_accounts=only_new,
             )
 
-    async def _import_projects_from_service_account(self, key: GcpServiceAccountKey) -> None:
+    async def _import_projects_from_service_account(self, key: GcpServiceAccountKey, only_new: bool = False) -> None:
         try:
             projects = await self.list_projects(key.value)
         except MalformedError as e:
@@ -114,7 +118,7 @@ class GcpServiceAccountService(Service):
             await self.service_account_key_repo.update_status(key.id, can_access_sa=False, error=str(e))
             return None
         await self.service_account_key_repo.update_status(key.id, can_access_sa=True)
-        await self.update_cloud_accounts(projects, key.tenant_id, key.id)
+        await self.update_cloud_accounts(projects, key.tenant_id, key.id, only_new=only_new)
 
     async def _ping_new_service_account_keys(self) -> None:
         created_less_than_30_minutes_ago = await self.service_account_key_repo.list_created_after(
@@ -126,10 +130,14 @@ class GcpServiceAccountService(Service):
                 tg.create_task(self._import_projects_from_service_account(key))
 
     async def _service_account_healthcheck(self) -> None:
+        """
+        This will look for any new projects created by the users after we imported the SA keys
+        and import them if we don't know about them yet.
+        """
         older_than_1_hour = await self.service_account_key_repo.list_created_before(
             utc() - timedelta(hours=1), only_valid_keys=True
         )
 
         async with asyncio.TaskGroup() as tg:
             for key in older_than_1_hour:
-                tg.create_task(self._import_projects_from_service_account(key))
+                tg.create_task(self._import_projects_from_service_account(key, only_new=True))

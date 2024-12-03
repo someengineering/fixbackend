@@ -826,6 +826,7 @@ class CloudAccountService(Service):
         account_id: CloudAccountId,
         key_id: GcpServiceAccountKeyId,
         account_name: Optional[CloudAccountName],
+        only_new_accounts: bool = False,
     ) -> CloudAccount:
         """Create a GCP cloud account."""
         set_workspace_id(workspace_id)
@@ -838,7 +839,7 @@ class CloudAccountService(Service):
             raise ResourceNotFound("Organization does not exist")
 
         if existing := await self.cloud_account_repository.get_by_account_id(workspace_id, account_id):
-            if isinstance(existing.state, CloudAccountStates.Configured):
+            if only_new_accounts or isinstance(existing.state, CloudAccountStates.Configured):
                 log.info("GCP account already exists")
                 return existing
 
