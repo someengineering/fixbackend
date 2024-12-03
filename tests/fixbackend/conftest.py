@@ -984,7 +984,7 @@ class GcpServiceAccountServiceMock(GcpServiceAccountService):
         return [{"projectId": "foo", "name": "bar"}]
 
     async def update_cloud_accounts(
-        self, projects: List[Dict[str, Any]], tenant_id: WorkspaceId, key_id: GcpServiceAccountKeyId
+        self, projects: List[Dict[str, Any]], tenant_id: WorkspaceId, key_id: GcpServiceAccountKeyId, only_new: bool
     ) -> None:
         return None
 

@@ -104,6 +104,7 @@ class InMemoryCloudAccountService(CloudAccountService):
         account_id: CloudAccountId,
         key_id: GcpServiceAccountKeyId,
         account_name: Optional[CloudAccountName],
+        only_new_accounts: bool = False,
     ) -> CloudAccount:
         """Create a GCP cloud account."""
         raise NotImplementedError
